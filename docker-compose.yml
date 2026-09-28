@@ -1,0 +1,80 @@
+name: contribfinder
+
+x-backend: &backend
+  build:
+    context: ./apps/backend
+    args:
+      UV_SYNC_ARGS: "--frozen"
+  env_file: .env
+  environment:
+    DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.development}
+    # Container hostnames; override the localhost defaults used by `npm start`.
+    DATABASE_URL: postgres://contribfinder:contribfinder@postgres:5432/contribfinder
+    REDIS_URL: redis://redis:6379/0
+  volumes:
+    - ./apps/backend:/app
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    # pgvector-enabled image so embeddings (Phase 6) need no image change.
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: contribfinder
+      POSTGRES_USER: contribfinder
+      POSTGRES_PASSWORD: contribfinder
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contribfinder -d contribfinder"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    <<: *backend
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+
+  worker:
+    <<: *backend
+    command: celery -A config worker --loglevel=info
+
+  beat:
+    <<: *backend
+    command: celery -A config beat --loglevel=info --schedule /tmp/celerybeat-schedule
+
+  frontend:
+    build: ./apps/frontend
+    env_file: .env
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:

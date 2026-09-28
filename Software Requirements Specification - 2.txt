@@ -1,0 +1,2150 @@
+Software Requirements Specification (SRS)
+GitHub Contribution Discovery & Repository Recommendation Platform
+
+Working Name: ContribFinder
+Document Version: 2.0
+Status: Proposed
+Preferred Stack: Django + Django REST Framework + Python + React + TypeScript
+
+1. Product Overview
+1.1 Problem
+
+Developers interested in open-source contribution frequently struggle to:
+
+Find repositories aligned with their technical skills.
+Discover projects that are actively accepting contributions.
+Determine whether their experience is appropriate for a project.
+Find suitable issues among thousands of repositories.
+Understand an unfamiliar repository quickly.
+Identify projects matching their interests even when terminology differs.
+Distinguish beginner-friendly opportunities from issues requiring substantial domain knowledge.
+Determine why a particular repository or issue is relevant to them.
+
+ContribFinder addresses this by building a structured developer profile from GitHub data and using it to discover, analyze, and rank potential open-source contribution opportunities.
+
+1.2 Core Concept
+
+The system follows this pipeline:
+
+GitHub Account
+
+↓
+
+GitHub Data Acquisition
+
+Profile
+Profile README
+Repositories
+Languages
+Topics
+Dependencies
+Public contribution activity
+
+↓
+
+Developer Profile Construction
+
+↓
+
+Skill & Interest Extraction
+
+↓
+
+Repository Candidate Generation
+
+↓
+
+Repository Analysis
+
+↓
+
+Candidate Filtering
+
+↓
+
+Repository Ranking
+
+↓
+
+Recommendation Explanations
+
+↓
+
+Issue Candidate Generation
+
+↓
+
+Issue Matching
+
+↓
+
+Personalized Contribution Opportunities
+
+The system should answer:
+
+"Given this developer's demonstrated skills, experience, interests, and contribution history, which open-source projects and contribution opportunities are relevant for them?"
+
+It should not merely search for repositories containing keywords found in the developer's README.
+
+2. Product Goals
+2.1 Primary Goals
+
+The system shall:
+
+Allow users to authenticate using GitHub.
+Retrieve relevant GitHub profile information.
+Retrieve and analyze the user's profile README where available.
+Analyze the user's public repositories.
+Analyze programming languages used by the user.
+Analyze repository topics and dependencies where available.
+Analyze relevant public contribution activity.
+Construct a structured developer profile.
+Extract technical skills and interests.
+Assign confidence to detected skills based on evidence.
+Discover potentially relevant open-source repositories.
+Analyze candidate repositories.
+Rank repositories based on developer-project compatibility.
+Explain why repositories were recommended.
+Identify potentially relevant contribution opportunities.
+Allow users to filter recommendations.
+Allow users to save or dismiss recommendations.
+Collect user interaction feedback.
+Periodically refresh GitHub-derived information.
+Allow users to delete their ContribFinder data.
+3. Secondary Goals
+
+Future versions may:
+
+Recommend specific "good first issue" opportunities.
+Recommend documentation contributions.
+Recommend testing opportunities.
+Estimate contribution difficulty.
+Detect inactive or archived projects.
+Analyze repository contribution practices.
+Track contribution progress.
+Notify users about newly relevant issues.
+Generate personalized contribution plans.
+Explain unfamiliar repository components.
+Recommend projects based on learning goals.
+Recommend projects based on career-development goals.
+Learn personalized ranking preferences from user feedback.
+4. Non-Goals
+
+The MVP shall not:
+
+Automatically create pull requests.
+Automatically modify repositories.
+Automatically submit GitHub issues.
+Automatically communicate with maintainers.
+Guarantee that a contribution will be accepted.
+Guarantee that a repository is actively maintained.
+Predict employment or hiring outcomes.
+Predict whether a developer will successfully contribute.
+Fully understand arbitrary source code.
+Replace GitHub's repository or issue-management functionality.
+Automatically make decisions on behalf of the developer.
+5. Target Users
+5.1 Beginner Contributor
+
+Typical profile:
+
+Python
+Django
+JavaScript
+
+Goal:
+
+Find beginner-friendly projects where existing skills can be used to make a first contribution.
+
+5.2 Experienced Developer
+
+Typical profile:
+
+Python
+Django
+PostgreSQL
+Docker
+AWS
+
+Goal:
+
+Find projects where existing backend experience could be useful.
+
+5.3 Technology Explorer
+
+Typical profile:
+
+React
+TypeScript
+
+Goal:
+
+Find projects that provide opportunities to contribute while learning related technologies.
+
+5.4 Interest-Driven Developer
+
+Profile README indicates interests such as:
+
+AI
+Developer tooling
+LLMs
+Python
+
+Goal:
+
+Find repositories matching these interests even when the repositories use different terminology.
+
+6. Product Principles
+
+The system should follow these principles.
+
+6.1 Evidence Over Keywords
+
+A technology mentioned once in a README should not be treated the same as a technology repeatedly used in repositories and contributions.
+
+6.2 Explainability Over Black-Box Ranking
+
+Recommendations should explain the evidence behind them.
+
+6.3 Candidate Generation and Ranking Are Separate
+
+The system should first identify potentially relevant repositories and then rank them.
+
+6.4 Activity Signals Are Not Absolute Repository Health
+
+The system should present activity indicators rather than declaring a repository "good" or "bad."
+
+6.5 Ranking Is Not a Guarantee
+
+A recommendation score represents algorithmic relevance, not probability of successful contribution.
+
+6.6 User Control
+
+Users should be able to:
+
+Filter recommendations.
+Save recommendations.
+Dismiss recommendations.
+Refresh their profile.
+Disconnect GitHub.
+Delete their data.
+7. High-Level Architecture
+
+The system shall initially use a modular monolith.
+
+                    ┌─────────────────────┐
+                    │     React App       │
+                    │ React + TypeScript  │
+                    └──────────┬──────────┘
+                               │
+                         HTTPS / REST
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   Django REST API   │
+                    │                     │
+                    │ Authentication      │
+                    │ Developer Profiles  │
+                    │ Repositories        │
+                    │ Issues              │
+                    │ Recommendations     │
+                    │ Feedback            │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+       PostgreSQL           Redis          GitHub API
+              │                │
+              │                ▼
+              │          Celery Workers
+              │                │
+              │        ┌───────┴────────┐
+              │        │                │
+              ▼        ▼                ▼
+       Application   GitHub Sync    AI/NLP Services
+          Data
+              │
+              ▼
+       Matching / Ranking
+8. Technology Stack
+Area	Technology
+Language	Python 3.12+
+Backend	Django
+API	Django REST Framework
+Background Processing	Celery
+Queue / Cache	Redis
+Database	PostgreSQL
+Vector Search	pgvector
+Frontend	React
+Frontend Language	TypeScript
+Build Tool	Vite
+Server State	TanStack Query
+Client State	Zustand
+Styling	Tailwind CSS
+UI	shadcn/ui
+Frontend Validation	Zod
+AI Structured Output	Pydantic
+API Schema	OpenAPI
+GitHub Integration	GitHub API
+Embeddings	Embedding Model
+Backend Testing	pytest / pytest-django
+Frontend Testing	Vitest / React Testing Library
+E2E Testing	Playwright
+Containers	Docker
+CI/CD	GitHub Actions
+Error Monitoring	Sentry
+Metrics	Prometheus / Grafana
+9. GitHub Authentication
+9.1 Authentication Flow
+
+The user shall be able to authenticate using GitHub.
+
+Flow:
+
+User
+ ↓
+Continue with GitHub
+ ↓
+GitHub Authorization
+ ↓
+Authorization Callback
+ ↓
+Django
+ ↓
+Authenticated Application Session
+
+GitHub credentials or access tokens shall never be exposed to the React application.
+
+10. GitHub Data Acquisition
+
+The system may collect relevant GitHub information including:
+
+User Profile
+GitHub ID
+Username
+Display name
+Bio
+Company
+Location where available
+Blog/website
+Followers
+Following
+Public repository count
+Account creation date
+Repository Data
+Repository ID
+Owner
+Name
+Description
+URL
+Default branch
+Stars
+Forks
+Languages
+Topics
+License
+Creation date
+Last update
+Last push
+Archived status
+Open issue count
+Contribution Data
+
+Where available and permitted:
+
+Commits
+Pull requests
+Issues
+Reviews
+Repository participation
+Contribution frequency
+11. Profile README
+
+The system shall attempt to identify and retrieve the user's GitHub profile README.
+
+The expected convention is the user's profile repository matching their GitHub username.
+
+The system shall:
+
+Detect whether the profile README exists.
+Retrieve its contents where accessible.
+Parse relevant sections.
+Extract technical skills.
+Extract interests.
+Extract domains.
+Extract experience-related signals.
+Preserve the original README separately from derived data.
+
+The absence of a profile README must not prevent the user from using the system.
+
+12. Developer Profile
+
+The system shall construct a normalized developer profile.
+
+The profile may contain:
+
+Summary
+Skills
+Programming languages
+Frameworks
+Databases
+Cloud technologies
+DevOps technologies
+Developer tools
+Domains
+Interests
+Experience signals
+Preferred project size
+Preferred contribution difficulty
+Embedding representation
+
+The system shall distinguish between raw evidence and derived conclusions.
+
+13. Skill Extraction
+
+Skill extraction shall use multiple evidence sources.
+
+Evidence Sources
+Profile README
+
+Explicit skill declarations.
+
+Repository Languages
+
+Languages repeatedly used across repositories.
+
+Repository Topics
+
+Technologies and domains represented by repository topics.
+
+Dependencies
+
+Relevant dependencies from:
+
+Python dependency files
+JavaScript package files
+Go modules
+Rust manifests
+Java build files
+Other supported ecosystem manifests
+Contribution History
+
+Potentially stronger evidence:
+
+Commits
+Pull requests
+Reviews
+Repeated repository contributions
+14. Skill Evidence Model
+
+Evidence strength shall be configurable.
+
+Conceptually:
+
+Evidence	Relative Strength
+README mention	Low
+Repository topic	Low–Medium
+Repository language	Medium
+Dependency usage	Medium–High
+Commit history	High
+Pull request	Very High
+Repeated contribution	Very High
+
+These values shall be configuration rather than permanent product rules.
+
+The system shall avoid treating an isolated README mention as equivalent to sustained practical usage.
+
+15. Skill Confidence
+
+Each detected skill shall have:
+
+Skill name
+Confidence
+Evidence sources
+Supporting repositories
+Supporting contributions where applicable
+Last observed date
+
+Example conceptual representation:
+
+Python
+Confidence: High
+
+Evidence:
+- Profile README
+- 8 repositories
+- Dependency usage
+- Multiple pull requests
+
+The UI should emphasize evidence rather than presenting confidence as an objective measurement of actual expertise.
+
+16. Interest Extraction
+
+The system shall identify interests from:
+
+Profile README
+Repository descriptions
+Repository topics
+Repository selection
+Contribution activity
+Semantic analysis of developer-authored content where appropriate
+
+Interests may include:
+
+AI
+Developer tooling
+Open source
+Web development
+Databases
+Infrastructure
+Security
+Data engineering
+Mobile development
+
+The system should support semantic relationships rather than requiring exact keyword matches.
+
+17. Experience-Level Signals
+
+The system may estimate an approximate contribution experience category using observable evidence.
+
+Possible categories:
+
+Beginner
+Intermediate
+Experienced
+
+This should be treated as an internal matching signal, not a definitive assessment of developer ability.
+
+The system should use multiple signals rather than relying on repository count alone.
+
+18. Repository Discovery
+
+Repository discovery shall use multiple candidate-generation strategies.
+
+Potential sources:
+
+GitHub repository search
+Languages
+Topics
+Developer skills
+Developer interests
+Previously indexed repositories
+Similar repositories
+Repository metadata
+Semantic search
+
+The system should not attempt to index the entire GitHub repository universe.
+
+19. Candidate Generation
+
+The recommendation pipeline shall separate:
+
+Candidate Generation
+
+Find potentially relevant repositories.
+
+↓
+
+Candidate Filtering
+
+Remove repositories that are clearly unsuitable.
+
+↓
+
+Candidate Ranking
+
+Rank remaining repositories based on relevance.
+
+This architecture allows candidate-generation strategies and ranking algorithms to evolve independently.
+
+20. Repository Candidate Tracking
+
+The system should track why a repository entered a developer's candidate pool.
+
+Possible discovery sources:
+
+Language search
+Topic search
+Skill search
+Interest search
+Semantic search
+Similar repository
+Previously interacted repository
+
+This information should be available for debugging and recommendation explainability.
+
+21. Repository Analysis
+
+For each candidate repository, the system may collect:
+
+Owner
+Name
+Description
+URL
+Default branch
+Stars
+Forks
+Open issues
+Primary language
+Language distribution
+Topics
+License
+Creation date
+Update date
+Last push
+Archived state
+README
+CONTRIBUTING documentation
+CODE_OF_CONDUCT documentation
+Issue templates
+Pull request activity
+Contributor activity
+Release activity
+22. Repository Activity Signals
+
+The system should calculate observable activity signals such as:
+
+Recent commits
+Recent pull requests
+Recent issues
+Issue response activity
+Recent releases
+Recent contributor activity
+Last push
+Contributor count
+Open issue count
+Archived status
+
+The system should avoid reducing these signals to a universal declaration such as:
+
+"This is a healthy repository."
+
+Instead, it may display:
+
+"Recently active"
+
+or:
+
+"High recent contribution activity."
+
+23. Repository Lifecycle
+
+Repositories shall have an internal processing lifecycle:
+
+DISCOVERED
+    ↓
+FETCHING
+    ↓
+ANALYZED
+    ↓
+EMBEDDED
+    ↓
+INDEXED
+    ↓
+RECOMMENDABLE
+
+When data becomes stale:
+
+RECOMMENDABLE
+    ↓
+STALE
+    ↓
+REFRESHING
+    ↓
+RECOMMENDABLE
+
+Failures should be represented separately rather than silently treated as missing data.
+
+24. Repository Staleness
+
+Repository information shall have refresh timestamps.
+
+Different data types may have different refresh frequencies.
+
+For example:
+
+Data	Suggested Refresh
+Repository metadata	Hours
+Issues	Minutes–Hours
+Activity signals	Hours
+README	Longer interval
+Embeddings	When source content changes
+
+These are starting points rather than fixed requirements.
+
+25. Contribution Opportunity Detection
+
+The system should identify potentially relevant contribution opportunities from repository issues.
+
+Relevant issue signals may include:
+
+good first issue
+help wanted
+documentation
+bug
+enhancement
+refactoring
+testing
+frontend
+backend
+performance
+security
+infrastructure
+
+The system should not assume that a GitHub label alone accurately describes difficulty or contribution suitability.
+
+26. Issue Analysis
+
+Each analyzed issue may contain:
+
+Title
+Description
+Labels
+State
+Repository
+Creation date
+Update date
+URL
+Detected technologies
+Contribution type
+Difficulty estimate
+Developer match
+Explanation
+27. Issue Difficulty
+
+The system may classify issues as:
+
+Beginner
+Intermediate
+Advanced
+Unknown
+
+Difficulty should be derived from multiple signals:
+
+Labels
+Issue description
+Technical requirements
+Expected scope
+Repository context
+Historical contribution patterns where available
+
+If insufficient evidence exists, the system should return:
+
+Difficulty: Unknown
+
+rather than inventing a classification.
+
+28. Recommendation Engine
+
+The recommendation engine shall use a hybrid architecture.
+
+Stage 1 — Candidate Generation
+
+Identify potentially relevant repositories.
+
+Stage 2 — Deterministic Matching
+
+Calculate signals such as:
+
+Skill match
+Language match
+Framework match
+Interest match
+Difficulty fit
+Activity signals
+Contribution opportunity signals
+Stage 3 — Semantic Matching
+
+Use embeddings for:
+
+Developer profile
+Repository descriptions
+README content
+Issues
+Interests
+Stage 4 — Ranking
+
+Combine the signals using configurable weights.
+
+29. Recommendation Signals
+
+A recommendation may use:
+
+Signal	Description
+Skill Match	Compatibility with demonstrated skills
+Language Match	Programming language overlap
+Framework Match	Framework/tool overlap
+Interest Match	Alignment with stated or inferred interests
+Semantic Match	Meaning-level similarity
+Difficulty Fit	Compatibility with contribution experience
+Activity Signal	Recent observable repository activity
+Issue Fit	Availability of potentially relevant contribution opportunities
+
+No single signal should automatically determine the recommendation.
+
+30. Recommendation Configuration
+
+Recommendation weights shall be configurable.
+
+The initial values are experimental and must not be treated as product truth.
+
+The system should support:
+
+Global default weights
+Versioned scoring configurations
+Experimentation
+Evaluation against benchmark datasets
+Future user-specific weighting
+
+Every generated recommendation should record which scoring configuration produced it.
+
+31. Recommendation Score
+
+The score shall be treated as an internal ranking signal.
+
+The UI should avoid implying:
+
+"This repository is 87% suitable for you."
+
+Instead, it may display:
+
+"Strong match"
+
+and provide the evidence behind that classification.
+
+If a numeric score is exposed, it should be clearly described as a ranking score rather than probability, expertise, or contribution success.
+
+32. Recommendation Explanation
+
+Every recommendation shall contain machine-readable reasons.
+
+Possible reason types:
+
+Skill
+Language
+Framework
+Interest
+Domain
+Activity
+Difficulty
+Issue availability
+
+Example:
+
+Why this repository matches:
+
+• Python is strongly represented in your development history.
+• The project uses Django.
+• The repository aligns with your developer-tooling interest.
+• Several potentially relevant backend issues are available.
+
+The explanation should be generated from actual scoring evidence.
+
+The system must not invent reasons that were not supported by the recommendation pipeline.
+
+33. Semantic Matching
+
+Embeddings shall be used to capture semantic relationships.
+
+For example:
+
+Developer interest:
+
+Developer productivity
+
+Repository:
+
+Tools for improving engineering workflows
+
+may be considered semantically related even without exact keyword overlap.
+
+Embeddings should complement deterministic signals rather than replace them.
+
+34. AI / LLM Responsibilities
+
+LLMs may be used for:
+
+README skill extraction
+Interest extraction
+Domain extraction
+README summarization
+Issue classification
+Contribution-type classification
+Difficulty analysis
+Repository semantic description
+
+LLMs should not independently determine the final recommendation ranking.
+
+35. Structured AI Output
+
+AI-generated structured information shall be validated before being stored.
+
+Possible output categories:
+
+Skills
+Frameworks
+Interests
+Domains
+Contribution types
+Difficulty
+Repository summary
+
+Invalid or incomplete AI output shall not be treated as authoritative.
+
+36. AI Failure Handling
+
+The system shall tolerate:
+
+LLM timeout
+Invalid structured output
+API failure
+Rate limiting
+Embedding failure
+Empty response
+Malformed content
+
+AI failure must not make the entire recommendation system unavailable.
+
+The deterministic recommendation layer should continue operating where possible.
+
+37. Developer Embedding
+
+A developer embedding should represent relevant information such as:
+
+Skills
+Interests
+Domains
+Technical background
+Relevant repository context
+
+The embedding should be regenerated when materially relevant profile information changes.
+
+38. Repository Embedding
+
+Repository embeddings may incorporate:
+
+Repository description
+README
+Topics
+Primary technologies
+Contribution documentation
+
+Large source-code analysis is outside the MVP.
+
+39. Issue Embedding
+
+Issue embeddings may incorporate:
+
+Title
+Description
+Labels
+Detected technology
+Contribution type
+
+Issue embeddings should be regenerated when materially relevant issue content changes.
+
+40. Database
+
+PostgreSQL shall be the primary database.
+
+It shall store:
+
+Application users
+GitHub accounts
+Developer profiles
+Skills
+Developer skill evidence
+Interests
+Repositories
+Repository metadata
+Repository languages
+Repository topics
+Issues
+Recommendations
+Recommendation reasons
+Feedback
+Synchronization jobs
+Processing metadata
+41. Vector Search
+
+pgvector shall initially be used for vector storage and similarity search.
+
+A separate vector database is not required for the initial version.
+
+A dedicated vector/search system may be considered if scale or query requirements justify it.
+
+42. Core Domain Entities
+
+The primary entities shall include:
+
+User
+ │
+ ├── GitHubAccount
+ │
+ └── DeveloperProfile
+       │
+       ├── DeveloperSkill
+       ├── DeveloperInterest
+       └── DeveloperEmbedding
+
+Repository
+ │
+ ├── RepositoryLanguage
+ ├── RepositoryTopic
+ ├── Issue
+ ├── RepositorySnapshot
+ └── RepositoryEmbedding
+
+DeveloperProfile
+       │
+       ▼
+RepositoryCandidate
+       │
+       ▼
+Recommendation
+       │
+       ├── RecommendationReason
+       └── RecommendationFeedback
+43. GitHub Account Data
+
+GitHub authentication data shall be isolated from general developer-profile information.
+
+Sensitive authentication information must:
+
+Never be returned to the frontend.
+Never be included in logs.
+Never be placed in URLs.
+Be encrypted at rest where appropriate.
+Use minimum necessary permissions.
+Be deleted/revoked when the user disconnects GitHub where applicable.
+44. Synchronization
+
+GitHub API requests shall primarily occur through background synchronization.
+
+The application should not depend on live GitHub API calls for every dashboard request.
+
+Preferred architecture:
+
+GitHub
+   ↓
+Synchronization Worker
+   ↓
+PostgreSQL
+   ↓
+Recommendation Engine
+   ↓
+API
+   ↓
+React
+45. Synchronization Jobs
+
+The system shall support background jobs for operations such as:
+
+Profile synchronization
+Repository synchronization
+README synchronization
+Language synchronization
+Topic synchronization
+Issue synchronization
+Developer profile analysis
+Embedding generation
+Recommendation generation
+Recommendation refresh
+46. Synchronization Job Tracking
+
+The system should maintain job metadata including:
+
+Job type
+Status
+Start time
+Completion time
+Attempt count
+Error information
+Relevant metadata
+
+Possible states:
+
+PENDING
+RUNNING
+COMPLETED
+FAILED
+RETRYING
+CANCELLED
+47. GitHub API Resilience
+
+The system shall account for GitHub API limitations.
+
+It should support:
+
+Pagination
+Caching
+Conditional requests
+Rate-limit monitoring
+Retry handling
+Exponential backoff
+Timeout handling
+Appropriate concurrency limits
+Secondary-rate-limit handling
+
+Repeated requests after rate limiting should be avoided.
+
+48. Caching
+
+Redis may be used for:
+
+GitHub API caching
+Rate-limit information
+Temporary job state
+Session/cache data
+Short-lived recommendation data
+
+Caching policies should vary according to data volatility.
+
+49. API
+
+Base API:
+
+/api/v1/
+
+Primary API areas:
+
+Authentication
+Developer Profile
+Repositories
+Issues
+Recommendations
+Feedback
+Synchronization
+
+Example endpoint categories:
+
+/auth/*
+/profile/*
+/repositories/*
+/issues/*
+/recommendations/*
+/feedback/*
+/sync/*
+
+The exact endpoint structure should be finalized during API design.
+
+50. API Design Requirements
+
+The API shall:
+
+Use consistent response structures.
+Provide pagination where appropriate.
+Support filtering.
+Validate input.
+Return meaningful error responses.
+Enforce authorization.
+Avoid exposing sensitive GitHub information.
+Provide OpenAPI documentation.
+51. Frontend
+
+The React application shall provide:
+
+GitHub authentication
+Onboarding
+Profile analysis status
+Developer profile
+Recommendation dashboard
+Repository details
+Issue details
+Filters
+Saved repositories
+Feedback controls
+Synchronization status
+Account/data controls
+52. Onboarding
+
+After authentication:
+
+Analyzing your GitHub profile...
+
+✓ Profile
+✓ Profile README
+✓ Repositories
+✓ Languages
+✓ Topics
+
+Building your developer profile...
+
+The user should not be required to keep the browser request open while lengthy background processing occurs.
+
+53. Dashboard
+
+The dashboard should show:
+
+Developer Profile
+Primary skills
+Languages
+Frameworks
+Interests
+Evidence
+Recommendations
+Recommended repositories
+Match explanation
+Relevant contribution opportunities
+Activity signals
+Synchronization
+Last synchronized
+Current synchronization status
+Refresh option
+54. Repository Recommendation Card
+
+Each recommendation should contain:
+
+Repository name
+Owner
+Description
+Technologies
+Match classification
+Explanation
+Relevant issue count
+Activity indicators
+Save action
+Repository link
+Issue link where applicable
+
+The card should prioritize why the repository is relevant rather than merely displaying a numerical score.
+
+55. Filters
+
+Users shall be able to filter recommendations by:
+
+Technology
+Python
+JavaScript
+TypeScript
+Go
+Rust
+Java
+C++
+Other supported languages
+Framework
+Django
+React
+Next.js
+FastAPI
+Vue
+Spring
+Other supported frameworks
+Difficulty
+Beginner
+Intermediate
+Advanced
+Unknown
+Contribution Type
+Code
+Documentation
+Testing
+Bug fixes
+Features
+DevOps
+Design
+Repository Activity
+Recently active
+Moderately active
+Any
+Repository Size
+Small
+Medium
+Large
+56. Repository Details Page
+
+The repository page shall contain:
+
+Overview
+Why it matches the user
+Technologies
+Topics
+Activity signals
+Contribution guidelines
+README summary
+Relevant issues
+Similar repositories
+GitHub link
+57. Issue Details
+
+The issue page shall contain:
+
+Issue title
+Repository
+Labels
+Description
+Contribution type
+Difficulty classification
+Developer match signals
+Explanation
+GitHub link
+
+The UI should clearly distinguish between:
+
+GitHub-provided information
+
+and:
+
+ContribFinder-generated analysis.
+
+58. Saved Recommendations
+
+Users shall be able to save repositories.
+
+Saved repositories should include:
+
+Repository reference
+Save timestamp
+Optional user notes in a future version
+Current repository status
+Current recommendation information
+
+Saving should not imply that the repository remains suitable indefinitely.
+
+59. Feedback
+
+The system should capture recommendation interactions such as:
+
+Viewed
+Saved
+Dismissed
+Opened repository
+Opened issue
+
+Future signals may include:
+
+Contributed
+Pull request created
+Pull request merged
+
+Feedback should be stored independently from the recommendation itself.
+
+60. Feedback and Learning
+
+Initially, feedback should be used primarily for:
+
+Analytics
+Evaluation
+Recommendation improvement
+
+The system should not immediately assume:
+
+"User clicked repository → user likes this repository."
+
+Interactions are noisy signals.
+
+Later versions may use feedback for personalized ranking.
+
+61. Recommendation Evaluation
+
+A fixed evaluation dataset should be created.
+
+Example:
+
+Developer A
+Developer B
+Developer C
+...
+
+Each developer should have manually evaluated relevant repository/issue candidates.
+
+Evaluation metrics may include:
+
+Precision@5
+Precision@10
+Recall@10
+MRR
+NDCG
+
+Recommendation changes should be evaluated against this dataset before being considered improvements.
+
+62. Ranking Experiments
+
+Recommendation configurations should be versioned.
+
+For example:
+
+Ranking Configuration A
+Ranking Configuration B
+Ranking Configuration C
+
+The system should record which configuration generated a recommendation.
+
+This enables comparison of ranking approaches without losing historical context.
+
+63. Recommendation Freshness
+
+Recommendations shall have a generated timestamp.
+
+Recommendations may become stale when:
+
+Repository activity changes.
+Issues close.
+Developer skills change.
+Repository metadata changes.
+Relevant content changes.
+
+The system should regenerate recommendations when materially relevant information changes.
+
+64. Security
+
+The application shall implement:
+
+GitHub OAuth security
+Secure session management
+HTTP-only cookies where applicable
+CSRF protection
+CORS restrictions
+Input validation
+Authorization checks
+Rate limiting
+Security headers
+Secure secret management
+Token encryption
+Audit logging for sensitive actions
+65. Privacy
+
+The system shall clearly communicate what data it stores.
+
+Potential stored information includes:
+
+GitHub account identifier
+Username
+Profile information
+Repository metadata
+README content
+Public contribution information
+Derived developer profile
+Recommendation history
+User feedback
+66. Data Deletion
+
+Users shall be able to:
+
+Disconnect GitHub.
+Delete GitHub-derived data.
+Delete their ContribFinder account.
+
+Where appropriate, disconnecting GitHub should trigger:
+
+Disconnect GitHub
+       ↓
+Revoke authorization where supported
+       ↓
+Delete GitHub-derived application data
+       ↓
+Retain only data necessary for account operation
+
+The exact retention policy should be documented separately.
+
+67. Observability
+
+The system should provide visibility into:
+
+API latency
+GitHub API errors
+Rate limits
+Celery failures
+Synchronization failures
+Recommendation generation time
+LLM failures
+Embedding failures
+Database performance
+Search performance
+
+Recommended tooling:
+
+Structured logging
+Sentry
+Prometheus
+Grafana
+68. Testing
+Backend
+Unit tests
+Service tests
+API tests
+Repository matching tests
+Recommendation tests
+Synchronization tests
+GitHub integration tests
+
+Recommended tools:
+
+pytest
+pytest-django
+factory_boy
+Frontend
+Component tests
+Hook tests
+API integration tests
+UI behavior tests
+
+Recommended tools:
+
+Vitest
+React Testing Library
+End-to-End
+
+Use Playwright for:
+
+GitHub authentication flow
+Onboarding
+Dashboard
+Filtering
+Repository details
+Issue details
+Save/dismiss behavior
+69. API / Frontend Type Synchronization
+
+The backend shall expose an OpenAPI schema.
+
+TypeScript types should preferably be generated from the API specification rather than manually duplicated.
+
+Flow:
+
+Django REST API
+       ↓
+OpenAPI
+       ↓
+Generated TypeScript Types
+       ↓
+React
+
+This reduces frontend/backend contract drift.
+
+70. Deployment
+
+Initial production architecture:
+
+                  CDN / Edge
+                      │
+              ┌───────┴───────┐
+              ▼               ▼
+        React Frontend    Django API
+                              │
+                    ┌─────────┼─────────┐
+                    ▼         ▼         ▼
+                PostgreSQL  Redis    Celery
+                                         │
+                                         ▼
+                                    GitHub API
+
+Potential infrastructure:
+
+Frontend: Vercel / Cloudflare Pages
+Backend: Render / Railway / Fly.io / AWS
+PostgreSQL: Managed PostgreSQL
+Redis: Managed Redis
+Object storage: S3-compatible storage
+
+Infrastructure should remain replaceable.
+
+71. Docker
+
+Docker should be used from the beginning to provide a reproducible development environment.
+
+Development environment should support:
+
+Backend
+Frontend
+PostgreSQL
+Redis
+Celery worker
+72. CI/CD
+
+GitHub Actions shall run automated checks on pull requests.
+
+Backend:
+
+Linting
+Type checking
+Unit tests
+API tests
+Security checks
+
+Frontend:
+
+Linting
+Formatting
+Type checking
+Component tests
+Build
+
+E2E tests may run on staging or selected CI workflows.
+
+Deployment pipeline:
+
+Pull Request
+     ↓
+Validation
+     ↓
+Merge
+     ↓
+Staging
+     ↓
+Production
+73. Repository Structure
+
+The project should use a monorepo.
+
+contrib-finder/
+│
+├── apps/
+│   ├── backend/
+│   └── frontend/
+│
+├── packages/
+│   └── shared-types/
+│
+├── infrastructure/
+│   ├── docker/
+│   └── terraform/
+│
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   └── product/
+│
+├── .github/
+│   └── workflows/
+│
+├── docker-compose.yml
+└── README.md
+
+The shared-types package should only be introduced if genuinely useful; generated API types may make a separate package unnecessary initially.
+
+74. Backend Architecture
+
+The Django application should be organized around domain boundaries.
+
+Potential applications:
+
+accounts
+github
+developers
+repositories
+issues
+recommendations
+feedback
+embeddings
+
+Business logic should reside primarily in services/domain modules rather than Django views.
+
+75. GitHub Integration Layer
+
+GitHub integration should have a dedicated service layer.
+
+Responsibilities include:
+
+Authentication
+API requests
+Pagination
+Rate-limit handling
+Caching
+Conditional requests
+Error handling
+Data normalization
+
+The rest of the application should not directly depend on GitHub API implementation details.
+
+This makes the integration easier to test and replace.
+
+76. AI/NLP Service Layer
+
+AI functionality should be isolated behind service interfaces.
+
+Responsibilities include:
+
+Skill extraction
+Interest extraction
+Repository analysis
+Issue classification
+Embedding generation
+Summarization
+
+This prevents AI provider-specific implementation from spreading throughout the application.
+
+77. Recommendation Service Layer
+
+Recommendation logic should be isolated into:
+
+Candidate Generation
+        ↓
+Candidate Filtering
+        ↓
+Feature Calculation
+        ↓
+Semantic Matching
+        ↓
+Score Calculation
+        ↓
+Ranking
+        ↓
+Explanation Generation
+
+Each stage should be independently testable.
+
+78. MVP Scope
+
+The first release should focus on the smallest useful end-to-end system.
+
+MVP
+GitHub Login
+      ↓
+Profile Ingestion
+      ↓
+Profile README Analysis
+      ↓
+Repository + Language Analysis
+      ↓
+Developer Skill Profile
+      ↓
+Repository Candidate Generation
+      ↓
+Repository Analysis
+      ↓
+Deterministic Matching
+      ↓
+Top Recommendations
+      ↓
+Recommendation Explanations
+
+MVP should prioritize a reliable recommendation pipeline over feature breadth.
+
+79. MVP+ Scope
+
+After the initial recommendation system works:
+
+Semantic Embeddings
+        ↓
+Hybrid Ranking
+        ↓
+Repository Activity Signals
+        ↓
+Issue Ingestion
+        ↓
+Issue Matching
+        ↓
+Difficulty Classification
+80. Post-MVP Scope
+
+Later releases may add:
+
+Personalized ranking
+Feedback-based ranking
+Contribution tracking
+Notifications
+Contribution plans
+Repository architecture explanations
+Learning recommendations
+Similar repositories
+Advanced repository health analysis
+81. Development Phases
+Phase 1 — Foundation
+
+Build:
+
+Django
+PostgreSQL
+React
+TypeScript
+Docker
+GitHub authentication
+Basic API structure
+
+Deliverable: User can authenticate with GitHub.
+
+Phase 2 — GitHub Data Ingestion
+
+Build:
+
+Profile ingestion
+Profile README ingestion
+Repository ingestion
+Languages
+Topics
+Synchronization jobs
+
+Deliverable: User's GitHub data is available inside ContribFinder.
+
+Phase 3 — Developer Profile
+
+Build:
+
+Skill extraction
+Interest extraction
+Evidence tracking
+Confidence calculation
+Developer profile
+
+Deliverable: User sees a structured representation of their technical profile.
+
+Phase 4 — Repository Discovery
+
+Build:
+
+Candidate generation
+GitHub search
+Candidate tracking
+Repository synchronization
+Repository analysis
+
+Deliverable: System can construct a repository candidate pool.
+
+Phase 5 — Recommendation Engine
+
+Build:
+
+Feature calculation
+Skill matching
+Language matching
+Interest matching
+Activity signals
+Ranking
+Explanations
+
+Deliverable: User receives personalized repository recommendations.
+
+Phase 6 — Semantic Matching
+
+Build:
+
+Developer embeddings
+Repository embeddings
+Semantic similarity
+Hybrid ranking
+
+Deliverable: System can identify semantically relevant projects beyond keyword overlap.
+
+Phase 7 — Issue Matching
+
+Build:
+
+Issue ingestion
+Issue classification
+Difficulty signals
+Issue embeddings
+Developer-issue matching
+
+Deliverable: User receives potentially relevant contribution opportunities.
+
+Phase 8 — Feedback
+
+Build:
+
+Save
+Dismiss
+Repository view
+Issue view
+Feedback tracking
+Evaluation pipeline
+
+Deliverable: System can measure how users interact with recommendations.
+
+82. MVP Definition of Done
+
+The MVP is complete when a user can:
+
+Sign in with GitHub.
+Have their public GitHub profile analyzed.
+Have their profile README analyzed when available.
+See detected skills.
+See detected interests.
+See programming languages.
+See evidence supporting detected skills.
+Receive at least 10 relevant repository recommendations.
+See why each repository was recommended.
+Open the repository on GitHub.
+Filter recommendations.
+Save recommendations.
+Refresh their GitHub data.
+See when their data was last synchronized.
+Delete or disconnect their GitHub data.
+
+Issue-level recommendations may be treated as MVP+ if implementation complexity becomes significant.
+
+83. Functional Requirements
+
+The following requirements should become the formal implementation checklist.
+
+Authentication
+
+FR-AUTH-001
+The system shall allow users to authenticate through GitHub.
+
+FR-AUTH-002
+The system shall maintain an authenticated application session.
+
+FR-AUTH-003
+The system shall allow users to disconnect GitHub.
+
+GitHub Data
+
+FR-GH-001
+The system shall retrieve the authenticated user's relevant GitHub profile information.
+
+FR-GH-002
+The system shall retrieve accessible public repositories.
+
+FR-GH-003
+The system shall retrieve repository languages.
+
+FR-GH-004
+The system shall retrieve repository topics where available.
+
+FR-GH-005
+The system shall retrieve the user's profile README when available.
+
+FR-GH-006
+The system shall handle GitHub pagination.
+
+FR-GH-007
+The system shall handle GitHub rate limits and transient failures.
+
+Developer Profile
+
+FR-PROFILE-001
+The system shall create a structured developer profile.
+
+FR-PROFILE-002
+The system shall identify technical skills.
+
+FR-PROFILE-003
+The system shall identify interests.
+
+FR-PROFILE-004
+The system shall associate evidence with detected skills.
+
+FR-PROFILE-005
+The system shall assign configurable confidence values.
+
+Repository Discovery
+
+FR-REPO-001
+The system shall generate repository candidates based on developer information.
+
+FR-REPO-002
+The system shall retain the source through which a candidate was discovered.
+
+FR-REPO-003
+The system shall analyze candidate repository metadata.
+
+FR-REPO-004
+The system shall identify observable repository activity signals.
+
+Recommendations
+
+FR-REC-001
+The system shall calculate repository relevance.
+
+FR-REC-002
+The system shall rank repository candidates.
+
+FR-REC-003
+The system shall provide recommendation explanations.
+
+FR-REC-004
+The system shall support configurable ranking weights.
+
+FR-REC-005
+The system shall record the scoring configuration used for recommendations.
+
+FR-REC-006
+The system shall support recommendation filtering.
+
+Issues
+
+FR-ISSUE-001
+The system shall retrieve repository issues where supported.
+
+FR-ISSUE-002
+The system shall analyze issue labels.
+
+FR-ISSUE-003
+The system may classify contribution type.
+
+FR-ISSUE-004
+The system may estimate issue difficulty.
+
+FR-ISSUE-005
+The system shall provide evidence for issue recommendations.
+
+Feedback
+
+FR-FEEDBACK-001
+The system shall record recommendation views.
+
+FR-FEEDBACK-002
+The system shall allow recommendations to be saved.
+
+FR-FEEDBACK-003
+The system shall allow recommendations to be dismissed.
+
+FR-FEEDBACK-004
+The system shall record repository and issue interactions where appropriate.
+
+Data Management
+
+FR-DATA-001
+The system shall track GitHub synchronization status.
+
+FR-DATA-002
+The system shall allow users to refresh their profile.
+
+FR-DATA-003
+The system shall allow users to delete stored GitHub-derived data.
+
+84. Non-Functional Requirements
+Performance
+
+Normal dashboard requests should primarily use local application data rather than waiting for GitHub API calls.
+
+Long-running operations shall be asynchronous.
+
+Reliability
+
+Temporary GitHub, AI, or embedding failures should not cause complete application failure.
+
+Scalability
+
+The architecture should support increasing:
+
+Users
+Repositories
+Issues
+Recommendations
+Background jobs
+
+without requiring immediate migration to microservices.
+
+Security
+
+Sensitive credentials must never be exposed through:
+
+Frontend responses
+Logs
+URLs
+Client-side source code
+Maintainability
+
+Core recommendation logic must be independently testable.
+
+Explainability
+
+Every recommendation should be traceable to measurable signals and evidence.
+
+85. Important Architectural Decisions
+
+The following decisions are considered foundational:
+
+Decision 1
+
+Modular monolith before microservices.
+
+Decision 2
+
+PostgreSQL + pgvector before introducing a dedicated vector database.
+
+Decision 3
+
+Celery + Redis for long-running GitHub and AI processing.
+
+Decision 4
+
+GitHub data synchronization rather than GitHub API calls on every request.
+
+Decision 5
+
+Candidate generation and ranking are separate pipeline stages.
+
+Decision 6
+
+Deterministic scoring remains responsible for final ranking.
+
+Decision 7
+
+LLMs assist extraction and classification rather than controlling recommendations.
+
+Decision 8
+
+Recommendation explanations are first-class data.
+
+Decision 9
+
+Recommendation weights are configuration, not hard-coded product truth.
+
+Decision 10
+
+Repository activity is presented as observable signals rather than an absolute health score.
+
+86. Future Recommendation Architecture
+
+The long-term system can evolve toward:
+
+                 Developer Profile
+                        │
+                        ▼
+              Candidate Generation
+                        │
+             ┌──────────┴───────────┐
+             │                      │
+       GitHub Search          Semantic Search
+             │                      │
+             └──────────┬───────────┘
+                        ▼
+                Candidate Pool
+                        │
+                        ▼
+                 Hard Filtering
+                        │
+                        ▼
+               Feature Extraction
+                        │
+          ┌─────────────┴──────────────┐
+          │                            │
+   Deterministic Signals        Semantic Signals
+          │                            │
+          └─────────────┬──────────────┘
+                        ▼
+                    Ranking
+                        │
+                        ▼
+                Explanation Engine
+                        │
+                        ▼
+                Recommendations
+                        │
+                        ▼
+                    Feedback
+                        │
+                        ▼
+              Ranking Evaluation
+
+This architecture gives you a path from a simple rule-based MVP to a substantially more sophisticated recommendation platform without having to redesign the entire system.
+
+87. Final Product Direction
+
+The most important distinction in ContribFinder is:
+
+It is not a GitHub repository search engine.
+
+It is a developer-to-contribution opportunity matching system.
+
+The core product loop should therefore remain:
+
+UNDERSTAND DEVELOPER
+        ↓
+FIND CANDIDATES
+        ↓
+UNDERSTAND PROJECTS
+        ↓
+MATCH DEVELOPER ↔ PROJECT
+        ↓
+EXPLAIN MATCH
+        ↓
+IDENTIFY CONTRIBUTION OPPORTUNITIES
+        ↓
+LEARN FROM INTERACTION
+        ↓
+IMPROVE RECOMMENDATIONS

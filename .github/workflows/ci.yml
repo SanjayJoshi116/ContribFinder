@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: contribfinder
+          POSTGRES_USER: contribfinder
+          POSTGRES_PASSWORD: contribfinder
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U contribfinder"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgres://contribfinder:contribfinder@localhost:5432/contribfinder
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Type check
+        run: uv run mypy .
+      - name: Migrations are up to date
+        run: uv run python manage.py makemigrations --check --dry-run --settings config.settings.test
+      - name: Tests
+        run: uv run pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Format
+        run: npm run format:check
+      - name: Type check
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  api-contract:
+    # Fails when the committed OpenAPI schema / generated TS types drift from the backend.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: Version consistency
+        run: node scripts/check-version.mjs
+      - run: uv sync --frozen
+        working-directory: apps/backend
+      - run: npm ci
+        working-directory: apps/frontend
+      - name: Regenerate schema and types
+        run: npm run api:sync
+        working-directory: apps/frontend
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code -- apps/frontend/src/api; then
+            echo "::error::OpenAPI schema or generated types are stale. Run 'npm run api:sync' in apps/frontend and commit the result."
+            exit 1
+          fi

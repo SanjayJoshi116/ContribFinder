@@ -1,0 +1,43 @@
+# Environment / secrets (never commit; see .env.example)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.sqlite3
+staticfiles/
+
+# Celery
+celerybeat-schedule*
+celerybeat.pid
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+
+# Playwright (Phase 7+)
+test-results/
+playwright-report/
+
+# Logs
+*.log
+
+# Claude Code: shared commands/skills are committed; personal settings are not
+.claude/settings.local.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,90 @@
+ContribFinder - Feature list
+Version: 0.1.0 (2026-09-28)
+Legend: [x] shipped   [~] partial / carried over   [ ] planned
+FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
+Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md.
+
+============================================================================
+SHIPPED - v0.1.0 - Phase 1: Foundation
+============================================================================
+
+Authentication (FR-AUTH)
+  [x] FR-AUTH-001  Sign in with GitHub (OAuth App, no scopes, single-use state)
+  [x] FR-AUTH-002  Authenticated session (HTTP-only cookie, CSRF, expiry, /auth/me)
+  [x] FR-AUTH-003  Disconnect GitHub (revoke grant, delete credential, sign out)
+  [x] Logout (session ended; GitHub link kept)
+  [x] Audit log for sign-in, failed sign-in, logout, disconnect
+
+Credential security
+  [x] GitHub token encrypted at rest (MultiFernet, key rotation)
+  [x] Token never in API responses, URLs or logs (log redaction filter as backstop)
+  [x] Startup blocked when encryption keys are missing or invalid
+
+API platform
+  [x] Versioned base path /api/v1/
+  [x] OpenAPI schema (/api/v1/schema/) + generated TypeScript types
+  [x] Standard error envelope {"error": {code, message, details}}
+  [x] Authenticated by default (401), CSRF on state-changing requests
+  [x] Rate limiting (429 + Retry-After), stricter on sign-in
+  [x] CORS allowlist + security headers (nosniff, DENY framing, referrer policy, HSTS in prod)
+  [x] Health check (database, Redis; Redis "not_configured" in local mode)
+
+Frontend
+  [x] Landing page with "Continue with GitHub" and sign-in error messages
+  [x] Route guard for signed-in pages
+  [x] Signed-in shell: identity, logout, disconnect with confirmation
+
+Developer experience
+  [x] npm run setup / npm start (local PostgreSQL, Redis optional)
+  [~] Docker Compose stack (built; not yet verified - carried over to Phase 2)
+  [x] CI: lint, types, tests, build, API schema drift, version consistency
+
+============================================================================
+PLANNED - MVP
+============================================================================
+
+Phase 2 - GitHub data ingestion (v0.2.0)
+  [ ] Carry-over: verify Docker stack and Celery worker against real Redis
+  [ ] FR-GH-001  Profile information
+  [ ] FR-GH-002  Public repositories
+  [ ] FR-GH-003  Repository languages
+  [ ] FR-GH-004  Repository topics
+  [ ] FR-GH-005  Profile README
+  [ ] FR-GH-006  Pagination
+  [ ] FR-GH-007  Rate limits and transient failures
+  [ ] FR-DATA-001  Sync status and onboarding progress
+
+Phase 3 - Developer profile, deterministic (v0.3.0)
+  [ ] FR-PROFILE-001  Structured developer profile
+  [ ] FR-PROFILE-002  Skill detection (taxonomy + aliases)
+  [ ] FR-PROFILE-003  Interest detection
+  [ ] FR-PROFILE-004  Evidence per skill
+  [ ] FR-PROFILE-005  Configurable confidence
+
+Phase 4 - Repository discovery (v0.4.0)
+  [ ] FR-REPO-001  Candidate generation (GitHub search)
+  [ ] FR-REPO-002  Discovery source tracking
+  [ ] FR-REPO-003  Repository metadata analysis + lifecycle
+  [ ] FR-REPO-004  Activity signals
+
+Phase 5 - Recommendation engine, deterministic (v0.5.0)
+  [ ] FR-REC-001  Relevance signals
+  [ ] FR-REC-002  Ranking
+  [ ] FR-REC-003  Explanations (reasons from real signals only)
+  [ ] FR-REC-004  Configurable, versioned weights
+  [ ] FR-REC-005  Scoring config recorded per recommendation
+  [ ] FR-REC-006  Filtering
+
+Phase 8a - Feedback and data controls (v0.6.0)
+  [ ] FR-FEEDBACK-001..004  Views, save, dismiss, interactions
+  [ ] FR-DATA-002  Refresh profile
+  [ ] FR-DATA-003  Delete GitHub-derived data / account
+
+============================================================================
+PLANNED - MVP+ / FUTURE
+============================================================================
+
+  [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
+  [ ] Phase 7  Issues: FR-ISSUE-001..005 (ingestion, labels, type, difficulty, evidence)
+  [ ] Phase 8b Recommendation evaluation (Precision@k, Recall@10, MRR, NDCG)
+  [ ]          Personalized ranking, notifications, contribution tracking

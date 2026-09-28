@@ -1,0 +1,340 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ContribFinder API",
+    "version": "1.0.0",
+    "description": "Developer-to-contribution-opportunity matching API."
+  },
+  "paths": {
+    "/api/v1/auth/csrf/": {
+      "get": {
+        "operationId": "auth_csrf",
+        "tags": ["auth"],
+        "responses": {
+          "204": {
+            "description": "CSRF cookie set."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/github": {
+      "get": {
+        "operationId": "auth_github_start",
+        "tags": ["auth"],
+        "responses": {
+          "302": {
+            "description": "Redirect (302)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/auth/github/callback": {
+      "get": {
+        "operationId": "auth_github_callback",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "tags": ["auth"],
+        "responses": {
+          "302": {
+            "description": "Redirect (302)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/auth/github/disconnect": {
+      "post": {
+        "operationId": "auth_github_disconnect",
+        "tags": ["auth"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisconnectResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "auth_logout",
+        "tags": ["auth"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Signed out."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "auth_me",
+        "tags": ["auth"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/health/": {
+      "get": {
+        "operationId": "health",
+        "tags": ["health"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DisconnectResult": {
+        "type": "object",
+        "properties": {
+          "revocation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RevocationEnum"
+              }
+            ],
+            "description": "Whether GitHub confirmed revocation. Local credentials are deleted either way.\n\n* `revoked` - revoked\n* `failed` - failed\n* `not_connected` - not_connected"
+          }
+        },
+        "required": ["revocation"]
+      },
+      "Error": {
+        "type": "object",
+        "description": "Standard error envelope, referenced by every endpoint's error responses.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "required": ["error"]
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {}
+        },
+        "required": ["code", "message"]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/StatusEnum"
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": ["ok", "unavailable", "not_configured"],
+              "type": "string",
+              "description": "* `ok` - ok\n* `unavailable` - unavailable\n* `not_configured` - not_configured"
+            }
+          }
+        },
+        "required": ["checks", "status"]
+      },
+      "Me": {
+        "type": "object",
+        "description": "Explicit allowlist: nothing credential-bearing can reach the client.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "github_username": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "display_name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "avatar_url": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "github_connected": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "required": ["avatar_url", "display_name", "github_connected", "github_username", "id"]
+      },
+      "RevocationEnum": {
+        "enum": ["revoked", "failed", "not_connected"],
+        "type": "string",
+        "description": "* `revoked` - revoked\n* `failed` - failed\n* `not_connected` - not_connected"
+      },
+      "StatusEnum": {
+        "enum": ["ok", "degraded"],
+        "type": "string",
+        "description": "* `ok` - ok\n* `degraded` - degraded"
+      }
+    },
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionid"
+      }
+    }
+  }
+}

@@ -1,0 +1,221 @@
+from datetime import timedelta
+from pathlib import Path
+
+import django_stubs_ext
+import environ
+
+# Allow generic annotations such as ModelAdmin[Model] / Serializer[T] at runtime.
+django_stubs_ext.monkeypatch()
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+REPO_ROOT = BASE_DIR.parent.parent
+
+env = environ.Env()
+# Local (non-Docker) runs read the repo-root .env; in Docker, compose injects it.
+if (REPO_ROOT / ".env").exists():
+    env.read_env(REPO_ROOT / ".env")
+
+SECRET_KEY = env("DJANGO_SECRET_KEY")
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "django_filters",
+    "corsheaders",
+    "drf_spectacular",
+    "accounts",
+    "core",
+    "github",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+# --- Data stores -----------------------------------------------------------
+# Default: locally installed PostgreSQL (`npm start`, no Docker). Docker/CI/production
+# set DATABASE_URL explicitly.
+DATABASES = {
+    "default": env.db(
+        "DATABASE_URL",
+        default="postgres://contribfinder:contribfinder@localhost:5432/contribfinder",
+    )
+}
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
+
+# Without REDIS_URL: in-process cache and eager (inline) Celery tasks. Fine for local
+# development only; Docker and production always set REDIS_URL.
+REDIS_URL = env("REDIS_URL", default="")
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "accounts.User"
+
+# Users only sign in through GitHub; passwords are unusable. Validators kept for admin users.
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# --- Sessions / CSRF / CORS ------------------------------------------------
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_AGE = env.int("SESSION_COOKIE_AGE", default=int(timedelta(days=14).total_seconds()))
+
+# The SPA reads the CSRF cookie and echoes it in X-CSRFToken.
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = False
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+CSRF_FAILURE_VIEW = "core.views.csrf_failure"
+
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+CORS_ALLOW_CREDENTIALS = True
+CORS_URLS_REGEX = r"^/api/.*$"
+
+# --- Security headers ------------------------------------------------------
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+
+# --- DRF / OpenAPI ---------------------------------------------------------
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.SessionAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON", default="60/min"),
+        "user": env("THROTTLE_USER", default="300/min"),
+        "auth": env("THROTTLE_AUTH", default="10/min"),
+    },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "ContribFinder API",
+    "DESCRIPTION": "Developer-to-contribution-opportunity matching API.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+}
+
+# --- Celery ----------------------------------------------------------------
+CELERY_BROKER_URL = REDIS_URL or "memory://"
+CELERY_RESULT_BACKEND = REDIS_URL or "cache+memory://"
+CELERY_TASK_ALWAYS_EAGER = not REDIS_URL
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TIMEZONE = TIME_ZONE
+# Keep Django LOGGING (and its secret-redaction filter) in charge of worker logs.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
+# --- Frontend / GitHub OAuth ----------------------------------------------
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173").rstrip("/")
+# Fixed post-auth destinations; never taken from request parameters.
+FRONTEND_SIGNED_IN_PATH = "/app"
+FRONTEND_AUTH_ERROR_PATH = "/"
+
+GITHUB_CLIENT_ID = env("GITHUB_CLIENT_ID", default="")
+GITHUB_CLIENT_SECRET = env("GITHUB_CLIENT_SECRET", default="")
+GITHUB_OAUTH_SCOPES = env("GITHUB_OAUTH_SCOPES", default="").split()
+GITHUB_OAUTH_REDIRECT_URI = env(
+    "GITHUB_OAUTH_REDIRECT_URI", default=f"{FRONTEND_URL}/api/v1/auth/github/callback"
+)
+GITHUB_OAUTH_BASE_URL = "https://github.com"
+GITHUB_API_BASE_URL = "https://api.github.com"
+GITHUB_HTTP_TIMEOUT = env.float("GITHUB_HTTP_TIMEOUT", default=10.0)
+
+# Comma-separated Fernet keys, newest first.
+TOKEN_ENCRYPTION_KEYS = env.list("TOKEN_ENCRYPTION_KEYS", default=[])
+
+# --- Logging ---------------------------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"redact_secrets": {"()": "core.logging.RedactSecretsFilter"}},
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "filters": ["redact_secrets"],
+        },
+    },
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
+    "loggers": {
+        # Replace Django's default "django" handler (it has no redaction filter) so every
+        # Django log line goes through the filtered console handler exactly once.
+        "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        # Keep request bodies/URLs of the httpx client out of INFO logs.
+        "httpx": {"level": "WARNING"},
+        "httpcore": {"level": "WARNING"},
+    },
+}

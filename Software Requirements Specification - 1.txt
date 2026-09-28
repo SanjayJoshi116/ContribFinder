@@ -1,0 +1,2396 @@
+Software Requirements Specification (SRS)
+GitHub Contribution Discovery & Repository Recommendation Platform
+Working name: ContribFinder
+Document version: 1.0
+Preferred stack: Django + Django REST Framework + Python + React + TypeScript
+Primary goal: Analyze a developer's GitHub profile/README and recommend open-source repositories where they are likely to make meaningful contributions.
+
+1. Product Overview
+1.1 Problem
+Developers often want to contribute to open source but struggle with:
+
+Finding projects aligned with their skills.
+
+Knowing whether a repository actually needs contributors.
+
+Determining whether they have enough experience for a project.
+
+Finding suitable issues among thousands of GitHub repositories.
+
+Understanding a repository's technology stack from its README.
+
+Connecting their own skills/interests with repositories.
+
+Distinguishing beginner-friendly issues from issues requiring deep domain knowledge.
+
+The proposed application solves this by building a developer profile from GitHub data and matching it against repositories, issues, and project documentation.
+
+1.2 Core idea
+A user provides:
+
+GitHub username / GitHub OAuth
+
+The application analyzes:
+
+GitHub Profile
+       │
+       ├── Profile README
+       ├── Repositories
+       ├── Languages
+       ├── Topics
+       ├── Contributions
+       ├── Stars/Forks
+       └── Public activity
+              │
+              ▼
+       Developer Profile
+              │
+              ▼
+       Skill / Interest Extraction
+              │
+              ▼
+       Repository Discovery
+              │
+              ▼
+       Repository Analysis
+              │
+              ▼
+       Matching Engine
+              │
+              ▼
+       Recommended repositories
+              │
+              ▼
+       Recommended issues
+
+The important distinction is that the system should not simply search for repositories containing technologies mentioned in the README.
+
+It should answer:
+
+"Given what this developer knows and appears interested in, which open-source projects and specific contribution opportunities are worth exploring?"
+
+2. Goals
+2.1 Primary goals
+The system shall:
+
+Allow users to connect their GitHub account.
+
+Retrieve and analyze their GitHub profile README.
+
+Analyze their public repositories and programming languages.
+
+Build a structured developer skill profile.
+
+Discover potentially relevant GitHub repositories.
+
+Analyze repository README files and metadata.
+
+Analyze open issues and contribution labels.
+
+Calculate a compatibility score between the developer and repositories.
+
+Explain why a repository was recommended.
+
+Recommend specific issues where possible.
+
+Allow users to filter recommendations.
+
+Allow users to save/bookmark repositories.
+
+Learn from user feedback.
+
+Periodically refresh GitHub data.
+
+2.2 Secondary goals
+Future versions may:
+
+Recommend first issues.
+
+Recommend "good first issue" opportunities.
+
+Analyze contribution difficulty.
+
+Detect inactive repositories.
+
+Detect repositories with healthy contribution activity.
+
+Track contribution progress.
+
+Notify users about newly relevant issues.
+
+Generate personalized contribution plans.
+
+Explain unfamiliar parts of a repository.
+
+Recommend repositories based on career goals.
+
+3. Non-Goals for MVP
+The first release should not attempt to:
+
+Automatically create pull requests.
+
+Automatically modify repositories.
+
+Automatically submit issues.
+
+Automatically communicate with maintainers.
+
+Replace GitHub.
+
+Guarantee that a contribution will be accepted.
+
+Guarantee that a repository is actively maintained.
+
+Make hiring/employment predictions.
+
+Fully understand arbitrary source code.
+
+These can be considered later.
+
+4. Target Users
+Persona A — Beginner contributor
+Knows:
+
+Python
+Django
+JavaScript
+
+Wants:
+
+"Find me beginner-friendly Python projects where I can contribute."
+
+Persona B — Experienced developer
+Knows:
+
+Python
+Django
+PostgreSQL
+Docker
+AWS
+
+Wants:
+
+"Find projects where my backend experience is useful."
+
+Persona C — Developer exploring a technology
+Knows:
+
+React
+TypeScript
+
+Wants:
+
+"Find open-source React projects where I can learn while contributing."
+
+Persona D — Developer with a specific interest
+README:
+
+Interested in:
+- AI
+- Developer tooling
+- LLMs
+- Python
+
+The system should identify repositories matching these interests even if the README doesn't use exactly the same keywords.
+
+5. High-Level Architecture
+I recommend a modular monolith initially, rather than microservices.
+
+                         ┌─────────────────────┐
+                         │      React App      │
+                         │  TypeScript + Vite  │
+                         └──────────┬──────────┘
+                                    │
+                              HTTPS / REST
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Django REST API     │
+                         │                     │
+                         │ Authentication      │
+                         │ Profiles            │
+                         │ Recommendations     │
+                         │ Repositories        │
+                         │ Issues              │
+                         └───────┬─────────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+              ▼                  ▼                  ▼
+       ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+       │ PostgreSQL  │    │    Redis    │    │ GitHub API  │
+       │             │    │             │    │             │
+       │ Application │    │ Cache/Queue │    │ REST/API    │
+       │ data        │    │             │    │             │
+       └─────────────┘    └──────┬──────┘    └─────────────┘
+                                 │
+                                 ▼
+                         ┌─────────────────┐
+                         │ Celery Workers  │
+                         │                 │
+                         │ GitHub sync     │
+                         │ README analysis │
+                         │ Issue analysis  │
+                         │ Matching        │
+                         └─────────────────┘
+
+6. Preferred Technology Stack
+Backend
+Python
+Python 3.12+
+
+Reason:
+
+Excellent GitHub API ecosystem.
+
+Strong NLP/ML ecosystem.
+
+Excellent integration with LLM APIs.
+
+Natural fit for recommendation algorithms.
+
+Mature async/background-processing ecosystem.
+
+Django
+Use Django as the primary backend framework.
+
+Recommended:
+
+Django
+Django REST Framework
+django-environ
+django-filter
+
+Django provides:
+
+Authentication.
+
+ORM.
+
+Admin interface.
+
+Database migrations.
+
+Security features.
+
+API foundation.
+
+Excellent ecosystem.
+
+Django REST Framework
+Use DRF for:
+
+/api/v1/...
+
+Example:
+
+GET    /api/v1/me
+GET    /api/v1/profile
+POST   /api/v1/profile/sync
+GET    /api/v1/repositories
+GET    /api/v1/recommendations
+GET    /api/v1/recommendations/{id}
+GET    /api/v1/issues
+POST   /api/v1/feedback
+
+7. Frontend Stack
+React
+Use:
+
+React 19+
+TypeScript
+Vite
+
+I recommend Vite rather than Create React App.
+
+State management
+Start with:
+
+TanStack Query
+
+for server state.
+
+Use:
+
+Zustand
+
+only for genuinely client-side state.
+
+Avoid putting every API response into a global Redux store.
+
+UI
+Recommended:
+
+Tailwind CSS
+shadcn/ui
+Lucide React
+
+This gives you a relatively fast path toward a polished developer-focused UI.
+
+Forms
+React Hook Form
+Zod
+
+Charts
+For MVP:
+
+Recharts
+
+Potential use:
+
+Skills.
+
+Languages.
+
+Repository activity.
+
+Recommendation breakdown.
+
+8. Database
+PostgreSQL
+PostgreSQL should be the primary database.
+
+Why?
+
+Mature Django integration.
+
+JSONB support.
+
+Full-text search.
+
+Array fields.
+
+Good indexing.
+
+Extensions available for vector search.
+
+9. Search / Vector Storage
+There are two possible approaches.
+
+MVP
+Use PostgreSQL:
+
+PostgreSQL
++ pgvector
+
+This allows you to store embeddings alongside normal application data.
+
+For example:
+
+repository.embedding
+developer_profile.embedding
+issue.embedding
+
+This is preferable initially to introducing Elasticsearch + a separate vector database.
+
+Later scale
+If the application becomes large:
+
+PostgreSQL
++
+OpenSearch / Elasticsearch
++
+Vector database
+
+can be evaluated.
+
+But I would not introduce those in v1.
+
+10. Background Processing
+Use:
+
+Celery
+Redis
+
+Example:
+
+User connects GitHub
+        │
+        ▼
+Create SyncJob
+        │
+        ▼
+Celery
+        │
+        ├── Fetch profile
+        ├── Fetch repositories
+        ├── Fetch READMEs
+        ├── Fetch languages
+        ├── Fetch topics
+        ├── Fetch issues
+        └── Analyze profile
+
+This is important because GitHub API operations shouldn't block an HTTP request.
+
+GitHub's current REST API documentation states that authenticated requests generally have a 5,000-request/hour primary limit, while unauthenticated requests have a 60-request/hour limit; search endpoints have additional restrictions. The system should therefore aggressively cache and synchronize data asynchronously. 
+G
+GitHub Docs
++1
+
+GitHub also explicitly recommends conditional requests and avoiding excessive concurrent requests, which fits well with a queued Celery synchronization architecture. 
+G
+GitHub Docs
+
+11. GitHub Integration
+This is one of the most important architectural components.
+
+11.1 Authentication
+Use GitHub OAuth / GitHub App authentication.
+
+Preferred flow:
+
+User
+ │
+ ▼
+"Continue with GitHub"
+ │
+ ▼
+GitHub OAuth
+ │
+ ▼
+Authorization
+ │
+ ▼
+Callback
+ │
+ ▼
+Django
+ │
+ ▼
+Encrypted token storage
+
+Do not put GitHub secrets in the React application.
+
+GitHub specifically warns that application secrets should not be exposed in client-side code. 
+G
+GitHub Docs
+
+12. GitHub Data Acquisition
+The application should collect:
+
+User
+username
+name
+bio
+company
+location
+blog
+followers
+following
+public repositories
+created_at
+
+GitHub provides REST endpoints for retrieving authenticated user information. 
+G
+GitHub Docs
+
+Profile README
+This is a key feature.
+
+GitHub profile README is generally represented by a repository matching:
+
+username/username
+
+The system should retrieve:
+
+README.md
+
+GitHub provides a repository README endpoint that returns the preferred README and supports raw content responses. 
+G
+GitHub Docs
+
+13. Profile Analysis
+The raw GitHub data should be converted into a structured profile.
+
+Example:
+
+{
+  "skills": [
+    {
+      "name": "Python",
+      "confidence": 0.96,
+      "evidence": [
+        "profile_readme",
+        "repository_languages",
+        "repository_topics"
+      ]
+    },
+    {
+      "name": "Django",
+      "confidence": 0.89,
+      "evidence": [
+        "profile_readme",
+        "repositories"
+      ]
+    }
+  ],
+  "interests": [
+    "developer tools",
+    "open source",
+    "AI"
+  ],
+  "experience_level": "intermediate"
+}
+
+14. Skill Extraction
+Skill extraction should combine multiple sources.
+
+Evidence sources
+Source 1 — Profile README
+Example:
+
+## Skills
+
+Python
+Django
+React
+PostgreSQL
+Docker
+
+Extract:
+
+Python
+Django
+React
+PostgreSQL
+Docker
+
+Source 2 — Repository languages
+If a user has:
+
+Python 70%
+TypeScript 20%
+JavaScript 10%
+
+this becomes evidence.
+
+Source 3 — Repository topics
+Example:
+
+django
+rest-api
+machine-learning
+llm
+
+Source 4 — Dependencies
+For example:
+
+requirements.txt
+pyproject.toml
+package.json
+go.mod
+Cargo.toml
+
+can provide additional evidence.
+
+Source 5 — Contribution history
+Examples:
+
+Pull requests
+Commits
+Issues
+Reviews
+
+These provide stronger evidence than simply listing a technology in a README.
+
+15. Skill Confidence Model
+Do not treat:
+
+"Python"
+
+in a README as equivalent to:
+
+500 commits in Python repositories
+
+Instead assign evidence weights.
+
+Example:
+
+Evidence	Weight
+README mention	0.20
+Repository topic	0.30
+Repository language	0.50
+Dependency usage	0.60
+Commit history	0.80
+Pull request	0.90
+Repeated contribution	1.00
+
+These are initial heuristic values and should be configurable.
+
+16. Developer Profile Model
+A normalized representation could look like:
+
+DeveloperProfile
+
+id
+user_id
+
+summary
+
+experience_level
+
+skills
+interests
+
+languages
+
+frameworks
+
+databases
+
+cloud_platforms
+
+devops_tools
+
+domains
+
+preferred_project_size
+
+preferred_issue_difficulty
+
+embedding
+
+created_at
+updated_at
+
+Rather than storing everything as an opaque JSON blob, core entities should be relational.
+
+17. Repository Discovery
+The recommendation engine needs a candidate pool.
+
+Candidate repositories can be discovered through:
+
+GitHub search.
+
+Topics.
+
+Languages.
+
+Repository metadata.
+
+Issues.
+
+Stars/forks.
+
+README content.
+
+User-selected technologies.
+
+Previously indexed repositories.
+
+The system should not attempt to index all GitHub repositories.
+
+Instead:
+
+Developer profile
+       │
+       ▼
+Generate search queries
+       │
+       ├── python django
+       ├── python open-source
+       ├── django developer-tools
+       ├── typescript react
+       └── AI python
+       │
+       ▼
+Candidate repositories
+
+18. Repository Analysis
+For each candidate repository, collect:
+
+owner
+name
+description
+URL
+default branch
+stars
+forks
+open issues
+language
+languages
+topics
+license
+created_at
+updated_at
+pushed_at
+archived
+README
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+issue templates
+pull request activity
+
+19. Repository Health
+The system should calculate a repository health profile, but avoid pretending that this is an objective truth.
+
+Possible signals:
+
+recent commits
+recent PRs
+recent issue activity
+open issue count
+issue response activity
+release frequency
+number of contributors
+last push
+archived status
+
+For example:
+
+{
+  "activity": "high",
+  "recent_activity_days": 3,
+  "contributors_90d": 28,
+  "open_issues": 132
+}
+
+Call this:
+
+Activity signals
+
+rather than:
+
+"Good repository"
+
+because repository health is inherently contextual.
+
+20. Contribution Opportunity Detection
+This is arguably the most valuable feature.
+
+The system should analyze issues for:
+
+good first issue
+first issue
+help wanted
+documentation
+bug
+enhancement
+refactor
+testing
+frontend
+backend
+performance
+security
+
+Example:
+
+Issue #1234
+
+Title:
+Add pagination to API endpoint
+
+Labels:
+enhancement
+good first issue
+backend
+
+Detected skills:
+Django
+REST API
+Python
+
+Difficulty:
+Beginner/Intermediate
+
+21. Issue Matching
+An issue should be scored against:
+
+developer skills
+developer experience
+developer interests
+issue difficulty
+repository technology
+issue labels
+issue description
+
+Example:
+
+Developer:
+
+Python       0.95
+Django       0.91
+REST API     0.82
+React        0.71
+
+Issue:
+
+Python       0.90
+Django       0.85
+REST API     0.88
+
+The matching engine produces:
+
+Skill match: 91%
+
+But the UI should explain the score:
+
+Why this matches
+
+✓ Python is one of your strongest skills
+✓ Django appears in your profile and repositories
+✓ Issue involves REST APIs
+✓ Issue is marked "good first issue"
+
+Explainability is critical.
+
+22. Recommendation Engine
+I recommend a hybrid recommendation architecture.
+
+Phase 1 — Rule-based scoring
+Start simple.
+
+RecommendationScore =
+    SkillMatch
+  + InterestMatch
+  + LanguageMatch
+  + FrameworkMatch
+  + IssueAvailability
+  + ActivitySignal
+  + DifficultyMatch
+  + ContributionFit
+
+Example:
+
+Skill match             30%
+Interest match          20%
+Technology match        15%
+Issue availability      10%
+Difficulty fit          10%
+Repository activity     10%
+Contribution openness    5%
+
+These should be configurable.
+
+23. Phase 2 — Semantic Matching
+Generate embeddings for:
+
+Developer profile
+Repository README
+Repository description
+Issues
+Topics
+
+Then calculate:
+
+cosine_similarity(
+    developer_embedding,
+    repository_embedding
+)
+
+This catches semantic relationships such as:
+
+Developer:
+"Interested in developer productivity"
+
+Repository:
+"CLI tooling for improving engineering workflows"
+
+even though the exact words differ.
+
+24. Phase 3 — Hybrid Ranking
+Final recommendation score:
+
+FinalScore =
+    0.50 * SemanticSimilarity
+  + 0.30 * SkillMatch
+  + 0.10 * DifficultyFit
+  + 0.10 * ActivitySignal
+
+Do not hard-code these values permanently.
+
+Create a scoring configuration:
+
+RECOMMENDATION_WEIGHTS = {
+    "semantic": 0.50,
+    "skills": 0.30,
+    "difficulty": 0.10,
+    "activity": 0.10,
+}
+
+Later you can tune them using user feedback.
+
+25. Recommendation Explanation
+Every recommendation should have machine-readable reasons.
+
+Example:
+
+{
+  "repository": "example/project",
+  "score": 0.87,
+  "reasons": [
+    {
+      "type": "skill",
+      "text": "Strong Python match"
+    },
+    {
+      "type": "framework",
+      "text": "Uses Django"
+    },
+    {
+      "type": "interest",
+      "text": "Matches your interest in developer tools"
+    },
+    {
+      "type": "issue",
+      "text": "Contains beginner-friendly backend issues"
+    }
+  ]
+}
+
+This should be reflected directly in the UI.
+
+26. User Experience
+Landing page
+┌─────────────────────────────────────────┐
+│       Find Your Next OSS Contribution   │
+│                                         │
+│ Analyze your GitHub profile and discover│
+│ repositories where you can contribute.  │
+│                                         │
+│       [ Continue with GitHub ]          │
+└─────────────────────────────────────────┘
+
+27. Onboarding
+After authentication:
+
+Analyzing your GitHub profile...
+
+✓ Profile
+✓ Profile README
+✓ 27 repositories
+✓ Languages
+✓ Topics
+✓ Contributions
+
+Building your developer profile...
+
+Use a background job.
+
+Do not make the browser wait on a 30–60 second synchronous request.
+
+28. Dashboard
+Suggested layout:
+
+┌────────────────────────────────────────────────────┐
+│ Your Open Source Profile                           │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│ Python ████████████████████ 92%                   │
+│ Django ██████████████████   87%                   │
+│ React  ███████████████      73%                   │
+│ Docker █████████████        68%                   │
+│                                                    │
+├────────────────────────────────────────────────────┤
+│ Recommended for you                                │
+│                                                    │
+│ ┌────────────────────────────────────────────────┐ │
+│ │ Project A                                     │ │
+│ │ Python · Django · APIs                        │ │
+│ │                                               │ │
+│ │ Strong skill match                            │ │
+│ │ 12 relevant issues                            │ │
+│ │                                               │ │
+│ │ [View Repository] [View Issues]               │ │
+│ └────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────┘
+
+29. Repository Recommendation Card
+Each card should display:
+
+Repository name
+Owner
+Description
+
+Technologies:
+Python · Django · PostgreSQL
+
+Match:
+87%
+
+Why recommended:
+✓ Matches Python experience
+✓ Matches Django experience
+✓ Matches your interest in APIs
+
+Contribution opportunities:
+12 relevant issues
+
+Activity:
+Active
+
+[View repository]
+[View issues]
+[Save]
+
+30. Filters
+Users should be able to filter recommendations by:
+
+Technology
+Python
+JavaScript
+TypeScript
+Go
+Rust
+Java
+C++
+
+Framework
+Django
+React
+Next.js
+FastAPI
+Vue
+Spring
+
+Difficulty
+Beginner
+Intermediate
+Advanced
+
+Contribution type
+Code
+Documentation
+Testing
+Bug fixes
+Features
+DevOps
+Design
+
+Repository size
+Small
+Medium
+Large
+
+Activity
+Recently active
+Moderately active
+Any
+
+31. Repository Details Page
+/project/owner/repository
+
+Sections:
+
+Overview
+
+Why it matches you
+
+Technology
+
+Repository activity
+
+Contribution opportunities
+
+Recommended issues
+
+README summary
+
+Contribution guidelines
+
+Similar repositories
+
+32. Issue Details
+Example:
+
+Add pagination to users API
+
+Repository:
+example/backend
+
+Labels:
+good first issue
+enhancement
+backend
+
+Difficulty:
+Beginner → Intermediate
+
+Your match:
+91%
+
+Why:
+
+✓ Python
+✓ Django
+✓ REST API
+✓ Similar work detected in your repositories
+
+[Open on GitHub]
+
+33. Data Model
+A simplified relational model:
+
+User
+ │
+ ├── GitHubAccount
+ │
+ └── DeveloperProfile
+       │
+       ├── Skill
+       ├── Interest
+       └── Embedding
+
+Repository side:
+
+Repository
+ │
+ ├── RepositoryLanguage
+ ├── RepositoryTopic
+ ├── RepositoryIssue
+ ├── RepositoryContributor
+ ├── RepositorySnapshot
+ └── Embedding
+
+Recommendation:
+
+DeveloperProfile
+        │
+        ▼
+Recommendation
+        │
+        ├── Repository
+        ├── score
+        ├── reasons
+        └── generated_at
+
+34. Core Django Models
+Conceptually:
+
+class GitHubAccount(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    github_id = models.BigIntegerField(unique=True)
+    username = models.CharField(max_length=255)
+    avatar_url = models.URLField()
+    access_token = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class DeveloperProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+
+    bio = models.TextField(blank=True)
+    experience_level = models.CharField(max_length=50)
+
+    profile_readme = models.TextField(blank=True)
+
+    embedding = VectorField(
+        dimensions=1536,
+        null=True
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+35. Skills
+class Skill(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+class DeveloperSkill(models.Model):
+    developer = models.ForeignKey(
+        DeveloperProfile,
+        on_delete=models.CASCADE
+    )
+
+    skill = models.ForeignKey(
+        Skill,
+        on_delete=models.CASCADE
+    )
+
+    confidence = models.FloatField()
+
+    evidence = models.JSONField(default=list)
+
+Example:
+
+{
+  "skill": "Django",
+  "confidence": 0.91,
+  "evidence": [
+    "profile_readme",
+    "repository_dependency",
+    "pull_request"
+  ]
+}
+
+36. Repository Model
+class Repository(models.Model):
+    github_id = models.BigIntegerField(unique=True)
+
+    owner = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
+
+    full_name = models.CharField(
+        max_length=511,
+        unique=True
+    )
+
+    description = models.TextField(blank=True)
+
+    html_url = models.URLField()
+
+    stars = models.IntegerField(default=0)
+    forks = models.IntegerField(default=0)
+
+    open_issues = models.IntegerField(default=0)
+
+    language = models.CharField(
+        max_length=100,
+        blank=True
+    )
+
+    topics = models.JSONField(default=list)
+
+    archived = models.BooleanField(default=False)
+
+    readme = models.TextField(blank=True)
+
+    embedding = VectorField(
+        dimensions=1536,
+        null=True
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+37. Issue Model
+class Issue(models.Model):
+    repository = models.ForeignKey(
+        Repository,
+        on_delete=models.CASCADE
+    )
+
+    github_id = models.BigIntegerField(unique=True)
+
+    number = models.IntegerField()
+
+    title = models.CharField(max_length=500)
+
+    body = models.TextField(blank=True)
+
+    labels = models.JSONField(default=list)
+
+    state = models.CharField(max_length=20)
+
+    html_url = models.URLField()
+
+    embedding = VectorField(
+        dimensions=1536,
+        null=True
+    )
+
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+38. Recommendation Model
+class Recommendation(models.Model):
+    developer = models.ForeignKey(
+        DeveloperProfile,
+        on_delete=models.CASCADE
+    )
+
+    repository = models.ForeignKey(
+        Repository,
+        on_delete=models.CASCADE
+    )
+
+    score = models.FloatField()
+
+    skill_score = models.FloatField()
+    semantic_score = models.FloatField()
+    difficulty_score = models.FloatField()
+    activity_score = models.FloatField()
+
+    reasons = models.JSONField(default=list)
+
+    generated_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+39. Feedback Model
+Feedback is extremely important for improving the system.
+
+class RecommendationFeedback(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE
+    )
+
+    recommendation = models.ForeignKey(
+        Recommendation,
+        on_delete=models.CASCADE
+    )
+
+    action = models.CharField(
+        max_length=50
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+Actions:
+
+viewed
+saved
+dismissed
+opened_github
+opened_issue
+
+Future:
+
+contributed
+pull_request_created
+pull_request_merged
+
+40. API Specification
+Base URL:
+
+/api/v1/
+
+Authentication
+GET /auth/github
+GET /auth/github/callback
+POST /auth/logout
+GET /auth/me
+
+Developer Profile
+GET /profile
+POST /profile/sync
+GET /profile/skills
+GET /profile/interests
+
+Recommendations
+GET /recommendations
+GET /recommendations/{id}
+POST /recommendations/{id}/feedback
+
+Example:
+
+GET /api/v1/recommendations?
+    language=python&
+    difficulty=beginner&
+    page=1
+
+41. Recommendation API Response
+{
+  "results": [
+    {
+      "id": 123,
+      "repository": {
+        "name": "example-project",
+        "owner": "example-org",
+        "url": "https://github.com/example-org/example-project",
+        "description": "Developer tooling for Python"
+      },
+      "score": 0.87,
+      "skills": [
+        "Python",
+        "Django"
+      ],
+      "relevant_issues": 8,
+      "reasons": [
+        "Strong Python match",
+        "Uses Django",
+        "Matches developer-tooling interest"
+      ]
+    }
+  ],
+  "count": 42
+}
+
+42. Synchronization Architecture
+The GitHub API should not be called on every page request.
+
+Instead:
+
+GitHub
+   │
+   ▼
+Sync Worker
+   │
+   ▼
+PostgreSQL
+   │
+   ▼
+API
+   │
+   ▼
+React
+
+Example:
+
+User visits dashboard
+        │
+        ▼
+Read PostgreSQL
+        │
+        ▼
+Return recommendations
+
+Meanwhile:
+
+Periodic Celery job
+        │
+        ▼
+Check GitHub
+        │
+        ▼
+Update changed repositories
+        │
+        ▼
+Regenerate affected embeddings
+
+This also reduces API usage.
+
+GitHub recommends conditional requests specifically to avoid consuming rate-limit budget when data has not changed. 
+G
+GitHub Docs
+
+43. Caching
+Use Redis for:
+
+GitHub API responses
+rate-limit information
+temporary recommendation data
+job state
+session/cache data
+
+Example:
+
+github:user:{username}
+github:repo:{owner}:{repo}
+github:issues:{owner}:{repo}
+
+TTL could vary:
+
+User profile: 1 hour
+Repository metadata: 1–6 hours
+Issues: 10–30 minutes
+Recommendations: 1–6 hours
+
+44. Celery Tasks
+Suggested tasks:
+
+sync_github_profile
+sync_user_repositories
+sync_repository
+sync_repository_readme
+sync_repository_issues
+extract_developer_skills
+generate_developer_embedding
+generate_repository_embedding
+generate_issue_embeddings
+generate_recommendations
+refresh_recommendations
+
+45. AI / LLM Architecture
+I would not make an LLM responsible for the entire recommendation system.
+
+Use deterministic algorithms where possible.
+
+LLM responsibilities
+Good uses:
+
+README → skill extraction
+README → interest extraction
+Issue → contribution type
+Issue → difficulty classification
+README → summary
+Repository → semantic description
+
+Algorithmic responsibilities
+Use traditional scoring for:
+
+skill matching
+language matching
+repository activity
+issue labels
+difficulty compatibility
+ranking
+filters
+
+Embedding responsibilities
+Use embeddings for:
+
+semantic repository matching
+semantic issue matching
+interest matching
+
+This architecture will be cheaper, more explainable, and easier to debug than an "LLM decides everything" system.
+
+46. Suggested AI Pipeline
+README
+  │
+  ▼
+Text cleaning
+  │
+  ▼
+Section extraction
+  │
+  ▼
+LLM / NLP extraction
+  │
+  ▼
+Structured JSON
+  │
+  ├── Skills
+  ├── Interests
+  ├── Domains
+  └── Experience
+  │
+  ▼
+Embedding generation
+  │
+  ▼
+DeveloperProfile
+
+47. Structured LLM Output
+Require the model to produce:
+
+{
+  "skills": [
+    {
+      "name": "Python",
+      "confidence": 0.95
+    }
+  ],
+  "frameworks": [
+    {
+      "name": "Django",
+      "confidence": 0.91
+    }
+  ],
+  "interests": [
+    "open source",
+    "developer tooling"
+  ],
+  "domains": [
+    "web development"
+  ]
+}
+
+Never depend on free-form LLM responses internally.
+
+Validate the response with Pydantic.
+
+48. Python Service Structure
+I recommend a modular Django project:
+
+backend/
+├── manage.py
+├── config/
+│   ├── settings/
+│   │   ├── base.py
+│   │   ├── development.py
+│   │   └── production.py
+│   ├── urls.py
+│   ├── celery.py
+│   └── wsgi.py
+│
+├── apps/
+│   ├── accounts/
+│   ├── github/
+│   ├── developers/
+│   ├── repositories/
+│   ├── issues/
+│   ├── recommendations/
+│   ├── embeddings/
+│   └── feedback/
+│
+├── services/
+│   ├── github/
+│   ├── matching/
+│   ├── ai/
+│   └── ranking/
+│
+└── tests/
+
+Avoid putting business logic directly into Django views.
+
+49. GitHub Service Layer
+Create:
+
+class GitHubClient:
+    def get_user(self, username):
+        ...
+
+    def get_repositories(self, username):
+        ...
+
+    def get_readme(self, owner, repo):
+        ...
+
+    def get_issues(self, owner, repo):
+        ...
+
+    def get_languages(self, owner, repo):
+        ...
+
+Then:
+
+class GitHubSyncService:
+    def sync_user(self, user):
+        ...
+
+This makes GitHub integration testable and replaceable.
+
+50. Frontend Structure
+frontend/
+├── src/
+│   ├── app/
+│   ├── components/
+│   │   ├── ui/
+│   │   ├── repository/
+│   │   ├── recommendation/
+│   │   └── profile/
+│   │
+│   ├── features/
+│   │   ├── auth/
+│   │   ├── profile/
+│   │   ├── recommendations/
+│   │   ├── repositories/
+│   │   └── issues/
+│   │
+│   ├── hooks/
+│   ├── lib/
+│   ├── api/
+│   ├── types/
+│   └── routes/
+│
+└── tests/
+
+51. TypeScript API Types
+Do not manually duplicate backend types wherever possible.
+
+Consider generating TypeScript types from OpenAPI.
+
+Flow:
+
+Django REST API
+       │
+       ▼
+OpenAPI schema
+       │
+       ▼
+TypeScript generated types
+       │
+       ▼
+React
+
+This greatly reduces API/frontend mismatch.
+
+52. Security Requirements
+Authentication
+GitHub OAuth.
+
+Secure HTTP-only cookies or secure token architecture.
+
+CSRF protection.
+
+Session expiration.
+
+Logout/revocation.
+
+GitHub tokens
+Tokens must:
+
+Never be returned to React.
+
+Never appear in logs.
+
+Never appear in URLs.
+
+Be encrypted at rest.
+
+Have minimum required permissions.
+
+API security
+Implement:
+
+rate limiting
+input validation
+permission checks
+CORS policy
+CSRF
+secure cookies
+security headers
+
+53. Privacy
+The system should clearly tell users what is collected.
+
+Potentially stored:
+
+GitHub username
+profile information
+repository metadata
+README content
+public contribution information
+recommendation history
+feedback
+
+Provide:
+
+Delete account
+Delete GitHub data
+Disconnect GitHub
+
+Ideally:
+
+Disconnect GitHub
+        │
+        ▼
+Revoke token
+        │
+        ▼
+Delete cached GitHub data
+
+54. GitHub API Resilience
+Implement:
+
+timeouts
+retries
+exponential backoff
+rate-limit handling
+conditional requests
+pagination
+caching
+circuit breaker
+
+For example:
+
+GitHub 429
+    │
+    ▼
+Read Retry-After
+    │
+    ▼
+Celery retry
+
+GitHub documents both primary and secondary rate limits and recommends backing off rather than repeatedly retrying when rate-limited. 
+G
+GitHub Docs
++1
+
+55. Observability
+Use:
+
+Sentry
+Prometheus
+Grafana
+structured logging
+
+Track:
+
+API latency
+GitHub API errors
+GitHub rate limits
+Celery failures
+recommendation generation time
+LLM failures
+embedding failures
+database performance
+
+56. Testing Strategy
+Backend
+Use:
+
+pytest
+pytest-django
+factory_boy
+
+Tests:
+
+unit tests
+service tests
+API tests
+GitHub integration tests
+recommendation tests
+
+Frontend
+Use:
+
+Vitest
+React Testing Library
+Playwright
+
+Test:
+
+authentication
+dashboard
+filters
+recommendation cards
+repository details
+issue details
+
+57. Recommendation Testing
+This deserves special attention.
+
+Create a fixed evaluation dataset:
+
+Developer A
+Developer B
+Developer C
+...
+
+and expected relevant repositories/issues.
+
+Then measure:
+
+Precision@5
+Precision@10
+Recall@10
+MRR
+NDCG
+
+This lets you improve the recommendation engine scientifically rather than relying on intuition.
+
+58. Feedback Loop
+Suppose the user sees:
+
+Repository A
+Repository B
+Repository C
+
+and clicks:
+
+Repository B
+
+Record:
+
+recommendation_view
+
+If they open an issue:
+
+issue_view
+
+If they bookmark it:
+
+save
+
+If eventually they contribute:
+
+contribution
+
+These signals can eventually improve ranking.
+
+59. Important Product Decision
+Do not make the ranking:
+
+"Repository X is 92% better than Repository Y."
+
+Instead:
+
+"Repository X has a high skill match because..."
+
+The recommendation score should primarily be an internal ranking mechanism, while the UI should emphasize evidence and reasons.
+
+This makes the system much easier to trust.
+
+60. MVP Scope
+I would make the first version significantly smaller.
+
+MVP
+GitHub login
+      ↓
+Profile README analysis
+      ↓
+Repository/language analysis
+      ↓
+Skill extraction
+      ↓
+GitHub repository discovery
+      ↓
+Repository README analysis
+      ↓
+Skill/semantic matching
+      ↓
+Top 20 recommendations
+      ↓
+Recommendation explanations
+
+Do not start with:
+
+notifications
+social features
+automatic PR creation
+complex ML
+microservices
+Kubernetes
+Elasticsearch
+
+61. MVP Recommendation Algorithm
+Start with:
+
+score = (
+    0.35 * skill_similarity +
+    0.25 * semantic_similarity +
+    0.15 * language_similarity +
+    0.10 * interest_similarity +
+    0.10 * activity_score +
+    0.05 * issue_fit
+)
+
+Normalize every component to:
+
+0.0 → 1.0
+
+Then:
+
+recommendations = sorted(
+    candidates,
+    key=lambda x: x.score,
+    reverse=True
+)
+
+The exact weights should be treated as tunable configuration, not product truth.
+
+62. Example End-to-End Scenario
+User:
+
+github.com/john
+
+README:
+
+Backend developer interested in:
+
+Python
+Django
+PostgreSQL
+Developer tooling
+AI
+
+System extracts:
+
+Python       0.95
+Django       0.92
+PostgreSQL   0.82
+AI           0.73
+DevTools     0.80
+
+It discovers:
+
+Repository A
+Python + Django
+
+Repository B
+Python + AI
+
+Repository C
+TypeScript + React
+
+Repository D
+Python + CLI tooling
+
+Matching produces:
+
+Repository A
+Strong Django/Python match
+
+Repository B
+Strong Python/AI match
+
+Repository D
+Strong Python/developer-tooling match
+
+Repository C
+Moderate match
+
+Then issue matching:
+
+Repository A
+
+#421 Add pagination
+good first issue
+Django
+REST API
+
+Match: 94%
+
+The dashboard becomes:
+
+Your best contribution opportunities
+
+1. Project A
+   Python · Django · REST API
+
+   8 relevant issues
+
+   Why:
+   ✓ Strong Django match
+   ✓ Strong Python match
+   ✓ Backend contribution opportunity
+
+2. Project D
+   Python · CLI · Developer tooling
+
+   5 relevant issues
+
+   Why:
+   ✓ Matches developer-tooling interest
+   ✓ Strong Python match
+
+63. Recommended Repository Lifecycle
+A repository moves through:
+
+DISCOVERED
+    ↓
+FETCHING
+    ↓
+ANALYZED
+    ↓
+EMBEDDED
+    ↓
+INDEXED
+    ↓
+RECOMMENDABLE
+
+If GitHub data becomes stale:
+
+RECOMMENDABLE
+    ↓
+STALE
+    ↓
+REFRESHING
+    ↓
+RECOMMENDABLE
+
+This state model will make background processing much easier to manage.
+
+64. Job Model
+Create a generic synchronization job:
+
+class SyncJob(models.Model):
+    job_type = models.CharField(max_length=100)
+
+    status = models.CharField(max_length=30)
+
+    started_at = models.DateTimeField(null=True)
+    completed_at = models.DateTimeField(null=True)
+
+    attempts = models.IntegerField(default=0)
+
+    error = models.TextField(blank=True)
+
+    metadata = models.JSONField(default=dict)
+
+This gives you visibility into failures.
+
+65. Deployment Architecture
+For the first production version:
+
+                    Cloudflare
+                        │
+                        ▼
+                   Load Balancer
+                        │
+             ┌──────────┴──────────┐
+             ▼                     ▼
+        React/static          Django API
+                                  │
+                         ┌────────┼────────┐
+                         ▼        ▼        ▼
+                    PostgreSQL Redis    Celery
+                                           │
+                                           ▼
+                                      GitHub API
+
+Potential infrastructure:
+
+Frontend:
+Vercel / Cloudflare Pages
+
+Backend:
+Render / Railway / Fly.io / AWS
+
+Database:
+Managed PostgreSQL
+
+Redis:
+Managed Redis
+
+Object storage:
+S3-compatible storage
+
+For a serious production deployment, AWS/GCP/Azure can be introduced later.
+
+66. Docker
+Use Docker from the beginning.
+
+docker-compose.yml
+
+services:
+
+  backend:
+    Django
+
+  worker:
+    Celery
+
+  postgres:
+    PostgreSQL
+
+  redis:
+    Redis
+
+  frontend:
+    React/Vite
+
+This gives every developer a reproducible environment.
+
+67. CI/CD
+GitHub Actions:
+
+Pull Request
+     │
+     ├── lint
+     ├── typecheck
+     ├── backend tests
+     ├── frontend tests
+     ├── build
+     └── security scan
+             │
+             ▼
+          merge
+             │
+             ▼
+        deploy staging
+             │
+             ▼
+        production
+
+Backend:
+
+ruff
+mypy
+pytest
+
+Frontend:
+
+eslint
+prettier
+tsc
+vitest
+playwright
+
+68. Suggested Development Phases
+Phase 1 — Foundation
+Build:
+
+Django
+PostgreSQL
+React
+TypeScript
+Docker
+GitHub OAuth
+
+Deliverable:
+
+User can sign in with GitHub.
+
+Phase 2 — Profile ingestion
+Build:
+
+GitHub profile
+Profile README
+Repositories
+Languages
+Topics
+
+Deliverable:
+
+User sees an automatically generated developer profile.
+
+Phase 3 — Skill extraction
+Build:
+
+README parser
+skill extraction
+interest extraction
+confidence scoring
+
+Deliverable:
+
+"Your detected skills are Python, Django, React..."
+
+Phase 4 — Repository discovery
+Build:
+
+GitHub search
+candidate repository collection
+repository synchronization
+README ingestion
+
+Deliverable:
+
+System has a candidate repository pool.
+
+Phase 5 — Recommendation engine
+Build:
+
+skill matching
+semantic matching
+ranking
+explanations
+
+Deliverable:
+
+User sees personalized repository recommendations.
+
+Phase 6 — Issues
+Build:
+
+issue ingestion
+label analysis
+issue matching
+difficulty detection
+
+Deliverable:
+
+User sees specific issues they could potentially contribute to.
+
+Phase 7 — Feedback
+Build:
+
+save
+dismiss
+view
+open issue
+feedback
+
+Deliverable:
+
+Recommendation system starts learning from user behavior.
+
+69. MVP Definition of Done
+The MVP is complete when a user can:
+
+Sign in with GitHub.
+
+Have their profile automatically analyzed.
+
+See detected skills.
+
+See detected interests.
+
+See their GitHub languages.
+
+Receive at least 10 repository recommendations.
+
+See why each repository was recommended.
+
+Open the repository on GitHub.
+
+View relevant issues.
+
+Filter recommendations.
+
+Save recommendations.
+
+Refresh their profile.
+
+70. Suggested Repository Structure
+I would use a monorepo:
+
+contrib-finder/
+│
+├── apps/
+│   ├── backend/
+│   │   ├── manage.py
+│   │   ├── config/
+│   │   └── apps/
+│   │
+│   └── frontend/
+│       ├── src/
+│       ├── package.json
+│       └── vite.config.ts
+│
+├── packages/
+│   └── shared-types/
+│
+├── infrastructure/
+│   ├── docker/
+│   └── terraform/
+│
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   └── product/
+│
+├── docker-compose.yml
+├── .github/
+│   └── workflows/
+│
+└── README.md
+
+71. Final Preferred Stack
+Area	Technology
+Language	Python
+Backend	Django
+API	Django REST Framework
+Async jobs	Celery
+Queue/cache	Redis
+Database	PostgreSQL
+Vector search	pgvector
+Frontend	React
+Frontend language	TypeScript
+Build	Vite
+Server state	TanStack Query
+Client state	Zustand
+Styling	Tailwind CSS
+UI	shadcn/ui
+Validation	Pydantic / Zod
+API schema	OpenAPI
+GitHub	GitHub REST API
+AI extraction	LLM API
+Embeddings	Embedding model + pgvector
+Backend tests	pytest
+Frontend tests	Vitest + RTL
+E2E	Playwright
+Containers	Docker
+CI/CD	GitHub Actions
+Monitoring	Sentry
+Metrics	Prometheus/Grafana
+
+72. Architecture Recommendation
+The most important architectural choice I would make is:
+
+                 ┌──────────────────────┐
+                 │      GitHub API      │
+                 └──────────┬───────────┘
+                            │
+                            ▼
+                 ┌──────────────────────┐
+                 │   GitHub Sync Layer  │
+                 │       Celery         │
+                 └──────────┬───────────┘
+                            │
+                            ▼
+                 ┌──────────────────────┐
+                 │      PostgreSQL      │
+                 │                      │
+                 │ Profile              │
+                 │ Repositories         │
+                 │ Issues               │
+                 │ Skills               │
+                 │ Embeddings            │
+                 └──────────┬───────────┘
+                            │
+              ┌─────────────┴──────────────┐
+              ▼                            ▼
+     ┌─────────────────┐          ┌─────────────────┐
+     │ Matching Engine │          │  AI/NLP Layer   │
+     │                 │          │                 │
+     │ Rules           │          │ Extraction      │
+     │ Similarity      │          │ Classification  │
+     │ Ranking         │          │ Embeddings      │
+     └────────┬────────┘          └────────┬────────┘
+              │                            │
+              └─────────────┬──────────────┘
+                            ▼
+                 ┌──────────────────────┐
+                 │ Recommendation API   │
+                 └──────────┬───────────┘
+                            │
+                            ▼
+                 ┌──────────────────────┐
+                 │ React + TypeScript   │
+                 └──────────────────────┘

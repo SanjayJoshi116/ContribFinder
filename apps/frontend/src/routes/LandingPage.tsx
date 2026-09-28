@@ -1,0 +1,45 @@
+import { LogIn } from 'lucide-react'
+import { Navigate, useSearchParams } from 'react-router'
+
+import { Button } from '@/components/ui/button'
+import { GITHUB_SIGN_IN_URL, useMe } from '@/features/auth/api'
+import { authErrorMessage } from '@/features/auth/authErrors'
+
+export function LandingPage() {
+  const [params] = useSearchParams()
+  const me = useMe()
+  const error = authErrorMessage(params.get('auth_error'))
+
+  if (me.isSuccess) return <Navigate to="/app" replace />
+
+  return (
+    <main className="flex min-h-svh items-center justify-center px-4">
+      <section className="w-full max-w-lg space-y-6 text-center">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          Find Your Next OSS Contribution
+        </h1>
+        <p className="text-muted-foreground">
+          Analyze your GitHub profile and discover repositories where you can contribute.
+        </p>
+        {error && (
+          <p
+            role="alert"
+            className="border-destructive/40 text-destructive rounded-md border px-4 py-3 text-sm"
+          >
+            {error}
+          </p>
+        )}
+        <Button asChild size="lg">
+          {/* Full-page navigation: the OAuth flow is a server redirect, not an XHR. */}
+          <a href={GITHUB_SIGN_IN_URL}>
+            <LogIn aria-hidden="true" />
+            Continue with GitHub
+          </a>
+        </Button>
+        <p className="text-muted-foreground text-xs">
+          We only read public GitHub data. You can disconnect at any time.
+        </p>
+      </section>
+    </main>
+  )
+}

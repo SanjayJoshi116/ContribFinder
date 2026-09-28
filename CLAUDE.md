@@ -1,0 +1,388 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in this repository.
+
+## 1. What ContribFinder is
+
+A **developer-to-contribution-opportunity matching system**, not a GitHub search engine.
+It builds an evidence-backed developer profile from GitHub data, discovers candidate
+open-source repositories, ranks them deterministically, and explains every match.
+
+Core loop (SRS-2 §87):
+
+```
+UNDERSTAND DEVELOPER → FIND CANDIDATES → UNDERSTAND PROJECTS → MATCH
+→ EXPLAIN MATCH → IDENTIFY CONTRIBUTION OPPORTUNITIES → LEARN FROM INTERACTION
+```
+
+## 2. Sources of truth
+
+- `Software Requirements Specification - 2.txt` (v2.0) is **authoritative** for what to build.
+  Its §83 functional requirements (FR-*) are the implementation checklist.
+- `Software Requirements Specification - 1.txt` (v1.0) supplies **concrete defaults**
+  (model sketches, Celery task names, evidence weights, cache keys/TTLs, GitHubClient
+  methods) wherever SRS-2 is silent. Where they conflict, SRS-2 wins.
+- Accepted behaviour lives in `openspec/specs/` (synced when a change is archived). Read the
+  relevant spec before changing its capability.
+- Each phase below is specified in detail as an OpenSpec change under `openspec/changes/`
+  before implementation. This file is the index; OpenSpec holds the per-phase specs and tasks.
+
+### Resolved conflicts between SRS-1 and SRS-2
+
+| Topic | Decision |
+|---|---|
+| Score display | Never show "87% match". UI shows match labels (Strong / Good / Partial) plus evidence. Numeric score is internal ranking only. |
+| Ranking weights | Stored in a versioned `ScoringConfig` row; every `Recommendation` references the config that produced it. SRS-1 numbers are starting points only. |
+| Semantic matching | Not in MVP. MVP ranking is fully deterministic. |
+| LLM / embeddings | **Future scope.** No AI provider is chosen. MVP must not call any LLM or embedding API. AI lives behind interfaces added in Phase 6+. |
+| Issue recommendations | **MVP+** (Phase 7), per SRS-2 §82. |
+| Explanations | First-class `RecommendationReason` rows generated only from computed signals — never free-text invented. |
+| Candidate provenance | `RepositoryCandidate` records *why* a repo entered a developer's pool (FR-REPO-002). |
+| Skill evidence | Relational evidence rows (source, supporting repo, last observed), not an opaque JSON blob. |
+| Difficulty | `beginner / intermediate / advanced / unknown`. Return `unknown` when evidence is insufficient. |
+| Repo layout | Monorepo: `apps/backend`, `apps/frontend` (see §4). |
+
+## 3. Non-negotiable invariants
+
+Architecture (SRS-2 §85):
+1. Modular monolith. No microservices, Kubernetes, Elasticsearch, or separate vector DB.
+2. PostgreSQL is the system of record (pgvector only once embeddings arrive).
+3. All GitHub and long-running work runs in **Celery** (Redis broker). HTTP requests never
+   wait on GitHub; dashboard reads come from PostgreSQL.
+4. Candidate generation → filtering → feature calculation → scoring → ranking → explanation
+   are **separate, independently testable stages**.
+5. Deterministic scoring owns final ranking. AI (when added) only extracts/classifies.
+6. Weights and evidence strengths are configuration, not constants in code.
+7. Repository activity is shown as observable signals ("Recently active"), never "healthy/good".
+
+Product principles (SRS-2 §6): evidence over keywords; explainability over black-box scores;
+a score is relevance, not probability of success; the user can filter, save, dismiss,
+refresh, disconnect, and delete.
+
+GitHub tokens and secrets:
+- Never returned to the frontend, never logged, never in URLs, never in client code.
+- Encrypted at rest (MultiFernet via `services/crypto.py`, keys from `TOKEN_ENCRYPTION_KEYS`).
+- Minimum scope: **no OAuth scopes** (public data only; configurable via `GITHUB_OAUTH_SCOPES`).
+- Revoked and deleted on disconnect.
+
+Resilience:
+- A missing profile README, GitHub failure, or (later) AI failure must degrade gracefully,
+  never take down recommendations.
+- Failures are recorded as state (`SyncJob.status=FAILED`, repo lifecycle), never
+  silently treated as empty data.
+
+## 4. Stack and layout
+
+Backend: Python 3.12+, Django, DRF, django-environ, django-filter, drf-spectacular (OpenAPI),
+Celery + Redis, PostgreSQL, pytest / pytest-django / factory_boy, ruff, mypy.
+
+Frontend: React 19+, TypeScript, Vite, TanStack Query (server state), Zustand (client-only
+state), Tailwind + shadcn/ui + lucide-react, React Hook Form + Zod, Recharts,
+Vitest + React Testing Library, Playwright. API types are **generated from OpenAPI**, not handwritten.
+
+```
+ContribFinder/
+├─ apps/
+│  ├─ backend/
+│  │  ├─ manage.py
+│  │  ├─ config/            settings/{base,development,test,production}.py, urls.py, celery.py,
+│  │  │                     exceptions.py (error envelope)
+│  │  ├─ core/              health, auth class, CSRF/404 JSON views, log redaction, checks
+│  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
+│  │  ├─ github/            GitHubAccount, SyncJob, sync tasks
+│  │  ├─ developers/        DeveloperProfile, Skill, DeveloperSkill, SkillEvidence, Interest
+│  │  ├─ repositories/      Repository, RepositoryLanguage/Topic/Snapshot, RepositoryCandidate
+│  │  ├─ issues/            Issue (Phase 7)
+│  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason, SavedRepository
+│  │  ├─ feedback/          RecommendationFeedback
+│  │  ├─ embeddings/        (Phase 6, future)
+│  │  └─ services/          crypto.py (token encryption), audit.py
+│  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2)
+│  │     ├─ profiling/      evidence collection, taxonomy, confidence
+│  │     ├─ discovery/      candidate generation + filtering
+│  │     ├─ matching/       feature/signal calculators
+│  │     ├─ ranking/        scoring + explanation generation
+│  │     └─ ai/             provider interfaces only (future)
+│  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
+├─ scripts/                 setup.mjs, backend.mjs, uv.mjs, check-version.mjs (npm runners)
+├─ package.json             root runner: npm run setup / npm start / check:version
+├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
+├─ VERSION, CHANGELOG.md, features.txt
+└─ .github/workflows/ci.yml
+```
+
+## 5. Conventions
+
+- Business logic lives in `services/`. Views, serializers and Celery tasks are thin
+  wrappers that call services.
+- Only `services/github/` talks to GitHub. It handles pagination, ETag conditional requests,
+  timeouts, retries with exponential backoff, `Retry-After`/secondary rate limits, and
+  Redis caching (`github:user:{u}`, `github:repo:{o}:{r}`, `github:issues:{o}:{r}`).
+  The rest of the app sees normalized dataclasses, never raw GitHub JSON.
+- Celery tasks are idempotent, create/update a `SyncJob`, and retry through Celery with backoff.
+- Every DRF endpoint lives under `/api/v1/`, is paginated where it returns lists, enforces
+  per-user authorization, and appears in the OpenAPI schema.
+- Auth: Django session cookies (HTTP-only, Secure in prod, SameSite=Lax) plus CSRF (`X-CSRFToken`),
+  with the SPA same-origin. Unauthenticated → 401. Every error uses
+  `{"error": {code, message, details?}}` (`config/exceptions.py`).
+- Scoring components are normalized to `0.0–1.0`.
+- Tests: every service stage has unit tests; the GitHub client is tested against recorded
+  fixtures, never the live API.
+
+## 6. Commands
+
+Local, no Docker (primary on this machine):
+- one-time: create the PostgreSQL role/db `contribfinder` (see README), then `npm run setup`.
+  This creates `.env` with generated secrets, installs deps and migrates.
+- `npm start` runs Django on :8000 and Vite on :5173 together. Open http://localhost:5173.
+  The SPA proxies `/api`.
+- No Redis locally: `REDIS_URL` empty means an in-process cache and inline Celery tasks, and
+  health reports `redis: not_configured`. Production refuses to start without `REDIS_URL`.
+- `uv` may only be installed as `python -m uv`; the npm scripts handle both.
+
+Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
+`REDIS_URL` with container hostnames; Postgres is on host port 5433.
+
+Backend (`apps/backend`, uses `uv`):
+- `uv sync`: install deps
+- `uv run pytest`: tests. Uses `config.settings.test` against local PostgreSQL (creates `test_contribfinder`)
+- `uv run ruff check . && uv run ruff format --check .`: lint and format
+- `uv run mypy .`: strict type check
+- `uv run python manage.py makemigrations --settings config.settings.test`: new migrations
+
+Frontend (`apps/frontend`, npm):
+- `npm run dev`, `npm test`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build`
+- `npm run api:sync`: re-export the OpenAPI schema from Django and regenerate
+  `src/api/schema.d.ts`. Run it after any API change and commit both files; CI fails on drift.
+
+## 7. Implementation roadmap (function by function)
+
+Build in phase order. Each FR is one unit of work. A phase is done only when every FR in it
+meets its **Done when** and its tests pass. Create one OpenSpec change per phase before
+starting it.
+
+### Phase 1 — Foundation  → *User can sign in with GitHub*  ✅ shipped in v0.1.0
+
+Archived: `openspec/changes/archive/2026-09-28-phase-1-foundation/`. Specs: `api-platform`,
+`github-authentication`.
+
+Scaffolding: monorepo, docker-compose (backend, worker, beat, postgres, redis, frontend),
+split settings via django-environ, Celery app, DRF plus drf-spectacular, Vite React TS app,
+CI (ruff, mypy, pytest, eslint, prettier, tsc, vitest, build).
+
+**FR-AUTH-001: GitHub authentication**
+- Where: `accounts/`, `github/models.py`
+- Build: `GET /api/v1/auth/github` (redirect with a `state` param), `GET /api/v1/auth/github/callback`
+  (verify state, exchange code, upsert `User` and `GitHubAccount(github_id, username, avatar_url,
+  encrypted access_token)`), frontend "Continue with GitHub" landing page.
+- Done when: login creates a session; the token is stored encrypted and absent from every response and log.
+
+**FR-AUTH-002: Authenticated session**
+- Build: `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`, session expiry, CSRF endpoint.
+  Frontend auth guard using TanStack Query on `/auth/me`.
+- Done when: protected routes redirect when logged out; logout invalidates the session.
+
+**FR-AUTH-003: Disconnect GitHub** (the endpoint lands here; data deletion in FR-DATA-003)
+- Build: `POST /api/v1/auth/github/disconnect` → revoke the token through the GitHub API, then delete `GitHubAccount`.
+- Done when: after disconnect the token no longer works and no copy of it remains.
+
+### Phase 2 — GitHub data ingestion  → *User's GitHub data is in ContribFinder*
+
+**Carry-over from phase-1-foundation (deferred, no Docker on the dev machine):** verify
+`docker compose up` from a fresh `.env`, and that a Celery worker runs `core.ping` against a real
+Redis. Phase 2 sync jobs need a real broker, so do this first: Docker, or Memurai/WSL Redis with
+`REDIS_URL` set and `celery -A config worker --pool=solo` on Windows.
+
+**SyncJob model**: `job_type, status (PENDING|RUNNING|COMPLETED|FAILED|RETRYING|CANCELLED),
+user, started_at, completed_at, attempts, error, metadata`.
+
+**FR-GH-001: Profile information**
+- Build: `GitHubClient.get_authenticated_user()`; task `sync_github_profile`; store username,
+  name, bio, company, location, blog, followers, following, public_repos, created_at.
+
+**FR-GH-002: Public repositories**
+- Build: `GitHubClient.get_repositories(username)`; task `sync_user_repositories`; persist the user's
+  own repositories (owned, non-fork flag kept) with the metadata from SRS-2 §10.
+
+**FR-GH-003: Repository languages**
+- Build: `GitHubClient.get_languages(owner, repo)` → `RepositoryLanguage(repo, language, bytes)`.
+
+**FR-GH-004: Repository topics**
+- Build: topics from the repo payload → `RepositoryTopic`.
+
+**FR-GH-005: Profile README**
+- Build: `GitHubClient.get_readme(owner, repo)` (raw); look up `{username}/{username}`.
+  Store the raw README separately from anything derived from it.
+- Done when: users without a profile README still complete sync (`has_profile_readme=False`).
+
+**FR-GH-006: Pagination**
+- Build: a generic `_paginate()` in GitHubClient that follows `Link` headers, with a per-call page cap.
+
+**FR-GH-007: Rate limits and transient failures**
+- Build: timeouts, exponential backoff, `Retry-After` / `X-RateLimit-Reset` handling that
+  schedules a Celery retry (never a hot loop), ETag conditional requests, Redis cache,
+  rate-limit state in Redis.
+- Done when: fixture tests cover 403/429 secondary limits, 5xx retry, and 304 not-modified.
+
+**FR-DATA-001: Sync status**
+- Build: `POST /api/v1/profile/sync` (enqueue, return job id), `GET /api/v1/sync/status`;
+  onboarding screen polls the status and shows per-step ticks (Profile, README, Repos, Languages, Topics).
+- Done when: the browser never blocks on a sync request; last-synced time is shown.
+
+### Phase 3 — Developer profile (deterministic)  → *User sees a structured technical profile*
+
+**FR-PROFILE-001: Structured profile**
+- Build: `DeveloperProfile(user, summary, experience_level, preferred_project_size,
+  preferred_issue_difficulty, profile_readme_raw, analyzed_at)`; `GET /api/v1/profile`.
+
+**FR-PROFILE-002: Identify skills**
+- Build: `services/profiling/taxonomy.py`, a canonical skill catalog with aliases and categories
+  (language, framework, database, cloud, devops, tool) and dependency-name mappings.
+  Evidence collectors:
+  - `readme_skills(readme)`: section and keyword extraction against the taxonomy
+  - `language_skills(repo_languages)`
+  - `topic_skills(repo_topics)`
+  - `dependency_skills(manifests)`: requirements.txt, pyproject.toml, package.json, go.mod, Cargo.toml
+  - `contribution_skills(events)`: commits and PRs to other repos, where available
+- Task: `extract_developer_skills`.
+
+**FR-PROFILE-003: Identify interests**
+- Build: `interest_extractor` that maps README phrases, repo descriptions and topics to an interest
+  taxonomy (AI, developer tooling, web, databases, infra, security, data eng, mobile…) using synonyms.
+  `GET /api/v1/profile/interests`.
+
+**FR-PROFILE-004: Evidence per skill**
+- Build: `SkillEvidence(developer_skill, source, supporting_repo?, detail, observed_at)`.
+  `GET /api/v1/profile/skills` returns skills with their evidence.
+- Done when: the UI shows *why* each skill was detected ("8 repositories, dependency usage, README").
+
+**FR-PROFILE-005: Configurable confidence**
+- Build: `EVIDENCE_WEIGHTS` in settings (defaults from SRS-1 §15: README 0.20, topic 0.30,
+  language 0.50, dependency 0.60, commit 0.80, PR 0.90, repeated contribution 1.00);
+  `compute_confidence(evidence) → 0..1`, with diminishing returns so a single README mention stays low.
+  Experience level (beginner/intermediate/experienced) comes from several signals and is used
+  only for matching.
+
+Frontend: profile page with skill bars labeled by evidence (not "expertise %"), languages chart,
+interests, and a refresh button.
+
+### Phase 4 — Repository discovery  → *System builds a candidate pool*
+
+**FR-REPO-001: Generate candidates**
+- Build: `services/discovery/queries.py` turns top skills and interests into GitHub search queries
+  (`language:python topic:django`, `topic:developer-tools language:python`, …), with a budget of
+  N queries per run. `GitHubClient.search_repositories(q)`. Task `generate_candidates`.
+  Hard filters: not archived, not a fork, pushed within X days, has a license, excludes the user's own repos.
+
+**FR-REPO-002: Record discovery source**
+- Build: `RepositoryCandidate(developer, repository, source ∈ {language_search, topic_search,
+  skill_search, interest_search, similar_repo, previously_interacted}, query, discovered_at)`.
+
+**FR-REPO-003: Analyze repository metadata**
+- Build: tasks `sync_repository`, `sync_repository_readme`; also fetch the CONTRIBUTING, CODE_OF_CONDUCT
+  and issue-template presence. Repo lifecycle field:
+  `DISCOVERED → FETCHING → ANALYZED → INDEXED → RECOMMENDABLE`, `→ STALE → REFRESHING`, plus `FAILED`.
+  (`EMBEDDED` comes in Phase 6.)
+
+**FR-REPO-004: Activity signals**
+- Build: `services/matching/activity.py` computes days since the last push, recent commits and PRs,
+  contributor count, release recency and open-issue count → `RepositorySnapshot` plus a label
+  (`recently_active | moderately_active | low_activity`).
+- Periodic Celery beat job marks repos STALE by data type (metadata: hours, README: longer).
+
+### Phase 5 — Recommendation engine (deterministic)  → *Personalized repo recommendations*
+
+**FR-REC-001: Calculate relevance**
+- Build: signal calculators in `services/matching/`, each returning `(score 0..1, evidence[])`:
+  `skill_match`, `language_match`, `framework_match`, `interest_match` (taxonomy overlap),
+  `activity_signal`, `contribution_openness` (CONTRIBUTING present, good-first-issue label exists).
+
+**FR-REC-004: Configurable weights**
+- Build: `ScoringConfig(version, weights JSON, is_active, created_at)`. Seed `v1-deterministic`
+  (experimental): skill 0.40, language 0.20, interest 0.15, framework 0.10, activity 0.10,
+  openness 0.05.
+
+**FR-REC-002: Rank candidates**
+- Build: `services/ranking/score.py` computes a weighted sum → `Recommendation(developer, repository,
+  score, per-signal scores, scoring_config, generated_at)`. Keep the top N (≥ 20).
+  Tasks `generate_recommendations`, `refresh_recommendations` (run on profile change or repo change).
+
+**FR-REC-005: Record the scoring config**
+- Done when: every Recommendation has a non-null FK to the ScoringConfig that produced it.
+
+**FR-REC-003: Explanations**
+- Build: `services/ranking/explain.py` turns signal evidence into
+  `RecommendationReason(recommendation, type ∈ {skill, language, framework, interest, domain,
+  activity, difficulty, issue_availability}, text, weight)`. Only reasons backed by a
+  non-zero signal are created. Match label comes from score bands (Strong/Good/Partial).
+
+**FR-REC-006: Filtering**
+- Build: `GET /api/v1/recommendations?language=&framework=&activity=&size=&page=` (django-filter);
+  `GET /api/v1/recommendations/{id}`. Difficulty and contribution-type filters are added in Phase 7.
+
+Frontend: dashboard (profile summary, recommendation cards with name, owner, description,
+technologies, match label, reasons, activity, save, GitHub link), filters, repository detail page
+(overview, why it matches, technologies, topics, activity, contribution guidelines, README excerpt,
+GitHub link).
+
+### Phase 8a — Feedback and data controls (MVP)
+
+**FR-FEEDBACK-001: Record views** · **FR-FEEDBACK-004: Repo/issue interactions**
+- Build: `RecommendationFeedback(user, recommendation, action ∈ {viewed, saved, dismissed,
+  opened_repository, opened_issue}, created_at)`; `POST /api/v1/recommendations/{id}/feedback`.
+  Stored independently from the recommendation; used for analytics only (no ranking changes yet).
+
+**FR-FEEDBACK-002: Save** · **FR-FEEDBACK-003: Dismiss**
+- Build: `SavedRepository(user, repository, saved_at)`; saved list page; dismissed repos are
+  excluded from later ranking runs.
+
+**FR-DATA-002: Refresh profile**: the refresh button triggers the Phase 2→5 pipeline with SyncJob tracking.
+
+**FR-DATA-003: Delete data**
+- Build: `DELETE /api/v1/profile/github-data`, `DELETE /api/v1/auth/account`; disconnect flow
+  = revoke token → delete GitHub-derived data → keep only account essentials. Privacy page
+  lists what is stored. Audit-log these actions.
+
+### MVP definition of done (SRS-2 §82)
+
+Sign in with GitHub · public profile analyzed · profile README analyzed when present ·
+see skills with evidence, interests, and languages · ≥ 10 repository recommendations with
+reasons · open on GitHub · filter · save · refresh · see last-synced time · disconnect/delete data.
+
+### MVP+ / future
+
+**Phase 6 — Semantic matching** (future; AI provider not chosen)
+- `services/ai/` interfaces: `EmbeddingProvider.embed(texts)`, `LLMProvider.extract(schema, text)`
+  with Pydantic validation. Embedding dimension comes from settings.
+- Developer, repository and issue embeddings (pgvector), `semantic_match` signal, `EMBEDDED` lifecycle
+  state, a new ScoringConfig version that includes semantic weight. Tasks `generate_*_embedding(s)`.
+- AI failures fall back to deterministic scoring.
+
+**Phase 7 — Issues** (MVP+)
+- FR-ISSUE-001: `GitHubClient.get_issues`, task `sync_repository_issues`, `Issue` model.
+- FR-ISSUE-002: label normalization (good first issue, help wanted, docs, bug, enhancement, …).
+- FR-ISSUE-003: contribution type (label and keyword rules first).
+- FR-ISSUE-004: difficulty ∈ {beginner, intermediate, advanced, unknown}; default `unknown`.
+- FR-ISSUE-005: issue match signals, reasons, and an issue detail page that separates GitHub-provided
+  data from ContribFinder analysis; add difficulty and contribution-type filters.
+
+**Phase 8b — Evaluation**
+- Fixed benchmark developers with hand-labeled relevant repos; compute Precision@5/10,
+  Recall@10, MRR and NDCG per ScoringConfig. A ranking change counts as an improvement only if it wins here.
+
+**Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
+contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).
+
+## 8. Release housekeeping
+
+When a change (phase) is completed and archived, update in the same commit:
+1. `VERSION`, root `package.json`, `apps/frontend/package.json`, `apps/backend/pyproject.toml`
+   (then refresh lockfiles: `npm install` / `uv lock`). Before the MVP, each phase bumps the minor
+   version (`0.x.0`), and fixes bump the patch version. `npm run check:version` must pass.
+2. `CHANGELOG.md`: move `[Unreleased]` entries into a dated version section (Keep a Changelog).
+3. `features.txt`: flip shipped items to `[x]`, and mark carry-overs `[~]`.
+4. `README.md`: version/status line, plus any setup changes.
+5. This file: mark the phase shipped, and record carry-overs in the next phase.
+
+The API contract version (`/api/v1`, OpenAPI `1.0.0`) changes only on breaking API changes,
+independently of the app version.
