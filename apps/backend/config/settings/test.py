@@ -11,6 +11,10 @@ CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
+# Threads get their own database connections, which cannot see a test's transaction.
+# Threaded analysis is covered by a transactional test that overrides this.
+DISCOVERY_ANALYSIS_CONCURRENCY = 1
+
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 

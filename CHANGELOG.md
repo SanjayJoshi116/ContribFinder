@@ -7,6 +7,85 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-29
+
+Phase 4: Repository discovery (OpenSpec change `phase-4-repository-discovery`; FR-REPO-001..004).
+Builds a per-developer candidate pool. Nothing is ranked or recommended yet (Phase 5).
+
+### Added
+
+- Query generation (`services/discovery/queries.py`): the developer's top skills, interests,
+  languages and repository topics become GitHub search queries in four strategies (language,
+  skill, interest, topic) within a per-run budget (`DISCOVERY_MAX_QUERIES`, default 10). Every
+  query carries the hard filters: not archived, not a fork, public, pushed recently, minimum
+  stars, not the user's own repositories.
+- Repository discovery job (`repository_discovery`, task `repositories.generate_candidates`) with
+  resumable steps queries → search → interactions → analysis → pool. It starts automatically
+  after a completed profile sync or profile analysis. Repositories the user contributed to join
+  as `previously_interacted`.
+- Candidate provenance: `RepositoryCandidate` (one per developer and repository) and
+  `CandidateDiscovery` (source, query, search rank, first/last seen).
+- Filtering as its own stage: a pre-filter on search results and an eligibility check on analyzed
+  data, each rejection recorded with a reason code (`archived`, `fork`, `inactive`, `no_license`,
+  `few_stars`, `own_repository`, `repository_unavailable`).
+- Shared repository analysis (`services/repositories/`): metadata, languages, topics, README (stored
+  raw, truncated at a cap), community files (CONTRIBUTING, code of conduct, issue/PR templates),
+  `good first issue` / `help wanted` labels and dependency manifests, each with its own refresh
+  timestamp.
+- Repository lifecycle: `discovered → fetching → analyzed → indexed → recommendable`,
+  `stale → refreshing`, and `failed` with an error code. Eligibility is stored separately.
+- Activity signals (`services/matching/activity.py`): days since push, commits and pull requests
+  in 90 days, contributors, latest release, open issues → `RepositorySnapshot` with a label
+  `recently_active | moderately_active | low_activity`. Thresholds are configuration.
+- Celery beat: `mark_stale_repositories` (hourly), `process_repository_backlog` (every 15 minutes,
+  app client credentials, public data only), `jobs.recover_stale_jobs` (every 5 minutes).
+- `GET /api/v1/discovery/status` and `GET /api/v1/discovery/candidates` (paginated, filterable by
+  source, eligibility and activity; stored data only; no score or rank).
+- Profile page "Project discovery" card (state, candidate count, last updated).
+- Dead-worker recovery: jobs record a heartbeat between units of work; a RUNNING job without one
+  for `SYNC_STALE_AFTER_SECONDS` (default 10 minutes) is requeued, or ends as FAILED
+  `worker_lost` once it has used all attempts.
+- Parallel repository analysis within a discovery run (`DISCOVERY_ANALYSIS_CONCURRENCY`, default
+  4 threads, each with its own GitHub client and database connection).
+- Local tooling: `scripts/beat.mjs` (Celery beat), `scripts/frontend.mjs` (Vite without `npm.cmd`),
+  `scripts/child.mjs` (runners kill their whole process tree and stop when `npm start` is gone),
+  and `npm run stop` (kills a leftover local stack of this repository).
+
+### Changed
+
+- The candidate list is ordered eligible → awaiting analysis → ineligible, then previously
+  interacted, best search rank and name (the order the job analyzes them), instead of by
+  last-found time.
+- The pool cap keeps the best candidates in analysis order and evicts the rest (previously: the
+  least recently found). With `DISCOVERY_MAX_POOL` equal to `DISCOVERY_MAX_ANALYSES_PER_RUN`, the
+  pool is exactly the analyzed top N.
+- `SYNC_STALE_AFTER_SECONDS` default lowered from 30 to 10 minutes.
+- On Windows the local Celery worker runs `--pool=threads --concurrency=4` (was `--pool=solo`),
+  so discovery, syncs and backlog refreshes run side by side.
+- Repository storage helpers moved from `services/github/sync.py` to `services/github/storage.py`;
+  the job retry/finish loop moved to `services/jobs.run_tracked_job`.
+
+### Fixed
+
+- A job killed together with its worker stayed RUNNING for up to an hour (Redis visibility
+  timeout), and the discovery card kept spinning.
+- Redis calls had no socket timeout, so a stalled connection (a sleeping WSL distro) could hang a
+  worker; `REDIS_SOCKET_TIMEOUT` (default 5 s) now applies to the cache and the broker connect.
+- Repository claims were stamped with the discovery job's start time, so after 10+ minutes other
+  workers saw them as abandoned. Claims now use the wall clock, and the backlog also takes over
+  claims left by a dead worker.
+- Flaky frontend tests: under parallel load a first render could outlast Testing Library's 1 s
+  default for `findBy*`/`waitFor`. The shared setup now allows 5 s (`asyncUtilTimeout`), and
+  Vitest's per-test timeout is 15 s.
+- The changelog was missing its `0.2.0` heading.
+
+### Known limitations
+
+- Ctrl+C does not stop `npm start` in an interactive Windows console (Anaconda Prompt, cmd); use
+  `npm run stop` from a second prompt. Tracked in CLAUDE.md §6 Known issues and carried to Phase 5.
+- Docker Compose is still unverified (no Docker on the development machine); carried to Phase 5.
+- `npm run api:sync` needs `uv` on PATH (`api:export` calls it directly).
+
 ## [0.3.0] - 2026-09-29
 
 Phase 3: Developer profile, deterministic (OpenSpec change `phase-3-developer-profile`;
@@ -53,6 +132,8 @@ FR-PROFILE-001..005). No LLM or embedding calls.
 - `GET /api/v1/profile/repositories` lists only repositories the user owns.
 - Sync jobs report steps missing from older jobs as `pending`.
 - `claim_job` / `finish_job` moved to `services/jobs.py` for reuse by all job types.
+
+## [0.2.0] - 2026-09-28
 
 Phase 2: GitHub data ingestion (OpenSpec change `phase-2-github-ingestion`; FR-GH-001..007, FR-DATA-001).
 
@@ -167,6 +248,8 @@ Phase 1: Foundation (OpenSpec change `phase-1-foundation`; FR-AUTH-001..003).
 - The API contract version (`/api/v1`, OpenAPI `1.0.0`) is versioned separately from the app
   version.
 
-[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/SanjayJoshi116/ContribFinder/releases/tag/v0.1.0

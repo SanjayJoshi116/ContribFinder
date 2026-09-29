@@ -23,6 +23,8 @@ _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         rf"\1\2{_REDACTED}\2",
     ),
+    # Authorization header values (Bearer tokens, Basic client credentials)
+    (re.compile(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9+/=._-]{8,}"), rf"\1 {_REDACTED}"),
     # GitHub token formats: gho_, ghu_, ghp_, ghs_, ghr_, github_pat_
     (re.compile(r"\b(gh[opusr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})\b"), _REDACTED),
 )

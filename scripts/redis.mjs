@@ -2,6 +2,7 @@
 // distro awake for as long as this process lives (WSL stops idle distros, and Redis with them).
 import { spawn, spawnSync } from 'node:child_process'
 
+import { watchStack } from './child.mjs'
 import { loadEnv, redisTarget } from './env.mjs'
 import { waitPort } from './wait-port.mjs'
 
@@ -41,6 +42,7 @@ const stop = () => {
 }
 process.on('SIGINT', stop)
 process.on('SIGTERM', stop)
+watchStack(stop)
 keepAlive.on('exit', (code) => {
   console.error(`WSL keep-alive session ended (code ${code}); Redis may stop.`)
   process.exit(1)

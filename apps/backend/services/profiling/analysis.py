@@ -39,14 +39,13 @@ from .interests import DetectedInterest, detect_interests
 from .languages import LanguageShare, aggregate_languages
 from .readme import readme_skills
 from .summary import build_summary
-from .taxonomy import INTERESTS_BY_SLUG, SKILLS_BY_SLUG, TAXONOMY_VERSION
+from .taxonomy import INTERESTS_BY_SLUG, MARKUP, SKILLS_BY_SLUG, TAXONOMY_VERSION
 
 logger = logging.getLogger(__name__)
 
 # Skills at or above this confidence count as "well evidenced" for experience estimation.
 WELL_EVIDENCED = 0.5
 SUMMARY_CATEGORIES = ("framework", "library")
-MARKUP = frozenset({"html", "css"})
 
 
 class ProfileAnalysisError(PermanentJobError):

@@ -7,12 +7,13 @@ error mapping, and returns normalized dataclasses instead of raw GitHub JSON.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -27,10 +28,12 @@ from services.crypto import decrypt_token
 from .errors import (
     GitHubAuthError,
     GitHubClientError,
+    GitHubConflict,
     GitHubForbidden,
     GitHubNotFound,
     GitHubRateLimited,
     GitHubTransientError,
+    GitHubUnavailableForLegalReasons,
     GitHubValidationError,
 )
 
@@ -42,8 +45,11 @@ RAW = "application/vnd.github.raw+json"
 PER_PAGE = 100
 # GitHub serves at most 3 pages (300 events, ~90 days) of a user's public events.
 EVENTS_MAX_PAGES = 3
+LABELS_MAX_PAGES = 3
 # GitHub asks clients to wait at least a minute on a secondary limit without Retry-After.
 SECONDARY_LIMIT_DEFAULT_WAIT = 60
+# ETag cache scope for public repository data, shared by every client (Phase 4).
+PUBLIC_SCOPE = "public"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -154,6 +160,26 @@ class PushRef:
     created_at: datetime | None
 
 
+@dataclass(frozen=True)
+class CommunityProfile:
+    """Presence of community files (``/community/profile``)."""
+
+    has_contributing: bool
+    has_code_of_conduct: bool
+    has_issue_template: bool
+    has_pull_request_template: bool
+
+
+@dataclass(frozen=True)
+class PullSample:
+    """Pull request counts over a window, from one page of recently updated PRs.
+    ``capped`` is True when the page was full and older PRs in the window may be missing."""
+
+    opened: int
+    merged: int
+    capped: bool
+
+
 def _repo_from_api_url(url: str) -> str:
     """``https://api.github.com/repos/owner/name`` → ``owner/name``."""
     return "/".join(httpx.URL(url).path.split("/")[2:4])
@@ -178,8 +204,12 @@ class _Response:
 
 
 class GitHubClient:
-    def __init__(self, token: str, *, cache_scope: str) -> None:
-        self._token = token
+    def __init__(
+        self, token: str | None = None, *, cache_scope: str, auth_header: str | None = None
+    ) -> None:
+        if (token is None) == (auth_header is None):
+            raise ValueError("Pass exactly one of token or auth_header")
+        self._auth = auth_header or f"Bearer {token}"
         self._scope = cache_scope
         self._http = httpx.Client(
             base_url=settings.GITHUB_API_BASE_URL,
@@ -188,13 +218,29 @@ class GitHubClient:
         )
 
     @classmethod
-    def for_user(cls, user: User) -> GitHubClient:
+    def for_user(cls, user: User, *, cache_scope: str | None = None) -> GitHubClient:
         """Build a client with the user's decrypted token. Raises GitHubAuthError if the
-        user has no connected GitHub account."""
+        user has no connected GitHub account.
+
+        ``cache_scope`` defaults to the user; pass ``PUBLIC_SCOPE`` for public repository
+        endpoints so their ETags are shared with other users and the app client."""
         account = GitHubAccount.objects.filter(user=user).first()
         if account is None:
             raise GitHubAuthError("No connected GitHub account")
-        return cls(decrypt_token(account.access_token_encrypted), cache_scope=str(user.pk))
+        return cls(
+            decrypt_token(account.access_token_encrypted), cache_scope=cache_scope or str(user.pk)
+        )
+
+    @classmethod
+    def for_app(cls) -> GitHubClient:
+        """Client authenticated with the OAuth app's client credentials, for public data that
+        belongs to no user (background repository refresh). Raises GitHubAuthError when the
+        credentials are not configured."""
+        client_id, secret = settings.GITHUB_CLIENT_ID, settings.GITHUB_CLIENT_SECRET
+        if not client_id or not secret:
+            raise GitHubAuthError("GitHub client credentials are not configured")
+        basic = base64.b64encode(f"{client_id}:{secret}".encode()).decode()
+        return cls(auth_header=f"Basic {basic}", cache_scope=PUBLIC_SCOPE)
 
     def __repr__(self) -> str:
         return f"<GitHubClient scope={self._scope}>"
@@ -278,6 +324,85 @@ class GitHubClient:
                 pushes.append(PushRef(repo, _dt(event.get("created_at"))))
         return pushes
 
+    # --- candidate repositories (Phase 4) -------------------------------------------
+
+    def search_repositories(self, query: str, limit: int) -> list[GitHubRepo]:
+        """First page (best match) of a repository search, at most ``limit`` (≤ 100) results.
+        Raises GitHubValidationError (422) for a query GitHub rejects."""
+        params = urlencode({"q": query, "per_page": min(limit, PER_PAGE)})
+        data = self._get(f"/search/repositories?{params}").json()
+        return [GitHubRepo.from_api(item) for item in data.get("items", [])[:limit]]
+
+    def get_readme(self, full_name: str) -> str | None:
+        try:
+            return self._get(f"/repos/{full_name}/readme", accept=RAW).text
+        except GitHubNotFound:
+            return None
+
+    def get_community_profile(self, full_name: str) -> CommunityProfile:
+        try:
+            files = self._get(f"/repos/{full_name}/community/profile").json().get("files") or {}
+        except GitHubNotFound:
+            files = {}
+        return CommunityProfile(
+            has_contributing=bool(files.get("contributing")),
+            has_code_of_conduct=bool(
+                files.get("code_of_conduct_file") or files.get("code_of_conduct")
+            ),
+            has_issue_template=bool(files.get("issue_template")),
+            has_pull_request_template=bool(files.get("pull_request_template")),
+        )
+
+    def list_label_names(self, full_name: str) -> list[str]:
+        page = self._paginate(f"/repos/{full_name}/labels", {}, max_pages=LABELS_MAX_PAGES)
+        return [str(label.get("name", "")) for label in page.items]
+
+    def count_commits_since(self, full_name: str, since: datetime) -> int:
+        """Default-branch commits since ``since`` (truncated to the UTC day, so the URL and
+        its ETag are stable within a day). An empty repository (409) has 0."""
+        day = since.astimezone(UTC).strftime("%Y-%m-%dT00:00:00Z")
+        try:
+            response = self._get(
+                f"/repos/{full_name}/commits?{urlencode({'since': day, 'per_page': 1})}"
+            )
+        except GitHubConflict:
+            return 0
+        return _count_from_single_item_page(response)
+
+    def count_contributors(self, full_name: str) -> int | None:
+        """Contributors (anonymous included), or None when GitHub will not list them (403 for
+        very large repositories)."""
+        try:
+            response = self._get(
+                f"/repos/{full_name}/contributors?{urlencode({'per_page': 1, 'anon': 1})}"
+            )
+        except GitHubForbidden:
+            return None
+        if response.status == 204:  # empty repository
+            return 0
+        return _count_from_single_item_page(response)
+
+    def recent_pull_requests(self, full_name: str, since: datetime) -> PullSample:
+        params = urlencode(
+            {"state": "all", "sort": "updated", "direction": "desc", "per_page": PER_PAGE}
+        )
+        items: list[dict[str, Any]] = self._get(f"/repos/{full_name}/pulls?{params}").json()
+        opened = merged = 0
+        for pr in items:
+            created, merged_at = _dt(pr.get("created_at")), _dt(pr.get("merged_at"))
+            opened += bool(created and created >= since)
+            merged += bool(merged_at and merged_at >= since)
+        oldest = _dt(items[-1].get("updated_at")) if items else None
+        capped = len(items) >= PER_PAGE and oldest is not None and oldest >= since
+        return PullSample(opened=opened, merged=merged, capped=capped)
+
+    def get_latest_release_date(self, full_name: str) -> datetime | None:
+        try:
+            data = self._get(f"/repos/{full_name}/releases/latest").json()
+        except GitHubNotFound:
+            return None
+        return _dt(data.get("published_at") or data.get("created_at"))
+
     # --- transport ------------------------------------------------------------
 
     def _paginate(
@@ -311,7 +436,7 @@ class GitHubClient:
     def _get(self, url: str, *, accept: str = JSON) -> _Response:
         key = self._cache_key(url, accept)
         cached: dict[str, Any] | None = cache.get(key)
-        headers = {"Accept": accept, "Authorization": f"Bearer {self._token}"}
+        headers = {"Accept": accept, "Authorization": self._auth}
         if cached:
             headers["If-None-Match"] = cached["etag"]
 
@@ -325,6 +450,8 @@ class GitHubClient:
 
         if response.status_code == 304 and cached:
             return _Response(status=200, text=cached["body"], link=cached.get("link", ""))
+        if response.status_code == 204:
+            return _Response(status=204, text="", link="")
         if response.status_code == 200:
             result = _Response(200, response.text, response.headers.get("Link", ""))
             if etag := response.headers.get("ETag"):
@@ -350,6 +477,19 @@ class GitHubClient:
             },
             60 * 60,
         )
+
+
+def _count_from_single_item_page(response: _Response) -> int:
+    """Total items of a ``per_page=1`` listing: the page number of ``rel="last"``, or the
+    number of items on the only page."""
+    for part in response.link.split(","):
+        section = part.split(";")
+        if len(section) >= 2 and 'rel="last"' in section[1]:
+            page = httpx.URL(section[0].strip().strip("<>")).params.get("page")
+            if page and page.isdigit():
+                return int(page)
+    data = response.json() if response.text else []
+    return len(data) if isinstance(data, list) else 0
 
 
 def _next_link(link_header: str) -> str | None:
@@ -384,6 +524,10 @@ def _error_for(response: httpx.Response, path: str) -> Exception:
         return GitHubForbidden(where)
     if status == 404:
         return GitHubNotFound(where)
+    if status == 409:
+        return GitHubConflict(where)
+    if status == 451:
+        return GitHubUnavailableForLegalReasons(where)
     if status == 422:
         return GitHubValidationError(where)
     if status >= 500:

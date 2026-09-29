@@ -9,6 +9,7 @@ api_v1: list[URLPattern | URLResolver] = [
     path("profile", DeveloperProfileView.as_view(), name="profile"),
     path("profile/", include("github.urls")),
     path("sync/", include("jobs.urls")),
+    path("discovery/", include("repositories.urls")),
 ]
 
 urlpatterns = [

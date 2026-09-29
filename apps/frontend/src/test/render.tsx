@@ -185,6 +185,37 @@ export const INTERESTS = [
   },
 ]
 
+export const EMPTY_POOL = {
+  total: 0,
+  eligible: 0,
+  awaiting_analysis: 0,
+  ineligible: 0,
+  by_source: {},
+}
+
+export const NEVER_DISCOVERED = { job: null, last_completed_at: null, pool: EMPTY_POOL }
+
+export function discoveryJob(status: string, error_code = '') {
+  const done = status === 'COMPLETED'
+  return {
+    id: 2,
+    job_type: 'repository_discovery',
+    status,
+    steps: {
+      queries: done ? 'done' : 'running',
+      search: done ? 'done' : 'pending',
+      interactions: done ? 'done' : 'pending',
+      analysis: done ? 'done' : 'pending',
+      pool: done ? 'done' : 'pending',
+    },
+    attempts: 1,
+    error_code,
+    created_at: '2026-09-28T10:00:06Z',
+    started_at: '2026-09-28T10:00:06Z',
+    completed_at: done || status === 'FAILED' ? '2026-09-28T10:01:00Z' : null,
+  }
+}
+
 const page = (results: unknown[]) =>
   json({ count: results.length, next: null, previous: null, results })
 
@@ -198,4 +229,5 @@ export const SYNCED_USER: Record<string, Handler> = {
   'GET /api/v1/profile': () => json(DEVELOPER_PROFILE),
   'GET /api/v1/profile/skills?page_size=200': () => page(SKILLS),
   'GET /api/v1/profile/interests?page_size=200': () => page(INTERESTS),
+  'GET /api/v1/discovery/status': () => json(NEVER_DISCOVERED),
 }

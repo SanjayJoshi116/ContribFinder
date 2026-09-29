@@ -100,6 +100,43 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/discovery/candidates': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description The developer's candidate pool: analysed-eligible first, then awaiting analysis, then
+     *     ineligible; within each, the discovery job's analysis order (previously interacted, best
+     *     search rank, name). Not a ranking.
+     */
+    get: operations['discovery_candidates']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/discovery/status': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['discovery_status']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/health/': {
     parameters: {
       query?: never
@@ -241,6 +278,50 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
+     * @description * `recently_active` - Recently Active
+     *     * `moderately_active` - Moderately Active
+     *     * `low_activity` - Low Activity
+     * @enum {string}
+     */
+    ActivityLabelEnum: 'recently_active' | 'moderately_active' | 'low_activity'
+    CandidateDiscovery: {
+      readonly source: components['schemas']['CandidateDiscoverySourceEnum']
+      readonly query: string
+      readonly search_rank: number | null
+      /** Format: date-time */
+      readonly first_seen_at: string
+      /** Format: date-time */
+      readonly last_seen_at: string
+    }
+    /**
+     * @description * `language_search` - Language Search
+     *     * `topic_search` - Topic Search
+     *     * `skill_search` - Skill Search
+     *     * `interest_search` - Interest Search
+     *     * `similar_repo` - Similar Repo
+     *     * `previously_interacted` - Previously Interacted
+     * @enum {string}
+     */
+    CandidateDiscoverySourceEnum:
+      | 'language_search'
+      | 'topic_search'
+      | 'skill_search'
+      | 'interest_search'
+      | 'similar_repo'
+      | 'previously_interacted'
+    CandidateRepository: {
+      readonly full_name: string
+      owner: string
+      readonly name: string
+      readonly description: string
+      /** Format: uri */
+      readonly html_url: string
+      readonly primary_language: string
+      readonly stars: number
+      readonly topics: string[]
+      license: string
+    }
+    /**
      * @description * `language` - Language
      *     * `framework` - Framework
      *     * `library` - Library
@@ -290,6 +371,12 @@ export interface components {
        *     * `not_connected` - not_connected
        */
       revocation: components['schemas']['RevocationEnum']
+    }
+    DiscoveryStatus: {
+      job: components['schemas']['SyncJob'] | null
+      /** Format: date-time */
+      last_completed_at: string | null
+      pool: components['schemas']['PoolCounts']
     }
     /** @description Standard error envelope, referenced by every endpoint's error responses. */
     Error: {
@@ -367,9 +454,30 @@ export interface components {
     /**
      * @description * `github_profile_sync` - Github Profile Sync
      *     * `profile_analysis` - Profile Analysis
+     *     * `repository_discovery` - Repository Discovery
      * @enum {string}
      */
-    JobTypeEnum: 'github_profile_sync' | 'profile_analysis'
+    JobTypeEnum: 'github_profile_sync' | 'profile_analysis' | 'repository_discovery'
+    /**
+     * @description * `discovered` - Discovered
+     *     * `fetching` - Fetching
+     *     * `analyzed` - Analyzed
+     *     * `indexed` - Indexed
+     *     * `recommendable` - Recommendable
+     *     * `stale` - Stale
+     *     * `refreshing` - Refreshing
+     *     * `failed` - Failed
+     * @enum {string}
+     */
+    LifecycleEnum:
+      | 'discovered'
+      | 'fetching'
+      | 'analyzed'
+      | 'indexed'
+      | 'recommendable'
+      | 'stale'
+      | 'refreshing'
+      | 'failed'
     /** @description Explicit allowlist: nothing credential-bearing can reach the client. */
     Me: {
       readonly id: number
@@ -378,6 +486,8 @@ export interface components {
       readonly avatar_url: string | null
       readonly github_connected: boolean
     }
+    /** @enum {unknown} */
+    NullEnum: null
     PaginatedDeveloperInterestList: {
       /** @example 123 */
       count: number
@@ -408,6 +518,21 @@ export interface components {
       previous?: string | null
       results: components['schemas']['DeveloperSkill'][]
     }
+    PaginatedRepositoryCandidateList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['RepositoryCandidate'][]
+    }
     PaginatedRepositoryList: {
       /** @example 123 */
       count: number
@@ -422,6 +547,15 @@ export interface components {
        */
       previous?: string | null
       results: components['schemas']['Repository'][]
+    }
+    PoolCounts: {
+      total: number
+      eligible: number
+      awaiting_analysis: number
+      ineligible: number
+      by_source: {
+        [key: string]: number
+      }
     }
     /**
      * @description * `beginner` - Beginner
@@ -470,6 +604,24 @@ export interface components {
       readonly pushed_at: string | null
       readonly languages: components['schemas']['RepositoryLanguage'][]
       readonly topics: string[]
+    }
+    /**
+     * @description A candidate in the developer's pool and why it is there. Deliberately carries no score
+     *     or rank across candidates: relevance is Phase 5's job.
+     */
+    RepositoryCandidate: {
+      readonly id: number
+      readonly repository: components['schemas']['CandidateRepository']
+      readonly lifecycle: components['schemas']['LifecycleEnum']
+      readonly eligible: boolean | null
+      ineligible_reason: string
+      readonly activity_label:
+        (components['schemas']['ActivityLabelEnum'] | components['schemas']['NullEnum']) | null
+      readonly discoveries: components['schemas']['CandidateDiscovery'][]
+      /** Format: date-time */
+      readonly first_discovered_at: string
+      /** Format: date-time */
+      readonly last_seen_at: string
     }
     RepositoryLanguage: {
       readonly language: string
@@ -711,6 +863,87 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['Me']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  discovery_candidates: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `recently_active` - Recently Active
+         *     * `moderately_active` - Moderately Active
+         *     * `low_activity` - Low Activity
+         */
+        activity?: 'low_activity' | 'moderately_active' | 'recently_active'
+        eligible?: boolean
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /**
+         * @description * `language_search` - Language Search
+         *     * `topic_search` - Topic Search
+         *     * `skill_search` - Skill Search
+         *     * `interest_search` - Interest Search
+         *     * `similar_repo` - Similar Repo
+         *     * `previously_interacted` - Previously Interacted
+         */
+        source?:
+          | 'interest_search'
+          | 'language_search'
+          | 'previously_interacted'
+          | 'similar_repo'
+          | 'skill_search'
+          | 'topic_search'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedRepositoryCandidateList']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  discovery_status: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DiscoveryStatus']
         }
       }
       401: {

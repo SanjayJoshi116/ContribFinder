@@ -1,7 +1,7 @@
 // `npm run start:worker`: wait for the broker, then run a Celery worker for apps/backend.
-import { spawn } from 'node:child_process'
 import path from 'node:path'
 
+import { runChild } from './child.mjs'
 import { loadEnv, redisTarget, root } from './env.mjs'
 import { uvCommand } from './uv.mjs'
 import { waitPort } from './wait-port.mjs'
@@ -15,13 +15,12 @@ if (!target) {
 
 await waitPort(target.host, target.port, 60_000)
 
-// Celery's default prefork pool does not work on Windows.
-const pool = process.platform === 'win32' ? ['--pool=solo'] : []
+// Celery's default prefork pool does not work on Windows; threads do, so a discovery run,
+// a profile sync and backlog refreshes run side by side (CELERY_CONCURRENCY, default 4).
+const concurrency = process.env.CELERY_CONCURRENCY || '4'
+const pool =
+  process.platform === 'win32' ? ['--pool=threads', `--concurrency=${concurrency}`] : []
 const [cmd, prefix] = uvCommand()
-const worker = spawn(
-  cmd,
-  [...prefix, 'run', 'celery', '-A', 'config', 'worker', '--loglevel=info', ...pool],
-  { cwd: path.join(root, 'apps', 'backend'), stdio: 'inherit' },
-)
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => worker.kill(signal))
-worker.on('exit', (code) => process.exit(code ?? 0))
+runChild(cmd, [...prefix, 'run', 'celery', '-A', 'config', 'worker', '--loglevel=info', ...pool], {
+  cwd: path.join(root, 'apps', 'backend'),
+})

@@ -194,6 +194,125 @@
         }
       }
     },
+    "/api/v1/discovery/candidates": {
+      "get": {
+        "operationId": "discovery_candidates",
+        "description": "The developer's candidate pool: analysed-eligible first, then awaiting analysis, then\nineligible; within each, the discovery job's analysis order (previously interacted, best\nsearch rank, name). Not a ranking.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "activity",
+            "schema": {
+              "type": "string",
+              "enum": ["low_activity", "moderately_active", "recently_active"]
+            },
+            "description": "* `recently_active` - Recently Active\n* `moderately_active` - Moderately Active\n* `low_activity` - Low Activity"
+          },
+          {
+            "in": "query",
+            "name": "eligible",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "interest_search",
+                "language_search",
+                "previously_interacted",
+                "similar_repo",
+                "skill_search",
+                "topic_search"
+              ]
+            },
+            "description": "* `language_search` - Language Search\n* `topic_search` - Topic Search\n* `skill_search` - Skill Search\n* `interest_search` - Interest Search\n* `similar_repo` - Similar Repo\n* `previously_interacted` - Previously Interacted"
+          }
+        ],
+        "tags": ["discovery"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRepositoryCandidateList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/discovery/status": {
+      "get": {
+        "operationId": "discovery_status",
+        "tags": ["discovery"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryStatus"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/v1/health/": {
       "get": {
         "operationId": "health",
@@ -590,6 +709,110 @@
   },
   "components": {
     "schemas": {
+      "ActivityLabelEnum": {
+        "enum": ["recently_active", "moderately_active", "low_activity"],
+        "type": "string",
+        "description": "* `recently_active` - Recently Active\n* `moderately_active` - Moderately Active\n* `low_activity` - Low Activity"
+      },
+      "CandidateDiscovery": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateDiscoverySourceEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "query": {
+            "type": "string",
+            "readOnly": true
+          },
+          "search_rank": {
+            "type": "integer",
+            "readOnly": true,
+            "nullable": true
+          },
+          "first_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": ["first_seen_at", "last_seen_at", "query", "search_rank", "source"]
+      },
+      "CandidateDiscoverySourceEnum": {
+        "enum": [
+          "language_search",
+          "topic_search",
+          "skill_search",
+          "interest_search",
+          "similar_repo",
+          "previously_interacted"
+        ],
+        "type": "string",
+        "description": "* `language_search` - Language Search\n* `topic_search` - Topic Search\n* `skill_search` - Skill Search\n* `interest_search` - Interest Search\n* `similar_repo` - Similar Repo\n* `previously_interacted` - Previously Interacted"
+      },
+      "CandidateRepository": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "owner": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "description": {
+            "type": "string",
+            "readOnly": true
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true
+          },
+          "primary_language": {
+            "type": "string",
+            "readOnly": true
+          },
+          "stars": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true
+          },
+          "license": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "full_name",
+          "html_url",
+          "license",
+          "name",
+          "owner",
+          "primary_language",
+          "stars",
+          "topics"
+        ]
+      },
       "CategoryEnum": {
         "enum": ["language", "framework", "library", "database", "cloud", "devops", "tool"],
         "type": "string",
@@ -732,6 +955,28 @@
           }
         },
         "required": ["revocation"]
+      },
+      "DiscoveryStatus": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SyncJob"
+              }
+            ],
+            "nullable": true
+          },
+          "last_completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pool": {
+            "$ref": "#/components/schemas/PoolCounts"
+          }
+        },
+        "required": ["job", "last_completed_at", "pool"]
       },
       "Error": {
         "type": "object",
@@ -945,9 +1190,23 @@
         "description": "* `readme` - Readme\n* `repo_description` - Repo Description\n* `topic` - Topic\n* `contribution` - Contribution"
       },
       "JobTypeEnum": {
-        "enum": ["github_profile_sync", "profile_analysis"],
+        "enum": ["github_profile_sync", "profile_analysis", "repository_discovery"],
         "type": "string",
-        "description": "* `github_profile_sync` - Github Profile Sync\n* `profile_analysis` - Profile Analysis"
+        "description": "* `github_profile_sync` - Github Profile Sync\n* `profile_analysis` - Profile Analysis\n* `repository_discovery` - Repository Discovery"
+      },
+      "LifecycleEnum": {
+        "enum": [
+          "discovered",
+          "fetching",
+          "analyzed",
+          "indexed",
+          "recommendable",
+          "stale",
+          "refreshing",
+          "failed"
+        ],
+        "type": "string",
+        "description": "* `discovered` - Discovered\n* `fetching` - Fetching\n* `analyzed` - Analyzed\n* `indexed` - Indexed\n* `recommendable` - Recommendable\n* `stale` - Stale\n* `refreshing` - Refreshing\n* `failed` - Failed"
       },
       "Me": {
         "type": "object",
@@ -977,6 +1236,9 @@
           }
         },
         "required": ["avatar_url", "display_name", "github_connected", "github_username", "id"]
+      },
+      "NullEnum": {
+        "enum": [null]
       },
       "PaginatedDeveloperInterestList": {
         "type": "object",
@@ -1034,6 +1296,34 @@
           }
         }
       },
+      "PaginatedRepositoryCandidateList": {
+        "type": "object",
+        "required": ["count", "results"],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepositoryCandidate"
+            }
+          }
+        }
+      },
       "PaginatedRepositoryList": {
         "type": "object",
         "required": ["count", "results"],
@@ -1061,6 +1351,30 @@
             }
           }
         }
+      },
+      "PoolCounts": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "eligible": {
+            "type": "integer"
+          },
+          "awaiting_analysis": {
+            "type": "integer"
+          },
+          "ineligible": {
+            "type": "integer"
+          },
+          "by_source": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": ["awaiting_analysis", "by_source", "eligible", "ineligible", "total"]
       },
       "PreferredIssueDifficultyEnum": {
         "enum": ["beginner", "intermediate", "advanced", "unknown"],
@@ -1204,6 +1518,80 @@
           "pushed_at",
           "stars",
           "topics"
+        ]
+      },
+      "RepositoryCandidate": {
+        "type": "object",
+        "description": "A candidate in the developer's pool and why it is there. Deliberately carries no score\nor rank across candidates: relevance is Phase 5's job.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "repository": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateRepository"
+              }
+            ],
+            "readOnly": true
+          },
+          "lifecycle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LifecycleEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "eligible": {
+            "type": "boolean",
+            "readOnly": true,
+            "nullable": true
+          },
+          "ineligible_reason": {
+            "type": "string"
+          },
+          "activity_label": {
+            "readOnly": true,
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActivityLabelEnum"
+              },
+              {
+                "$ref": "#/components/schemas/NullEnum"
+              }
+            ]
+          },
+          "discoveries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CandidateDiscovery"
+            },
+            "readOnly": true
+          },
+          "first_discovered_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "activity_label",
+          "discoveries",
+          "eligible",
+          "first_discovered_at",
+          "id",
+          "ineligible_reason",
+          "last_seen_at",
+          "lifecycle",
+          "repository"
         ]
       },
       "RepositoryLanguage": {

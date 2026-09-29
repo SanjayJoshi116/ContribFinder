@@ -33,6 +33,8 @@ DEVOPS = "devops"
 TOOL = "tool"
 
 JVM_ECOSYSTEMS = ("maven", "gradle")
+# Markup "languages": they inflate byte counts and say little about programming skill.
+MARKUP = frozenset({"html", "css"})
 
 
 @dataclass(frozen=True)

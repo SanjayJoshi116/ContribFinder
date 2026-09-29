@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.3.0 (2026-09-29)
+Version: 0.4.0 (2026-09-29)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md.
@@ -103,17 +103,40 @@ Developer experience
   [~] Docker Compose verification (still no Docker; carried to Phase 4)
 
 ============================================================================
+SHIPPED - v0.4.0 - Phase 4: Repository discovery
+============================================================================
+
+Repository discovery (FR-REPO)
+  [x] FR-REPO-001  Candidate generation (GitHub search, 4 strategies, per-run query budget,
+                   hard filters, previously contributed repositories)
+  [x] FR-REPO-002  Discovery source tracking (source, query, search rank, first/last seen)
+  [x] FR-REPO-003  Repository analysis + lifecycle (README, community files, labels,
+                   dependencies; discovered -> recommendable, stale/refreshing, failed)
+  [x] FR-REPO-004  Activity signals (snapshots, recently/moderately/low activity labels)
+
+Jobs and API
+  [x] Discovery job after every sync/analysis; resumable steps; pool retention and cap
+  [x] Filtering stage with recorded rejection reasons; eligibility separate from lifecycle
+  [x] Background staleness + backlog refresh on app credentials (public data only)
+  [x] Dead-worker recovery (heartbeat, requeue, worker_lost) and Redis socket timeouts
+  [x] Parallel repository analysis (DISCOVERY_ANALYSIS_CONCURRENCY)
+  [x] GET /discovery/status, /discovery/candidates (analyzed first; no score or rank)
+
+Frontend
+  [x] Profile page "Project discovery" card
+
+Developer experience
+  [x] Celery beat and a threaded worker under npm start; npm run stop
+  [~] Ctrl+C in an interactive Windows console does not stop npm start (carried to Phase 5)
+  [~] Docker Compose verification (still no Docker; carried to Phase 5)
+
+============================================================================
 PLANNED - MVP
 ============================================================================
 
-Phase 4 - Repository discovery (v0.4.0)
-  [~] Carry-over: verify Docker Compose stack (needs a machine with Docker)
-  [ ] FR-REPO-001  Candidate generation (GitHub search)
-  [ ] FR-REPO-002  Discovery source tracking
-  [ ] FR-REPO-003  Repository metadata analysis + lifecycle
-  [ ] FR-REPO-004  Activity signals
-
 Phase 5 - Recommendation engine, deterministic (v0.5.0)
+  [~] Carry-over: verify Docker Compose stack (needs a machine with Docker)
+  [~] Carry-over: Ctrl+C stops npm start in an interactive Windows console
   [ ] FR-REC-001  Relevance signals
   [ ] FR-REC-002  Ranking
   [ ] FR-REC-003  Explanations (reasons from real signals only)

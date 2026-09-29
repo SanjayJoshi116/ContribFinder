@@ -5,7 +5,7 @@ from celery import shared_task
 from django.utils import timezone
 
 from jobs.models import SyncJob
-from services.jobs import claim_job, finish_job
+from services.jobs import claim_job, finish_job, start_discovery_after
 from services.profiling.analysis import ProfileAnalysisError, ProfileAnalysisService
 
 logger = logging.getLogger(__name__)
@@ -35,4 +35,10 @@ def extract_developer_skills(self: Any, job_id: int) -> None:
             completed_at=timezone.now(),
         )
         return
-    finish_job(job_id, Status.COMPLETED, steps={"analysis": "done"}, completed_at=timezone.now())
+    if finish_job(
+        job_id, Status.COMPLETED, steps={"analysis": "done"}, completed_at=timezone.now()
+    ):
+        try:
+            start_discovery_after(job)
+        except Exception:
+            logger.exception("Could not start discovery after analysis job %s", job_id)

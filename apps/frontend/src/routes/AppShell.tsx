@@ -4,6 +4,7 @@ import { Navigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useMe } from '@/features/auth/api'
 import { DisconnectSection } from '@/features/auth/DisconnectSection'
+import { DiscoveryCard } from '@/features/discovery/DiscoveryCard'
 import { useDeveloperProfile, useInterests, useSkills } from '@/features/profile/api'
 import { InterestList } from '@/features/profile/InterestList'
 import { SkillGroups } from '@/features/profile/SkillGroups'
@@ -100,6 +101,8 @@ export function AppShell() {
               how good you are.
             </p>
           </section>
+
+          <DiscoveryCard />
 
           <section className="space-y-3" aria-labelledby="skills-heading">
             <h2 id="skills-heading" className="font-medium">

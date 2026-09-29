@@ -10,7 +10,7 @@ stored data without calling GitHub (Phase 3).
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -24,16 +24,19 @@ from github.models import GitHubProfile
 from jobs.models import SyncJob
 from repositories.models import (
     Repository,
-    RepositoryDependency,
-    RepositoryLanguage,
-    RepositoryTopic,
     UserRepository,
 )
 from services.profiling.analysis import ProfileAnalysisService
-from services.profiling.manifests import is_manifest, parse_manifest
 
-from .client import GitHubClient, GitHubRepo, PullRequestRef, PushRef
+from .client import GitHubClient, PullRequestRef, PushRef
 from .errors import GitHubClientError, GitHubForbidden, GitHubNotFound, GitHubValidationError
+from .storage import (
+    read_manifests,
+    replace_dependencies,
+    replace_languages,
+    replace_topics,
+    upsert_repository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +131,7 @@ class GitHubSyncService:
 
         now = timezone.now()
         with transaction.atomic():
-            stored = [_upsert_repository(r, now) for r in selected]
+            stored = [upsert_repository(r, now) for r in selected]
             keep = {repo.pk for repo in stored}
             links = UserRepository.objects.filter(
                 user=self.user, relation=UserRepository.Relation.OWNER
@@ -163,7 +166,7 @@ class GitHubSyncService:
             except GitHubNotFound:
                 languages = {}  # deleted between listing and now: nothing to record
             with transaction.atomic():
-                _replace_languages(repo, languages)
+                replace_languages(repo, languages)
             done.append(repo.pk)
             self._update_metadata(languages_done=done)
         return Step.DONE
@@ -172,7 +175,7 @@ class GitHubSyncService:
         topics_by_repo: dict[str, list[str]] = self.job.metadata.get("repo_topics", {})
         with transaction.atomic():
             for repo_pk, topics in topics_by_repo.items():
-                _replace_topics(int(repo_pk), topics)
+                replace_topics(int(repo_pk), topics)
         return Step.DONE
 
     def _step_dependencies(self, client: GitHubClient) -> str:
@@ -188,18 +191,12 @@ class GitHubSyncService:
                 continue
             self._check_cancelled()
             try:
-                dependencies = _read_manifests(client, repo.full_name)
+                dependencies = read_manifests(client, repo.full_name)
             except SKIPPABLE:
                 dependencies = None  # unreadable right now: keep what we knew
             if dependencies is not None:
                 with transaction.atomic():
-                    RepositoryDependency.objects.filter(repository=repo).delete()
-                    RepositoryDependency.objects.bulk_create(
-                        RepositoryDependency(
-                            repository=repo, ecosystem=eco, name=name, manifest_path=path
-                        )
-                        for (eco, name), path in dependencies.items()
-                    )
+                    replace_dependencies(repo, dependencies)
             done.append(repo.pk)
             self._update_metadata(dependencies_done=done)
         return Step.DONE
@@ -268,9 +265,9 @@ class GitHubSyncService:
         except SKIPPABLE:
             return None
         with transaction.atomic():
-            repo = _upsert_repository(gh, timezone.now())
-            _replace_languages(repo, languages)
-            _replace_topics(repo.pk, gh.topics)
+            repo = upsert_repository(gh, timezone.now())
+            replace_languages(repo, languages)
+            replace_topics(repo.pk, gh.topics)
         return repo.pk
 
     def _plan_contributions(
@@ -307,8 +304,8 @@ class GitHubSyncService:
         return GitHubProfile.objects.get(user=self.user)
 
     def _check_cancelled(self) -> None:
-        status = SyncJob.objects.filter(pk=self.job.pk).values_list("status", flat=True).first()
-        if status == SyncJob.Status.CANCELLED:
+        """Cancellation check and heartbeat: called between units of work."""
+        if self.job.heartbeat() == SyncJob.Status.CANCELLED:
             raise JobCancelled()
 
     def _set_step(self, step: str, state: str) -> None:
@@ -318,67 +315,6 @@ class GitHubSyncService:
     def _update_metadata(self, **values: Any) -> None:
         self.job.metadata = {**self.job.metadata, **values}
         self.job.save(update_fields=["metadata", "updated_at"])
-
-
-def _upsert_repository(gh: GitHubRepo, now: Any) -> Repository:
-    # A different repo that used to have this name (deleted and recreated, or renamed away) is
-    # stale; drop it so the unique full_name can move to the current repo.
-    Repository.objects.filter(full_name=gh.full_name).exclude(github_id=gh.github_id).delete()
-    repo, _ = Repository.objects.update_or_create(
-        github_id=gh.github_id,
-        defaults={
-            "owner_login": gh.owner_login,
-            "name": gh.name,
-            "full_name": gh.full_name,
-            "description": gh.description,
-            "html_url": gh.html_url,
-            "default_branch": gh.default_branch,
-            "stars": gh.stars,
-            "forks": gh.forks,
-            "open_issues": gh.open_issues,
-            "primary_language": gh.primary_language,
-            "license_spdx": gh.license_spdx,
-            "is_fork": gh.is_fork,
-            "is_archived": gh.is_archived,
-            "github_created_at": gh.created_at,
-            "github_updated_at": gh.updated_at,
-            "pushed_at": gh.pushed_at,
-            "synced_at": now,
-        },
-    )
-    return repo
-
-
-def _replace_languages(repo: Repository, languages: dict[str, int]) -> None:
-    RepositoryLanguage.objects.filter(repository=repo).delete()
-    RepositoryLanguage.objects.bulk_create(
-        RepositoryLanguage(repository=repo, language=lang, bytes=count)
-        for lang, count in languages.items()
-    )
-
-
-def _replace_topics(repo_pk: int, topics: Iterable[str]) -> None:
-    RepositoryTopic.objects.filter(repository_id=repo_pk).delete()
-    RepositoryTopic.objects.bulk_create(
-        RepositoryTopic(repository_id=repo_pk, topic=topic) for topic in dict.fromkeys(topics)
-    )
-
-
-def _read_manifests(client: GitHubClient, full_name: str) -> dict[tuple[str, str], str]:
-    """``{(ecosystem, name): manifest path}`` from the repository's root manifests."""
-    found: dict[tuple[str, str], str] = {}
-    for entry in client.list_root_contents(full_name):
-        if entry.type != "file" or not is_manifest(entry.name):
-            continue
-        if entry.size > settings.GITHUB_MANIFEST_MAX_BYTES:
-            continue
-        try:
-            text = client.get_file(full_name, entry.name)
-        except GitHubNotFound:
-            continue  # removed between listing and fetching
-        for dep in parse_manifest(entry.name, text):
-            found.setdefault((dep.ecosystem, dep.name), entry.name)
-    return found
 
 
 def _parse_dt(value: str | None) -> datetime | None:

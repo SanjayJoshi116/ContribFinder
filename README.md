@@ -3,10 +3,12 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.3.0** (Phase 3: Developer profile). After signing in with GitHub, your public
+**Version 0.4.0** (Phase 4: Repository discovery). After signing in with GitHub, your public
 profile, README, repositories, dependencies and contributions are synced in the background and
 turned into an evidence-backed profile: skills (with the evidence behind each), interests and
-languages. Repository discovery and recommendations are next.
+languages. From that profile ContribFinder searches GitHub for candidate projects, records why
+each was found, and analyzes them (README, contribution guidelines, labels, activity signals).
+Ranked, explained recommendations are next.
 
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
@@ -61,8 +63,13 @@ npm run setup      # creates .env with generated secrets, installs deps, runs mi
 Add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from step 1 to `.env`, then:
 
 ```bash
-npm start          # WSL Redis + Django :8000 + Celery worker + Vite :5173 (proxies /api)
+npm start          # WSL Redis + Django :8000 + Celery worker + Celery beat + Vite :5173 (proxies /api)
+npm run stop       # stop the stack (Ctrl+C does not work in an interactive Windows console yet)
 ```
+
+Celery beat runs the periodic repository jobs: it marks candidate repositories stale and
+refreshes them in the background with the OAuth app's client credentials (never a user's
+token). Without `REDIS_URL` there is no worker or beat, so those jobs do not run.
 
 Open http://localhost:5173. API health: http://localhost:5173/api/v1/health/.
 
@@ -74,7 +81,9 @@ npm run manage -- reanalyze_profiles   # rebuild profiles from stored data (no G
 ```
 
 Profile scoring is configurable in `.env` (`EVIDENCE_WEIGHTS` and friends, see `.env.example`).
-Run `reanalyze_profiles` after changing it.
+Run `reanalyze_profiles` after changing it. Repository discovery budgets, filters, staleness and
+activity thresholds (`DISCOVERY_*`, `REPO_*`, `ACTIVITY_THRESHOLDS`) are configured the same way.
+A completed sync or re-analysis starts a discovery run automatically.
 
 ## 2b. Run with Docker
 

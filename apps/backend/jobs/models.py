@@ -13,6 +13,7 @@ class SyncJob(models.Model):
     class JobType(models.TextChoices):
         GITHUB_PROFILE_SYNC = "github_profile_sync"
         PROFILE_ANALYSIS = "profile_analysis"
+        REPOSITORY_DISCOVERY = "repository_discovery"
 
     class Status(models.TextChoices):
         PENDING = "PENDING"
@@ -66,3 +67,13 @@ class SyncJob(models.Model):
     @property
     def is_active(self) -> bool:
         return self.status in self.ACTIVE_STATUSES
+
+    def heartbeat(self) -> str | None:
+        """Mark a RUNNING job as alive (so it is not reclaimed as a dead worker's) and return
+        its current status; None when the job no longer exists."""
+        from django.utils import timezone
+
+        jobs = SyncJob.objects.filter(pk=self.pk)
+        if jobs.filter(status=self.Status.RUNNING).update(updated_at=timezone.now()):
+            return self.Status.RUNNING
+        return jobs.values_list("status", flat=True).first()

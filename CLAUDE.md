@@ -90,30 +90,34 @@ ContribFinder/
 │  │  ├─ core/              health, auth class, CSRF/404 JSON views, log redaction, checks
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
-│  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API
+│  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API, recover_stale_jobs task
 │  │  ├─ developers/        DeveloperProfile, Skill, DeveloperSkill, SkillEvidence, Interest,
 │  │  │                     DeveloperInterest, InterestEvidence; profile API; analysis task;
 │  │  │                     reanalyze_profiles command
-│  │  ├─ repositories/      Repository, RepositoryLanguage, RepositoryTopic, RepositoryDependency,
-│  │  │                     UserRepository (owner | contributor)
-│  │  │                     (+ Snapshot, RepositoryCandidate in Phase 4)
+│  │  ├─ repositories/      Repository (lifecycle, eligibility), RepositoryLanguage, RepositoryTopic,
+│  │  │                     RepositoryDependency, UserRepository (owner | contributor),
+│  │  │                     RepositoryReadme, RepositorySnapshot, RepositoryCandidate,
+│  │  │                     CandidateDiscovery; discovery API; discovery/refresh/beat tasks
 │  │  ├─ issues/            Issue (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason, SavedRepository
 │  │  ├─ feedback/          RecommendationFeedback
 │  │  ├─ embeddings/        (Phase 6, future)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError)
-│  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2)
+│  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
+│  │     │                  storage.py (shared repository upserts)
 │  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
 │  │     │                  experience, summary, analysis (Phase 3)
-│  │     ├─ discovery/      candidate generation + filtering
-│  │     ├─ matching/       feature/signal calculators
+│  │     ├─ discovery/      queries, filters (prefilter/eligibility), DiscoveryService (Phase 4)
+│  │     ├─ repositories/   analysis, lifecycle, staleness (shared repository data, Phase 4)
+│  │     ├─ matching/       feature/signal calculators (activity.py since Phase 4)
 │  │     ├─ ranking/        scoring + explanation generation
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
-├─ scripts/                 npm runners: start, setup, backend, worker, redis (WSL), env,
-│                           wait-port, uv, manage, check-version
-├─ package.json             root runner: npm run setup / npm start / manage / check:version
+├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
+│                           redis (WSL), child (process-tree runner), env, wait-port, uv,
+│                           manage, check-version
+├─ package.json             root runner: npm run setup / npm start / stop / manage / check:version
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt
 └─ .github/workflows/ci.yml
@@ -150,9 +154,15 @@ Local, no Docker (primary on this machine):
 - one-time: create the PostgreSQL role/db `contribfinder` (see README), then `npm run setup`.
   This creates `.env` with generated secrets, installs deps and migrates.
 - `npm start` runs Django on :8000 and Vite on :5173 together. Open http://localhost:5173.
+  Runners use `scripts/child.mjs`, which kills the whole process tree on Windows so
+  Celery/Python children are not orphaned, and stops it when the `npm start` process disappears
+  (`CF_STACK_PID`; terminals such as Git Bash end only the top process). A leftover
+  `Terminate batch job (Y/N)?` comes from `npm.cmd`: answer Y. Ctrl+C does **not** work in an
+  interactive Windows console yet (see Known issues below): stop the stack with `npm run stop`
+  from a second prompt. It kills this repo's stack only (matched by executable and repo path).
   The SPA proxies `/api`.
 - Redis: on Windows, `npm start` starts the `redis-server` service in WSL Ubuntu and keeps the
-  distro awake (`scripts/redis.mjs`), then a Celery worker with `--pool=solo`
+  distro awake (`scripts/redis.mjs`), then a Celery worker with `--pool=threads --concurrency=4`
   (`scripts/worker.mjs`). `REDIS_URL=redis://localhost:6379/1`: db 1, because db 0 holds unrelated
   data. With `REDIS_URL` empty, tasks run inline (syncs block) and health reports
   `redis: not_configured`. Production refuses to start without `REDIS_URL`.
@@ -177,6 +187,27 @@ Frontend (`apps/frontend`, npm):
 - `npm run dev`, `npm test`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build`
 - `npm run api:sync`: re-export the OpenAPI schema from Django and regenerate
   `src/api/schema.d.ts`. Run it after any API change and commit both files; CI fails on drift.
+
+### Known issues
+
+- **Ctrl+C does not stop `npm start` in an interactive Windows console** (Anaconda Prompt, cmd).
+  Open. Workaround: `npm run stop` from a second prompt.
+  - Symptom: after Ctrl+C no process reacts, not even `scripts/start.mjs`. Worker/backend logs
+    keep scrolling and every runner, Celery and Django process stays alive.
+  - Works: the same `cmd /c npm start` with output redirected to a file stops within 15 s on a
+    real Ctrl+C (`GenerateConsoleCtrlEvent`), and killing only `start.mjs` makes the watchdog
+    clean up everything within 8 s. So the process-tree handling is fine; the Ctrl+C event
+    itself is lost when the console is interactive.
+  - Ruled out: `wsl.exe` (the Redis keep-alive) and `concurrently` input handling (children get
+    piped stdin, so Vite's CLI shortcuts/raw mode are off).
+  - Suspect: a child attached to the console switches console input out of processed mode
+    (`ENABLE_PROCESSED_INPUT` off), so Ctrl+C becomes a keystroke instead of a signal.
+  - Next step: bisect by runner. In an interactive `cmd /K`, start one of `scripts/{frontend,
+    redis,backend,worker,beat}.mjs` with `start /b` next to a SIGINT probe and send Ctrl+C.
+    The runner whose presence stops the probe from getting SIGINT is the culprit.
+  - Testing note: processes started from Claude Code's shell inherit "ignore Ctrl+C". Launch
+    test consoles through WMI (`Invoke-CimMethod Win32_Process Create`) and send the event
+    with `AttachConsole` + `GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)`.
 
 ## 7. Implementation roadmap (function by function)
 
@@ -306,12 +337,26 @@ Deviations from the sketch below, as built:
 Frontend: profile page with skill bars labeled by evidence (not "expertise %"), languages chart,
 interests, and a refresh button.
 
-### Phase 4 — Repository discovery  → *System builds a candidate pool*
+### Phase 4 — Repository discovery  → *System builds a candidate pool*  ✅ shipped in v0.4.0
 
-**Carry-over:** verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
-Reuse from Phase 3: `RepositoryDependency` and the skill catalog (`skill_for_dependency`,
-`skill_for_topic`) work on candidate repos unchanged; contributor links are the
-`previously_interacted` source.
+Archived: `openspec/changes/archive/2026-09-29-phase-4-repository-discovery/`. Specs:
+`repository-discovery`, `repository-analysis`, `repository-activity` (plus a delta to
+`sync-jobs`). Docker verification and the Windows Ctrl+C issue are carried over to Phase 5.
+
+Deviations from the sketch below, as built:
+- Provenance is split: one `RepositoryCandidate` per (developer profile, repository) plus
+  `CandidateDiscovery` rows (source, query, search rank, first/last seen), so a repository found
+  by several queries is one candidate with several sources. Candidates FK `DeveloperProfile` and
+  cascade with it.
+- The discovery job is `repository_discovery` (task `repositories.generate_candidates`) with
+  steps queries → search → interactions → analysis → pool. It starts after every completed sync
+  or profile analysis. Analysis is shared across users (`services/repositories/`) and runs
+  `DISCOVERY_ANALYSIS_CONCURRENCY` threads; the backlog uses the app's client credentials.
+- Eligibility (`is_eligible`, `ineligible_reason`) is stored separately from the lifecycle.
+- The pool cap keeps the best candidates in analysis order (interacted, best search rank);
+  locally `.env` sets `DISCOVERY_MAX_POOL=10` and `DISCOVERY_MAX_ANALYSES_PER_RUN=10`.
+- Added beyond the FRs: dead-worker recovery (`SyncJob.heartbeat`, `jobs.recover_stale_jobs`,
+  `SYNC_STALE_AFTER_SECONDS` 10 min), `REDIS_SOCKET_TIMEOUT`, and a threaded local worker.
 
 **FR-REPO-001: Generate candidates**
 - Build: `services/discovery/queries.py` turns top skills and interests into GitHub search queries
@@ -336,6 +381,11 @@ Reuse from Phase 3: `RepositoryDependency` and the skill catalog (`skill_for_dep
 - Periodic Celery beat job marks repos STALE by data type (metadata: hours, README: longer).
 
 ### Phase 5 — Recommendation engine (deterministic)  → *Personalized repo recommendations*
+
+**Carry-over:** verify `docker compose up` from a fresh `.env` (needs a machine with Docker), and
+fix Ctrl+C in an interactive Windows console (§6 Known issues). Reuse from Phase 4: rank only
+`RepositoryCandidate`s whose repository is `recommendable`; `RepositorySnapshot.activity_label`,
+community flags and labels feed `activity_signal` and `contribution_openness`.
 
 **FR-REC-001: Calculate relevance**
 - Build: signal calculators in `services/matching/`, each returning `(score 0..1, evidence[])`:

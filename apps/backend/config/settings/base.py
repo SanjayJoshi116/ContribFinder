@@ -81,11 +81,18 @@ DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
 # Without REDIS_URL: in-process cache and eager (inline) Celery tasks. Fine for local
 # development only; Docker and production always set REDIS_URL.
 REDIS_URL = env("REDIS_URL", default="")
+# Seconds before a Redis call gives up. Without it a stalled connection (e.g. a sleeping WSL
+# distro) blocks a worker forever instead of failing the task.
+REDIS_SOCKET_TIMEOUT = env.float("REDIS_SOCKET_TIMEOUT", default=5.0)
 if REDIS_URL:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "socket_timeout": REDIS_SOCKET_TIMEOUT,
+                "socket_connect_timeout": REDIS_SOCKET_TIMEOUT,
+            },
         }
     }
 else:
@@ -174,6 +181,7 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_BROKER_TRANSPORT_OPTIONS = {"socket_connect_timeout": REDIS_SOCKET_TIMEOUT}
 CELERY_TIMEZONE = TIME_ZONE
 # Keep Django LOGGING (and its secret-redaction filter) in charge of worker logs.
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
@@ -201,8 +209,11 @@ GITHUB_MAX_RETRY_DELAY = env.int("GITHUB_MAX_RETRY_DELAY", default=900)
 GITHUB_ETAG_TTL = env.int("GITHUB_ETAG_TTL", default=24 * 60 * 60)
 SYNC_MAX_ATTEMPTS = env.int("SYNC_MAX_ATTEMPTS", default=5)
 SYNC_COOLDOWN_SECONDS = env.int("SYNC_COOLDOWN_SECONDS", default=300)
-# A RUNNING job with no update for this long is treated as dead (worker crash).
-SYNC_STALE_AFTER_SECONDS = env.int("SYNC_STALE_AFTER_SECONDS", default=30 * 60)
+# A RUNNING job with no heartbeat for this long is treated as dead (worker crash). Jobs beat
+# between units of work (a repository, a step), each bounded by HTTP and Redis timeouts.
+SYNC_STALE_AFTER_SECONDS = env.int("SYNC_STALE_AFTER_SECONDS", default=10 * 60)
+# How often beat requeues RUNNING jobs whose worker died.
+JOB_RECOVERY_INTERVAL_SECONDS = env.int("JOB_RECOVERY_INTERVAL_SECONDS", default=5 * 60)
 
 # --- Developer profile (Phase 3) ---
 # Evidence strength per source (SRS-1 §15). Configuration, not product rules: an env JSON
@@ -244,6 +255,69 @@ GITHUB_MANIFEST_MAX_REPOS = env.int("GITHUB_MANIFEST_MAX_REPOS", default=30)
 GITHUB_MANIFEST_MAX_BYTES = env.int("GITHUB_MANIFEST_MAX_BYTES", default=512 * 1024)
 GITHUB_CONTRIB_MAX_PRS = env.int("GITHUB_CONTRIB_MAX_PRS", default=200)
 GITHUB_CONTRIB_MAX_REPOS = env.int("GITHUB_CONTRIB_MAX_REPOS", default=20)
+
+# --- Repository discovery (Phase 4) ---
+# Search queries per discovery run, split across strategies by these shares (in this order;
+# unused slots pass to the next strategy).
+DISCOVERY_MAX_QUERIES = env.int("DISCOVERY_MAX_QUERIES", default=10)
+DISCOVERY_QUERY_SHARES: dict[str, int] = {
+    "language": 2,
+    "skill": 4,
+    "interest": 3,
+    "topic": 1,
+    **env.json("DISCOVERY_QUERY_SHARES", default={}),
+}
+DISCOVERY_RESULTS_PER_QUERY = env.int("DISCOVERY_RESULTS_PER_QUERY", default=30)
+DISCOVERY_MIN_STARS = env.int("DISCOVERY_MIN_STARS", default=20)
+DISCOVERY_MAX_PUSH_AGE_DAYS = env.int("DISCOVERY_MAX_PUSH_AGE_DAYS", default=180)
+DISCOVERY_MIN_SKILL_CONFIDENCE = env.float("DISCOVERY_MIN_SKILL_CONFIDENCE", default=0.3)
+DISCOVERY_MAX_ANALYSES_PER_RUN = env.int("DISCOVERY_MAX_ANALYSES_PER_RUN", default=60)
+# Repositories analyzed at once in a discovery run (1 = one after another). Keep it low:
+# concurrent requests for one user trip GitHub's secondary rate limits.
+DISCOVERY_ANALYSIS_CONCURRENCY = env.int("DISCOVERY_ANALYSIS_CONCURRENCY", default=4)
+DISCOVERY_MAX_POOL = env.int("DISCOVERY_MAX_POOL", default=300)
+DISCOVERY_CANDIDATE_RETENTION_DAYS = env.int("DISCOVERY_CANDIDATE_RETENTION_DAYS", default=30)
+
+REPO_README_MAX_BYTES = env.int("REPO_README_MAX_BYTES", default=200 * 1024)
+REPO_SNAPSHOT_HISTORY = env.int("REPO_SNAPSHOT_HISTORY", default=10)
+# Hours after which each data type of a repository is stale (SRS-2 §24).
+REPO_STALE_AFTER: dict[str, int] = {
+    "metadata": 12,
+    "activity": 24,
+    "community": 168,
+    "dependencies": 168,
+    "readme": 168,
+    **env.json("REPO_STALE_AFTER", default={}),
+}
+REPO_REFRESH_BATCH = env.int("REPO_REFRESH_BATCH", default=50)
+REPO_DISCOVERED_GRACE_MINUTES = env.int("REPO_DISCOVERED_GRACE_MINUTES", default=10)
+REPO_FAILED_RETRY_HOURS = env.int("REPO_FAILED_RETRY_HOURS", default=24)
+
+# Activity label thresholds (FR-REPO-004). Observable signals, never a health verdict.
+ACTIVITY_THRESHOLDS: dict[str, int] = {
+    "recent_push_days": 30,
+    "recent_commits": 10,
+    "recent_merged_prs": 5,
+    "moderate_push_days": 90,
+    "moderate_commits": 1,
+    "moderate_merged_prs": 1,
+    **env.json("ACTIVITY_THRESHOLDS", default={}),
+}
+
+CELERY_BEAT_SCHEDULE = {
+    "recover-stale-jobs": {
+        "task": "jobs.recover_stale_jobs",
+        "schedule": float(JOB_RECOVERY_INTERVAL_SECONDS),
+    },
+    "mark-stale-repositories": {
+        "task": "repositories.mark_stale_repositories",
+        "schedule": 60 * 60.0,
+    },
+    "process-repository-backlog": {
+        "task": "repositories.process_repository_backlog",
+        "schedule": 15 * 60.0,
+    },
+}
 
 # Comma-separated Fernet keys, newest first.
 TOKEN_ENCRYPTION_KEYS = env.list("TOKEN_ENCRYPTION_KEYS", default=[])

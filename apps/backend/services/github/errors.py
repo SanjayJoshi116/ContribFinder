@@ -36,3 +36,11 @@ class GitHubClientError(GitHubError):
 
 class GitHubValidationError(GitHubClientError):
     """422: GitHub rejected the request as invalid (e.g. a search for a user it won't search)."""
+
+
+class GitHubConflict(GitHubClientError):
+    """409: e.g. listing commits of an empty repository."""
+
+
+class GitHubUnavailableForLegalReasons(GitHubClientError):
+    """451: the repository is blocked (e.g. DMCA takedown)."""
