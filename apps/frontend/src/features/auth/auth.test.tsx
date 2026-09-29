@@ -2,7 +2,15 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ME, json, mockFetch, noContent, renderRoute, unauthenticated } from '@/test/render'
+import {
+  ME,
+  SYNCED_USER,
+  json,
+  mockFetch,
+  noContent,
+  renderRoute,
+  unauthenticated,
+} from '@/test/render'
 
 beforeEach(() => {
   document.cookie = 'csrftoken=test-csrf-token'
@@ -72,7 +80,7 @@ describe('route guard', () => {
 
 describe('signed-in shell', () => {
   it('renders the GitHub identity', async () => {
-    mockFetch({ 'GET /api/v1/auth/me': () => json(ME) })
+    mockFetch({ 'GET /api/v1/auth/me': () => json(ME), ...SYNCED_USER })
     renderRoute('/app')
 
     expect(
@@ -85,6 +93,7 @@ describe('signed-in shell', () => {
     let signedIn = true
     const fetchMock = mockFetch({
       'GET /api/v1/auth/me': () => (signedIn ? json(ME) : unauthenticated()),
+      ...SYNCED_USER,
       'POST /api/v1/auth/logout': () => {
         signedIn = false
         return noContent()
@@ -104,6 +113,7 @@ describe('signed-in shell', () => {
     let signedIn = true
     const fetchMock = mockFetch({
       'GET /api/v1/auth/me': () => (signedIn ? json(ME) : unauthenticated()),
+      ...SYNCED_USER,
       'POST /api/v1/auth/github/disconnect': () => {
         signedIn = false
         return json({ revocation: 'revoked' })
@@ -129,6 +139,7 @@ describe('signed-in shell', () => {
     document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
     const fetchMock = mockFetch({
       'GET /api/v1/auth/me': () => json(ME),
+      ...SYNCED_USER,
       'GET /api/v1/auth/csrf/': () => {
         document.cookie = 'csrftoken=fresh-token'
         return noContent()

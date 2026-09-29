@@ -8,15 +8,15 @@ from django.http import HttpResponseRedirect
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.exceptions import NotAuthenticated
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.authentication import current_user
 from core.serializers import error_responses
 from github.models import GitHubAccount
-from services import audit
+from services import audit, jobs
 from services.crypto import decrypt_token
 from services.github import oauth
 from services.github.accounts import link_github_account
@@ -41,13 +41,6 @@ def _frontend_redirect(path: str, **params: str) -> HttpResponseRedirect:
     return HttpResponseRedirect(f"{settings.FRONTEND_URL}{path}{query}")
 
 
-def _current_user(request: Request) -> User:
-    user = request.user
-    if not isinstance(user, User):
-        raise NotAuthenticated()
-    return user
-
-
 def _auth_error(request: Request, code: str, reason: str) -> HttpResponseRedirect:
     audit.record(
         AuditEvent.Action.SIGN_IN_FAILED,
@@ -56,6 +49,15 @@ def _auth_error(request: Request, code: str, reason: str) -> HttpResponseRedirec
         metadata={"reason": reason, "error_code": code},
     )
     return _frontend_redirect(settings.FRONTEND_AUTH_ERROR_PATH, auth_error=code)
+
+
+def _start_initial_sync(user: User) -> None:
+    """Queue the first GitHub sync; sign-in must never fail or wait because of it."""
+    try:
+        if jobs.needs_initial_sync(user):
+            jobs.start_profile_sync(user, enforce_cooldown=False)
+    except Exception:
+        logger.exception("Could not queue initial GitHub sync")
 
 
 class GitHubLoginView(APIView):
@@ -130,6 +132,7 @@ class GitHubCallbackView(APIView):
                 "created_user": result.created_user,
             },
         )
+        _start_initial_sync(result.user)
         return _frontend_redirect(settings.FRONTEND_SIGNED_IN_PATH)
 
 
@@ -150,7 +153,7 @@ class CsrfView(APIView):
 class MeView(APIView):
     @extend_schema(operation_id="auth_me", responses={200: MeSerializer, **error_responses(401)})
     def get(self, request: Request) -> Response:
-        user = User.objects.select_related("github_account").get(pk=_current_user(request).pk)
+        user = User.objects.select_related("github_account").get(pk=current_user(request).pk)
         return Response(MeSerializer(user).data)
 
 
@@ -179,8 +182,10 @@ class GitHubDisconnectView(APIView):
         responses={200: DisconnectResultSerializer, **error_responses(401, 403)},
     )
     def post(self, request: Request) -> Response:
-        user = _current_user(request)
+        user = current_user(request)
         account = GitHubAccount.objects.filter(user=user).first()
+        # Stop background syncs first so no further GitHub requests are made for this user.
+        jobs.cancel_active_syncs(user)
 
         revocation = "not_connected"
         if account is not None:

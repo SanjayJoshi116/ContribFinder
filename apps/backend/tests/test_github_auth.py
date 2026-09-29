@@ -140,10 +140,12 @@ def _assert_auth_error_redirect(response, code: str) -> None:
     assert response["Location"] == f"{settings.FRONTEND_URL}/?auth_error={code}"
 
 
-@respx.mock(assert_all_called=False)
+@pytest.mark.respx(assert_all_called=False)
 @pytest.mark.parametrize("scenario", ["missing", "mismatched"])
-def test_invalid_state_rejected_without_calling_github(client: Client, scenario: str) -> None:
-    token_route = respx.mock.post(TOKEN_URL)
+def test_invalid_state_rejected_without_calling_github(
+    client: Client, scenario: str, respx_mock: respx.MockRouter
+) -> None:
+    token_route = respx_mock.post(TOKEN_URL)
     start(client)
     params = {"code": CODE} if scenario == "missing" else {"code": CODE, "state": "forged"}
 
@@ -155,18 +157,18 @@ def test_invalid_state_rejected_without_calling_github(client: Client, scenario:
     assert AuditEvent.objects.filter(action="sign_in_failed", outcome="failure").exists()
 
 
-@respx.mock(assert_all_called=False)
-def test_reused_state_rejected(client: Client) -> None:
-    mock_github_ok(respx.mock)
+@pytest.mark.respx(assert_all_called=False)
+def test_reused_state_rejected(client: Client, respx_mock: respx.MockRouter) -> None:
+    mock_github_ok(respx_mock)
     state = start(client)
     callback(client, code=CODE, state=state)
     client.logout()
-    calls_before = respx.mock.calls.call_count
+    calls_before = respx_mock.calls.call_count
 
     response = callback(client, code=CODE, state=state)
 
     _assert_auth_error_redirect(response, "invalid_state")
-    assert respx.mock.calls.call_count == calls_before
+    assert respx_mock.calls.call_count == calls_before
 
 
 def test_state_without_session_rejected(client: Client) -> None:

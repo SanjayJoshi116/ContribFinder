@@ -2,6 +2,7 @@ from collections.abc import Iterator
 from typing import cast
 
 import pytest
+import respx
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
@@ -17,6 +18,15 @@ def _clear_cache() -> Iterator[None]:
     cache.clear()
     yield
     cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_respx() -> Iterator[None]:
+    # Routes registered on the global router outside an active `@respx.mock` would otherwise
+    # leak into later tests. Prefer the `respx_mock` fixture for non-default options.
+    yield
+    respx.mock.clear()
+    respx.mock.reset()
 
 
 @pytest.fixture

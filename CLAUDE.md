@@ -89,9 +89,11 @@ ContribFinder/
 │  │  │                     exceptions.py (error envelope)
 │  │  ├─ core/              health, auth class, CSRF/404 JSON views, log redaction, checks
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
-│  │  ├─ github/            GitHubAccount, SyncJob, sync tasks
+│  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
+│  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API
 │  │  ├─ developers/        DeveloperProfile, Skill, DeveloperSkill, SkillEvidence, Interest
-│  │  ├─ repositories/      Repository, RepositoryLanguage/Topic/Snapshot, RepositoryCandidate
+│  │  ├─ repositories/      Repository, RepositoryLanguage, RepositoryTopic, UserRepository
+│  │  │                     (+ Snapshot, RepositoryCandidate in Phase 4)
 │  │  ├─ issues/            Issue (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason, SavedRepository
 │  │  ├─ feedback/          RecommendationFeedback
@@ -104,7 +106,8 @@ ContribFinder/
 │  │     ├─ ranking/        scoring + explanation generation
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
-├─ scripts/                 setup.mjs, backend.mjs, uv.mjs, check-version.mjs (npm runners)
+├─ scripts/                 npm runners: start, setup, backend, worker, redis (WSL), env,
+│                           wait-port, uv, check-version
 ├─ package.json             root runner: npm run setup / npm start / check:version
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt
@@ -127,7 +130,14 @@ ContribFinder/
   `{"error": {code, message, details?}}` (`config/exceptions.py`).
 - Scoring components are normalized to `0.0–1.0`.
 - Tests: every service stage has unit tests; the GitHub client is tested against recorded
-  fixtures, never the live API.
+  fixtures, never the live API. Mock HTTP with `@respx.mock`, or the `respx_mock` fixture plus
+  `@pytest.mark.respx(...)` for options. Never use `@respx.mock(...)` with kwargs and then register
+  routes on the global `respx.mock`: they leak into other tests.
+- Retry and backoff policies are pure functions (`services/github/retry.py`); Celery tasks only
+  translate decisions into `self.retry(countdown=...)`.
+- API errors: raise an `APIException` subclass with its own `default_code`; the handler keeps
+  custom codes (`not_synced`, `sync_cooldown`, ...). Use `core.authentication.current_user(request)`,
+  never `assert isinstance(request.user, User)`.
 
 ## 6. Commands
 
@@ -136,9 +146,14 @@ Local, no Docker (primary on this machine):
   This creates `.env` with generated secrets, installs deps and migrates.
 - `npm start` runs Django on :8000 and Vite on :5173 together. Open http://localhost:5173.
   The SPA proxies `/api`.
-- No Redis locally: `REDIS_URL` empty means an in-process cache and inline Celery tasks, and
-  health reports `redis: not_configured`. Production refuses to start without `REDIS_URL`.
-- `uv` may only be installed as `python -m uv`; the npm scripts handle both.
+- Redis: on Windows, `npm start` starts the `redis-server` service in WSL Ubuntu and keeps the
+  distro awake (`scripts/redis.mjs`), then a Celery worker with `--pool=solo`
+  (`scripts/worker.mjs`). `REDIS_URL=redis://localhost:6379/1`: db 1, because db 0 holds unrelated
+  data. With `REDIS_URL` empty, tasks run inline (syncs block) and health reports
+  `redis: not_configured`. Production refuses to start without `REDIS_URL`.
+- `uv` need not be on PATH: `scripts/uv.mjs` tries `UV_BIN`, PATH, standard install dirs
+  (e.g. `%APPDATA%\Python\Python3xx\Scripts\uv.exe` from `pip install --user uv`) and
+  `python -m uv`. In some terminals `python` is the Microsoft Store stub.
 
 Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
 `REDIS_URL` with container hostnames; Postgres is on host port 5433.
@@ -186,12 +201,13 @@ CI (ruff, mypy, pytest, eslint, prettier, tsc, vitest, build).
 - Build: `POST /api/v1/auth/github/disconnect` → revoke the token through the GitHub API, then delete `GitHubAccount`.
 - Done when: after disconnect the token no longer works and no copy of it remains.
 
-### Phase 2 — GitHub data ingestion  → *User's GitHub data is in ContribFinder*
+### Phase 2 — GitHub data ingestion  → *User's GitHub data is in ContribFinder*  ✅ shipped in v0.2.0
 
-**Carry-over from phase-1-foundation (deferred, no Docker on the dev machine):** verify
-`docker compose up` from a fresh `.env`, and that a Celery worker runs `core.ping` against a real
-Redis. Phase 2 sync jobs need a real broker, so do this first: Docker, or Memurai/WSL Redis with
-`REDIS_URL` set and `celery -A config worker --pool=solo` on Windows.
+Archived: `openspec/changes/archive/2026-09-28-phase-2-github-ingestion/`. Specs: `github-data-sync`, `sync-jobs`. The local real-worker
+carry-over from Phase 1 is closed; Docker verification moves to Phase 3.
+
+**Carry-over from phase-1-foundation:** the local Celery worker against real Redis (WSL) is
+verified. `docker compose up` verification is still open (no Docker on the dev machine).
 
 **SyncJob model**: `job_type, status (PENDING|RUNNING|COMPLETED|FAILED|RETRYING|CANCELLED),
 user, started_at, completed_at, attempts, error, metadata`.
@@ -230,6 +246,8 @@ user, started_at, completed_at, attempts, error, metadata`.
 - Done when: the browser never blocks on a sync request; last-synced time is shown.
 
 ### Phase 3 — Developer profile (deterministic)  → *User sees a structured technical profile*
+
+**Carry-over:** verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **FR-PROFILE-001: Structured profile**
 - Build: `DeveloperProfile(user, summary, experience_level, preferred_project_size,
@@ -378,7 +396,8 @@ contribution plans, similar repositories, observability dashboards (Sentry, Prom
 When a change (phase) is completed and archived, update in the same commit:
 1. `VERSION`, root `package.json`, `apps/frontend/package.json`, `apps/backend/pyproject.toml`
    (then refresh lockfiles: `npm install` / `uv lock`). Before the MVP, each phase bumps the minor
-   version (`0.x.0`), and fixes bump the patch version. `npm run check:version` must pass.
+   version (`0.x.0`), and fixes bump the patch version. `npm run check:version` must pass (it also
+   checks `package-lock.json`, `apps/frontend/package-lock.json` and `apps/backend/uv.lock`).
 2. `CHANGELOG.md`: move `[Unreleased]` entries into a dated version section (Keep a Changelog).
 3. `features.txt`: flip shipped items to `[x]`, and mark carry-overs `[~]`.
 4. `README.md`: version/status line, plus any setup changes.

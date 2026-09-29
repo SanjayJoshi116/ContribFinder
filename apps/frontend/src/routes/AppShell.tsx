@@ -1,95 +1,93 @@
-import { useNavigate } from 'react-router'
+import { Navigate } from 'react-router'
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { useDisconnectGitHub, useLogout, useMe } from '@/features/auth/api'
+import { useMe } from '@/features/auth/api'
+import { DisconnectSection } from '@/features/auth/DisconnectSection'
+import {
+  isActive,
+  useGitHubProfile,
+  useRepositories,
+  useStartSync,
+  useSyncStatus,
+} from '@/features/sync/api'
+import { LanguageBreakdown } from '@/features/sync/LanguageBreakdown'
+import { failureMessage, formatWait } from '@/features/sync/messages'
+import { RepositoryList } from '@/features/sync/RepositoryList'
+
+const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 export function AppShell() {
   const { data: me } = useMe()
-  const navigate = useNavigate()
-  const logout = useLogout()
-  const disconnect = useDisconnectGitHub()
-  const busy = logout.isPending || disconnect.isPending
+  const status = useSyncStatus()
+  const synced = !!status.data?.last_synced_at
+  const profile = useGitHubProfile(synced)
+  const repositories = useRepositories(synced)
+  const start = useStartSync()
 
-  const goHome = () => navigate('/', { replace: true })
+  if (status.isPending) return <p className="text-muted-foreground">Loading…</p>
+  if (status.isError) {
+    return <p role="alert">Could not load your profile. Please refresh the page.</p>
+  }
+  if (!synced) return <Navigate to="/onboarding" replace />
 
-  if (!me) return null
-  const name = me.display_name || me.github_username || 'there'
+  const job = status.data.job
+  const syncing = isActive(job)
+  const lastFailure = job && job.status === 'FAILED' ? failureMessage(job) : null
+  const name = profile.data?.name || me?.display_name || me?.github_username || 'there'
+  const repos = repositories.data?.results ?? []
 
   return (
-    <div className="min-h-svh">
-      <header className="flex items-center justify-between gap-4 border-b px-4 py-3 sm:px-6">
-        <span className="font-semibold">ContribFinder</span>
-        <div className="flex items-center gap-3">
-          {me.avatar_url && <img src={me.avatar_url} alt="" className="size-8 rounded-full" />}
-          <span className="hidden text-sm sm:inline">{me.github_username}</span>
+    <>
+      <section className="space-y-2">
+        <h1 className="text-2xl font-semibold">Welcome, {name}</h1>
+        {profile.data?.bio && <p className="text-muted-foreground">{profile.data.bio}</p>}
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-muted-foreground">
+            Last synced {dateTime.format(new Date(status.data.last_synced_at!))}
+          </span>
           <Button
             variant="outline"
             size="sm"
-            disabled={busy}
-            onClick={() => logout.mutate(undefined, { onSuccess: goHome })}
+            disabled={syncing || start.isPending}
+            onClick={() => start.mutate()}
           >
-            Log out
+            {syncing ? 'Syncing…' : 'Refresh'}
           </Button>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
-        <section className="space-y-2">
-          <h1 className="text-2xl font-semibold">Welcome, {name}</h1>
-          <p className="text-muted-foreground">
-            Signed in as <strong>@{me.github_username}</strong>. Profile analysis arrives in the
-            next release.
+        {start.isError && (
+          <p role="status" className="text-muted-foreground text-sm">
+            {start.error.code === 'sync_cooldown' && start.error.retryAfter
+              ? `Your data was synced recently. You can refresh again in ${formatWait(start.error.retryAfter)}.`
+              : start.error.message}
           </p>
-        </section>
-
-        <section className="space-y-3 rounded-lg border p-4">
-          <h2 className="font-medium">GitHub connection</h2>
-          <p className="text-muted-foreground text-sm">
-            Disconnecting revokes ContribFinder&apos;s access on GitHub, deletes the stored
-            credential, and signs you out.
+        )}
+        {lastFailure && (
+          <p role="alert" className="text-destructive text-sm">
+            Last refresh failed: {lastFailure.text}
           </p>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" disabled={busy}>
-                Disconnect GitHub
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Disconnect GitHub?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  We will ask GitHub to revoke ContribFinder&apos;s access, delete the stored GitHub
-                  credential, and sign you out. You can reconnect later by signing in again.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => disconnect.mutate(undefined, { onSuccess: goHome })}
-                >
-                  Disconnect
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          {(logout.isError || disconnect.isError) && (
-            <p role="alert" className="text-destructive text-sm">
-              That didn&apos;t work. Please try again.
-            </p>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-medium">Languages</h2>
+        <LanguageBreakdown repositories={repos} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-medium">
+          Repositories{' '}
+          {repositories.data && (
+            <span className="text-muted-foreground font-normal">({repositories.data.count})</span>
           )}
-        </section>
-      </main>
-    </div>
+        </h2>
+        {repositories.isPending ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : (
+          <RepositoryList repositories={repos} />
+        )}
+      </section>
+
+      <DisconnectSection />
+    </>
   )
 }

@@ -3,8 +3,9 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.1.0** (Phase 1: Foundation). Users can sign in with GitHub, log out and disconnect.
-Profile analysis and recommendations are next.
+**Version 0.2.0** (Phase 2: GitHub data ingestion). After signing in with GitHub, your public
+profile, profile README, repositories, languages and topics are synced in the background and shown
+on your dashboard. Skill detection and recommendations are next.
 
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
@@ -26,9 +27,11 @@ it reads public data only.
 
 ## 2a. Run locally (no Docker)
 
-Requires Python 3.12+, [uv](https://docs.astral.sh/uv/) (`python -m pip install uv` works too),
-Node 24 and a local PostgreSQL. Redis is optional: without it the cache is in-process and
-background tasks run inline.
+Requires Python 3.12+, [uv](https://docs.astral.sh/uv/) (`python -m pip install uv` works too; it
+doesn't need to be on PATH, and you can set `UV_BIN` to point at it),
+Node 24, a local PostgreSQL and, for background jobs, Redis. On Windows, Redis runs inside WSL
+(Ubuntu); `npm start` starts it for you. Without Redis the cache is in-process and background
+tasks run inline, so GitHub syncs block the request.
 
 Create the database once. `psql` prompts for the `postgres` password:
 
@@ -37,6 +40,15 @@ Create the database once. `psql` prompts for the `postgres` password:
 ```
 
 `CREATEDB` lets the test suite create its own `test_contribfinder` database.
+
+Install Redis in WSL once (runs as root, so no sudo password is needed):
+
+```powershell
+wsl -d Ubuntu -u root -- apt-get install -y redis-server
+```
+
+ContribFinder uses Redis database 1 (`REDIS_URL=redis://localhost:6379/1`), so it doesn't touch
+anything else stored in that Redis.
 
 Then:
 
@@ -48,7 +60,7 @@ npm run setup      # creates .env with generated secrets, installs deps, runs mi
 Add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from step 1 to `.env`, then:
 
 ```bash
-npm start          # Django on :8000 + Vite on :5173 (proxies /api)
+npm start          # WSL Redis + Django :8000 + Celery worker + Vite :5173 (proxies /api)
 ```
 
 Open http://localhost:5173. API health: http://localhost:5173/api/v1/health/.

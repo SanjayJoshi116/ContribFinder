@@ -231,6 +231,200 @@
           }
         }
       }
+    },
+    "/api/v1/profile/github": {
+      "get": {
+        "operationId": "profile_github",
+        "description": "Stored data only: never calls GitHub.",
+        "tags": ["profile"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubProfile"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/profile/repositories": {
+      "get": {
+        "operationId": "profile_repositories",
+        "description": "The user's synced repositories, most recently pushed first. Stored data only.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": ["profile"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRepositoryList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/profile/sync": {
+      "post": {
+        "operationId": "profile_sync_start",
+        "tags": ["profile"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncJob"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/sync/status": {
+      "get": {
+        "operationId": "sync_status",
+        "tags": ["sync"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatus"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
     }
   },
   "components": {
@@ -272,11 +466,88 @@
         },
         "required": ["code", "message"]
       },
+      "GitHubProfile": {
+        "type": "object",
+        "description": "Synced GitHub profile. The README body is not included here (Phase 3 analyses it).",
+        "properties": {
+          "login": {
+            "type": "string",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "bio": {
+            "type": "string",
+            "readOnly": true
+          },
+          "company": {
+            "type": "string",
+            "readOnly": true
+          },
+          "location": {
+            "type": "string",
+            "readOnly": true
+          },
+          "blog": {
+            "type": "string",
+            "readOnly": true
+          },
+          "avatar_url": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true
+          },
+          "followers": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "following": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "public_repos": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "github_created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          },
+          "has_profile_readme": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "avatar_url",
+          "bio",
+          "blog",
+          "company",
+          "followers",
+          "following",
+          "github_created_at",
+          "has_profile_readme",
+          "location",
+          "login",
+          "name",
+          "public_repos",
+          "synced_at"
+        ]
+      },
       "Health": {
         "type": "object",
         "properties": {
           "status": {
-            "$ref": "#/components/schemas/StatusEnum"
+            "$ref": "#/components/schemas/HealthStatusEnum"
           },
           "checks": {
             "type": "object",
@@ -288,6 +559,16 @@
           }
         },
         "required": ["checks", "status"]
+      },
+      "HealthStatusEnum": {
+        "enum": ["ok", "degraded"],
+        "type": "string",
+        "description": "* `ok` - ok\n* `degraded` - degraded"
+      },
+      "JobTypeEnum": {
+        "enum": ["github_profile_sync"],
+        "type": "string",
+        "description": "* `github_profile_sync` - Github Profile Sync"
       },
       "Me": {
         "type": "object",
@@ -318,15 +599,261 @@
         },
         "required": ["avatar_url", "display_name", "github_connected", "github_username", "id"]
       },
+      "PaginatedRepositoryList": {
+        "type": "object",
+        "required": ["count", "results"],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Repository"
+            }
+          }
+        }
+      },
+      "Repository": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "full_name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "owner_login": {
+            "type": "string",
+            "readOnly": true
+          },
+          "description": {
+            "type": "string",
+            "readOnly": true
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true
+          },
+          "default_branch": {
+            "type": "string",
+            "readOnly": true
+          },
+          "stars": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "forks": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "open_issues": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "primary_language": {
+            "type": "string",
+            "readOnly": true
+          },
+          "license_spdx": {
+            "type": "string",
+            "readOnly": true
+          },
+          "is_fork": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "is_archived": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "github_created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          },
+          "github_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          },
+          "pushed_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepositoryLanguage"
+            },
+            "readOnly": true
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true
+          }
+        },
+        "required": [
+          "default_branch",
+          "description",
+          "forks",
+          "full_name",
+          "github_created_at",
+          "github_updated_at",
+          "html_url",
+          "id",
+          "is_archived",
+          "is_fork",
+          "languages",
+          "license_spdx",
+          "name",
+          "open_issues",
+          "owner_login",
+          "primary_language",
+          "pushed_at",
+          "stars",
+          "topics"
+        ]
+      },
+      "RepositoryLanguage": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "readOnly": true
+          },
+          "bytes": {
+            "type": "integer",
+            "readOnly": true
+          }
+        },
+        "required": ["bytes", "language"]
+      },
       "RevocationEnum": {
         "enum": ["revoked", "failed", "not_connected"],
         "type": "string",
         "description": "* `revoked` - revoked\n* `failed` - failed\n* `not_connected` - not_connected"
       },
-      "StatusEnum": {
-        "enum": ["ok", "degraded"],
+      "SyncJob": {
+        "type": "object",
+        "description": "Public view of a job. ``metadata`` and ``error_detail`` stay internal.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "job_type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobTypeEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SyncJobStatusEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "steps": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": ["pending", "running", "done", "not_found", "skipped", "failed"],
+              "type": "string",
+              "description": "* `pending` - Pending\n* `running` - Running\n* `done` - Done\n* `not_found` - Not Found\n* `skipped` - Skipped\n* `failed` - Failed"
+            }
+          },
+          "attempts": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "error_code": {
+            "type": "string",
+            "readOnly": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "attempts",
+          "completed_at",
+          "created_at",
+          "error_code",
+          "id",
+          "job_type",
+          "started_at",
+          "status",
+          "steps"
+        ]
+      },
+      "SyncJobStatusEnum": {
+        "enum": ["PENDING", "RUNNING", "RETRYING", "COMPLETED", "FAILED", "CANCELLED"],
         "type": "string",
-        "description": "* `ok` - ok\n* `degraded` - degraded"
+        "description": "* `PENDING` - Pending\n* `RUNNING` - Running\n* `RETRYING` - Retrying\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `CANCELLED` - Cancelled"
+      },
+      "SyncStatus": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SyncJob"
+              }
+            ],
+            "nullable": true
+          },
+          "last_synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["job", "last_synced_at"]
       }
     },
     "securitySchemes": {

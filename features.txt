@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.1.0 (2026-09-28)
+Version: 0.2.0 (2026-09-28)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md.
@@ -36,25 +36,46 @@ Frontend
 
 Developer experience
   [x] npm run setup / npm start (local PostgreSQL, Redis optional)
-  [~] Docker Compose stack (built; not yet verified - carried over to Phase 2)
+  [~] Docker Compose stack (built; not yet verified - no Docker on the dev machine)
   [x] CI: lint, types, tests, build, API schema drift, version consistency
+
+============================================================================
+SHIPPED - v0.2.0 - Phase 2: GitHub data ingestion
+============================================================================
+
+GitHub data (FR-GH)
+  [x] FR-GH-001  Profile information
+  [x] FR-GH-002  Public owned repositories (capped at 100, most recently pushed)
+  [x] FR-GH-003  Repository languages (bytes)
+  [x] FR-GH-004  Repository topics
+  [x] FR-GH-005  Profile README (raw; missing README is not a failure)
+  [x] FR-GH-006  Pagination (with page cap and truncation flag)
+  [x] FR-GH-007  Rate limits and transient failures (Retry-After/reset, backoff, 401 = no retry)
+  [x] ETag conditional requests (304 reuses cached data)
+
+Sync jobs (FR-DATA-001)
+  [x] Background sync with per-step progress (profile, README, repos, languages, topics)
+  [x] One active sync per user (database constraint), cooldown with Retry-After
+  [x] Resumable retries (completed steps never re-fetched)
+  [x] Initial sync on first sign-in; disconnect cancels running syncs
+  [x] Sync status, profile and repository endpoints (stored data only)
+
+Frontend
+  [x] Onboarding with live step progress and failure messages
+  [x] Dashboard: profile, language breakdown, repositories, last synced, Refresh
+
+Developer experience
+  [x] npm start: WSL Redis (Windows) + Celery worker + Django + Vite
+  [x] Real async worker verified locally (Phase 1 carry-over closed locally)
+  [x] Version check covers lockfiles
+  [x] npm runners find uv even when it is not on PATH (UV_BIN override)
 
 ============================================================================
 PLANNED - MVP
 ============================================================================
 
-Phase 2 - GitHub data ingestion (v0.2.0)
-  [ ] Carry-over: verify Docker stack and Celery worker against real Redis
-  [ ] FR-GH-001  Profile information
-  [ ] FR-GH-002  Public repositories
-  [ ] FR-GH-003  Repository languages
-  [ ] FR-GH-004  Repository topics
-  [ ] FR-GH-005  Profile README
-  [ ] FR-GH-006  Pagination
-  [ ] FR-GH-007  Rate limits and transient failures
-  [ ] FR-DATA-001  Sync status and onboarding progress
-
 Phase 3 - Developer profile, deterministic (v0.3.0)
+  [ ] Carry-over: verify Docker Compose stack (needs a machine with Docker)
   [ ] FR-PROFILE-001  Structured developer profile
   [ ] FR-PROFILE-002  Skill detection (taxonomy + aliases)
   [ ] FR-PROFILE-003  Interest detection

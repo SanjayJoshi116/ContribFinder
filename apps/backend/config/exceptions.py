@@ -37,8 +37,12 @@ def error_body(code: str, message: str, details: Any = None) -> dict[str, Any]:
 def _code_for(exc: exceptions.APIException) -> str:
     if isinstance(exc, exceptions.PermissionDenied) and str(exc.detail).startswith("CSRF Failed"):
         return "csrf_failed"
+    if isinstance(exc, exceptions.ValidationError):
+        return "validation_error"
+    # Exact type only: application subclasses (e.g. NotSynced(NotFound)) keep their own
+    # default_code instead of inheriting the generic one.
     for exc_type, code in _CODE_BY_EXCEPTION:
-        if isinstance(exc, exc_type):
+        if type(exc) is exc_type:
             return code
     return str(exc.default_code)
 

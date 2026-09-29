@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     "accounts",
     "core",
     "github",
+    "jobs",
+    "repositories",
 ]
 
 MIDDLEWARE = [
@@ -190,6 +192,16 @@ GITHUB_OAUTH_REDIRECT_URI = env(
 GITHUB_OAUTH_BASE_URL = "https://github.com"
 GITHUB_API_BASE_URL = "https://api.github.com"
 GITHUB_HTTP_TIMEOUT = env.float("GITHUB_HTTP_TIMEOUT", default=10.0)
+
+# --- GitHub sync (Phase 2) ---
+GITHUB_SYNC_MAX_REPOS = env.int("GITHUB_SYNC_MAX_REPOS", default=100)
+GITHUB_MAX_PAGES = env.int("GITHUB_MAX_PAGES", default=10)
+GITHUB_MAX_RETRY_DELAY = env.int("GITHUB_MAX_RETRY_DELAY", default=900)
+GITHUB_ETAG_TTL = env.int("GITHUB_ETAG_TTL", default=24 * 60 * 60)
+SYNC_MAX_ATTEMPTS = env.int("SYNC_MAX_ATTEMPTS", default=5)
+SYNC_COOLDOWN_SECONDS = env.int("SYNC_COOLDOWN_SECONDS", default=300)
+# A RUNNING job with no update for this long is treated as dead (worker crash).
+SYNC_STALE_AFTER_SECONDS = env.int("SYNC_STALE_AFTER_SECONDS", default=30 * 60)
 
 # Comma-separated Fernet keys, newest first.
 TOKEN_ENCRYPTION_KEYS = env.list("TOKEN_ENCRYPTION_KEYS", default=[])

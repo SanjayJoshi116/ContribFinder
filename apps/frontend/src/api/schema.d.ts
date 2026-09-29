@@ -116,6 +116,72 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/profile/github': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Stored data only: never calls GitHub. */
+    get: operations['profile_github']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/profile/repositories': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description The user's synced repositories, most recently pushed first. Stored data only. */
+    get: operations['profile_repositories']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/profile/sync': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['profile_sync_start']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/sync/status': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['sync_status']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -139,12 +205,42 @@ export interface components {
       message: string
       details?: unknown
     }
+    /** @description Synced GitHub profile. The README body is not included here (Phase 3 analyses it). */
+    GitHubProfile: {
+      readonly login: string
+      readonly name: string
+      readonly bio: string
+      readonly company: string
+      readonly location: string
+      readonly blog: string
+      /** Format: uri */
+      readonly avatar_url: string
+      readonly followers: number
+      readonly following: number
+      readonly public_repos: number
+      /** Format: date-time */
+      readonly github_created_at: string | null
+      readonly has_profile_readme: boolean
+      /** Format: date-time */
+      readonly synced_at: string
+    }
     Health: {
-      status: components['schemas']['StatusEnum']
+      status: components['schemas']['HealthStatusEnum']
       checks: {
         [key: string]: 'ok' | 'unavailable' | 'not_configured'
       }
     }
+    /**
+     * @description * `ok` - ok
+     *     * `degraded` - degraded
+     * @enum {string}
+     */
+    HealthStatusEnum: 'ok' | 'degraded'
+    /**
+     * @description * `github_profile_sync` - Github Profile Sync
+     * @enum {string}
+     */
+    JobTypeEnum: 'github_profile_sync'
     /** @description Explicit allowlist: nothing credential-bearing can reach the client. */
     Me: {
       readonly id: number
@@ -153,6 +249,50 @@ export interface components {
       readonly avatar_url: string | null
       readonly github_connected: boolean
     }
+    PaginatedRepositoryList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Repository'][]
+    }
+    Repository: {
+      readonly id: number
+      readonly full_name: string
+      readonly name: string
+      readonly owner_login: string
+      readonly description: string
+      /** Format: uri */
+      readonly html_url: string
+      readonly default_branch: string
+      readonly stars: number
+      readonly forks: number
+      readonly open_issues: number
+      readonly primary_language: string
+      readonly license_spdx: string
+      readonly is_fork: boolean
+      readonly is_archived: boolean
+      /** Format: date-time */
+      readonly github_created_at: string | null
+      /** Format: date-time */
+      readonly github_updated_at: string | null
+      /** Format: date-time */
+      readonly pushed_at: string | null
+      readonly languages: components['schemas']['RepositoryLanguage'][]
+      readonly topics: string[]
+    }
+    RepositoryLanguage: {
+      readonly language: string
+      readonly bytes: number
+    }
     /**
      * @description * `revoked` - revoked
      *     * `failed` - failed
@@ -160,12 +300,38 @@ export interface components {
      * @enum {string}
      */
     RevocationEnum: 'revoked' | 'failed' | 'not_connected'
+    /** @description Public view of a job. ``metadata`` and ``error_detail`` stay internal. */
+    SyncJob: {
+      readonly id: number
+      readonly job_type: components['schemas']['JobTypeEnum']
+      readonly status: components['schemas']['SyncJobStatusEnum']
+      steps: {
+        [key: string]: 'pending' | 'running' | 'done' | 'not_found' | 'skipped' | 'failed'
+      }
+      readonly attempts: number
+      readonly error_code: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly started_at: string | null
+      /** Format: date-time */
+      readonly completed_at: string | null
+    }
     /**
-     * @description * `ok` - ok
-     *     * `degraded` - degraded
+     * @description * `PENDING` - Pending
+     *     * `RUNNING` - Running
+     *     * `RETRYING` - Retrying
+     *     * `COMPLETED` - Completed
+     *     * `FAILED` - Failed
+     *     * `CANCELLED` - Cancelled
      * @enum {string}
      */
-    StatusEnum: 'ok' | 'degraded'
+    SyncJobStatusEnum: 'PENDING' | 'RUNNING' | 'RETRYING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+    SyncStatus: {
+      job: components['schemas']['SyncJob'] | null
+      /** Format: date-time */
+      last_synced_at: string | null
+    }
   }
   responses: never
   parameters: never
@@ -376,6 +542,151 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['Health']
+        }
+      }
+    }
+  }
+  profile_github: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GitHubProfile']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  profile_repositories: {
+    parameters: {
+      query?: {
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedRepositoryList']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  profile_sync_start: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SyncJob']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  sync_status: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SyncStatus']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
         }
       }
     }

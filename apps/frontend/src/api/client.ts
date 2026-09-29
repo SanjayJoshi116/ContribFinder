@@ -8,13 +8,22 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly details?: unknown
+  /** Seconds from the Retry-After header (429 responses), when present. */
+  readonly retryAfter?: number
 
-  constructor(status: number, code: string, message: string, details?: unknown) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details?: unknown,
+    retryAfter?: number,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.details = details
+    this.retryAfter = retryAfter
   }
 }
 
@@ -36,10 +45,13 @@ export async function ensureCsrfToken(): Promise<string> {
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
+  const header = Number(response.headers.get('Retry-After'))
+  const retryAfter = Number.isFinite(header) && header > 0 ? header : undefined
   try {
     const body = (await response.json()) as Partial<ApiErrorBody>
     if (body.error) {
-      return new ApiError(response.status, body.error.code, body.error.message, body.error.details)
+      const { code, message, details } = body.error
+      return new ApiError(response.status, code, message, details, retryAfter)
     }
   } catch {
     // Non-JSON error body; fall through to a generic error.
