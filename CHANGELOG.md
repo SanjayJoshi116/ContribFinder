@@ -7,7 +7,52 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-09-28
+## [0.3.0] - 2026-09-29
+
+Phase 3: Developer profile, deterministic (OpenSpec change `phase-3-developer-profile`;
+FR-PROFILE-001..005). No LLM or embedding calls.
+
+### Added
+
+- Skill and interest catalog (`services/profiling/taxonomy.py`, `TAXONOMY_VERSION`): 170 skills
+  in 7 categories (language, framework, library, database, cloud, devops, tool) with aliases,
+  GitHub language names, topics, badge/icon tokens and per-ecosystem dependency names; 16
+  interests with synonyms and topics. Ambiguous words ("Go", "Rust", "Spring") only count in
+  README tech sections, badges and skill icons.
+- Two new sync steps:
+  - `dependencies`: root manifests (requirements.txt, pyproject.toml, package.json, go.mod,
+    Cargo.toml, pom.xml, build.gradle/.kts) of up to 30 recently pushed non-fork repositories,
+    stored as `RepositoryDependency` names (raw files are not stored);
+  - `contributions`: merged pull requests (search API) and recent public pushes to other
+    people's repositories. Up to 20 of those repositories are stored with languages and topics
+    and linked to the user as `contributor`. A 422 from search skips the step.
+- Evidence collectors for README (sections, shields.io badges, skillicons.dev, devicon, alt
+  text), repository languages, topics, dependencies, pull requests, pushes and repeated
+  contributions. Every skill and interest has relational evidence rows (source, supporting
+  repository, detail, observed date).
+- Configurable confidence: `EVIDENCE_WEIGHTS` (SRS-1 §15 defaults) with diminishing returns per
+  source and a 0.99 cap, so one README mention stays at 0.20. A system check refuses to start
+  with invalid weights. Each profile records the weights and catalog version it used.
+- `DeveloperProfile`: summary from fixed templates (computed signals only), language breakdown,
+  default preferences, and an internal experience level (never shown or returned by the API).
+- Analysis runs as the final `analysis` sync step and as a standalone `profile_analysis` job.
+  `manage.py reanalyze_profiles [--user ID]` rebuilds profiles from stored data without GitHub
+  calls. A failure (`analysis_failed`, not retried) keeps the previous profile.
+- API: `GET /api/v1/profile` (404 `not_analyzed`), `GET /api/v1/profile/skills` (evidence,
+  `?category=`), `GET /api/v1/profile/interests`.
+- Frontend: `/app` is now the profile page: summary, skills grouped by category with bars labeled
+  by evidence ("8 repositories · dependencies · README", never a percentage), expandable evidence
+  with repository links, interests, and a Recharts languages chart (loaded lazily). Onboarding
+  shows all eight steps.
+- `npm run manage -- <command>` runs Django management commands without uv on PATH.
+- Tests: 306 backend and 31 frontend. Verified end to end with a real account, including
+  `reanalyze_profiles` on a Celery worker.
+
+### Changed
+
+- `GET /api/v1/profile/repositories` lists only repositories the user owns.
+- Sync jobs report steps missing from older jobs as `pending`.
+- `claim_job` / `finish_job` moved to `services/jobs.py` for reuse by all job types.
 
 Phase 2: GitHub data ingestion (OpenSpec change `phase-2-github-ingestion`; FR-GH-001..007, FR-DATA-001).
 

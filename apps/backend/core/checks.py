@@ -33,3 +33,40 @@ def github_oauth_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMess
             )
         ]
     return []
+
+
+def _weight_errors(name: str, weights: object, sources: list[str], code: str) -> list[CheckMessage]:
+    if not isinstance(weights, dict):
+        return [Error(f"{name} must be a mapping of source to weight.", id=code)]
+    errors: list[CheckMessage] = []
+    if missing := sorted(set(sources) - set(weights)):
+        errors.append(Error(f"{name} is missing sources: {', '.join(missing)}.", id=code))
+    if unknown := sorted(set(weights) - set(sources)):
+        errors.append(Error(f"{name} has unknown sources: {', '.join(unknown)}.", id=code))
+    for source, weight in weights.items():
+        if not isinstance(weight, int | float) or isinstance(weight, bool) or not 0 <= weight <= 1:
+            errors.append(Error(f"{name}[{source!r}] must be a number between 0 and 1.", id=code))
+    return errors
+
+
+@register()
+def profiling_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    """Evidence weights are configuration (FR-PROFILE-005); refuse to start with bad values."""
+    from developers.models import InterestSource, SkillSource
+
+    errors = _weight_errors(
+        "EVIDENCE_WEIGHTS", settings.EVIDENCE_WEIGHTS, SkillSource.values, "core.E010"
+    )
+    errors += _weight_errors(
+        "INTEREST_EVIDENCE_WEIGHTS",
+        settings.INTEREST_EVIDENCE_WEIGHTS,
+        InterestSource.values,
+        "core.E011",
+    )
+    for name in ("EVIDENCE_REPEAT_DECAY", "CONFIDENCE_CAP"):
+        if not 0 < getattr(settings, name) < 1:
+            errors.append(Error(f"{name} must be strictly between 0 and 1.", id="core.E012"))
+    for name in ("LANGUAGE_MIN_SHARE", "INTEREST_MIN_STRENGTH"):
+        if not 0 <= getattr(settings, name) <= 1:
+            errors.append(Error(f"{name} must be between 0 and 1.", id="core.E013"))
+    return errors

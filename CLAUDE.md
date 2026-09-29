@@ -91,24 +91,29 @@ ContribFinder/
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
 │  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API
-│  │  ├─ developers/        DeveloperProfile, Skill, DeveloperSkill, SkillEvidence, Interest
-│  │  ├─ repositories/      Repository, RepositoryLanguage, RepositoryTopic, UserRepository
+│  │  ├─ developers/        DeveloperProfile, Skill, DeveloperSkill, SkillEvidence, Interest,
+│  │  │                     DeveloperInterest, InterestEvidence; profile API; analysis task;
+│  │  │                     reanalyze_profiles command
+│  │  ├─ repositories/      Repository, RepositoryLanguage, RepositoryTopic, RepositoryDependency,
+│  │  │                     UserRepository (owner | contributor)
 │  │  │                     (+ Snapshot, RepositoryCandidate in Phase 4)
 │  │  ├─ issues/            Issue (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason, SavedRepository
 │  │  ├─ feedback/          RecommendationFeedback
 │  │  ├─ embeddings/        (Phase 6, future)
-│  │  └─ services/          crypto.py (token encryption), audit.py
+│  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
+│  │     │                  jobs), errors.py (PermanentJobError)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2)
-│  │     ├─ profiling/      evidence collection, taxonomy, confidence
+│  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
+│  │     │                  experience, summary, analysis (Phase 3)
 │  │     ├─ discovery/      candidate generation + filtering
 │  │     ├─ matching/       feature/signal calculators
 │  │     ├─ ranking/        scoring + explanation generation
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
 ├─ scripts/                 npm runners: start, setup, backend, worker, redis (WSL), env,
-│                           wait-port, uv, check-version
-├─ package.json             root runner: npm run setup / npm start / check:version
+│                           wait-port, uv, manage, check-version
+├─ package.json             root runner: npm run setup / npm start / manage / check:version
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt
 └─ .github/workflows/ci.yml
@@ -154,6 +159,9 @@ Local, no Docker (primary on this machine):
 - `uv` need not be on PATH: `scripts/uv.mjs` tries `UV_BIN`, PATH, standard install dirs
   (e.g. `%APPDATA%\Python\Python3xx\Scripts\uv.exe` from `pip install --user uv`) and
   `python -m uv`. In some terminals `python` is the Microsoft Store stub.
+- `npm run manage -- <command> [args]` runs a Django management command in `apps/backend` the
+  same way (e.g. `npm run manage -- reanalyze_profiles` after changing `EVIDENCE_WEIGHTS` or the
+  skill catalog; it queues jobs, so a worker must be running when `REDIS_URL` is set).
 
 Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
 `REDIS_URL` with container hostnames; Postgres is on host port 5433.
@@ -245,9 +253,23 @@ user, started_at, completed_at, attempts, error, metadata`.
   onboarding screen polls the status and shows per-step ticks (Profile, README, Repos, Languages, Topics).
 - Done when: the browser never blocks on a sync request; last-synced time is shown.
 
-### Phase 3 — Developer profile (deterministic)  → *User sees a structured technical profile*
+### Phase 3 — Developer profile (deterministic)  → *User sees a structured technical profile*  ✅ shipped in v0.3.0
 
-**Carry-over:** verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
+Archived: `openspec/changes/archive/2026-09-29-phase-3-developer-profile/`. Specs:
+`skill-detection`, `interest-detection`, `developer-profile` (plus deltas to `github-data-sync`
+and `sync-jobs`). Docker verification is carried over to Phase 4.
+
+Deviations from the sketch below, as built:
+- `DeveloperProfile` has **no** `profile_readme_raw`: the raw README stays on `GitHubProfile`
+  (raw data in one place). The profile also stores `languages`, `experience_signals` and
+  `analysis_config` (weights, thresholds, `TAXONOMY_VERSION`).
+- Analysis is the final `analysis` step of the GitHub sync (after new `dependencies` and
+  `contributions` steps) and a standalone `profile_analysis` job (task
+  `developers.extract_developer_skills`). Failures use `analysis_failed` and are not retried.
+- Contribution evidence comes from merged PRs (search API) and recent public pushes (events
+  API); contributed repos are stored and linked as `UserRepository(relation=contributor)`.
+- Manifests also include `pom.xml` and `build.gradle(.kts)` (SRS-2 §13 lists Java build files).
+- The summary names languages by skill confidence, not bytes, and ignores README-only skills.
 
 **FR-PROFILE-001: Structured profile**
 - Build: `DeveloperProfile(user, summary, experience_level, preferred_project_size,
@@ -285,6 +307,11 @@ Frontend: profile page with skill bars labeled by evidence (not "expertise %"), 
 interests, and a refresh button.
 
 ### Phase 4 — Repository discovery  → *System builds a candidate pool*
+
+**Carry-over:** verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
+Reuse from Phase 3: `RepositoryDependency` and the skill catalog (`skill_for_dependency`,
+`skill_for_topic`) work on candidate repos unchanged; contributor links are the
+`previously_interacted` source.
 
 **FR-REPO-001: Generate candidates**
 - Build: `services/discovery/queries.py` turns top skills and interests into GitHub search queries

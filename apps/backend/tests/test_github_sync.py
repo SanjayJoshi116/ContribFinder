@@ -72,6 +72,12 @@ def mock_github(
     router.get(url__regex=rf"{API}/repos/octocat/r\d+/languages").mock(
         side_effect=lambda request: httpx.Response(200, json=languages)
     )
+    # Phase 3 steps: no manifests and no external contributions unless a test adds them.
+    # Exact URLs, so a test can override one repository by registering the same URL again.
+    for repo in repos:
+        router.get(f"{API}/repos/{repo['full_name']}/contents/").respond(200, json=[])
+    router.get(f"{API}/search/issues").respond(200, json={"total_count": 0, "items": []})
+    router.get(f"{API}/users/octocat/events/public").respond(200, json=[])
     return languages
 
 
@@ -116,7 +122,17 @@ def test_full_sync_stores_everything(job, user) -> None:
 
     job.refresh_from_db()
     assert job.steps == dict.fromkeys(
-        ["profile", "readme", "repositories", "languages", "topics"], "done"
+        [
+            "profile",
+            "readme",
+            "repositories",
+            "languages",
+            "topics",
+            "dependencies",
+            "contributions",
+            "analysis",
+        ],
+        "done",
     )
 
 

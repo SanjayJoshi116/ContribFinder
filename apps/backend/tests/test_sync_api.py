@@ -37,7 +37,16 @@ def test_start_creates_pending_job_and_enqueues(
     assert response.status_code == 202
     body = response.json()
     assert body["status"] == "PENDING"
-    assert set(body["steps"]) == {"profile", "readme", "repositories", "languages", "topics"}
+    assert list(body["steps"]) == [
+        "profile",
+        "readme",
+        "repositories",
+        "languages",
+        "topics",
+        "dependencies",
+        "contributions",
+        "analysis",
+    ]
     assert "metadata" not in body and "error_detail" not in body
     delay.assert_called_once_with(body["id"])
 
@@ -106,7 +115,15 @@ def test_status_running_with_last_success(signed_in_client: APIClient, user) -> 
     body = signed_in_client.get("/api/v1/sync/status").json()
     assert body["job"]["id"] == running.pk
     assert body["job"]["status"] == "RUNNING"
-    assert body["job"]["steps"] == {"profile": "done", "readme": "running"}
+    # Steps missing from older jobs are reported as pending, in step order.
+    assert body["job"]["steps"] == {
+        "profile": "done",
+        "readme": "running",
+        **dict.fromkeys(
+            ["repositories", "languages", "topics", "dependencies", "contributions", "analysis"],
+            "pending",
+        ),
+    }
     assert body["last_synced_at"] is not None
 
 

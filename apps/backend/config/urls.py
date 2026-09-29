@@ -1,9 +1,12 @@
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import URLPattern, URLResolver, include, path
 
-api_v1 = [
+from developers.api import DeveloperProfileView
+
+api_v1: list[URLPattern | URLResolver] = [
     path("", include("core.urls")),
     path("auth/", include("accounts.urls")),
+    path("profile", DeveloperProfileView.as_view(), name="profile"),
     path("profile/", include("github.urls")),
     path("sync/", include("jobs.urls")),
 ]

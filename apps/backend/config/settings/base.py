@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "github",
     "jobs",
     "repositories",
+    "developers",
 ]
 
 MIDDLEWARE = [
@@ -202,6 +203,47 @@ SYNC_MAX_ATTEMPTS = env.int("SYNC_MAX_ATTEMPTS", default=5)
 SYNC_COOLDOWN_SECONDS = env.int("SYNC_COOLDOWN_SECONDS", default=300)
 # A RUNNING job with no update for this long is treated as dead (worker crash).
 SYNC_STALE_AFTER_SECONDS = env.int("SYNC_STALE_AFTER_SECONDS", default=30 * 60)
+
+# --- Developer profile (Phase 3) ---
+# Evidence strength per source (SRS-1 §15). Configuration, not product rules: an env JSON
+# object overrides individual sources, e.g. EVIDENCE_WEIGHTS='{"readme": 0.1}'.
+EVIDENCE_WEIGHTS: dict[str, float] = {
+    "readme": 0.20,
+    "topic": 0.30,
+    "language": 0.50,
+    "dependency": 0.60,
+    "commit": 0.80,
+    "pull_request": 0.90,
+    "repeated_contribution": 1.00,
+    **env.json("EVIDENCE_WEIGHTS", default={}),
+}
+# Each further piece of evidence from the same source counts `decay` times the previous one.
+EVIDENCE_REPEAT_DECAY = env.float("EVIDENCE_REPEAT_DECAY", default=0.5)
+CONFIDENCE_CAP = env.float("CONFIDENCE_CAP", default=0.99)
+# A repository counts as language evidence when the language is primary or has this share.
+LANGUAGE_MIN_SHARE = env.float("LANGUAGE_MIN_SHARE", default=0.10)
+REPEATED_CONTRIBUTION_MIN_PRS = env.int("REPEATED_CONTRIBUTION_MIN_PRS", default=3)
+INTEREST_EVIDENCE_WEIGHTS: dict[str, float] = {
+    "readme": 0.30,
+    "repo_description": 0.40,
+    "topic": 0.50,
+    "contribution": 0.60,
+    **env.json("INTEREST_EVIDENCE_WEIGHTS", default={}),
+}
+INTEREST_MIN_STRENGTH = env.float("INTEREST_MIN_STRENGTH", default=0.35)
+# Per signal: [intermediate_from, experienced_from]. Internal matching signal only.
+EXPERIENCE_THRESHOLDS: dict[str, list[float]] = {
+    "account_age_years": [1, 4],
+    "active_repositories": [3, 10],
+    "merged_external_prs": [1, 15],
+    "contributed_repositories": [1, 4],
+    "well_evidenced_skills": [3, 8],
+    **env.json("EXPERIENCE_THRESHOLDS", default={}),
+}
+GITHUB_MANIFEST_MAX_REPOS = env.int("GITHUB_MANIFEST_MAX_REPOS", default=30)
+GITHUB_MANIFEST_MAX_BYTES = env.int("GITHUB_MANIFEST_MAX_BYTES", default=512 * 1024)
+GITHUB_CONTRIB_MAX_PRS = env.int("GITHUB_CONTRIB_MAX_PRS", default=200)
+GITHUB_CONTRIB_MAX_REPOS = env.int("GITHUB_CONTRIB_MAX_REPOS", default=20)
 
 # Comma-separated Fernet keys, newest first.
 TOKEN_ENCRYPTION_KEYS = env.list("TOKEN_ENCRYPTION_KEYS", default=[])

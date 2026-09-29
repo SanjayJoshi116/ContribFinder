@@ -1,6 +1,6 @@
 {
   "name": "contribfinder",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "ContribFinder monorepo: local dev runner (Docker alternative: docker compose up)",
   "type": "module",
@@ -11,7 +11,8 @@
     "start:frontend": "npm --prefix apps/frontend run dev",
     "check:version": "node scripts/check-version.mjs",
     "start:redis": "node scripts/redis.mjs",
-    "start:worker": "node scripts/worker.mjs"
+    "start:worker": "node scripts/worker.mjs",
+    "manage": "node scripts/manage.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

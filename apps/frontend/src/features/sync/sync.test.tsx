@@ -2,10 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Repository } from '@/api/types'
-import { COMPLETED_JOB, ME, REPO, SYNCED_USER, json, mockFetch, renderRoute } from '@/test/render'
-
-import { aggregateLanguages } from './languages'
+import { COMPLETED_JOB, ME, SYNCED_USER, json, mockFetch, renderRoute } from '@/test/render'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
 const NEVER_SYNCED = { 'GET /api/v1/sync/status': () => json({ job: null, last_synced_at: null }) }
@@ -20,38 +17,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
-})
-
-describe('aggregateLanguages', () => {
-  it('sums bytes across repositories, largest first, shares add to 1', () => {
-    const repos = [
-      {
-        ...REPO,
-        languages: [
-          { language: 'Python', bytes: 600 },
-          { language: 'Go', bytes: 100 },
-        ],
-      },
-      {
-        ...REPO,
-        languages: [
-          { language: 'Python', bytes: 200 },
-          { language: 'TypeScript', bytes: 100 },
-        ],
-      },
-    ] as Repository[]
-    const shares = aggregateLanguages(repos)
-    expect(shares.map((s) => [s.language, s.bytes])).toEqual([
-      ['Python', 800],
-      ['Go', 100],
-      ['TypeScript', 100],
-    ])
-    expect(shares.reduce((sum, s) => sum + s.share, 0)).toBeCloseTo(1)
-  })
-
-  it('returns nothing when no languages were detected', () => {
-    expect(aggregateLanguages([{ ...REPO, languages: [] }] as Repository[])).toEqual([])
-  })
 })
 
 describe('app redirect', () => {
@@ -96,7 +61,11 @@ describe('onboarding', () => {
         'running',
         'pending',
         'pending',
+        'pending',
+        'pending',
+        'pending',
       ])
+      expect(within(items[7]).getByText('Building profile')).toBeInTheDocument()
       expect(within(items[1]).getByText('Not found')).toBeInTheDocument()
 
       // The next poll (every 2 s) reports COMPLETED.
@@ -172,7 +141,7 @@ describe('onboarding', () => {
 })
 
 describe('dashboard', () => {
-  it('shows profile, languages, repositories and last-synced time', async () => {
+  it('shows profile, repositories and last-synced time', async () => {
     mockFetch({ ...ME_ROUTE, ...SYNCED_USER })
     renderRoute('/app')
 
@@ -181,9 +150,6 @@ describe('dashboard', () => {
     ).toBeInTheDocument()
     expect(await screen.findByText('Builds tools')).toBeInTheDocument()
     expect(screen.getByText(/last synced/i)).toBeInTheDocument()
-    const languages = await screen.findByRole('list', { name: 'Languages' })
-    expect(within(languages).getByText('Python')).toBeInTheDocument()
-    expect(within(languages).getByText('100%')).toBeInTheDocument()
     const repos = screen.getByRole('list', { name: 'Repositories' })
     expect(within(repos).getByRole('link', { name: 'octocat/tools' })).toHaveAttribute(
       'href',

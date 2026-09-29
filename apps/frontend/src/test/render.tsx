@@ -100,6 +100,9 @@ export const COMPLETED_JOB = {
     repositories: 'done',
     languages: 'done',
     topics: 'done',
+    dependencies: 'done',
+    contributions: 'done',
+    analysis: 'done',
   },
   attempts: 1,
   error_code: '',
@@ -108,11 +111,91 @@ export const COMPLETED_JOB = {
   completed_at: '2026-09-28T10:00:05Z',
 }
 
-/** Handlers for a user whose GitHub data has been synced. */
+export const DEVELOPER_PROFILE = {
+  summary: 'Works mostly in Python. Frequently uses Django. Interested in developer tooling.',
+  languages: [
+    { name: 'Python', bytes: 7000, share: 0.7, repo_count: 1 },
+    { name: 'TypeScript', bytes: 3000, share: 0.3, repo_count: 1 },
+  ],
+  preferred_project_size: 'any',
+  preferred_issue_difficulty: 'unknown',
+  analyzed_at: '2026-09-28T10:00:05Z',
+  skill_count: 2,
+  interest_count: 1,
+}
+
+export const SKILLS = [
+  {
+    id: 1,
+    skill: { slug: 'python', name: 'Python', category: 'language' },
+    confidence: 0.93,
+    evidence_summary: {
+      by_source: { readme: 1, language: 8, dependency: 2 },
+      repository_count: 8,
+      last_observed_at: '2026-09-01T00:00:00Z',
+    },
+    evidence: [
+      {
+        source: 'readme',
+        repository: null,
+        detail: '"Skills" section',
+        observed_at: null,
+      },
+      {
+        source: 'language',
+        repository: { full_name: 'octocat/tools', html_url: 'https://github.com/octocat/tools' },
+        detail: 'Python · 90% of code',
+        observed_at: '2026-09-01T00:00:00Z',
+      },
+    ],
+  },
+  {
+    id: 2,
+    skill: { slug: 'django', name: 'Django', category: 'framework' },
+    confidence: 0.6,
+    evidence_summary: {
+      by_source: { dependency: 1 },
+      repository_count: 1,
+      last_observed_at: '2026-09-01T00:00:00Z',
+    },
+    evidence: [
+      {
+        source: 'dependency',
+        repository: { full_name: 'octocat/tools', html_url: 'https://github.com/octocat/tools' },
+        detail: 'pyproject.toml: django',
+        observed_at: '2026-09-01T00:00:00Z',
+      },
+    ],
+  },
+]
+
+export const INTERESTS = [
+  {
+    id: 1,
+    interest: { slug: 'developer-tooling', name: 'Developer tooling' },
+    strength: 0.5,
+    evidence: [
+      {
+        source: 'topic',
+        repository: { full_name: 'octocat/tools', html_url: 'https://github.com/octocat/tools' },
+        detail: '"cli"',
+        observed_at: '2026-09-01T00:00:00Z',
+      },
+    ],
+  },
+]
+
+const page = (results: unknown[]) =>
+  json({ count: results.length, next: null, previous: null, results })
+
+/** Handlers for a user whose GitHub data has been synced and analyzed. */
 export const SYNCED_USER: Record<string, Handler> = {
   'GET /api/v1/sync/status': () =>
     json({ job: COMPLETED_JOB, last_synced_at: COMPLETED_JOB.completed_at }),
   'GET /api/v1/profile/github': () => json(PROFILE),
   'GET /api/v1/profile/repositories?page_size=100': () =>
     json({ count: 1, next: null, previous: null, results: [REPO] }),
+  'GET /api/v1/profile': () => json(DEVELOPER_PROFILE),
+  'GET /api/v1/profile/skills?page_size=200': () => page(SKILLS),
+  'GET /api/v1/profile/interests?page_size=200': () => page(INTERESTS),
 }

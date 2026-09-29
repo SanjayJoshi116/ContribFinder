@@ -3,9 +3,10 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.2.0** (Phase 2: GitHub data ingestion). After signing in with GitHub, your public
-profile, profile README, repositories, languages and topics are synced in the background and shown
-on your dashboard. Skill detection and recommendations are next.
+**Version 0.3.0** (Phase 3: Developer profile). After signing in with GitHub, your public
+profile, README, repositories, dependencies and contributions are synced in the background and
+turned into an evidence-backed profile: skills (with the evidence behind each), interests and
+languages. Repository discovery and recommendations are next.
 
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
@@ -64,6 +65,16 @@ npm start          # WSL Redis + Django :8000 + Celery worker + Vite :5173 (prox
 ```
 
 Open http://localhost:5173. API health: http://localhost:5173/api/v1/health/.
+
+Django management commands work from the root without uv on PATH:
+
+```bash
+npm run manage -- migrate
+npm run manage -- reanalyze_profiles   # rebuild profiles from stored data (no GitHub calls)
+```
+
+Profile scoring is configurable in `.env` (`EVIDENCE_WEIGHTS` and friends, see `.env.example`).
+Run `reanalyze_profiles` after changing it.
 
 ## 2b. Run with Docker
 

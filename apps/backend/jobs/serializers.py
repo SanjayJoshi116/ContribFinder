@@ -1,4 +1,8 @@
+from typing import Any
+
 from rest_framework import serializers
+
+from services.jobs import STEPS_BY_JOB_TYPE
 
 from .models import SyncJob
 
@@ -22,6 +26,13 @@ class SyncJobSerializer(serializers.ModelSerializer[SyncJob]):
             "completed_at",
         ]
         read_only_fields = fields
+
+    def to_representation(self, instance: SyncJob) -> dict[str, Any]:
+        data = super().to_representation(instance)
+        # Jobs created before a step existed report it as pending, in step order.
+        order = STEPS_BY_JOB_TYPE.get(instance.job_type, ())
+        data["steps"] = {**dict.fromkeys(order, "pending"), **data["steps"]}
+        return data
 
 
 class SyncStatusSerializer(serializers.Serializer[dict[str, object]]):

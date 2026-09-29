@@ -10,6 +10,7 @@ from accounts.models import User
 from github.models import GitHubAccount
 
 from .factories import GitHubAccountFactory
+from .profile_data import synced  # noqa: F401  (shared fixture)
 
 
 @pytest.fixture(autouse=True)

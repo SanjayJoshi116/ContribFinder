@@ -12,6 +12,7 @@ class SyncJob(models.Model):
 
     class JobType(models.TextChoices):
         GITHUB_PROFILE_SYNC = "github_profile_sync"
+        PROFILE_ANALYSIS = "profile_analysis"
 
     class Status(models.TextChoices):
         PENDING = "PENDING"

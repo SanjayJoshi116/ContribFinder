@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.2.0 (2026-09-28)
+Version: 0.3.0 (2026-09-29)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md.
@@ -71,18 +71,43 @@ Developer experience
   [x] npm runners find uv even when it is not on PATH (UV_BIN override)
 
 ============================================================================
+SHIPPED - v0.3.0 - Phase 3: Developer profile (deterministic)
+============================================================================
+
+Developer profile (FR-PROFILE)
+  [x] FR-PROFILE-001  Structured profile (summary, languages, preferences, internal experience)
+  [x] FR-PROFILE-002  Skill detection (170-skill catalog, aliases, ambiguous-word rules)
+  [x] FR-PROFILE-003  Interest detection (16 interests, synonyms and topics)
+  [x] FR-PROFILE-004  Evidence per skill and interest (source, repository, detail, date)
+  [x] FR-PROFILE-005  Configurable confidence (EVIDENCE_WEIGHTS, diminishing returns, cap)
+
+Evidence sources
+  [x] Profile README: tech sections, badges, skill icons, text
+  [x] Repository languages and topics (forks excluded)
+  [x] Dependency manifests: requirements.txt, pyproject.toml, package.json, go.mod, Cargo.toml,
+      pom.xml, build.gradle(.kts)
+  [x] Merged pull requests, recent public pushes, repeated contributions
+
+Jobs and API
+  [x] Sync steps: dependencies, contributions, analysis (resumable, capped)
+  [x] Standalone re-analysis job + manage.py reanalyze_profiles (no GitHub calls)
+  [x] GET /profile, /profile/skills (?category=), /profile/interests
+
+Frontend
+  [x] Profile page: summary, skills by category with evidence labels, evidence detail,
+      interests, languages chart
+  [x] Onboarding shows all eight sync steps
+
+Developer experience
+  [x] npm run manage -- <command> (Django commands without uv on PATH)
+  [~] Docker Compose verification (still no Docker; carried to Phase 4)
+
+============================================================================
 PLANNED - MVP
 ============================================================================
 
-Phase 3 - Developer profile, deterministic (v0.3.0)
-  [ ] Carry-over: verify Docker Compose stack (needs a machine with Docker)
-  [ ] FR-PROFILE-001  Structured developer profile
-  [ ] FR-PROFILE-002  Skill detection (taxonomy + aliases)
-  [ ] FR-PROFILE-003  Interest detection
-  [ ] FR-PROFILE-004  Evidence per skill
-  [ ] FR-PROFILE-005  Configurable confidence
-
 Phase 4 - Repository discovery (v0.4.0)
+  [~] Carry-over: verify Docker Compose stack (needs a machine with Docker)
   [ ] FR-REPO-001  Candidate generation (GitHub search)
   [ ] FR-REPO-002  Discovery source tracking
   [ ] FR-REPO-003  Repository metadata analysis + lifecycle

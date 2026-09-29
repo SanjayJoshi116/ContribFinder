@@ -4,6 +4,8 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from services.errors import PermanentJobError
+
 from .errors import (
     GitHubAuthError,
     GitHubError,
@@ -34,6 +36,8 @@ def decide_retry(
     rng: Callable[[], float] = random.random,
 ) -> Retry | Fail:
     """Decide what to do after ``error`` on execution number ``attempts`` (1-based)."""
+    if isinstance(error, PermanentJobError):
+        return Fail(error.code)
     if isinstance(error, GitHubAuthError):
         return Fail("github_auth_invalid")
     if isinstance(error, GitHubRateLimited):

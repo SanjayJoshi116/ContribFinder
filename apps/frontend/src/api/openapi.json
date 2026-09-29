@@ -232,6 +232,50 @@
         }
       }
     },
+    "/api/v1/profile": {
+      "get": {
+        "operationId": "profile_retrieve",
+        "description": "The analyzed developer profile. Stored data only: never calls GitHub.",
+        "tags": ["profile"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeveloperProfile"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/v1/profile/github": {
       "get": {
         "operationId": "profile_github",
@@ -276,10 +320,64 @@
         }
       }
     },
+    "/api/v1/profile/interests": {
+      "get": {
+        "operationId": "profile_interests",
+        "description": "Detected interests with their evidence, strongest first.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": ["profile"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedDeveloperInterestList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/v1/profile/repositories": {
       "get": {
         "operationId": "profile_repositories",
-        "description": "The user's synced repositories, most recently pushed first. Stored data only.",
+        "description": "Repositories the user owns, most recently pushed first. Stored data only. Repositories\nthey only contributed to are profile evidence and are not listed here.",
         "parameters": [
           {
             "name": "page",
@@ -312,6 +410,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaginatedRepositoryList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/profile/skills": {
+      "get": {
+        "operationId": "profile_skills",
+        "description": "Detected skills with their evidence, highest confidence first.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string",
+              "enum": ["cloud", "database", "devops", "framework", "language", "library", "tool"]
+            },
+            "description": "* `language` - Language\n* `framework` - Framework\n* `library` - Library\n* `database` - Database\n* `cloud` - Cloud\n* `devops` - Devops\n* `tool` - Tool"
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": ["profile"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedDeveloperSkillList"
                 }
               }
             },
@@ -429,6 +590,135 @@
   },
   "components": {
     "schemas": {
+      "CategoryEnum": {
+        "enum": ["language", "framework", "library", "database", "cloud", "devops", "tool"],
+        "type": "string",
+        "description": "* `language` - Language\n* `framework` - Framework\n* `library` - Library\n* `database` - Database\n* `cloud` - Cloud\n* `devops` - Devops\n* `tool` - Tool"
+      },
+      "DeveloperInterest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "interest": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Interest"
+              }
+            ],
+            "readOnly": true
+          },
+          "strength": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterestEvidence"
+            },
+            "readOnly": true
+          }
+        },
+        "required": ["evidence", "id", "interest", "strength"]
+      },
+      "DeveloperProfile": {
+        "type": "object",
+        "description": "The analyzed profile. The experience level is an internal matching signal and is\ndeliberately not part of this representation (SRS-2 §17).",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "readOnly": true
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileLanguage"
+            },
+            "readOnly": true
+          },
+          "preferred_project_size": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredProjectSizeEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "preferred_issue_difficulty": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredIssueDifficultyEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "analyzed_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "skill_count": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "interest_count": {
+            "type": "integer",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "analyzed_at",
+          "interest_count",
+          "languages",
+          "preferred_issue_difficulty",
+          "preferred_project_size",
+          "skill_count",
+          "summary"
+        ]
+      },
+      "DeveloperSkill": {
+        "type": "object",
+        "description": "``confidence`` (0-1) drives ranking and bar width; the UI never prints it.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "skill": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Skill"
+              }
+            ],
+            "readOnly": true
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "evidence_summary": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceSummary"
+              }
+            ],
+            "readOnly": true
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillEvidence"
+            },
+            "readOnly": true
+          }
+        },
+        "required": ["confidence", "evidence", "evidence_summary", "id", "skill"]
+      },
       "DisconnectResult": {
         "type": "object",
         "properties": {
@@ -465,6 +755,42 @@
           "details": {}
         },
         "required": ["code", "message"]
+      },
+      "EvidenceRepository": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true
+          }
+        },
+        "required": ["full_name", "html_url"]
+      },
+      "EvidenceSummary": {
+        "type": "object",
+        "description": "Counts computed from the (prefetched) evidence of one skill.",
+        "properties": {
+          "by_source": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "repository_count": {
+            "type": "integer"
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["by_source", "last_observed_at", "repository_count"]
       },
       "GitHubProfile": {
         "type": "object",
@@ -565,10 +891,63 @@
         "type": "string",
         "description": "* `ok` - ok\n* `degraded` - degraded"
       },
-      "JobTypeEnum": {
-        "enum": ["github_profile_sync"],
+      "Interest": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "readOnly": true,
+            "pattern": "^[-a-zA-Z0-9_]+$"
+          },
+          "name": {
+            "type": "string",
+            "readOnly": true
+          }
+        },
+        "required": ["name", "slug"]
+      },
+      "InterestEvidence": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InterestEvidenceSourceEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "repository": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceRepository"
+              }
+            ],
+            "readOnly": true,
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "readOnly": true
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          }
+        },
+        "required": ["detail", "observed_at", "repository", "source"]
+      },
+      "InterestEvidenceSourceEnum": {
+        "enum": ["readme", "repo_description", "topic", "contribution"],
         "type": "string",
-        "description": "* `github_profile_sync` - Github Profile Sync"
+        "description": "* `readme` - Readme\n* `repo_description` - Repo Description\n* `topic` - Topic\n* `contribution` - Contribution"
+      },
+      "JobTypeEnum": {
+        "enum": ["github_profile_sync", "profile_analysis"],
+        "type": "string",
+        "description": "* `github_profile_sync` - Github Profile Sync\n* `profile_analysis` - Profile Analysis"
       },
       "Me": {
         "type": "object",
@@ -599,6 +978,62 @@
         },
         "required": ["avatar_url", "display_name", "github_connected", "github_username", "id"]
       },
+      "PaginatedDeveloperInterestList": {
+        "type": "object",
+        "required": ["count", "results"],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeveloperInterest"
+            }
+          }
+        }
+      },
+      "PaginatedDeveloperSkillList": {
+        "type": "object",
+        "required": ["count", "results"],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeveloperSkill"
+            }
+          }
+        }
+      },
       "PaginatedRepositoryList": {
         "type": "object",
         "required": ["count", "results"],
@@ -626,6 +1061,35 @@
             }
           }
         }
+      },
+      "PreferredIssueDifficultyEnum": {
+        "enum": ["beginner", "intermediate", "advanced", "unknown"],
+        "type": "string",
+        "description": "* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
+      },
+      "PreferredProjectSizeEnum": {
+        "enum": ["any", "small", "medium", "large"],
+        "type": "string",
+        "description": "* `any` - Any\n* `small` - Small\n* `medium` - Medium\n* `large` - Large"
+      },
+      "ProfileLanguage": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "share": {
+            "type": "number",
+            "format": "double"
+          },
+          "repo_count": {
+            "type": "integer"
+          }
+        },
+        "required": ["bytes", "name", "repo_count", "share"]
       },
       "Repository": {
         "type": "object",
@@ -760,6 +1224,75 @@
         "enum": ["revoked", "failed", "not_connected"],
         "type": "string",
         "description": "* `revoked` - revoked\n* `failed` - failed\n* `not_connected` - not_connected"
+      },
+      "Skill": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "readOnly": true,
+            "pattern": "^[-a-zA-Z0-9_]+$"
+          },
+          "name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoryEnum"
+              }
+            ],
+            "readOnly": true
+          }
+        },
+        "required": ["category", "name", "slug"]
+      },
+      "SkillEvidence": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SkillEvidenceSourceEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "repository": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceRepository"
+              }
+            ],
+            "readOnly": true,
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "readOnly": true
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          }
+        },
+        "required": ["detail", "observed_at", "repository", "source"]
+      },
+      "SkillEvidenceSourceEnum": {
+        "enum": [
+          "readme",
+          "language",
+          "topic",
+          "dependency",
+          "commit",
+          "pull_request",
+          "repeated_contribution"
+        ],
+        "type": "string",
+        "description": "* `readme` - Readme\n* `language` - Language\n* `topic` - Topic\n* `dependency` - Dependency\n* `commit` - Commit\n* `pull_request` - Pull Request\n* `repeated_contribution` - Repeated Contribution"
       },
       "SyncJob": {
         "type": "object",

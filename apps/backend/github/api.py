@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from core.authentication import current_user
 from core.serializers import error_responses
-from repositories.models import Repository
+from repositories.models import Repository, UserRepository
 
 from .models import GitHubProfile
 from .serializers import GitHubProfileSerializer, RepositorySerializer
@@ -42,7 +42,8 @@ class RepositoryPagination(PageNumberPagination):
 
 
 class RepositoryListView(ListAPIView[Repository]):
-    """The user's synced repositories, most recently pushed first. Stored data only."""
+    """Repositories the user owns, most recently pushed first. Stored data only. Repositories
+    they only contributed to are profile evidence and are not listed here."""
 
     serializer_class = RepositorySerializer
     pagination_class = RepositoryPagination
@@ -50,7 +51,10 @@ class RepositoryListView(ListAPIView[Repository]):
 
     def get_queryset(self) -> QuerySet[Repository]:
         return (
-            Repository.objects.filter(user_links__user=current_user(self.request))
+            Repository.objects.filter(
+                user_links__user=current_user(self.request),
+                user_links__relation=UserRepository.Relation.OWNER,
+            )
             .prefetch_related("languages", "topics")
             .order_by(F("pushed_at").desc(nulls_last=True), "full_name")
             .distinct()

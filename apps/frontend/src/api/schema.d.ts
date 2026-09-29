@@ -116,6 +116,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/profile': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description The analyzed developer profile. Stored data only: never calls GitHub. */
+    get: operations['profile_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/profile/github': {
     parameters: {
       query?: never
@@ -133,6 +150,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/profile/interests': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Detected interests with their evidence, strongest first. */
+    get: operations['profile_interests']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/profile/repositories': {
     parameters: {
       query?: never
@@ -140,8 +174,28 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** @description The user's synced repositories, most recently pushed first. Stored data only. */
+    /**
+     * @description Repositories the user owns, most recently pushed first. Stored data only. Repositories
+     *     they only contributed to are profile evidence and are not listed here.
+     */
     get: operations['profile_repositories']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/profile/skills': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Detected skills with their evidence, highest confidence first. */
+    get: operations['profile_skills']
     put?: never
     post?: never
     delete?: never
@@ -186,6 +240,47 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    /**
+     * @description * `language` - Language
+     *     * `framework` - Framework
+     *     * `library` - Library
+     *     * `database` - Database
+     *     * `cloud` - Cloud
+     *     * `devops` - Devops
+     *     * `tool` - Tool
+     * @enum {string}
+     */
+    CategoryEnum: 'language' | 'framework' | 'library' | 'database' | 'cloud' | 'devops' | 'tool'
+    DeveloperInterest: {
+      readonly id: number
+      readonly interest: components['schemas']['Interest']
+      /** Format: double */
+      readonly strength: number
+      readonly evidence: components['schemas']['InterestEvidence'][]
+    }
+    /**
+     * @description The analyzed profile. The experience level is an internal matching signal and is
+     *     deliberately not part of this representation (SRS-2 §17).
+     */
+    DeveloperProfile: {
+      readonly summary: string
+      readonly languages: components['schemas']['ProfileLanguage'][]
+      readonly preferred_project_size: components['schemas']['PreferredProjectSizeEnum']
+      readonly preferred_issue_difficulty: components['schemas']['PreferredIssueDifficultyEnum']
+      /** Format: date-time */
+      readonly analyzed_at: string
+      readonly skill_count: number
+      readonly interest_count: number
+    }
+    /** @description ``confidence`` (0-1) drives ranking and bar width; the UI never prints it. */
+    DeveloperSkill: {
+      readonly id: number
+      readonly skill: components['schemas']['Skill']
+      /** Format: double */
+      readonly confidence: number
+      readonly evidence_summary: components['schemas']['EvidenceSummary']
+      readonly evidence: components['schemas']['SkillEvidence'][]
+    }
     DisconnectResult: {
       /**
        * @description Whether GitHub confirmed revocation. Local credentials are deleted either way.
@@ -204,6 +299,20 @@ export interface components {
       code: string
       message: string
       details?: unknown
+    }
+    EvidenceRepository: {
+      readonly full_name: string
+      /** Format: uri */
+      readonly html_url: string
+    }
+    /** @description Counts computed from the (prefetched) evidence of one skill. */
+    EvidenceSummary: {
+      by_source: {
+        [key: string]: number
+      }
+      repository_count: number
+      /** Format: date-time */
+      last_observed_at: string | null
     }
     /** @description Synced GitHub profile. The README body is not included here (Phase 3 analyses it). */
     GitHubProfile: {
@@ -236,11 +345,31 @@ export interface components {
      * @enum {string}
      */
     HealthStatusEnum: 'ok' | 'degraded'
+    Interest: {
+      readonly slug: string
+      readonly name: string
+    }
+    InterestEvidence: {
+      readonly source: components['schemas']['InterestEvidenceSourceEnum']
+      readonly repository: components['schemas']['EvidenceRepository'] | null
+      readonly detail: string
+      /** Format: date-time */
+      readonly observed_at: string | null
+    }
     /**
-     * @description * `github_profile_sync` - Github Profile Sync
+     * @description * `readme` - Readme
+     *     * `repo_description` - Repo Description
+     *     * `topic` - Topic
+     *     * `contribution` - Contribution
      * @enum {string}
      */
-    JobTypeEnum: 'github_profile_sync'
+    InterestEvidenceSourceEnum: 'readme' | 'repo_description' | 'topic' | 'contribution'
+    /**
+     * @description * `github_profile_sync` - Github Profile Sync
+     *     * `profile_analysis` - Profile Analysis
+     * @enum {string}
+     */
+    JobTypeEnum: 'github_profile_sync' | 'profile_analysis'
     /** @description Explicit allowlist: nothing credential-bearing can reach the client. */
     Me: {
       readonly id: number
@@ -248,6 +377,36 @@ export interface components {
       readonly display_name: string
       readonly avatar_url: string | null
       readonly github_connected: boolean
+    }
+    PaginatedDeveloperInterestList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeveloperInterest'][]
+    }
+    PaginatedDeveloperSkillList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeveloperSkill'][]
     }
     PaginatedRepositoryList: {
       /** @example 123 */
@@ -263,6 +422,29 @@ export interface components {
        */
       previous?: string | null
       results: components['schemas']['Repository'][]
+    }
+    /**
+     * @description * `beginner` - Beginner
+     *     * `intermediate` - Intermediate
+     *     * `advanced` - Advanced
+     *     * `unknown` - Unknown
+     * @enum {string}
+     */
+    PreferredIssueDifficultyEnum: 'beginner' | 'intermediate' | 'advanced' | 'unknown'
+    /**
+     * @description * `any` - Any
+     *     * `small` - Small
+     *     * `medium` - Medium
+     *     * `large` - Large
+     * @enum {string}
+     */
+    PreferredProjectSizeEnum: 'any' | 'small' | 'medium' | 'large'
+    ProfileLanguage: {
+      name: string
+      bytes: number
+      /** Format: double */
+      share: number
+      repo_count: number
     }
     Repository: {
       readonly id: number
@@ -300,6 +482,36 @@ export interface components {
      * @enum {string}
      */
     RevocationEnum: 'revoked' | 'failed' | 'not_connected'
+    Skill: {
+      readonly slug: string
+      readonly name: string
+      readonly category: components['schemas']['CategoryEnum']
+    }
+    SkillEvidence: {
+      readonly source: components['schemas']['SkillEvidenceSourceEnum']
+      readonly repository: components['schemas']['EvidenceRepository'] | null
+      readonly detail: string
+      /** Format: date-time */
+      readonly observed_at: string | null
+    }
+    /**
+     * @description * `readme` - Readme
+     *     * `language` - Language
+     *     * `topic` - Topic
+     *     * `dependency` - Dependency
+     *     * `commit` - Commit
+     *     * `pull_request` - Pull Request
+     *     * `repeated_contribution` - Repeated Contribution
+     * @enum {string}
+     */
+    SkillEvidenceSourceEnum:
+      | 'readme'
+      | 'language'
+      | 'topic'
+      | 'dependency'
+      | 'commit'
+      | 'pull_request'
+      | 'repeated_contribution'
     /** @description Public view of a job. ``metadata`` and ``error_detail`` stay internal. */
     SyncJob: {
       readonly id: number
@@ -546,6 +758,41 @@ export interface operations {
       }
     }
   }
+  profile_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeveloperProfile']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
   profile_github: {
     parameters: {
       query?: never
@@ -581,6 +828,38 @@ export interface operations {
       }
     }
   }
+  profile_interests: {
+    parameters: {
+      query?: {
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeveloperInterestList']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
   profile_repositories: {
     parameters: {
       query?: {
@@ -601,6 +880,48 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['PaginatedRepositoryList']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  profile_skills: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `language` - Language
+         *     * `framework` - Framework
+         *     * `library` - Library
+         *     * `database` - Database
+         *     * `cloud` - Cloud
+         *     * `devops` - Devops
+         *     * `tool` - Tool
+         */
+        category?: 'cloud' | 'database' | 'devops' | 'framework' | 'language' | 'library' | 'tool'
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeveloperSkillList']
         }
       }
       401: {

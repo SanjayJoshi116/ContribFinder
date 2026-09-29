@@ -32,3 +32,7 @@ class GitHubForbidden(GitHubError):
 
 class GitHubClientError(GitHubError):
     """Any other unexpected 4xx response."""
+
+
+class GitHubValidationError(GitHubClientError):
+    """422: GitHub rejected the request as invalid (e.g. a search for a user it won't search)."""

@@ -6,8 +6,20 @@ export const STEP_LABELS: Record<string, string> = {
   repositories: 'Repositories',
   languages: 'Languages',
   topics: 'Topics',
+  dependencies: 'Dependencies',
+  contributions: 'Contributions',
+  analysis: 'Building profile',
 }
-export const STEP_ORDER = ['profile', 'readme', 'repositories', 'languages', 'topics'] as const
+export const STEP_ORDER = [
+  'profile',
+  'readme',
+  'repositories',
+  'languages',
+  'topics',
+  'dependencies',
+  'contributions',
+  'analysis',
+] as const
 
 export const STEP_STATE_LABELS: Record<SyncStepState, string> = {
   pending: 'Waiting',
@@ -35,6 +47,10 @@ const FAILURES: Record<string, FailureMessage> = {
   },
   github_rate_limited: {
     text: 'GitHub is limiting requests right now. Please try again in a few minutes.',
+    needsSignIn: false,
+  },
+  analysis_failed: {
+    text: 'Your GitHub data was synced, but your profile could not be built from it. Please try again.',
     needsSignIn: false,
   },
   github_unavailable: {

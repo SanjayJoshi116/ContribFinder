@@ -62,11 +62,44 @@ class RepositoryTopic(models.Model):
         return f"{self.repository_id}:{self.topic}"
 
 
+class RepositoryDependency(models.Model):
+    """A dependency declared in a root-level manifest (Phase 3). Names are normalized per
+    ecosystem (``services.profiling.manifests``); raw manifest contents are not stored."""
+
+    class Ecosystem(models.TextChoices):
+        PYPI = "pypi"
+        NPM = "npm"
+        GO = "go"
+        CARGO = "cargo"
+        MAVEN = "maven"
+        GRADLE = "gradle"
+
+    repository = models.ForeignKey(
+        Repository, on_delete=models.CASCADE, related_name="dependencies"
+    )
+    ecosystem = models.CharField(max_length=20, choices=Ecosystem.choices)
+    name = models.CharField(max_length=255)
+    manifest_path = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ["ecosystem", "name"]
+        verbose_name_plural = "repository dependencies"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["repository", "ecosystem", "name"], name="unique_repo_dependency"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.repository_id}:{self.ecosystem}:{self.name}"
+
+
 class UserRepository(models.Model):
-    """Links a user to a repository they own (later: contributed to, starred, ...)."""
+    """Links a user to a repository they own or contributed to (merged PRs, public pushes)."""
 
     class Relation(models.TextChoices):
         OWNER = "owner"
+        CONTRIBUTOR = "contributor"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="repository_links"
@@ -74,6 +107,10 @@ class UserRepository(models.Model):
     repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="user_links")
     relation = models.CharField(max_length=20, choices=Relation.choices, default=Relation.OWNER)
     linked_at = models.DateTimeField(auto_now_add=True)
+    # Contributor links only (null for owner links).
+    merged_pr_count = models.PositiveIntegerField(null=True, blank=True)
+    push_count = models.PositiveIntegerField(null=True, blank=True)
+    last_contributed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [

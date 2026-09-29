@@ -1,46 +1,21 @@
 import logging
-from datetime import timedelta
 from typing import Any
 
 from celery import shared_task
 from django.conf import settings
-from django.db.models import F, Q
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from jobs.models import SyncJob
 from services.github.errors import GitHubError
 from services.github.retry import Retry, decide_retry
 from services.github.sync import GitHubSyncService, JobCancelled
+from services.jobs import claim_job
+from services.jobs import finish_job as _finish
+
+__all__ = ["claim_job", "sync_github_profile"]
 
 logger = logging.getLogger(__name__)
 Status = SyncJob.Status
-
-
-def claim_job(job_id: int) -> bool:
-    """Atomically move a job to RUNNING. False for duplicate deliveries, cancelled or
-    finished jobs. A RUNNING job that stopped updating (worker crash, redelivered task) is
-    reclaimed."""
-    now = timezone.now()
-    stale_before = now - timedelta(seconds=settings.SYNC_STALE_AFTER_SECONDS)
-    return bool(
-        SyncJob.objects.filter(
-            Q(status__in=[Status.PENDING, Status.RETRYING])
-            | Q(status=Status.RUNNING, updated_at__lt=stale_before),
-            pk=job_id,
-        ).update(
-            status=Status.RUNNING,
-            attempts=F("attempts") + 1,
-            started_at=Coalesce("started_at", now),
-            updated_at=now,
-        )
-    )
-
-
-def _finish(job_id: int, status: str, **fields: Any) -> None:
-    SyncJob.objects.filter(pk=job_id, status=Status.RUNNING).update(
-        status=status, updated_at=timezone.now(), **fields
-    )
 
 
 def _safe_detail(exc: Exception) -> str:
