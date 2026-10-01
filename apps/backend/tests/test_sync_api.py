@@ -13,6 +13,7 @@ from rest_framework.test import APIClient
 from github.models import GitHubAccount, GitHubProfile
 from jobs.models import SyncJob
 from repositories.models import Repository, RepositoryLanguage, RepositoryTopic, UserRepository
+from services import data_deletion
 
 from .factories import GitHubAccountFactory
 
@@ -250,15 +251,24 @@ def test_sign_in_succeeds_even_if_enqueue_fails(client: Client) -> None:
 
 @respx.mock
 @pytest.mark.parametrize("status", ["PENDING", "RUNNING", "RETRYING"])
-def test_disconnect_cancels_active_sync(signed_in_client: APIClient, user, status: str) -> None:
+def test_disconnect_cancels_active_sync(
+    signed_in_client: APIClient, user, status: str, monkeypatch
+) -> None:
     respx.mock.delete(
         f"https://api.github.com/applications/{settings.GITHUB_CLIENT_ID}/grant"
     ).respond(204)
     job = make_job(user, status)
+    seen: list[str] = []
+    real_delete = data_deletion.delete_github_data
+
+    def spy(u):
+        seen.append(SyncJob.objects.get(pk=job.pk).status)  # cancelled before any deletion
+        return real_delete(u)
+
+    monkeypatch.setattr(data_deletion, "delete_github_data", spy)
     signed_in_client.post("/api/v1/auth/github/disconnect")
-    job.refresh_from_db()
-    assert job.status == "CANCELLED"
-    assert job.completed_at is not None
+    assert seen == ["CANCELLED"]
+    assert not SyncJob.objects.filter(pk=job.pk).exists()  # job history is GitHub data
 
 
 def test_repositories_page_size_param(signed_in_client: APIClient, synced) -> None:

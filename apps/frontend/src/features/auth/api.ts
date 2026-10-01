@@ -33,3 +33,28 @@ export function useLogout() {
 export function useDisconnectGitHub() {
   return useSignOutMutation<DisconnectResult>('/auth/github/disconnect')
 }
+
+/** Deletes GitHub-derived data; the account and connection stay, so the dashboard falls
+ * through to onboarding. */
+export function useDeleteGitHubData() {
+  const queryClient = useQueryClient()
+  return useMutation<void, ApiError>({
+    mutationFn: () => apiFetch<void>('/profile/github-data', { method: 'DELETE' }),
+    onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ['profile'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: meQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ['sync'] }),
+      ])
+    },
+  })
+}
+
+/** Deletes the account and everything in it; the session ends. */
+export function useDeleteAccount() {
+  const queryClient = useQueryClient()
+  return useMutation<void, ApiError>({
+    mutationFn: () => apiFetch<void>('/auth/account', { method: 'DELETE' }),
+    onSuccess: () => queryClient.clear(),
+  })
+}

@@ -3,12 +3,14 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.4.0** (Phase 4: Repository discovery). After signing in with GitHub, your public
-profile, README, repositories, dependencies and contributions are synced in the background and
-turned into an evidence-backed profile: skills (with the evidence behind each), interests and
-languages. From that profile ContribFinder searches GitHub for candidate projects, records why
-each was found, and analyzes them (README, contribution guidelines, labels, activity signals).
-Ranked, explained recommendations are next.
+**Version 0.6.0** (Phase 8a: Feedback and data controls, MVP complete). After signing in with
+GitHub, your public profile, README, repositories, dependencies and contributions are synced in
+the background and turned into an evidence-backed profile: skills (with the evidence behind each),
+interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
+then ranks them with deterministic, versioned scoring and shows each recommendation with a match
+label (Strong, Good, Partial) and the reasons behind it, never a percentage. You can save or
+dismiss projects, refresh everything, and delete your GitHub data or your account at any time
+(see the in-app privacy page). Issues and semantic matching come after the MVP.
 
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
@@ -64,7 +66,7 @@ Add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from step 1 to `.env`, then:
 
 ```bash
 npm start          # WSL Redis + Django :8000 + Celery worker + Celery beat + Vite :5173 (proxies /api)
-npm run stop       # stop the stack (Ctrl+C does not work in an interactive Windows console yet)
+npm run stop       # stop the stack from another prompt (Ctrl+C in its own console also works)
 ```
 
 Celery beat runs the periodic repository jobs: it marks candidate repositories stale and
@@ -83,7 +85,20 @@ npm run manage -- reanalyze_profiles   # rebuild profiles from stored data (no G
 Profile scoring is configurable in `.env` (`EVIDENCE_WEIGHTS` and friends, see `.env.example`).
 Run `reanalyze_profiles` after changing it. Repository discovery budgets, filters, staleness and
 activity thresholds (`DISCOVERY_*`, `REPO_*`, `ACTIVITY_THRESHOLDS`) are configured the same way.
-A completed sync or re-analysis starts a discovery run automatically.
+A completed sync or re-analysis starts a discovery run automatically, and a completed discovery
+starts a recommendation generation. Ranking limits and sizes (`RECOMMENDATION_*`,
+`RECOMMENDATIONS_TOP_N`, `REPO_SIZE_THRESHOLDS`) and the view de-duplication window
+(`FEEDBACK_VIEW_DEDUP_MINUTES`) are in `.env.example` too; scoring weights live in the active
+`ScoringConfig` (Django admin).
+
+## Your data
+
+The dashboard's "Your data" section and the public `/privacy` page cover what is stored.
+**Delete GitHub data** removes everything derived from GitHub (profile, skills, recommendations,
+saved and hidden projects, feedback, job history) and keeps your account, so you can sync again.
+**Disconnect GitHub** revokes ContribFinder's authorization and deletes the same data.
+**Delete account** does both and removes the account. None of these touch your GitHub account
+itself.
 
 ## 2b. Run with Docker
 

@@ -305,7 +305,7 @@ class GitHubSyncService:
 
     def _check_cancelled(self) -> None:
         """Cancellation check and heartbeat: called between units of work."""
-        if self.job.heartbeat() == SyncJob.Status.CANCELLED:
+        if self.job.heartbeat() in (SyncJob.Status.CANCELLED, None):
             raise JobCancelled()
 
     def _set_step(self, step: str, state: str) -> None:

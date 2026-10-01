@@ -19,6 +19,8 @@ class AuditEvent(models.Model):
         SIGN_IN_FAILED = "sign_in_failed"
         LOGOUT = "logout"
         GITHUB_DISCONNECT = "github_disconnect"
+        GITHUB_DATA_DELETED = "github_data_deleted"
+        ACCOUNT_DELETED = "account_deleted"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success"

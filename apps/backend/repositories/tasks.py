@@ -20,7 +20,7 @@ from services.discovery.service import DiscoveryService
 from services.github.client import GitHubClient
 from services.github.errors import GitHubAuthError
 from services.github.retry import Retry, decide_retry
-from services.jobs import run_tracked_job
+from services.jobs import run_tracked_job, start_recommendations_after
 from services.repositories.analysis import RepositoryAnalysisService
 from services.repositories.lifecycle import IN_PROGRESS
 from services.repositories.staleness import stale_parts
@@ -141,4 +141,4 @@ def _discover(job: SyncJob) -> None:
 @shared_task(bind=True, name="repositories.generate_candidates", acks_late=True, max_retries=None)
 def generate_candidates(self: Any, job_id: int) -> None:
     """Run a repository discovery job (job type ``repository_discovery``). Job ID only."""
-    run_tracked_job(self, job_id, _discover)
+    run_tracked_job(self, job_id, _discover, on_completed=start_recommendations_after)

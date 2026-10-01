@@ -3,11 +3,13 @@ import { Navigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { useMe } from '@/features/auth/api'
+import { DataSection } from '@/features/auth/DataSection'
 import { DisconnectSection } from '@/features/auth/DisconnectSection'
 import { DiscoveryCard } from '@/features/discovery/DiscoveryCard'
 import { useDeveloperProfile, useInterests, useSkills } from '@/features/profile/api'
 import { InterestList } from '@/features/profile/InterestList'
 import { SkillGroups } from '@/features/profile/SkillGroups'
+import { RecommendationList } from '@/features/recommendations/RecommendationList'
 import {
   isActive,
   useGitHubProfile,
@@ -16,6 +18,7 @@ import {
   useSyncStatus,
 } from '@/features/sync/api'
 import { failureMessage, formatWait } from '@/features/sync/messages'
+import { STAGE_TEXT, usePipelineStage } from '@/features/sync/pipeline'
 import { RepositoryList } from '@/features/sync/RepositoryList'
 
 // Recharts is large; load it only with the profile page's chart.
@@ -36,6 +39,7 @@ export function AppShell() {
   const skills = useSkills(analyzed)
   const interests = useInterests(analyzed)
   const start = useStartSync()
+  const stage = usePipelineStage()
 
   if (status.isPending) return <p className="text-muted-foreground">Loading…</p>
   if (status.isError) {
@@ -64,8 +68,13 @@ export function AppShell() {
             disabled={syncing || start.isPending}
             onClick={() => start.mutate()}
           >
-            {syncing ? 'Syncing…' : 'Refresh'}
+            Refresh
           </Button>
+          {stage && (
+            <span role="status" className="text-muted-foreground">
+              {STAGE_TEXT[stage]}
+            </span>
+          )}
         </div>
         {start.isError && (
           <p role="status" className="text-muted-foreground text-sm">
@@ -103,6 +112,8 @@ export function AppShell() {
           </section>
 
           <DiscoveryCard />
+
+          <RecommendationList />
 
           <section className="space-y-3" aria-labelledby="skills-heading">
             <h2 id="skills-heading" className="font-medium">
@@ -150,6 +161,8 @@ export function AppShell() {
           <RepositoryList repositories={repos} />
         )}
       </section>
+
+      <DataSection />
 
       <DisconnectSection />
     </>

@@ -24,8 +24,8 @@ export function DisconnectSection() {
       <h2 className="font-medium">GitHub connection</h2>
       <p className="text-muted-foreground text-sm">
         Disconnecting revokes ContribFinder&apos;s access on GitHub, deletes the stored credential,
-        stops any sync in progress, and signs you out. Your synced public profile data stays in
-        ContribFinder for now; deleting it will be available in a later release.
+        stops any sync in progress, deletes your GitHub data from ContribFinder, and signs you out.
+        Your account stays, so you can sign in again and start over.
       </p>
       <AlertDialog>
         <AlertDialogTrigger asChild>
@@ -38,8 +38,9 @@ export function DisconnectSection() {
             <AlertDialogTitle>Disconnect GitHub?</AlertDialogTitle>
             <AlertDialogDescription>
               We will ask GitHub to revoke ContribFinder&apos;s access, delete the stored GitHub
-              credential, stop any sync in progress, and sign you out. You can reconnect later by
-              signing in again.
+              credential, stop any sync in progress, delete your GitHub data (profile, skills,
+              recommendations, saved and hidden projects), and sign you out. Signing in again syncs
+              your data from scratch.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

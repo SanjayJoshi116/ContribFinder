@@ -7,6 +7,130 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-01
+
+Phase 8a: Feedback and data controls (OpenSpec change `phase-8a-feedback-data-controls`;
+FR-FEEDBACK-001..004, FR-DATA-002, FR-DATA-003). Completes the MVP definition of done. Feedback
+is recorded for analytics and evaluation only: it does not change ranking.
+
+### Added
+
+- New `feedback` app: `RecommendationFeedback` (viewed, saved, unsaved, dismissed, undismissed,
+  opened repository, opened issue), stored independently of the recommendation with snapshots of
+  the repository name, match label, rank and scoring config version. It survives regenerations
+  and repository deletion (`SET_NULL`). Views are de-duplicated per recommendation within
+  `FEEDBACK_VIEW_DEDUP_MINUTES` (30, system check `core.E020`).
+- Save: `SavedRepository` (unique per user and repository). Saved projects survive regenerations
+  and stay listed when they are no longer recommended. Recommendation list and detail carry a
+  `saved` flag.
+- Dismiss: `DismissedRepository`. Dismissing deletes the recommendation and any save, and the
+  repository is excluded from every later ranking run (`load_candidates`, and re-checked inside
+  the generation transaction so a dismissal during a run is honored). Restoring it starts a new
+  generation.
+- Feedback API: `POST /recommendations/{id}/feedback`, `POST|DELETE /recommendations/{id}/save`,
+  `POST /recommendations/{id}/dismiss`, `GET /saved`, `DELETE /saved/{repository_id}`,
+  `GET /dismissed`, `DELETE /dismissed/{repository_id}`.
+- Data deletion (`services/data_deletion.py`), one routine for every path: cancels the user's
+  jobs, deletes the GitHub profile and README, repository links, developer profile (skills,
+  interests, evidence, candidate pool, recommendations), saves, dismissals, feedback and job
+  history, removes shared repositories no one references any more, and purges the user's cached
+  GitHub responses.
+- `DELETE /api/v1/profile/github-data`: deletes GitHub-derived data and keeps the account and the
+  GitHub connection, so the user can sync again.
+- `DELETE /api/v1/auth/account`: revokes the GitHub grant (a failure is recorded, deletion still
+  proceeds), deletes the data and the account, and ends the session.
+- Audit actions `github_data_deleted` and `account_deleted` (with deletion counts). Audit entries
+  survive account deletion without the user reference.
+- Dashboard: Save/Saved and Dismiss (with Undo) on cards and the detail page; `viewed` and
+  `opened_repository` events (never blocking); `/app/saved` page with saved projects ("No longer
+  recommended" note) and hidden projects with Restore; a pipeline stage line next to Refresh
+  (syncing, analyzing, finding projects, preparing recommendations); a "Your data" section with
+  confirmed delete actions.
+- Public `/privacy` page: what is stored, why, how long, and how to delete it. Linked from the
+  landing page and "Your data".
+
+### Changed
+
+- **Behavior change:** disconnecting GitHub now also deletes all GitHub-derived data (SRS-2 §66),
+  keeping only the account and its audit trail. Reconnecting starts from scratch. The disconnect
+  dialog says so, and its audit entry records the deletion counts.
+
+### Fixed
+
+- Ctrl+C now stops `npm start` in an interactive Windows console (Anaconda Prompt, cmd). The
+  `wsl.exe` processes that start and keep Redis alive switched the shared console's input to raw
+  mode; `scripts/redis.mjs` now gives each one its own hidden console.
+- The dashboard kept showing "No suitable projects yet" after a refresh when the recommendation
+  generation finished between two status polls; the list now reloads whenever a new finished
+  generation appears.
+- The "Hidden … Undo" notice did not appear after dismissing a project: the card is removed
+  before the request returns, which dropped the success callback.
+
+### Known limitations
+
+- Feedback does not influence ranking yet (post-MVP); evaluation arrives with Phase 8b.
+- `opened_issue` is accepted but has no source until issues arrive (Phase 7).
+- Docker Compose verification remains future scope.
+
+## [0.5.0] - 2026-09-29
+
+Phase 5: Recommendation engine, deterministic (OpenSpec change `phase-5-recommendation-engine`;
+FR-REC-001..006). No LLM or embedding calls; scoring reads stored data only.
+
+### Added
+
+- Repository technologies (`services/matching/technologies.py`): the skill catalog maps a
+  repository's languages (byte share), topics and dependency manifests to skills, with the source
+  of each detection.
+- Six relevance signals (`services/matching/signals.py`), each 0..1 with the evidence it used:
+  skill match (weighted stack coverage), language match (code share × confidence), framework match
+  and interest match (noisy-OR), activity signal (activity label) and contribution openness
+  (contributing guide, issue templates, good-first-issue and help-wanted labels).
+- Versioned scoring configuration (`ScoringConfig`, one active): weights, match-label bands and
+  signal parameters, validated on save. Seeded `v1-deterministic` (skill 0.40, language 0.20,
+  interest 0.15, framework 0.10, activity 0.10, openness 0.05; strong ≥ 0.55, good ≥ 0.35),
+  marked experimental. Admin "Activate" action; configs in use cannot be edited or deleted.
+- Ranking (`services/ranking/`): weighted score, Strong/Good/Partial labels, tie-break by search
+  rank then name, top N (`RECOMMENDATIONS_TOP_N`, 50) above `RECOMMENDATION_MIN_SCORE` (0.10).
+  A candidate needs at least one skill, language, framework or interest match: activity and
+  openness alone never make a recommendation.
+- `Recommendation` (non-null FK to the config that produced it, per-signal scores, technologies,
+  activity, size) and `RecommendationReason` (type, text, contribution, JSON detail), built only
+  from non-zero signals. Texts use words, never percentages.
+- Generation job `recommendation_generation` (task `recommendations.generate_recommendations`):
+  starts after every completed discovery, writes in one transaction, upserts per repository so ids
+  stay stable, and keeps the previous results on failure or cancellation.
+- Freshness: beat task `recommendations.refresh_recommendations` (every 30 minutes) regenerates
+  when the profile, a pooled repository or the active config changed since the last generation.
+- API: `GET /api/v1/recommendations` (rank order; filters `language`, `framework`, `activity`,
+  `size`, `match`; 400 on unknown values), `GET /api/v1/recommendations/{id}` (language breakdown,
+  README excerpt, contribution facts, activity signals) and `GET /api/v1/recommendations/status`.
+  No score or rank is exposed.
+- Dashboard "Recommended projects": cards with match label, top reasons, technologies (matched
+  highlighted), activity and a GitHub link; URL-backed filters shown when there is more than one
+  page (20) or a filter is active; pagination; generating and empty states.
+- Repository detail page (`/app/recommendations/:id`) separating "From GitHub" (overview, topics,
+  languages, activity, contribution guidelines, README) from "ContribFinder analysis" (why it
+  matches, technologies, activity label, size).
+- Settings `RECOMMENDATIONS_TOP_N`, `RECOMMENDATION_MIN_SCORE`, `REPO_SIZE_THRESHOLDS`,
+  `RECOMMENDATION_REFRESH_INTERVAL_SECONDS`, `RECOMMENDATION_README_EXCERPT_CHARS`, with a system
+  check (`core.E030`–`E032`).
+
+### Changed
+
+- Disconnecting GitHub also cancels an active recommendation generation.
+- `jobs.recover_stale_jobs` also requeues recommendation generation jobs.
+
+### Known limitations
+
+- Save, dismiss and feedback on recommendations arrive with Phase 8a.
+- Difficulty fit, issue fit and the difficulty and contribution-type filters arrive with issues
+  (Phase 7).
+- With the local pool capped at 10 (`.env`), at most 10 recommendations are generated.
+- Ctrl+C still does not stop `npm start` in an interactive Windows console (Anaconda Prompt): use
+  `npm run stop`. Carried to the next phase.
+- Docker Compose verification moved to future scope.
+
 ## [0.4.0] - 2026-09-29
 
 Phase 4: Repository discovery (OpenSpec change `phase-4-repository-discovery`; FR-REPO-001..004).
@@ -248,7 +372,9 @@ Phase 1: Foundation (OpenSpec change `phase-1-foundation`; FR-AUTH-001..003).
 - The API contract version (`/api/v1`, OpenAPI `1.0.0`) is versioned separately from the app
   version.
 
-[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.1.0...v0.2.0

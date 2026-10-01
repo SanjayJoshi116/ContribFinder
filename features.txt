@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.4.0 (2026-09-29)
+Version: 0.6.0 (2026-10-01)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md.
@@ -128,31 +128,71 @@ Frontend
 Developer experience
   [x] Celery beat and a threaded worker under npm start; npm run stop
   [~] Ctrl+C in an interactive Windows console does not stop npm start (carried to Phase 5)
-  [~] Docker Compose verification (still no Docker; carried to Phase 5)
+  [~] Docker Compose verification (moved to future scope in v0.5.0)
 
 ============================================================================
-PLANNED - MVP
+SHIPPED - v0.5.0 - Phase 5: Recommendation engine (deterministic)
 ============================================================================
 
-Phase 5 - Recommendation engine, deterministic (v0.5.0)
-  [~] Carry-over: verify Docker Compose stack (needs a machine with Docker)
-  [~] Carry-over: Ctrl+C stops npm start in an interactive Windows console
-  [ ] FR-REC-001  Relevance signals
-  [ ] FR-REC-002  Ranking
-  [ ] FR-REC-003  Explanations (reasons from real signals only)
-  [ ] FR-REC-004  Configurable, versioned weights
-  [ ] FR-REC-005  Scoring config recorded per recommendation
-  [ ] FR-REC-006  Filtering
+Recommendations (FR-REC)
+  [x] FR-REC-001  Relevance signals: skill, language, framework, interest, activity, openness
+  [x] FR-REC-002  Ranking: weighted score, top N, relevance gate, stable ids
+  [x] FR-REC-003  Explanations: reasons from non-zero signals only; Strong/Good/Partial labels
+  [x] FR-REC-004  Configurable, versioned weights (ScoringConfig, v1-deterministic seed)
+  [x] FR-REC-005  Scoring config recorded on every recommendation
+  [x] FR-REC-006  Filtering: language, framework, activity, size, match
 
-Phase 8a - Feedback and data controls (v0.6.0)
-  [ ] FR-FEEDBACK-001..004  Views, save, dismiss, interactions
-  [ ] FR-DATA-002  Refresh profile
-  [ ] FR-DATA-003  Delete GitHub-derived data / account
+Jobs and API
+  [x] Generation job after every discovery; freshness sweep every 30 minutes
+  [x] GET /recommendations, /recommendations/{id}, /recommendations/status (no score exposed)
+
+Frontend
+  [x] Dashboard recommendation cards, URL-backed filters (shown past one page), pagination
+  [x] Repository detail page: "From GitHub" vs "ContribFinder analysis"
+
+Developer experience
+  [x] Ctrl+C in an interactive Windows console stops npm start (fixed in v0.6.0)
+
+============================================================================
+SHIPPED - v0.6.0 - Phase 8a: Feedback and data controls (MVP complete)
+============================================================================
+
+Feedback (FR-FEEDBACK)
+  [x] FR-FEEDBACK-001  Record views (de-duplicated within FEEDBACK_VIEW_DEDUP_MINUTES)
+  [x] FR-FEEDBACK-002  Save / unsave; saved projects kept when no longer recommended
+  [x] FR-FEEDBACK-003  Dismiss with Undo; dismissed repositories excluded from ranking; restore
+  [x] FR-FEEDBACK-004  Repository interactions (opened on GitHub); opened_issue waits for Phase 7
+  [x] Feedback stored independently with snapshots (label, rank, config); analytics only
+
+Data controls (FR-DATA)
+  [x] FR-DATA-002  Refresh runs sync -> analysis -> discovery -> recommendations, stage shown
+  [x] FR-DATA-003  Delete GitHub-derived data (account and connection kept)
+  [x] FR-DATA-003  Delete account (revoke grant, delete data and account, sign out)
+  [x] Disconnect also deletes GitHub-derived data (behavior change)
+  [x] Orphaned shared repositories and the user's cached GitHub responses removed
+  [x] Audit log for GitHub data deletion and account deletion
+
+Frontend
+  [x] Save/Dismiss on cards and detail page, /app/saved (saved + hidden projects)
+  [x] Pipeline stage line next to Refresh; "Your data" section with confirmations
+  [x] Public /privacy page (what is stored, why, how long, how to delete)
+
+MVP definition of done (SRS-2 section 82)
+  [x] Sign in with GitHub
+  [x] Public profile analyzed; profile README analyzed when present
+  [x] Skills with evidence, interests and languages
+  [x] >= 10 repository recommendations with reasons (pool capped at 10 locally via .env)
+  [x] Open on GitHub, filter, save, refresh, last-synced time
+  [x] Disconnect / delete data
+
+Developer experience
+  [x] Carry-over closed: Ctrl+C stops npm start in an interactive Windows console
 
 ============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
+  [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ] Phase 7  Issues: FR-ISSUE-001..005 (ingestion, labels, type, difficulty, evidence)
   [ ] Phase 8b Recommendation evaluation (Precision@k, Recall@10, MRR, NDCG)

@@ -1,5 +1,5 @@
 import { LogIn } from 'lucide-react'
-import { Navigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL, useMe } from '@/features/auth/api'
@@ -37,7 +37,10 @@ export function LandingPage() {
           </a>
         </Button>
         <p className="text-muted-foreground text-xs">
-          We only read public GitHub data. You can disconnect at any time.
+          We only read public GitHub data. You can disconnect and delete your data at any time.{' '}
+          <Link to="/privacy" className="underline-offset-2 hover:underline">
+            What we store
+          </Link>
         </p>
       </section>
     </main>

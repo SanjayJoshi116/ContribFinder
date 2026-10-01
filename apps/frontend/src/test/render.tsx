@@ -15,7 +15,7 @@ export function renderRoute(path: string) {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { ...utils, router }
+  return { ...utils, router, queryClient }
 }
 
 type Handler = (init: RequestInit | undefined) => Response | Promise<Response>
@@ -195,6 +195,13 @@ export const EMPTY_POOL = {
 
 export const NEVER_DISCOVERED = { job: null, last_completed_at: null, pool: EMPTY_POOL }
 
+export const NEVER_GENERATED = {
+  job: null,
+  last_generated_at: null,
+  count: 0,
+  config_version: null,
+}
+
 export function discoveryJob(status: string, error_code = '') {
   const done = status === 'COMPLETED'
   return {
@@ -230,4 +237,6 @@ export const SYNCED_USER: Record<string, Handler> = {
   'GET /api/v1/profile/skills?page_size=200': () => page(SKILLS),
   'GET /api/v1/profile/interests?page_size=200': () => page(INTERESTS),
   'GET /api/v1/discovery/status': () => json(NEVER_DISCOVERED),
+  'GET /api/v1/recommendations/status': () => json(NEVER_GENERATED),
+  'GET /api/v1/recommendations': () => page([]),
 }

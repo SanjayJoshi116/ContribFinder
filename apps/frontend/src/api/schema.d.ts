@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+  '/api/v1/auth/account': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete: operations['auth_account_delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/auth/csrf/': {
     parameters: {
       query?: never
@@ -137,6 +153,39 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/dismissed': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Hidden repositories, most recently dismissed first. */
+    get: operations['dismissed_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/dismissed/{repository_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete: operations['dismissed_restore']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/health/': {
     parameters: {
       query?: never
@@ -182,6 +231,23 @@ export interface paths {
     put?: never
     post?: never
     delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/profile/github-data': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** @description Delete everything derived from GitHub; the account and connection stay. */
+    delete: operations['profile_github_data_delete']
     options?: never
     head?: never
     patch?: never
@@ -257,6 +323,136 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/recommendations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description The user's recommendations, best first. No score or rank is exposed. */
+    get: operations['recommendations_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recommendations/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['recommendations_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recommendations/{id}/dismiss': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['recommendations_dismiss']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recommendations/{id}/feedback': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['recommendations_feedback']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recommendations/{id}/save': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['recommendations_save']
+    delete: operations['recommendations_unsave']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recommendations/status': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['recommendations_status']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/saved': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Saved repositories, most recently saved first, whether or not still recommended. */
+    get: operations['saved_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/saved/{repository_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete: operations['saved_delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/sync/status': {
     parameters: {
       query?: never
@@ -278,12 +474,32 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
+     * @description * `viewed` - viewed
+     *     * `opened_repository` - opened_repository
+     *     * `opened_issue` - opened_issue
+     * @enum {string}
+     */
+    ActionEnum: 'viewed' | 'opened_repository' | 'opened_issue'
+    /**
      * @description * `recently_active` - Recently Active
      *     * `moderately_active` - Moderately Active
      *     * `low_activity` - Low Activity
      * @enum {string}
      */
     ActivityLabelEnum: 'recently_active' | 'moderately_active' | 'low_activity'
+    ActivitySignals: {
+      /** Format: date-time */
+      readonly captured_at: string
+      readonly days_since_push: number | null
+      readonly commits_90d: number | null
+      readonly prs_merged_90d: number | null
+      readonly contributors: number | null
+      /** Format: date-time */
+      readonly latest_release_at: string | null
+      readonly open_issues: number
+    }
+    /** @enum {unknown} */
+    BlankEnum: ''
     CandidateDiscovery: {
       readonly source: components['schemas']['CandidateDiscoverySourceEnum']
       readonly query: string
@@ -378,6 +594,12 @@ export interface components {
       last_completed_at: string | null
       pool: components['schemas']['PoolCounts']
     }
+    DismissedRepository: {
+      readonly repository_id: number
+      readonly repository: components['schemas']['CandidateRepository']
+      /** Format: date-time */
+      readonly dismissed_at: string
+    }
     /** @description Standard error envelope, referenced by every endpoint's error responses. */
     Error: {
       error: components['schemas']['ErrorDetail']
@@ -400,6 +622,16 @@ export interface components {
       repository_count: number
       /** Format: date-time */
       last_observed_at: string | null
+    }
+    FeedbackRequest: {
+      /**
+       * @description Saves and dismissals are recorded by their own endpoints.
+       *
+       *     * `viewed` - viewed
+       *     * `opened_repository` - opened_repository
+       *     * `opened_issue` - opened_issue
+       */
+      action: components['schemas']['ActionEnum']
     }
     /** @description Synced GitHub profile. The README body is not included here (Phase 3 analyses it). */
     GitHubProfile: {
@@ -455,9 +687,22 @@ export interface components {
      * @description * `github_profile_sync` - Github Profile Sync
      *     * `profile_analysis` - Profile Analysis
      *     * `repository_discovery` - Repository Discovery
+     *     * `recommendation_generation` - Recommendation Generation
      * @enum {string}
      */
-    JobTypeEnum: 'github_profile_sync' | 'profile_analysis' | 'repository_discovery'
+    JobTypeEnum:
+      | 'github_profile_sync'
+      | 'profile_analysis'
+      | 'repository_discovery'
+      | 'recommendation_generation'
+    LanguageShare: {
+      language: string
+      /**
+       * Format: double
+       * @description Fraction of the repository's code, 0..1.
+       */
+      share: number
+    }
     /**
      * @description * `discovered` - Discovered
      *     * `fetching` - Fetching
@@ -478,6 +723,13 @@ export interface components {
       | 'stale'
       | 'refreshing'
       | 'failed'
+    /**
+     * @description * `strong` - Strong
+     *     * `good` - Good
+     *     * `partial` - Partial
+     * @enum {string}
+     */
+    MatchLabelEnum: 'strong' | 'good' | 'partial'
     /** @description Explicit allowlist: nothing credential-bearing can reach the client. */
     Me: {
       readonly id: number
@@ -488,6 +740,15 @@ export interface components {
     }
     /** @enum {unknown} */
     NullEnum: null
+    /** @description Observable contribution affordances; null means not yet known. */
+    Openness: {
+      contributing: boolean | null
+      code_of_conduct: boolean | null
+      issue_templates: boolean | null
+      pull_request_template: boolean | null
+      good_first_issue: boolean | null
+      help_wanted: boolean | null
+    }
     PaginatedDeveloperInterestList: {
       /** @example 123 */
       count: number
@@ -518,6 +779,36 @@ export interface components {
       previous?: string | null
       results: components['schemas']['DeveloperSkill'][]
     }
+    PaginatedDismissedRepositoryList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DismissedRepository'][]
+    }
+    PaginatedRecommendationList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Recommendation'][]
+    }
     PaginatedRepositoryCandidateList: {
       /** @example 123 */
       count: number
@@ -547,6 +838,21 @@ export interface components {
        */
       previous?: string | null
       results: components['schemas']['Repository'][]
+    }
+    PaginatedSavedRepositoryList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['SavedRepository'][]
     }
     PoolCounts: {
       total: number
@@ -579,6 +885,69 @@ export interface components {
       /** Format: double */
       share: number
       repo_count: number
+    }
+    Reason: {
+      readonly type: components['schemas']['TypeEnum']
+      readonly text: string
+      readonly detail: unknown
+    }
+    Recommendation: {
+      readonly id: number
+      /** @description For the saved and dismissed endpoints. */
+      readonly repository_id: number
+      readonly repository: components['schemas']['CandidateRepository']
+      readonly match_label: components['schemas']['MatchLabelEnum']
+      readonly technologies: components['schemas']['Technology'][]
+      readonly reasons: components['schemas']['Reason'][]
+      /**
+       * @description Empty when the repository's activity is unknown.
+       *
+       *     * `recently_active` - Recently Active
+       *     * `moderately_active` - Moderately Active
+       *     * `low_activity` - Low Activity
+       */
+      readonly activity_label:
+        components['schemas']['ActivityLabelEnum'] | components['schemas']['BlankEnum']
+      readonly size: components['schemas']['SizeEnum']
+      readonly openness: components['schemas']['Openness']
+      /** @description Whether the user saved it. */
+      readonly saved: boolean
+      /** Format: date-time */
+      readonly generated_at: string
+    }
+    RecommendationDetail: {
+      readonly id: number
+      /** @description For the saved and dismissed endpoints. */
+      readonly repository_id: number
+      readonly repository: components['schemas']['CandidateRepository']
+      readonly match_label: components['schemas']['MatchLabelEnum']
+      readonly technologies: components['schemas']['Technology'][]
+      readonly reasons: components['schemas']['Reason'][]
+      /**
+       * @description Empty when the repository's activity is unknown.
+       *
+       *     * `recently_active` - Recently Active
+       *     * `moderately_active` - Moderately Active
+       *     * `low_activity` - Low Activity
+       */
+      readonly activity_label:
+        components['schemas']['ActivityLabelEnum'] | components['schemas']['BlankEnum']
+      readonly size: components['schemas']['SizeEnum']
+      readonly openness: components['schemas']['Openness']
+      /** @description Whether the user saved it. */
+      readonly saved: boolean
+      /** Format: date-time */
+      readonly generated_at: string
+      readonly languages: components['schemas']['LanguageShare'][]
+      readonly readme_excerpt: string
+      readonly activity_signals: components['schemas']['ActivitySignals'] | null
+    }
+    RecommendationStatus: {
+      job: components['schemas']['SyncJob'] | null
+      /** Format: date-time */
+      last_generated_at: string | null
+      count: number
+      config_version: string | null
     }
     Repository: {
       readonly id: number
@@ -634,6 +1003,33 @@ export interface components {
      * @enum {string}
      */
     RevocationEnum: 'revoked' | 'failed' | 'not_connected'
+    SaveResult: {
+      saved: boolean
+    }
+    SavedRecommendation: {
+      readonly id: number
+      readonly match_label: components['schemas']['MatchLabelEnum']
+      readonly reasons: components['schemas']['Reason'][]
+    }
+    SavedRepository: {
+      readonly repository_id: number
+      readonly repository: components['schemas']['CandidateRepository']
+      /** Format: date-time */
+      readonly saved_at: string
+      /** @description Current activity label; empty when unknown. */
+      readonly activity_label:
+        components['schemas']['ActivityLabelEnum'] | components['schemas']['BlankEnum']
+      /** @description The current recommendation, or null when it is no longer recommended. */
+      readonly recommendation: components['schemas']['SavedRecommendation'] | null
+    }
+    /**
+     * @description * `small` - Small
+     *     * `medium` - Medium
+     *     * `large` - Large
+     *     * `unknown` - Unknown
+     * @enum {string}
+     */
+    SizeEnum: 'small' | 'medium' | 'large' | 'unknown'
     Skill: {
       readonly slug: string
       readonly name: string
@@ -696,6 +1092,22 @@ export interface components {
       /** Format: date-time */
       last_synced_at: string | null
     }
+    Technology: {
+      slug: string
+      name: string
+      category: string
+      matched: boolean
+    }
+    /**
+     * @description * `skill` - Skill
+     *     * `language` - Language
+     *     * `framework` - Framework
+     *     * `interest` - Interest
+     *     * `activity` - Activity
+     *     * `openness` - Openness
+     * @enum {string}
+     */
+    TypeEnum: 'skill' | 'language' | 'framework' | 'interest' | 'activity' | 'openness'
   }
   responses: never
   parameters: never
@@ -705,6 +1117,40 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  auth_account_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Account and data deleted; signed out. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
   auth_csrf: {
     parameters: {
       query?: never
@@ -956,6 +1402,74 @@ export interface operations {
       }
     }
   }
+  dismissed_list: {
+    parameters: {
+      query?: {
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDismissedRepositoryList']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  dismissed_restore: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repository_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Done. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
   health: {
     parameters: {
       query?: never
@@ -1052,6 +1566,40 @@ export interface operations {
         }
       }
       404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  profile_github_data_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description GitHub-derived data deleted. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }
@@ -1209,6 +1757,849 @@ export interface operations {
         }
       }
       429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  recommendations_list: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `recently_active` - Recently Active
+         *     * `moderately_active` - Moderately Active
+         *     * `low_activity` - Low Activity
+         */
+        activity?: 'low_activity' | 'moderately_active' | 'recently_active'
+        /**
+         * @description Catalog skill slug the repository uses, e.g. django or react.
+         *
+         *     * `actix` - actix
+         *     * `airflow` - airflow
+         *     * `angular` - angular
+         *     * `ansible` - ansible
+         *     * `assembly` - assembly
+         *     * `astro` - astro
+         *     * `aws` - aws
+         *     * `axum` - axum
+         *     * `azure` - azure
+         *     * `bigquery` - bigquery
+         *     * `bootstrap` - bootstrap
+         *     * `bun` - bun
+         *     * `c` - c
+         *     * `cassandra` - cassandra
+         *     * `celery` - celery
+         *     * `clickhouse` - clickhouse
+         *     * `clojure` - clojure
+         *     * `cloudflare` - cloudflare
+         *     * `cpp` - cpp
+         *     * `crystal` - crystal
+         *     * `csharp` - csharp
+         *     * `css` - css
+         *     * `cuda` - cuda
+         *     * `cypress` - cypress
+         *     * `d3` - d3
+         *     * `dart` - dart
+         *     * `dbt` - dbt
+         *     * `deno` - deno
+         *     * `digitalocean` - digitalocean
+         *     * `django` - django
+         *     * `django-rest-framework` - django-rest-framework
+         *     * `docker` - docker
+         *     * `dotnet` - dotnet
+         *     * `dynamodb` - dynamodb
+         *     * `elasticsearch` - elasticsearch
+         *     * `electron` - electron
+         *     * `elixir` - elixir
+         *     * `elm` - elm
+         *     * `erlang` - erlang
+         *     * `eslint` - eslint
+         *     * `express` - express
+         *     * `fastapi` - fastapi
+         *     * `figma` - figma
+         *     * `firebase` - firebase
+         *     * `flask` - flask
+         *     * `flutter` - flutter
+         *     * `fortran` - fortran
+         *     * `fsharp` - fsharp
+         *     * `gcp` - gcp
+         *     * `gdscript` - gdscript
+         *     * `gin` - gin
+         *     * `git` - git
+         *     * `github-actions` - github-actions
+         *     * `gitlab-ci` - gitlab-ci
+         *     * `go` - go
+         *     * `godot` - godot
+         *     * `grafana` - grafana
+         *     * `graphql` - graphql
+         *     * `groovy` - groovy
+         *     * `grpc` - grpc
+         *     * `haskell` - haskell
+         *     * `helm` - helm
+         *     * `heroku` - heroku
+         *     * `hibernate` - hibernate
+         *     * `html` - html
+         *     * `hugging-face` - hugging-face
+         *     * `java` - java
+         *     * `javascript` - javascript
+         *     * `jenkins` - jenkins
+         *     * `jest` - jest
+         *     * `jquery` - jquery
+         *     * `julia` - julia
+         *     * `junit` - junit
+         *     * `jupyter` - jupyter
+         *     * `kafka` - kafka
+         *     * `keras` - keras
+         *     * `kotlin` - kotlin
+         *     * `kubernetes` - kubernetes
+         *     * `langchain` - langchain
+         *     * `laravel` - laravel
+         *     * `linux` - linux
+         *     * `lua` - lua
+         *     * `mariadb` - mariadb
+         *     * `matlab` - matlab
+         *     * `matplotlib` - matplotlib
+         *     * `mongodb` - mongodb
+         *     * `mongoose` - mongoose
+         *     * `mysql` - mysql
+         *     * `neo4j` - neo4j
+         *     * `nestjs` - nestjs
+         *     * `netlify` - netlify
+         *     * `nextjs` - nextjs
+         *     * `nginx` - nginx
+         *     * `nim` - nim
+         *     * `nix` - nix
+         *     * `nodejs` - nodejs
+         *     * `numpy` - numpy
+         *     * `nuxt` - nuxt
+         *     * `objective-c` - objective-c
+         *     * `ocaml` - ocaml
+         *     * `openai-sdk` - openai-sdk
+         *     * `openapi` - openapi
+         *     * `opencv` - opencv
+         *     * `pandas` - pandas
+         *     * `perl` - perl
+         *     * `phoenix` - phoenix
+         *     * `php` - php
+         *     * `playwright` - playwright
+         *     * `polars` - polars
+         *     * `postgresql` - postgresql
+         *     * `postman` - postman
+         *     * `powershell` - powershell
+         *     * `prisma` - prisma
+         *     * `prometheus` - prometheus
+         *     * `pulumi` - pulumi
+         *     * `pydantic` - pydantic
+         *     * `pytest` - pytest
+         *     * `python` - python
+         *     * `pytorch` - pytorch
+         *     * `qt` - qt
+         *     * `r` - r
+         *     * `rabbitmq` - rabbitmq
+         *     * `rails` - rails
+         *     * `react` - react
+         *     * `react-native` - react-native
+         *     * `redis` - redis
+         *     * `redux` - redux
+         *     * `ruby` - ruby
+         *     * `rust` - rust
+         *     * `sass` - sass
+         *     * `scala` - scala
+         *     * `scikit-learn` - scikit-learn
+         *     * `scipy` - scipy
+         *     * `selenium` - selenium
+         *     * `serde` - serde
+         *     * `shell` - shell
+         *     * `snowflake` - snowflake
+         *     * `socketio` - socketio
+         *     * `solidity` - solidity
+         *     * `spark` - spark
+         *     * `spring` - spring
+         *     * `sql` - sql
+         *     * `sql-server` - sql-server
+         *     * `sqlalchemy` - sqlalchemy
+         *     * `sqlite` - sqlite
+         *     * `storybook` - storybook
+         *     * `streamlit` - streamlit
+         *     * `supabase` - supabase
+         *     * `svelte` - svelte
+         *     * `swift` - swift
+         *     * `swiftui` - swiftui
+         *     * `symfony` - symfony
+         *     * `tailwindcss` - tailwindcss
+         *     * `tauri` - tauri
+         *     * `tensorflow` - tensorflow
+         *     * `terraform` - terraform
+         *     * `threejs` - threejs
+         *     * `tokio` - tokio
+         *     * `typescript` - typescript
+         *     * `unity` - unity
+         *     * `unreal-engine` - unreal-engine
+         *     * `vercel` - vercel
+         *     * `vim` - vim
+         *     * `vite` - vite
+         *     * `vitest` - vitest
+         *     * `vue` - vue
+         *     * `webassembly` - webassembly
+         *     * `webpack` - webpack
+         *     * `xgboost` - xgboost
+         *     * `zig` - zig
+         */
+        framework?:
+          | 'actix'
+          | 'airflow'
+          | 'angular'
+          | 'ansible'
+          | 'assembly'
+          | 'astro'
+          | 'aws'
+          | 'axum'
+          | 'azure'
+          | 'bigquery'
+          | 'bootstrap'
+          | 'bun'
+          | 'c'
+          | 'cassandra'
+          | 'celery'
+          | 'clickhouse'
+          | 'clojure'
+          | 'cloudflare'
+          | 'cpp'
+          | 'crystal'
+          | 'csharp'
+          | 'css'
+          | 'cuda'
+          | 'cypress'
+          | 'd3'
+          | 'dart'
+          | 'dbt'
+          | 'deno'
+          | 'digitalocean'
+          | 'django'
+          | 'django-rest-framework'
+          | 'docker'
+          | 'dotnet'
+          | 'dynamodb'
+          | 'elasticsearch'
+          | 'electron'
+          | 'elixir'
+          | 'elm'
+          | 'erlang'
+          | 'eslint'
+          | 'express'
+          | 'fastapi'
+          | 'figma'
+          | 'firebase'
+          | 'flask'
+          | 'flutter'
+          | 'fortran'
+          | 'fsharp'
+          | 'gcp'
+          | 'gdscript'
+          | 'gin'
+          | 'git'
+          | 'github-actions'
+          | 'gitlab-ci'
+          | 'go'
+          | 'godot'
+          | 'grafana'
+          | 'graphql'
+          | 'groovy'
+          | 'grpc'
+          | 'haskell'
+          | 'helm'
+          | 'heroku'
+          | 'hibernate'
+          | 'html'
+          | 'hugging-face'
+          | 'java'
+          | 'javascript'
+          | 'jenkins'
+          | 'jest'
+          | 'jquery'
+          | 'julia'
+          | 'junit'
+          | 'jupyter'
+          | 'kafka'
+          | 'keras'
+          | 'kotlin'
+          | 'kubernetes'
+          | 'langchain'
+          | 'laravel'
+          | 'linux'
+          | 'lua'
+          | 'mariadb'
+          | 'matlab'
+          | 'matplotlib'
+          | 'mongodb'
+          | 'mongoose'
+          | 'mysql'
+          | 'neo4j'
+          | 'nestjs'
+          | 'netlify'
+          | 'nextjs'
+          | 'nginx'
+          | 'nim'
+          | 'nix'
+          | 'nodejs'
+          | 'numpy'
+          | 'nuxt'
+          | 'objective-c'
+          | 'ocaml'
+          | 'openai-sdk'
+          | 'openapi'
+          | 'opencv'
+          | 'pandas'
+          | 'perl'
+          | 'phoenix'
+          | 'php'
+          | 'playwright'
+          | 'polars'
+          | 'postgresql'
+          | 'postman'
+          | 'powershell'
+          | 'prisma'
+          | 'prometheus'
+          | 'pulumi'
+          | 'pydantic'
+          | 'pytest'
+          | 'python'
+          | 'pytorch'
+          | 'qt'
+          | 'r'
+          | 'rabbitmq'
+          | 'rails'
+          | 'react'
+          | 'react-native'
+          | 'redis'
+          | 'redux'
+          | 'ruby'
+          | 'rust'
+          | 'sass'
+          | 'scala'
+          | 'scikit-learn'
+          | 'scipy'
+          | 'selenium'
+          | 'serde'
+          | 'shell'
+          | 'snowflake'
+          | 'socketio'
+          | 'solidity'
+          | 'spark'
+          | 'spring'
+          | 'sql'
+          | 'sql-server'
+          | 'sqlalchemy'
+          | 'sqlite'
+          | 'storybook'
+          | 'streamlit'
+          | 'supabase'
+          | 'svelte'
+          | 'swift'
+          | 'swiftui'
+          | 'symfony'
+          | 'tailwindcss'
+          | 'tauri'
+          | 'tensorflow'
+          | 'terraform'
+          | 'threejs'
+          | 'tokio'
+          | 'typescript'
+          | 'unity'
+          | 'unreal-engine'
+          | 'vercel'
+          | 'vim'
+          | 'vite'
+          | 'vitest'
+          | 'vue'
+          | 'webassembly'
+          | 'webpack'
+          | 'xgboost'
+          | 'zig'
+        /**
+         * @description Repositories with code in this language (case-insensitive), e.g. python.
+         *
+         *     * `assembly` - assembly
+         *     * `c` - c
+         *     * `c#` - c#
+         *     * `c++` - c++
+         *     * `clojure` - clojure
+         *     * `crystal` - crystal
+         *     * `css` - css
+         *     * `cuda` - cuda
+         *     * `dart` - dart
+         *     * `dockerfile` - dockerfile
+         *     * `elixir` - elixir
+         *     * `elm` - elm
+         *     * `erlang` - erlang
+         *     * `f#` - f#
+         *     * `fortran` - fortran
+         *     * `gdscript` - gdscript
+         *     * `go` - go
+         *     * `groovy` - groovy
+         *     * `haskell` - haskell
+         *     * `hcl` - hcl
+         *     * `html` - html
+         *     * `java` - java
+         *     * `javascript` - javascript
+         *     * `julia` - julia
+         *     * `jupyter notebook` - jupyter notebook
+         *     * `kotlin` - kotlin
+         *     * `lua` - lua
+         *     * `matlab` - matlab
+         *     * `nim` - nim
+         *     * `nix` - nix
+         *     * `objective-c` - objective-c
+         *     * `ocaml` - ocaml
+         *     * `perl` - perl
+         *     * `php` - php
+         *     * `plpgsql` - plpgsql
+         *     * `plsql` - plsql
+         *     * `powershell` - powershell
+         *     * `python` - python
+         *     * `r` - r
+         *     * `ruby` - ruby
+         *     * `rust` - rust
+         *     * `sass` - sass
+         *     * `scala` - scala
+         *     * `scss` - scss
+         *     * `shell` - shell
+         *     * `solidity` - solidity
+         *     * `sql` - sql
+         *     * `svelte` - svelte
+         *     * `swift` - swift
+         *     * `tsql` - tsql
+         *     * `typescript` - typescript
+         *     * `vim script` - vim script
+         *     * `vue` - vue
+         *     * `webassembly` - webassembly
+         *     * `zig` - zig
+         */
+        language?:
+          | 'assembly'
+          | 'c'
+          | 'c#'
+          | 'c++'
+          | 'clojure'
+          | 'crystal'
+          | 'css'
+          | 'cuda'
+          | 'dart'
+          | 'dockerfile'
+          | 'elixir'
+          | 'elm'
+          | 'erlang'
+          | 'f#'
+          | 'fortran'
+          | 'gdscript'
+          | 'go'
+          | 'groovy'
+          | 'haskell'
+          | 'hcl'
+          | 'html'
+          | 'java'
+          | 'javascript'
+          | 'julia'
+          | 'jupyter notebook'
+          | 'kotlin'
+          | 'lua'
+          | 'matlab'
+          | 'nim'
+          | 'nix'
+          | 'objective-c'
+          | 'ocaml'
+          | 'perl'
+          | 'php'
+          | 'plpgsql'
+          | 'plsql'
+          | 'powershell'
+          | 'python'
+          | 'r'
+          | 'ruby'
+          | 'rust'
+          | 'sass'
+          | 'scala'
+          | 'scss'
+          | 'shell'
+          | 'solidity'
+          | 'sql'
+          | 'svelte'
+          | 'swift'
+          | 'tsql'
+          | 'typescript'
+          | 'vim script'
+          | 'vue'
+          | 'webassembly'
+          | 'zig'
+        /**
+         * @description * `strong` - Strong
+         *     * `good` - Good
+         *     * `partial` - Partial
+         */
+        match?: 'good' | 'partial' | 'strong'
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /**
+         * @description * `small` - Small
+         *     * `medium` - Medium
+         *     * `large` - Large
+         *     * `unknown` - Unknown
+         */
+        size?: 'large' | 'medium' | 'small' | 'unknown'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedRecommendationList']
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  recommendations_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RecommendationDetail']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  recommendations_dismiss: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Done. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  recommendations_feedback: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FeedbackRequest']
+        'application/x-www-form-urlencoded': components['schemas']['FeedbackRequest']
+        'multipart/form-data': components['schemas']['FeedbackRequest']
+      }
+    }
+    responses: {
+      /** @description Done. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  recommendations_save: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SaveResult']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  recommendations_unsave: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SaveResult']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  recommendations_status: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RecommendationStatus']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  saved_list: {
+    parameters: {
+      query?: {
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedSavedRepositoryList']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  saved_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repository_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Done. */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }

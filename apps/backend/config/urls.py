@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import URLPattern, URLResolver, include, path
 
 from developers.api import DeveloperProfileView
+from recommendations.api import RecommendationListView
 
 api_v1: list[URLPattern | URLResolver] = [
     path("", include("core.urls")),
@@ -10,6 +11,9 @@ api_v1: list[URLPattern | URLResolver] = [
     path("profile/", include("github.urls")),
     path("sync/", include("jobs.urls")),
     path("discovery/", include("repositories.urls")),
+    path("recommendations", RecommendationListView.as_view(), name="recommendations"),
+    path("recommendations/", include("recommendations.urls")),
+    path("", include("feedback.urls")),
 ]
 
 urlpatterns = [

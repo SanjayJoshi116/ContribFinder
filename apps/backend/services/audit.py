@@ -21,6 +21,7 @@ ALLOWED_METADATA_KEYS = frozenset(
         "error_code",
         "revocation",
         "created_user",
+        "deleted",  # counts of deleted rows per kind, never content
     }
 )
 

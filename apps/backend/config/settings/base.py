@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "jobs",
     "repositories",
     "developers",
+    "recommendations",
+    "feedback",
 ]
 
 MIDDLEWARE = [
@@ -304,6 +306,25 @@ ACTIVITY_THRESHOLDS: dict[str, int] = {
     **env.json("ACTIVITY_THRESHOLDS", default={}),
 }
 
+# --- Recommendations (Phase 5) ---
+# Weights, bands and signal parameters are versioned ScoringConfig rows, not settings.
+RECOMMENDATIONS_TOP_N = env.int("RECOMMENDATIONS_TOP_N", default=50)
+RECOMMENDATION_MIN_SCORE = env.float("RECOMMENDATION_MIN_SCORE", default=0.10)
+# Contributor counts: under "small" is small, under "medium" is medium, otherwise large.
+REPO_SIZE_THRESHOLDS: dict[str, int] = {
+    "small": 10,
+    "medium": 100,
+    **env.json("REPO_SIZE_THRESHOLDS", default={}),
+}
+RECOMMENDATION_REFRESH_INTERVAL_SECONDS = env.int(
+    "RECOMMENDATION_REFRESH_INTERVAL_SECONDS", default=30 * 60
+)
+RECOMMENDATION_README_EXCERPT_CHARS = env.int("RECOMMENDATION_README_EXCERPT_CHARS", default=1500)
+
+# --- Feedback (Phase 8a) ---
+# A second "viewed" event for the same recommendation within this window is not recorded.
+FEEDBACK_VIEW_DEDUP_MINUTES = env.int("FEEDBACK_VIEW_DEDUP_MINUTES", default=30)
+
 CELERY_BEAT_SCHEDULE = {
     "recover-stale-jobs": {
         "task": "jobs.recover_stale_jobs",
@@ -316,6 +337,10 @@ CELERY_BEAT_SCHEDULE = {
     "process-repository-backlog": {
         "task": "repositories.process_repository_backlog",
         "schedule": 15 * 60.0,
+    },
+    "refresh-recommendations": {
+        "task": "recommendations.refresh_recommendations",
+        "schedule": float(RECOMMENDATION_REFRESH_INTERVAL_SECONDS),
     },
 }
 

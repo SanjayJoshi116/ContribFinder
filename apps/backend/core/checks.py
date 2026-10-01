@@ -149,3 +149,41 @@ def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
             )
         )
     return errors
+
+
+@register()
+def recommendation_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    """Top-N size, minimum score and size classes (Phase 5). Weights live in ScoringConfig rows
+    and are validated there: a database check would run before migrations."""
+    errors: list[CheckMessage] = []
+    top_n = settings.RECOMMENDATIONS_TOP_N
+    if not _is_int(top_n) or top_n < 20:
+        errors.append(
+            Error("RECOMMENDATIONS_TOP_N must be an integer of at least 20.", id="core.E030")
+        )
+    if not 0 <= settings.RECOMMENDATION_MIN_SCORE <= 1:
+        errors.append(Error("RECOMMENDATION_MIN_SCORE must be between 0 and 1.", id="core.E031"))
+    for name in ("RECOMMENDATION_REFRESH_INTERVAL_SECONDS", "RECOMMENDATION_README_EXCERPT_CHARS"):
+        value = getattr(settings, name)
+        if not _is_int(value) or value <= 0:
+            errors.append(Error(f"{name} must be a positive integer.", id="core.E020"))
+    sizes = settings.REPO_SIZE_THRESHOLDS
+    size_errors = _keys_errors("REPO_SIZE_THRESHOLDS", sizes, ("small", "medium"), "core.E032")
+    errors += size_errors
+    if not size_errors and not 0 < sizes["small"] < sizes["medium"]:
+        errors.append(
+            Error(
+                "REPO_SIZE_THRESHOLDS: small must be positive and lower than medium.",
+                id="core.E032",
+            )
+        )
+    return errors
+
+
+@register()
+def feedback_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    """View de-duplication window (Phase 8a)."""
+    value = settings.FEEDBACK_VIEW_DEDUP_MINUTES
+    if not _is_int(value) or value <= 0:
+        return [Error("FEEDBACK_VIEW_DEDUP_MINUTES must be a positive integer.", id="core.E020")]
+    return []

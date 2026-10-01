@@ -28,13 +28,16 @@ logger = logging.getLogger(__name__)
 SYNC = SyncJob.JobType.GITHUB_PROFILE_SYNC
 ANALYSIS = SyncJob.JobType.PROFILE_ANALYSIS
 DISCOVERY = SyncJob.JobType.REPOSITORY_DISCOVERY
+RECOMMENDATIONS = SyncJob.JobType.RECOMMENDATION_GENERATION
 Status = SyncJob.Status
 
 DISCOVERY_STEPS = ("queries", "search", "interactions", "analysis", "pool")
+RECOMMENDATION_STEPS = ("recommendations",)
 STEPS_BY_JOB_TYPE: dict[str, tuple[str, ...]] = {
     SYNC: STEPS,
     ANALYSIS: ("analysis",),
     DISCOVERY: DISCOVERY_STEPS,
+    RECOMMENDATIONS: RECOMMENDATION_STEPS,
 }
 
 
@@ -156,12 +159,14 @@ def active_jobs(user: User, job_type: str = SYNC) -> QuerySet[SyncJob]:
 def _task_for(job_type: str) -> Any:
     from developers.tasks import extract_developer_skills
     from github.tasks import sync_github_profile
+    from recommendations.tasks import generate_recommendations
     from repositories.tasks import generate_candidates
 
     tasks: dict[str, Any] = {
         SYNC: sync_github_profile,
         ANALYSIS: extract_developer_skills,
         DISCOVERY: generate_candidates,
+        RECOMMENDATIONS: generate_recommendations,
     }
     return tasks[job_type]
 
@@ -300,3 +305,34 @@ def start_discovery(user: User) -> tuple[SyncJob | None, bool]:
 def start_discovery_after(job: SyncJob) -> None:
     """``on_completed`` hook of profile sync and profile analysis jobs."""
     start_discovery(job.user)
+
+
+def start_recommendations(user: User) -> tuple[SyncJob | None, bool]:
+    """Queue a recommendation generation (Phase 5). No job without a developer profile; an
+    active generation is returned instead of a second one. Reads stored data only, so no
+    GitHub account is needed."""
+    from developers.models import DeveloperProfile
+    from recommendations.tasks import generate_recommendations  # avoid import cycle
+
+    if not DeveloperProfile.objects.filter(user=user).exists():
+        return None, False
+    if existing := active_jobs(user, RECOMMENDATIONS).first():
+        return existing, False
+    _expire_stale(user, RECOMMENDATIONS)
+    try:
+        with transaction.atomic():
+            job = SyncJob.objects.create(
+                user=user,
+                job_type=RECOMMENDATIONS,
+                status=Status.PENDING,
+                steps=dict.fromkeys(RECOMMENDATION_STEPS, SyncJob.StepState.PENDING),
+            )
+            transaction.on_commit(lambda: generate_recommendations.delay(job.pk))
+    except IntegrityError:
+        return active_jobs(user, RECOMMENDATIONS).first(), False
+    return job, True
+
+
+def start_recommendations_after(job: SyncJob) -> None:
+    """``on_completed`` hook of repository discovery jobs."""
+    start_recommendations(job.user)

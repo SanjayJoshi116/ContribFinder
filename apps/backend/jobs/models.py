@@ -14,6 +14,7 @@ class SyncJob(models.Model):
         GITHUB_PROFILE_SYNC = "github_profile_sync"
         PROFILE_ANALYSIS = "profile_analysis"
         REPOSITORY_DISCOVERY = "repository_discovery"
+        RECOMMENDATION_GENERATION = "recommendation_generation"
 
     class Status(models.TextChoices):
         PENDING = "PENDING"

@@ -168,7 +168,8 @@ describe('dashboard', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /refresh/i }))
 
-    expect(await screen.findByRole('button', { name: /syncing/i })).toBeDisabled()
+    expect(await screen.findByRole('status')).toHaveTextContent('Syncing GitHub data…')
+    expect(screen.getByRole('button', { name: /refresh/i })).toBeDisabled()
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
     expect(new Headers(post[1]!.headers).get('X-CSRFToken')).toBe('test-csrf-token')
   })

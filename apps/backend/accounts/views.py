@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 from core.authentication import current_user
 from core.serializers import error_responses
 from github.models import GitHubAccount
-from services import audit, jobs
+from services import audit, data_deletion, jobs
 from services.crypto import decrypt_token
 from services.github import oauth
 from services.github.accounts import link_github_account
@@ -175,6 +175,25 @@ class LogoutView(APIView):
         return Response(status=204)
 
 
+def _revoke_and_unlink(user: User) -> str:
+    """Stop the user's jobs, ask GitHub to revoke the grant and delete the stored credential.
+    Returns the revocation outcome; a failed revocation never keeps the credential."""
+    account = GitHubAccount.objects.filter(user=user).first()
+    # Stop background syncs first so no further GitHub requests are made for this user.
+    jobs.cancel_active_syncs(user)
+    if account is None:
+        return "not_connected"
+    try:
+        oauth.revoke_grant(decrypt_token(account.access_token_encrypted))
+        return "revoked"
+    except Exception as exc:
+        # Local credentials are deleted regardless; only the failure type is logged.
+        logger.warning("GitHub grant revocation failed: %s", type(exc).__name__)
+        return "failed"
+    finally:
+        account.delete()
+
+
 class GitHubDisconnectView(APIView):
     @extend_schema(
         operation_id="auth_github_disconnect",
@@ -183,28 +202,39 @@ class GitHubDisconnectView(APIView):
     )
     def post(self, request: Request) -> Response:
         user = current_user(request)
-        account = GitHubAccount.objects.filter(user=user).first()
-        # Stop background syncs first so no further GitHub requests are made for this user.
-        jobs.cancel_active_syncs(user)
-
-        revocation = "not_connected"
-        if account is not None:
-            try:
-                oauth.revoke_grant(decrypt_token(account.access_token_encrypted))
-                revocation = "revoked"
-            except Exception as exc:
-                # Local credentials are deleted regardless; only the failure type is logged.
-                revocation = "failed"
-                logger.warning("GitHub grant revocation failed: %s", type(exc).__name__)
-            finally:
-                account.delete()
-
+        revocation = _revoke_and_unlink(user)
+        deleted = data_deletion.delete_github_data(user)
         audit.record(
             AuditEvent.Action.GITHUB_DISCONNECT,
             AuditEvent.Outcome.SUCCESS,
             user=user,
             request=request,
-            metadata={"revocation": revocation},
+            metadata={"revocation": revocation, "deleted": deleted},
         )
         logout(request)
         return Response(DisconnectResultSerializer({"revocation": revocation}).data)
+
+
+class AccountView(APIView):
+    @extend_schema(
+        operation_id="auth_account_delete",
+        responses={
+            204: OpenApiResponse(description="Account and data deleted; signed out."),
+            **error_responses(401, 403),
+        },
+    )
+    def delete(self, request: Request) -> Response:
+        user = current_user(request)
+        revocation = _revoke_and_unlink(user)
+        deleted = data_deletion.delete_github_data(user)
+        # Recorded while the user still exists; the entry loses its user link (SET_NULL).
+        audit.record(
+            AuditEvent.Action.ACCOUNT_DELETED,
+            AuditEvent.Outcome.SUCCESS,
+            user=user,
+            request=request,
+            metadata={"revocation": revocation, "deleted": deleted},
+        )
+        logout(request)
+        user.delete()
+        return Response(status=204)

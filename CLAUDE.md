@@ -99,19 +99,23 @@ ContribFinder/
 │  │  │                     RepositoryReadme, RepositorySnapshot, RepositoryCandidate,
 │  │  │                     CandidateDiscovery; discovery API; discovery/refresh/beat tasks
 │  │  ├─ issues/            Issue (Phase 7)
-│  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason, SavedRepository
-│  │  ├─ feedback/          RecommendationFeedback
+│  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason; API; generation
+│  │  │                     and freshness tasks
+│  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
+│  │  │                     saved and dismissed API (Phase 8a)
 │  │  ├─ embeddings/        (Phase 6, future)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
-│  │     │                  jobs), errors.py (PermanentJobError)
+│  │     │                  jobs), errors.py (PermanentJobError), feedback.py (record, save,
+│  │     │                  dismiss, restore), data_deletion.py (GitHub data / account deletion)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
 │  │     │                  storage.py (shared repository upserts)
 │  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
 │  │     │                  experience, summary, analysis (Phase 3)
 │  │     ├─ discovery/      queries, filters (prefilter/eligibility), DiscoveryService (Phase 4)
 │  │     ├─ repositories/   analysis, lifecycle, staleness (shared repository data, Phase 4)
-│  │     ├─ matching/       feature/signal calculators (activity.py since Phase 4)
-│  │     ├─ ranking/        scoring + explanation generation
+│  │     ├─ matching/       activity, technologies, features (loading), signals (Phase 4–5)
+│  │     ├─ ranking/        config (validation), score, explain, service (generation),
+│  │     │                  freshness (Phase 5)
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
@@ -157,9 +161,9 @@ Local, no Docker (primary on this machine):
   Runners use `scripts/child.mjs`, which kills the whole process tree on Windows so
   Celery/Python children are not orphaned, and stops it when the `npm start` process disappears
   (`CF_STACK_PID`; terminals such as Git Bash end only the top process). A leftover
-  `Terminate batch job (Y/N)?` comes from `npm.cmd`: answer Y. Ctrl+C does **not** work in an
-  interactive Windows console yet (see Known issues below): stop the stack with `npm run stop`
-  from a second prompt. It kills this repo's stack only (matched by executable and repo path).
+  `Terminate batch job (Y/N)?` comes from `npm.cmd`: answer Y. Ctrl+C stops the stack,
+  also in an interactive Windows console (fixed in Phase 8a, see Known issues below);
+  `npm run stop` from a second prompt works too. It kills this repo's stack only (matched by executable and repo path).
   The SPA proxies `/api`.
 - Redis: on Windows, `npm start` starts the `redis-server` service in WSL Ubuntu and keeps the
   distro awake (`scripts/redis.mjs`), then a Celery worker with `--pool=threads --concurrency=4`
@@ -190,24 +194,19 @@ Frontend (`apps/frontend`, npm):
 
 ### Known issues
 
-- **Ctrl+C does not stop `npm start` in an interactive Windows console** (Anaconda Prompt, cmd).
-  Open. Workaround: `npm run stop` from a second prompt.
-  - Symptom: after Ctrl+C no process reacts, not even `scripts/start.mjs`. Worker/backend logs
-    keep scrolling and every runner, Celery and Django process stays alive.
-  - Works: the same `cmd /c npm start` with output redirected to a file stops within 15 s on a
-    real Ctrl+C (`GenerateConsoleCtrlEvent`), and killing only `start.mjs` makes the watchdog
-    clean up everything within 8 s. So the process-tree handling is fine; the Ctrl+C event
-    itself is lost when the console is interactive.
-  - Ruled out: `wsl.exe` (the Redis keep-alive) and `concurrently` input handling (children get
-    piped stdin, so Vite's CLI shortcuts/raw mode are off).
-  - Suspect: a child attached to the console switches console input out of processed mode
-    (`ENABLE_PROCESSED_INPUT` off), so Ctrl+C becomes a keystroke instead of a signal.
-  - Next step: bisect by runner. In an interactive `cmd /K`, start one of `scripts/{frontend,
-    redis,backend,worker,beat}.mjs` with `start /b` next to a SIGINT probe and send Ctrl+C.
-    The runner whose presence stops the probe from getting SIGINT is the culprit.
-  - Testing note: processes started from Claude Code's shell inherit "ignore Ctrl+C". Launch
-    test consoles through WMI (`Invoke-CimMethod Win32_Process Create`) and send the event
-    with `AttachConsole` + `GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)`.
+- **Fixed (Phase 8a): Ctrl+C did not stop `npm start` in an interactive Windows console.**
+  Cause: `wsl.exe` (started by `scripts/redis.mjs`) switches its console's input to raw VT mode
+  (`ENABLE_PROCESSED_INPUT` off, mode 0x1F7 → 0x3D8), so on the shared console Ctrl+C became a
+  keystroke. Only happens when the runner's stdin is a pipe (under `concurrently`), which is why
+  running a runner alone never reproduced it. Fix: every `wsl.exe` is spawned `detached` +
+  `windowsHide`, so it gets its own hidden console. Any new runner that starts a console program
+  (wsl.exe, ssh, ...) must do the same.
+  - Testing note: processes started from Claude Code's shell inherit "ignore Ctrl+C", and
+    `start /b` also starts children with Ctrl+C ignored. Launch test consoles through WMI
+    (`Invoke-CimMethod Win32_Process Create`, `cmd.exe /K ...`), read the input mode with
+    `AttachConsole` + `GetConsoleMode(CONIN$)` and send `GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)`.
+    `GenerateConsoleCtrlEvent` bypasses the input mode and `WriteConsoleInput` does not raise a
+    signal, so the input mode is the thing to check; confirm with a real key press.
 
 ## 7. Implementation roadmap (function by function)
 
@@ -380,12 +379,28 @@ Deviations from the sketch below, as built:
   (`recently_active | moderately_active | low_activity`).
 - Periodic Celery beat job marks repos STALE by data type (metadata: hours, README: longer).
 
-### Phase 5 — Recommendation engine (deterministic)  → *Personalized repo recommendations*
+### Phase 5 — Recommendation engine (deterministic)  → *Personalized repo recommendations*  ✅ shipped in v0.5.0
 
-**Carry-over:** verify `docker compose up` from a fresh `.env` (needs a machine with Docker), and
-fix Ctrl+C in an interactive Windows console (§6 Known issues). Reuse from Phase 4: rank only
-`RepositoryCandidate`s whose repository is `recommendable`; `RepositorySnapshot.activity_label`,
-community flags and labels feed `activity_signal` and `contribution_openness`.
+Archived: `openspec/changes/archive/2026-09-29-phase-5-recommendation-engine/`. Specs:
+`recommendation-engine`, `recommendation-explanations`, `recommendations-view` (plus a delta to
+`sync-jobs`). The Windows Ctrl+C issue is carried over to Phase 8a; Docker Compose verification
+moved to future scope.
+
+Deviations from the sketch below, as built:
+- Signal keys are `skill`, `language`, `interest`, `framework`, `activity`, `openness`; per-signal
+  values live in `Recommendation.signal_scores` (JSON), not one column per signal.
+- `ScoringConfig` also stores `params` (bands, activity values, openness points, technology
+  source weights) and `description`; a partial unique constraint keeps one config active.
+- Relevance gate: a candidate needs a skill, language, framework or interest match above 0;
+  activity and openness alone never make a recommendation (found while implementing).
+- Recommendations are upserted per (developer, repository), so ids survive regenerations; no
+  history is kept. `technologies`, `activity_label` (blank when unknown) and `size` (contributor
+  thresholds) are stored on the row for filters.
+- Reason types are `skill, language, framework, interest, activity, openness`; `domain`,
+  `difficulty` and `issue_availability` wait for Phases 6–7.
+- There is no separate `refresh_recommendations` trigger per change: the beat task sweeps every
+  30 minutes. The API exposes no score or rank. Filters show only past one page (20) or when
+  active. Save lives in Phase 8a.
 
 **FR-REC-001: Calculate relevance**
 - Build: signal calculators in `services/matching/`, each returning `(score 0..1, evidence[])`:
@@ -420,7 +435,34 @@ technologies, match label, reasons, activity, save, GitHub link), filters, repos
 (overview, why it matches, technologies, topics, activity, contribution guidelines, README excerpt,
 GitHub link).
 
-### Phase 8a — Feedback and data controls (MVP)
+### Phase 8a — Feedback and data controls (MVP)  ✅ shipped in v0.6.0
+
+Archived: `openspec/changes/archive/2026-10-01-phase-8a-feedback-data-controls/`. Specs:
+`recommendation-feedback`, `data-controls` (plus a delta to `github-authentication`). The Ctrl+C
+carry-over is closed (§6 Known issues). No carry-overs; Docker Compose verification stays future
+scope. **The MVP definition of done is met.**
+
+Deviations from the sketch below, as built:
+- Save and dismiss state live in their own tables in the new `feedback` app
+  (`SavedRepository`, `DismissedRepository`), not in `recommendations/`. The event log is
+  append-only history; it is not used to derive current state.
+- Feedback actions also include `unsaved` and `undismissed`. Each event snapshots
+  `repository_full_name`, `match_label`, `rank` and `config_version`; repository and
+  recommendation FKs are `SET_NULL`, so events survive regenerations and deletions. `viewed` is
+  de-duplicated within `FEEDBACK_VIEW_DEDUP_MINUTES` (30).
+- Dismiss deletes the recommendation row and any save; `RecommendationService._persist` re-checks
+  dismissals inside its transaction. Restore (`DELETE /dismissed/{repository_id}`) starts a
+  generation, which brings the project back.
+- One deletion routine (`services/data_deletion.py`) serves delete-data, disconnect and account
+  deletion. It also removes orphaned shared repositories and purges the user's GitHub response
+  cache (`github:etag:{pk}:*`, `github:ratelimit:{pk}`). Disconnect deleting data is a behavior
+  change. Audit entries lose their user link (`SET_NULL`) when the account is deleted.
+- FR-DATA-002 needed no backend change: the dashboard shows the running stage
+  (`usePipelineStage`) next to Refresh.
+- Frontend pitfalls found in manual testing: a mutation started from a component that the
+  optimistic update unmounts must use `mutateAsync` (per-call `mutate` callbacks are skipped after
+  unmount); a short generation can finish between two status polls, so the list refreshes on any
+  newly seen finished job.
 
 **FR-FEEDBACK-001: Record views** · **FR-FEEDBACK-004: Repo/issue interactions**
 - Build: `RecommendationFeedback(user, recommendation, action ∈ {viewed, saved, dismissed,
@@ -438,7 +480,7 @@ GitHub link).
   = revoke token → delete GitHub-derived data → keep only account essentials. Privacy page
   lists what is stored. Audit-log these actions.
 
-### MVP definition of done (SRS-2 §82)
+### MVP definition of done (SRS-2 §82)  ✅ met in v0.6.0
 
 Sign in with GitHub · public profile analyzed · profile README analyzed when present ·
 see skills with evidence, interests, and languages · ≥ 10 repository recommendations with
@@ -464,6 +506,8 @@ reasons · open on GitHub · filter · save · refresh · see last-synced time �
 **Phase 8b — Evaluation**
 - Fixed benchmark developers with hand-labeled relevant repos; compute Precision@5/10,
   Recall@10, MRR and NDCG per ScoringConfig. A ranking change counts as an improvement only if it wins here.
+
+**Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).

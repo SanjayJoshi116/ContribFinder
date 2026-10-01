@@ -6,6 +6,42 @@
     "description": "Developer-to-contribution-opportunity matching API."
   },
   "paths": {
+    "/api/v1/auth/account": {
+      "delete": {
+        "operationId": "auth_account_delete",
+        "tags": ["auth"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Account and data deleted; signed out."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/v1/auth/csrf/": {
       "get": {
         "operationId": "auth_csrf",
@@ -313,6 +349,106 @@
         }
       }
     },
+    "/api/v1/dismissed": {
+      "get": {
+        "operationId": "dismissed_list",
+        "description": "Hidden repositories, most recently dismissed first.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": ["dismissed"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedDismissedRepositoryList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/dismissed/{repository_id}": {
+      "delete": {
+        "operationId": "dismissed_restore",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["dismissed"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/v1/health/": {
       "get": {
         "operationId": "health",
@@ -427,6 +563,43 @@
             "description": ""
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/profile/github-data": {
+      "delete": {
+        "operationId": "profile_github_data_delete",
+        "description": "Delete everything derived from GitHub; the account and connection stay.",
+        "tags": ["profile"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "GitHub-derived data deleted."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -673,6 +846,794 @@
         }
       }
     },
+    "/api/v1/recommendations": {
+      "get": {
+        "operationId": "recommendations_list",
+        "description": "The user's recommendations, best first. No score or rank is exposed.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "activity",
+            "schema": {
+              "type": "string",
+              "enum": ["low_activity", "moderately_active", "recently_active"]
+            },
+            "description": "* `recently_active` - Recently Active\n* `moderately_active` - Moderately Active\n* `low_activity` - Low Activity"
+          },
+          {
+            "in": "query",
+            "name": "framework",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "actix",
+                "airflow",
+                "angular",
+                "ansible",
+                "assembly",
+                "astro",
+                "aws",
+                "axum",
+                "azure",
+                "bigquery",
+                "bootstrap",
+                "bun",
+                "c",
+                "cassandra",
+                "celery",
+                "clickhouse",
+                "clojure",
+                "cloudflare",
+                "cpp",
+                "crystal",
+                "csharp",
+                "css",
+                "cuda",
+                "cypress",
+                "d3",
+                "dart",
+                "dbt",
+                "deno",
+                "digitalocean",
+                "django",
+                "django-rest-framework",
+                "docker",
+                "dotnet",
+                "dynamodb",
+                "elasticsearch",
+                "electron",
+                "elixir",
+                "elm",
+                "erlang",
+                "eslint",
+                "express",
+                "fastapi",
+                "figma",
+                "firebase",
+                "flask",
+                "flutter",
+                "fortran",
+                "fsharp",
+                "gcp",
+                "gdscript",
+                "gin",
+                "git",
+                "github-actions",
+                "gitlab-ci",
+                "go",
+                "godot",
+                "grafana",
+                "graphql",
+                "groovy",
+                "grpc",
+                "haskell",
+                "helm",
+                "heroku",
+                "hibernate",
+                "html",
+                "hugging-face",
+                "java",
+                "javascript",
+                "jenkins",
+                "jest",
+                "jquery",
+                "julia",
+                "junit",
+                "jupyter",
+                "kafka",
+                "keras",
+                "kotlin",
+                "kubernetes",
+                "langchain",
+                "laravel",
+                "linux",
+                "lua",
+                "mariadb",
+                "matlab",
+                "matplotlib",
+                "mongodb",
+                "mongoose",
+                "mysql",
+                "neo4j",
+                "nestjs",
+                "netlify",
+                "nextjs",
+                "nginx",
+                "nim",
+                "nix",
+                "nodejs",
+                "numpy",
+                "nuxt",
+                "objective-c",
+                "ocaml",
+                "openai-sdk",
+                "openapi",
+                "opencv",
+                "pandas",
+                "perl",
+                "phoenix",
+                "php",
+                "playwright",
+                "polars",
+                "postgresql",
+                "postman",
+                "powershell",
+                "prisma",
+                "prometheus",
+                "pulumi",
+                "pydantic",
+                "pytest",
+                "python",
+                "pytorch",
+                "qt",
+                "r",
+                "rabbitmq",
+                "rails",
+                "react",
+                "react-native",
+                "redis",
+                "redux",
+                "ruby",
+                "rust",
+                "sass",
+                "scala",
+                "scikit-learn",
+                "scipy",
+                "selenium",
+                "serde",
+                "shell",
+                "snowflake",
+                "socketio",
+                "solidity",
+                "spark",
+                "spring",
+                "sql",
+                "sql-server",
+                "sqlalchemy",
+                "sqlite",
+                "storybook",
+                "streamlit",
+                "supabase",
+                "svelte",
+                "swift",
+                "swiftui",
+                "symfony",
+                "tailwindcss",
+                "tauri",
+                "tensorflow",
+                "terraform",
+                "threejs",
+                "tokio",
+                "typescript",
+                "unity",
+                "unreal-engine",
+                "vercel",
+                "vim",
+                "vite",
+                "vitest",
+                "vue",
+                "webassembly",
+                "webpack",
+                "xgboost",
+                "zig"
+              ]
+            },
+            "description": "Catalog skill slug the repository uses, e.g. django or react.\n\n* `actix` - actix\n* `airflow` - airflow\n* `angular` - angular\n* `ansible` - ansible\n* `assembly` - assembly\n* `astro` - astro\n* `aws` - aws\n* `axum` - axum\n* `azure` - azure\n* `bigquery` - bigquery\n* `bootstrap` - bootstrap\n* `bun` - bun\n* `c` - c\n* `cassandra` - cassandra\n* `celery` - celery\n* `clickhouse` - clickhouse\n* `clojure` - clojure\n* `cloudflare` - cloudflare\n* `cpp` - cpp\n* `crystal` - crystal\n* `csharp` - csharp\n* `css` - css\n* `cuda` - cuda\n* `cypress` - cypress\n* `d3` - d3\n* `dart` - dart\n* `dbt` - dbt\n* `deno` - deno\n* `digitalocean` - digitalocean\n* `django` - django\n* `django-rest-framework` - django-rest-framework\n* `docker` - docker\n* `dotnet` - dotnet\n* `dynamodb` - dynamodb\n* `elasticsearch` - elasticsearch\n* `electron` - electron\n* `elixir` - elixir\n* `elm` - elm\n* `erlang` - erlang\n* `eslint` - eslint\n* `express` - express\n* `fastapi` - fastapi\n* `figma` - figma\n* `firebase` - firebase\n* `flask` - flask\n* `flutter` - flutter\n* `fortran` - fortran\n* `fsharp` - fsharp\n* `gcp` - gcp\n* `gdscript` - gdscript\n* `gin` - gin\n* `git` - git\n* `github-actions` - github-actions\n* `gitlab-ci` - gitlab-ci\n* `go` - go\n* `godot` - godot\n* `grafana` - grafana\n* `graphql` - graphql\n* `groovy` - groovy\n* `grpc` - grpc\n* `haskell` - haskell\n* `helm` - helm\n* `heroku` - heroku\n* `hibernate` - hibernate\n* `html` - html\n* `hugging-face` - hugging-face\n* `java` - java\n* `javascript` - javascript\n* `jenkins` - jenkins\n* `jest` - jest\n* `jquery` - jquery\n* `julia` - julia\n* `junit` - junit\n* `jupyter` - jupyter\n* `kafka` - kafka\n* `keras` - keras\n* `kotlin` - kotlin\n* `kubernetes` - kubernetes\n* `langchain` - langchain\n* `laravel` - laravel\n* `linux` - linux\n* `lua` - lua\n* `mariadb` - mariadb\n* `matlab` - matlab\n* `matplotlib` - matplotlib\n* `mongodb` - mongodb\n* `mongoose` - mongoose\n* `mysql` - mysql\n* `neo4j` - neo4j\n* `nestjs` - nestjs\n* `netlify` - netlify\n* `nextjs` - nextjs\n* `nginx` - nginx\n* `nim` - nim\n* `nix` - nix\n* `nodejs` - nodejs\n* `numpy` - numpy\n* `nuxt` - nuxt\n* `objective-c` - objective-c\n* `ocaml` - ocaml\n* `openai-sdk` - openai-sdk\n* `openapi` - openapi\n* `opencv` - opencv\n* `pandas` - pandas\n* `perl` - perl\n* `phoenix` - phoenix\n* `php` - php\n* `playwright` - playwright\n* `polars` - polars\n* `postgresql` - postgresql\n* `postman` - postman\n* `powershell` - powershell\n* `prisma` - prisma\n* `prometheus` - prometheus\n* `pulumi` - pulumi\n* `pydantic` - pydantic\n* `pytest` - pytest\n* `python` - python\n* `pytorch` - pytorch\n* `qt` - qt\n* `r` - r\n* `rabbitmq` - rabbitmq\n* `rails` - rails\n* `react` - react\n* `react-native` - react-native\n* `redis` - redis\n* `redux` - redux\n* `ruby` - ruby\n* `rust` - rust\n* `sass` - sass\n* `scala` - scala\n* `scikit-learn` - scikit-learn\n* `scipy` - scipy\n* `selenium` - selenium\n* `serde` - serde\n* `shell` - shell\n* `snowflake` - snowflake\n* `socketio` - socketio\n* `solidity` - solidity\n* `spark` - spark\n* `spring` - spring\n* `sql` - sql\n* `sql-server` - sql-server\n* `sqlalchemy` - sqlalchemy\n* `sqlite` - sqlite\n* `storybook` - storybook\n* `streamlit` - streamlit\n* `supabase` - supabase\n* `svelte` - svelte\n* `swift` - swift\n* `swiftui` - swiftui\n* `symfony` - symfony\n* `tailwindcss` - tailwindcss\n* `tauri` - tauri\n* `tensorflow` - tensorflow\n* `terraform` - terraform\n* `threejs` - threejs\n* `tokio` - tokio\n* `typescript` - typescript\n* `unity` - unity\n* `unreal-engine` - unreal-engine\n* `vercel` - vercel\n* `vim` - vim\n* `vite` - vite\n* `vitest` - vitest\n* `vue` - vue\n* `webassembly` - webassembly\n* `webpack` - webpack\n* `xgboost` - xgboost\n* `zig` - zig"
+          },
+          {
+            "in": "query",
+            "name": "language",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "assembly",
+                "c",
+                "c#",
+                "c++",
+                "clojure",
+                "crystal",
+                "css",
+                "cuda",
+                "dart",
+                "dockerfile",
+                "elixir",
+                "elm",
+                "erlang",
+                "f#",
+                "fortran",
+                "gdscript",
+                "go",
+                "groovy",
+                "haskell",
+                "hcl",
+                "html",
+                "java",
+                "javascript",
+                "julia",
+                "jupyter notebook",
+                "kotlin",
+                "lua",
+                "matlab",
+                "nim",
+                "nix",
+                "objective-c",
+                "ocaml",
+                "perl",
+                "php",
+                "plpgsql",
+                "plsql",
+                "powershell",
+                "python",
+                "r",
+                "ruby",
+                "rust",
+                "sass",
+                "scala",
+                "scss",
+                "shell",
+                "solidity",
+                "sql",
+                "svelte",
+                "swift",
+                "tsql",
+                "typescript",
+                "vim script",
+                "vue",
+                "webassembly",
+                "zig"
+              ]
+            },
+            "description": "Repositories with code in this language (case-insensitive), e.g. python.\n\n* `assembly` - assembly\n* `c` - c\n* `c#` - c#\n* `c++` - c++\n* `clojure` - clojure\n* `crystal` - crystal\n* `css` - css\n* `cuda` - cuda\n* `dart` - dart\n* `dockerfile` - dockerfile\n* `elixir` - elixir\n* `elm` - elm\n* `erlang` - erlang\n* `f#` - f#\n* `fortran` - fortran\n* `gdscript` - gdscript\n* `go` - go\n* `groovy` - groovy\n* `haskell` - haskell\n* `hcl` - hcl\n* `html` - html\n* `java` - java\n* `javascript` - javascript\n* `julia` - julia\n* `jupyter notebook` - jupyter notebook\n* `kotlin` - kotlin\n* `lua` - lua\n* `matlab` - matlab\n* `nim` - nim\n* `nix` - nix\n* `objective-c` - objective-c\n* `ocaml` - ocaml\n* `perl` - perl\n* `php` - php\n* `plpgsql` - plpgsql\n* `plsql` - plsql\n* `powershell` - powershell\n* `python` - python\n* `r` - r\n* `ruby` - ruby\n* `rust` - rust\n* `sass` - sass\n* `scala` - scala\n* `scss` - scss\n* `shell` - shell\n* `solidity` - solidity\n* `sql` - sql\n* `svelte` - svelte\n* `swift` - swift\n* `tsql` - tsql\n* `typescript` - typescript\n* `vim script` - vim script\n* `vue` - vue\n* `webassembly` - webassembly\n* `zig` - zig"
+          },
+          {
+            "in": "query",
+            "name": "match",
+            "schema": {
+              "type": "string",
+              "enum": ["good", "partial", "strong"]
+            },
+            "description": "* `strong` - Strong\n* `good` - Good\n* `partial` - Partial"
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "string",
+              "enum": ["large", "medium", "small", "unknown"]
+            },
+            "description": "* `small` - Small\n* `medium` - Medium\n* `large` - Large\n* `unknown` - Unknown"
+          }
+        ],
+        "tags": ["recommendations"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRecommendationList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/recommendations/{id}": {
+      "get": {
+        "operationId": "recommendations_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["recommendations"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationDetail"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/recommendations/{id}/dismiss": {
+      "post": {
+        "operationId": "recommendations_dismiss",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["recommendations"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/recommendations/{id}/feedback": {
+      "post": {
+        "operationId": "recommendations_feedback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["recommendations"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/recommendations/{id}/save": {
+      "post": {
+        "operationId": "recommendations_save",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["recommendations"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "operationId": "recommendations_unsave",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["recommendations"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/recommendations/status": {
+      "get": {
+        "operationId": "recommendations_status",
+        "tags": ["recommendations"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationStatus"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/saved": {
+      "get": {
+        "operationId": "saved_list",
+        "description": "Saved repositories, most recently saved first, whether or not still recommended.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": ["saved"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedSavedRepositoryList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/saved/{repository_id}": {
+      "delete": {
+        "operationId": "saved_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["saved"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/v1/sync/status": {
       "get": {
         "operationId": "sync_status",
@@ -709,10 +1670,67 @@
   },
   "components": {
     "schemas": {
+      "ActionEnum": {
+        "enum": ["viewed", "opened_repository", "opened_issue"],
+        "type": "string",
+        "description": "* `viewed` - viewed\n* `opened_repository` - opened_repository\n* `opened_issue` - opened_issue"
+      },
       "ActivityLabelEnum": {
         "enum": ["recently_active", "moderately_active", "low_activity"],
         "type": "string",
         "description": "* `recently_active` - Recently Active\n* `moderately_active` - Moderately Active\n* `low_activity` - Low Activity"
+      },
+      "ActivitySignals": {
+        "type": "object",
+        "properties": {
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "days_since_push": {
+            "type": "integer",
+            "readOnly": true,
+            "nullable": true
+          },
+          "commits_90d": {
+            "type": "integer",
+            "readOnly": true,
+            "nullable": true
+          },
+          "prs_merged_90d": {
+            "type": "integer",
+            "readOnly": true,
+            "nullable": true
+          },
+          "contributors": {
+            "type": "integer",
+            "readOnly": true,
+            "nullable": true
+          },
+          "latest_release_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          },
+          "open_issues": {
+            "type": "integer",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "captured_at",
+          "commits_90d",
+          "contributors",
+          "days_since_push",
+          "latest_release_at",
+          "open_issues",
+          "prs_merged_90d"
+        ]
+      },
+      "BlankEnum": {
+        "enum": [""]
       },
       "CandidateDiscovery": {
         "type": "object",
@@ -978,6 +1996,29 @@
         },
         "required": ["job", "last_completed_at", "pool"]
       },
+      "DismissedRepository": {
+        "type": "object",
+        "properties": {
+          "repository_id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "repository": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateRepository"
+              }
+            ],
+            "readOnly": true
+          },
+          "dismissed_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": ["dismissed_at", "repository", "repository_id"]
+      },
       "Error": {
         "type": "object",
         "description": "Standard error envelope, referenced by every endpoint's error responses.",
@@ -1036,6 +2077,20 @@
           }
         },
         "required": ["by_source", "last_observed_at", "repository_count"]
+      },
+      "FeedbackRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ActionEnum"
+              }
+            ],
+            "description": "Saves and dismissals are recorded by their own endpoints.\n\n* `viewed` - viewed\n* `opened_repository` - opened_repository\n* `opened_issue` - opened_issue"
+          }
+        },
+        "required": ["action"]
       },
       "GitHubProfile": {
         "type": "object",
@@ -1190,9 +2245,28 @@
         "description": "* `readme` - Readme\n* `repo_description` - Repo Description\n* `topic` - Topic\n* `contribution` - Contribution"
       },
       "JobTypeEnum": {
-        "enum": ["github_profile_sync", "profile_analysis", "repository_discovery"],
+        "enum": [
+          "github_profile_sync",
+          "profile_analysis",
+          "repository_discovery",
+          "recommendation_generation"
+        ],
         "type": "string",
-        "description": "* `github_profile_sync` - Github Profile Sync\n* `profile_analysis` - Profile Analysis\n* `repository_discovery` - Repository Discovery"
+        "description": "* `github_profile_sync` - Github Profile Sync\n* `profile_analysis` - Profile Analysis\n* `repository_discovery` - Repository Discovery\n* `recommendation_generation` - Recommendation Generation"
+      },
+      "LanguageShare": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "share": {
+            "type": "number",
+            "format": "double",
+            "description": "Fraction of the repository's code, 0..1."
+          }
+        },
+        "required": ["language", "share"]
       },
       "LifecycleEnum": {
         "enum": [
@@ -1207,6 +2281,11 @@
         ],
         "type": "string",
         "description": "* `discovered` - Discovered\n* `fetching` - Fetching\n* `analyzed` - Analyzed\n* `indexed` - Indexed\n* `recommendable` - Recommendable\n* `stale` - Stale\n* `refreshing` - Refreshing\n* `failed` - Failed"
+      },
+      "MatchLabelEnum": {
+        "enum": ["strong", "good", "partial"],
+        "type": "string",
+        "description": "* `strong` - Strong\n* `good` - Good\n* `partial` - Partial"
       },
       "Me": {
         "type": "object",
@@ -1239,6 +2318,44 @@
       },
       "NullEnum": {
         "enum": [null]
+      },
+      "Openness": {
+        "type": "object",
+        "description": "Observable contribution affordances; null means not yet known.",
+        "properties": {
+          "contributing": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "code_of_conduct": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "issue_templates": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "pull_request_template": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "good_first_issue": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "help_wanted": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": [
+          "code_of_conduct",
+          "contributing",
+          "good_first_issue",
+          "help_wanted",
+          "issue_templates",
+          "pull_request_template"
+        ]
       },
       "PaginatedDeveloperInterestList": {
         "type": "object",
@@ -1292,6 +2409,62 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DeveloperSkill"
+            }
+          }
+        }
+      },
+      "PaginatedDismissedRepositoryList": {
+        "type": "object",
+        "required": ["count", "results"],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DismissedRepository"
+            }
+          }
+        }
+      },
+      "PaginatedRecommendationList": {
+        "type": "object",
+        "required": ["count", "results"],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
             }
           }
         }
@@ -1352,6 +2525,34 @@
           }
         }
       },
+      "PaginatedSavedRepositoryList": {
+        "type": "object",
+        "required": ["count", "results"],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedRepository"
+            }
+          }
+        }
+      },
       "PoolCounts": {
         "type": "object",
         "properties": {
@@ -1404,6 +2605,266 @@
           }
         },
         "required": ["bytes", "name", "repo_count", "share"]
+      },
+      "Reason": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TypeEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "text": {
+            "type": "string",
+            "readOnly": true
+          },
+          "detail": {
+            "readOnly": true
+          }
+        },
+        "required": ["detail", "text", "type"]
+      },
+      "Recommendation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "repository_id": {
+            "type": "integer",
+            "readOnly": true,
+            "description": "For the saved and dismissed endpoints."
+          },
+          "repository": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateRepository"
+              }
+            ],
+            "readOnly": true
+          },
+          "match_label": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchLabelEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "technologies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Technology"
+            },
+            "readOnly": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "readOnly": true
+          },
+          "activity_label": {
+            "readOnly": true,
+            "description": "Empty when the repository's activity is unknown.\n\n* `recently_active` - Recently Active\n* `moderately_active` - Moderately Active\n* `low_activity` - Low Activity",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActivityLabelEnum"
+              },
+              {
+                "$ref": "#/components/schemas/BlankEnum"
+              }
+            ]
+          },
+          "size": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SizeEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "openness": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Openness"
+              }
+            ],
+            "readOnly": true
+          },
+          "saved": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Whether the user saved it."
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "activity_label",
+          "generated_at",
+          "id",
+          "match_label",
+          "openness",
+          "reasons",
+          "repository",
+          "repository_id",
+          "saved",
+          "size",
+          "technologies"
+        ]
+      },
+      "RecommendationDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "repository_id": {
+            "type": "integer",
+            "readOnly": true,
+            "description": "For the saved and dismissed endpoints."
+          },
+          "repository": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateRepository"
+              }
+            ],
+            "readOnly": true
+          },
+          "match_label": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchLabelEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "technologies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Technology"
+            },
+            "readOnly": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "readOnly": true
+          },
+          "activity_label": {
+            "readOnly": true,
+            "description": "Empty when the repository's activity is unknown.\n\n* `recently_active` - Recently Active\n* `moderately_active` - Moderately Active\n* `low_activity` - Low Activity",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActivityLabelEnum"
+              },
+              {
+                "$ref": "#/components/schemas/BlankEnum"
+              }
+            ]
+          },
+          "size": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SizeEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "openness": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Openness"
+              }
+            ],
+            "readOnly": true
+          },
+          "saved": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Whether the user saved it."
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageShare"
+            },
+            "readOnly": true
+          },
+          "readme_excerpt": {
+            "type": "string",
+            "readOnly": true
+          },
+          "activity_signals": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ActivitySignals"
+              }
+            ],
+            "nullable": true,
+            "readOnly": true
+          }
+        },
+        "required": [
+          "activity_label",
+          "activity_signals",
+          "generated_at",
+          "id",
+          "languages",
+          "match_label",
+          "openness",
+          "readme_excerpt",
+          "reasons",
+          "repository",
+          "repository_id",
+          "saved",
+          "size",
+          "technologies"
+        ]
+      },
+      "RecommendationStatus": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SyncJob"
+              }
+            ],
+            "nullable": true
+          },
+          "last_generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer"
+          },
+          "config_version": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["config_version", "count", "job", "last_generated_at"]
       },
       "Repository": {
         "type": "object",
@@ -1613,6 +3074,90 @@
         "type": "string",
         "description": "* `revoked` - revoked\n* `failed` - failed\n* `not_connected` - not_connected"
       },
+      "SaveResult": {
+        "type": "object",
+        "properties": {
+          "saved": {
+            "type": "boolean"
+          }
+        },
+        "required": ["saved"]
+      },
+      "SavedRecommendation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "match_label": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchLabelEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "readOnly": true
+          }
+        },
+        "required": ["id", "match_label", "reasons"]
+      },
+      "SavedRepository": {
+        "type": "object",
+        "properties": {
+          "repository_id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "repository": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateRepository"
+              }
+            ],
+            "readOnly": true
+          },
+          "saved_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "activity_label": {
+            "description": "Current activity label; empty when unknown.",
+            "readOnly": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActivityLabelEnum"
+              },
+              {
+                "$ref": "#/components/schemas/BlankEnum"
+              }
+            ]
+          },
+          "recommendation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SavedRecommendation"
+              }
+            ],
+            "nullable": true,
+            "readOnly": true,
+            "description": "The current recommendation, or null when it is no longer recommended."
+          }
+        },
+        "required": ["activity_label", "recommendation", "repository", "repository_id", "saved_at"]
+      },
+      "SizeEnum": {
+        "enum": ["small", "medium", "large", "unknown"],
+        "type": "string",
+        "description": "* `small` - Small\n* `medium` - Medium\n* `large` - Large\n* `unknown` - Unknown"
+      },
       "Skill": {
         "type": "object",
         "properties": {
@@ -1775,6 +3320,29 @@
           }
         },
         "required": ["job", "last_synced_at"]
+      },
+      "Technology": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "matched": {
+            "type": "boolean"
+          }
+        },
+        "required": ["category", "matched", "name", "slug"]
+      },
+      "TypeEnum": {
+        "enum": ["skill", "language", "framework", "interest", "activity", "openness"],
+        "type": "string",
+        "description": "* `skill` - Skill\n* `language` - Language\n* `framework` - Framework\n* `interest` - Interest\n* `activity` - Activity\n* `openness` - Openness"
       }
     },
     "securitySchemes": {

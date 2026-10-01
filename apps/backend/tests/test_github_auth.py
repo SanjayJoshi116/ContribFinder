@@ -347,7 +347,8 @@ def test_disconnect_revokes_deletes_and_logs_out(user: User) -> None:
     assert User.objects.filter(pk=user.pk).exists()
     assert client.get("/api/v1/auth/me").status_code == 401
     event = AuditEvent.objects.get(action="github_disconnect")
-    assert event.metadata == {"revocation": "revoked"}
+    assert event.metadata["revocation"] == "revoked"
+    assert set(event.metadata) == {"revocation", "deleted"}
 
 
 @respx.mock
@@ -373,7 +374,7 @@ def test_disconnect_when_github_revocation_fails(
     assert response.json() == {"revocation": "failed"}
     assert not GitHubAccount.objects.filter(user=user).exists()
     assert client.get("/api/v1/auth/me").status_code == 401
-    assert AuditEvent.objects.get(action="github_disconnect").metadata == {"revocation": "failed"}
+    assert AuditEvent.objects.get(action="github_disconnect").metadata["revocation"] == "failed"
     assert_no_secrets(caplog.text)
 
 

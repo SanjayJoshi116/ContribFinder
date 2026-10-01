@@ -1,0 +1,105 @@
+# recommendation-engine Specification
+
+## Purpose
+
+Scores and ranks each developer's analyzed candidate repositories against their evidence-backed profile with deterministic, versioned and configurable signals, so that every stored recommendation can be traced to the data and configuration that produced it.
+
+## Requirements
+
+### Requirement: Repository technologies
+The system SHALL derive each candidate repository's technologies from its stored data, using the same skill catalog as the developer profile: languages (with their share of the repository's code), topics, and dependency manifest entries. Each detected technology SHALL record its catalog category and the sources that detected it. Technologies SHALL be derived from stored data only, without calling GitHub.
+
+#### Scenario: Stack from several sources
+- **WHEN** a repository is 80% Python, has the topic `django`, and its `requirements.txt` lists `django` and `celery`
+- **THEN** its technologies are Python (language, from languages, 80% share), Django (framework, from topic and dependency) and Celery (from dependency)
+
+#### Scenario: No detectable technologies
+- **WHEN** a repository has no languages, no catalog topics and no manifests
+- **THEN** its technology set is empty, and every technology-based signal for it is 0
+
+### Requirement: Relevance signals
+For each candidate, the system SHALL calculate these signals independently, each as a value from 0.0 to 1.0 together with the evidence that produced it:
+- **skill match**: how much of the repository's technology set the developer has demonstrated, weighted by the developer's confidence in each skill;
+- **language match**: the repository's code share in languages the developer knows, weighted by the developer's confidence in each language;
+- **framework match**: overlap between the repository's frameworks and the developer's framework skills;
+- **interest match**: overlap between the interests the repository's topics and description express and the developer's detected interests, weighted by interest strength;
+- **activity signal**: the repository's latest activity label, mapped to a configured value;
+- **contribution openness**: observable contribution affordances (contribution guidelines, issue templates, `good first issue` and `help wanted` labels), each worth a configured amount.
+
+A signal with no supporting data SHALL be 0 with no evidence; it SHALL NOT be guessed. Skills whose only evidence is a README mention SHALL count at their stored (low) confidence and never as full matches. No single signal SHALL determine a recommendation on its own. Signal calculation SHALL NOT call GitHub or any AI service.
+
+#### Scenario: Strong Python/Django match
+- **WHEN** the developer has high-confidence Python and Django skills and the repository is mostly Python and depends on Django
+- **THEN** language match and framework match are high, and their evidence names Python and Django
+
+#### Scenario: Unknown activity
+- **WHEN** a repository has no activity snapshot
+- **THEN** its activity signal is 0 with no evidence
+
+#### Scenario: Deterministic
+- **WHEN** signals are calculated twice for the same profile, repository data and configuration
+- **THEN** the values and evidence are identical
+
+### Requirement: Versioned scoring configuration
+The system SHALL keep scoring configurations as versioned records, each with a unique version name, a weight per signal, match-label score bands, the parameters of the activity and openness signals, and a creation time. Exactly one configuration SHALL be active at a time. The initial configuration `v1-deterministic` SHALL use the weights skill 0.40, language 0.20, interest 0.15, framework 0.10, activity 0.10 and contribution openness 0.05, and SHALL be described as experimental. A configuration SHALL be rejected when a weight is negative, a signal is missing, or the weights do not sum to 1. A configuration that produced recommendations SHALL NOT be deletable.
+
+#### Scenario: Seeded configuration
+- **WHEN** the system is migrated from an empty database
+- **THEN** `v1-deterministic` exists, is active, and has the documented weights
+
+#### Scenario: Invalid weights
+- **WHEN** an operator saves a configuration whose weights sum to 0.9
+- **THEN** it is rejected with a validation error
+
+#### Scenario: Config in use
+- **WHEN** an operator tries to delete a configuration referenced by recommendations
+- **THEN** the deletion is refused
+
+### Requirement: Recommendation score and ranking
+The system SHALL score each candidate as the weighted sum of its signals under the active configuration, giving a value from 0.0 to 1.0 used only for internal ranking. Only candidates whose repository is eligible and recommendable SHALL be scored. Candidates SHALL be ranked by score, then by best search rank, then by repository name. The system SHALL keep the top N (configured, default 50, never fewer than 20) whose score is at least the configured minimum (default 0.10) and that have at least one relevance signal (skill, language, framework or interest match) above 0 as the developer's recommendations; activity and contribution openness alone SHALL NOT make a candidate a recommendation. Each recommendation SHALL store its score, each signal's value, its rank, its match label, its generation time and a non-null reference to the configuration that produced it. Candidates that fall out of the top N SHALL stop being recommendations. A recommendation for the same developer and repository SHALL keep its identity across regenerations.
+
+#### Scenario: Ranking
+- **WHEN** a developer has 30 eligible candidates and the top N is 20
+- **THEN** the 20 highest-scoring candidates at or above the minimum score are stored as recommendations, in score order
+
+#### Scenario: Activity alone is not relevance
+- **WHEN** a candidate matches none of the developer's skills, languages, frameworks or interests but is recently active and open to contributions
+- **THEN** it is not a recommendation, whatever its score
+
+#### Scenario: Ineligible candidates excluded
+- **WHEN** a candidate's repository is ineligible, failed or not yet analyzed
+- **THEN** it is not scored and is not a recommendation
+
+#### Scenario: Config recorded
+- **WHEN** recommendations are generated under `v1-deterministic`
+- **THEN** every recommendation references `v1-deterministic`
+
+#### Scenario: Stable identity
+- **WHEN** recommendations are regenerated and repository R stays in the top N
+- **THEN** R's recommendation keeps its id, with updated score, signals, rank and generation time
+
+### Requirement: Recommendation generation job
+The system SHALL generate recommendations in a background job per user, tracked like other jobs, that reads only stored data. A job SHALL start when the user's repository discovery completes. At most one generation job SHALL be active per user. A failed generation SHALL keep the user's previous recommendations unchanged. A developer with no eligible candidates SHALL end with no recommendations and a completed job.
+
+#### Scenario: After discovery
+- **WHEN** a user's discovery job completes
+- **THEN** a recommendation generation job for that user starts in the background
+
+#### Scenario: Failure keeps old results
+- **WHEN** a generation job fails while writing
+- **THEN** the user's recommendations are exactly those of the previous successful generation
+
+### Requirement: Recommendation freshness
+The system SHALL periodically (configured interval, default 30 minutes) start a generation job for every developer whose recommendations are older than their profile analysis, older than the latest analysis of a repository in their pool, or produced by a configuration that is no longer active. It SHALL NOT start a job for a developer whose recommendations are current, or who has an active generation job.
+
+#### Scenario: Repository refreshed
+- **WHEN** the backlog refreshes a pooled repository after the developer's recommendations were generated
+- **THEN** the next freshness run starts a generation job for that developer
+
+#### Scenario: New configuration activated
+- **WHEN** an operator activates configuration `v2`
+- **THEN** the next freshness run regenerates every developer's recommendations under `v2`
+
+#### Scenario: Nothing changed
+- **WHEN** nothing relevant changed since the last generation
+- **THEN** no job is started

@@ -1,5 +1,5 @@
 from django.db.models import F, QuerySet
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
@@ -7,9 +7,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import AuditEvent
 from core.authentication import current_user
 from core.serializers import error_responses
 from repositories.models import Repository, UserRepository
+from services import audit, data_deletion
 
 from .models import GitHubProfile
 from .serializers import GitHubProfileSerializer, RepositorySerializer
@@ -32,6 +34,28 @@ class GitHubProfileView(APIView):
         if profile is None:
             raise NotSynced()
         return Response(GitHubProfileSerializer(profile).data)
+
+
+class GitHubDataView(APIView):
+    @extend_schema(
+        operation_id="profile_github_data_delete",
+        responses={
+            204: OpenApiResponse(description="GitHub-derived data deleted."),
+            **error_responses(401, 403),
+        },
+    )
+    def delete(self, request: Request) -> Response:
+        """Delete everything derived from GitHub; the account and connection stay."""
+        user = current_user(request)
+        deleted = data_deletion.delete_github_data(user)
+        audit.record(
+            AuditEvent.Action.GITHUB_DATA_DELETED,
+            AuditEvent.Outcome.SUCCESS,
+            user=user,
+            request=request,
+            metadata={"deleted": deleted},
+        )
+        return Response(status=204)
 
 
 class RepositoryPagination(PageNumberPagination):
