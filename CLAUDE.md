@@ -101,10 +101,12 @@ ContribFinder/
 │  │  ├─ issues/            Issue (shared, analysis on the row), RecommendedIssue; issue
 │  │  │                     detail API (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason; API; generation
-│  │  │                     and freshness tasks
+│  │  │                     and freshness tasks; evaluate_ranking and export_benchmark_developer
+│  │  │                     commands (Phase 8b)
 │  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
 │  │  │                     saved and dismissed API (Phase 8a)
 │  │  ├─ embeddings/        (Phase 6, future)
+│  │  ├─ evaluation/        data only: benchmark-v1.json (seed benchmark), baselines.json
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError), feedback.py (record, save,
 │  │     │                  dismiss, restore), data_deletion.py (GitHub data / account deletion)
@@ -118,8 +120,10 @@ ContribFinder/
 │  │     │                  technologies, analysis (Phase 7)
 │  │     ├─ matching/       activity, technologies, features (loading), signals,
 │  │     │                  issues (issue matching) (Phase 4–7)
-│  │     ├─ ranking/        config (validation), score, explain, service (generation),
-│  │     │                  freshness (Phase 5)
+│  │     ├─ ranking/        config (validation), pipeline (rank_pool, shared by generation and
+│  │     │                  evaluation), score, explain, service (generation), freshness (Phase 5)
+│  │     ├─ evaluation/     dataset (benchmark load/validate), metrics, runner (evaluate, compare),
+│  │     │                  baseline, export (Phase 8b)
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
@@ -180,6 +184,10 @@ Local, no Docker (primary on this machine):
 - `npm run manage -- <command> [args]` runs a Django management command in `apps/backend` the
   same way (e.g. `npm run manage -- reanalyze_profiles` after changing `EVIDENCE_WEIGHTS` or the
   skill catalog; it queues jobs, so a worker must be running when `REDIS_URL` is set).
+- `npm run manage -- evaluate_ranking --config <v1> --config <v2>` scores configurations on the
+  benchmark (`apps/backend/evaluation/`); a ranking change is an improvement only if it wins there
+  (README "Evaluating a ranking change"). After an intended ranking change, rerun with
+  `--write-baseline` and commit `baselines.json`, or the baseline test fails.
 
 Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
 `REDIS_URL` with container hostnames; Postgres is on host port 5433.
@@ -535,7 +543,23 @@ Sketch:
 - FR-ISSUE-005: issue match signals, reasons, and an issue detail page that separates GitHub-provided
   data from ContribFinder analysis; add difficulty and contribution-type filters.
 
-**Phase 8b — Evaluation**
+**Phase 8b — Evaluation** (MVP+)  ✅ shipped in v0.8.0
+
+Archived: `openspec/changes/archive/2026-10-14-phase-8b-evaluation/`. Spec:
+`recommendation-evaluation`. No carry-overs; Docker Compose verification stays future scope.
+
+Deviations from the sketch below, as built:
+- Evaluation is offline (management commands, no API, model or UI) and ranks through
+  `services/ranking/pipeline.rank_pool`, which generation now calls too, so the two cannot drift.
+- The seed benchmark `benchmark-v1` is six persona developers over 40 fictional `bench/`
+  repositories, judged from the persona descriptions before any run; real developers can be
+  added with `export_benchmark_developer` (anonymized, unjudged) and judged by hand.
+- Improvement rule: NDCG@10 strictly higher and no other metric lower by more than 0.01.
+  `baselines.json` pins min score 0.10 and top N 50 so a local `.env` cannot change CI's numbers.
+- Result on `benchmark-v1`: v2 is **not** an improvement over v1 (NDCG@10 +0.0195, P@5 −0.0333).
+  v2 stays active; tuning is left to a later change, which must win on the benchmark.
+
+Sketch:
 - Fixed benchmark developers with hand-labeled relevant repos; compute Precision@5/10,
   Recall@10, MRR and NDCG per ScoringConfig. A ranking change counts as an improvement only if it wins here.
 

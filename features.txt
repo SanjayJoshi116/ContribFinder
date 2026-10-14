@@ -211,10 +211,22 @@ Frontend
   [x] /app/issues/:id: "From GitHub" vs "ContribFinder analysis", plain-text description
 
 ============================================================================
+SHIPPED - v0.8.0 - Phase 8b: Recommendation evaluation (MVP+)
+============================================================================
+
+Evaluation
+  [x] Benchmark dataset format with validation; seed benchmark-v1 (6 personas, 40 repositories)
+  [x] Precision@5/10, Recall@10, MRR, NDCG@10 per developer and per dataset
+  [x] evaluate_ranking: compare stored and unsaved configs; improvement rule; JSON report
+  [x] Regression baseline (baselines.json) checked by the test suite
+  [x] export_benchmark_developer: anonymized, unjudged snapshot of a real developer
+  [x] Generation and evaluation share one ranking stage (rank_pool)
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
-  [ ] Phase 8b Recommendation evaluation (Precision@k, Recall@10, MRR, NDCG)
+  [ ]          Benchmark from real, hand-judged developer exports; issue-level evaluation
   [ ]          Personalized ranking, notifications, contribution tracking

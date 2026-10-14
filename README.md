@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.7.0** (Phase 7: Issues, MVP+). After signing in with
+**Version 0.8.0** (Phase 8b: Recommendation evaluation, MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -11,8 +11,9 @@ then ranks them with deterministic, versioned scoring and shows each recommendat
 label (Strong, Good, Partial) and the reasons behind it, never a percentage. You can save or
 dismiss projects, refresh everything, and delete your GitHub data or your account at any time
 (see the in-app privacy page). Each recommendation also lists the open issues that fit you, with
-their contribution type and an estimated difficulty (or "Not enough evidence"). Semantic matching
-comes later.
+their contribution type and an estimated difficulty (or "Not enough evidence"). Ranking changes
+are measured offline on a hand-judged benchmark before they count as improvements (see
+"Evaluating a ranking change"). Semantic matching comes later.
 
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
@@ -93,6 +94,35 @@ starts a recommendation generation. Ranking limits and sizes (`RECOMMENDATION_*`
 (`FEEDBACK_VIEW_DEDUP_MINUTES`) are in `.env.example` too, as are the issue fetch budget and
 difficulty thresholds (`ISSUES_MAX_PAGES`, `ISSUE_*`). Scoring weights and issue matching
 parameters live in the active `ScoringConfig` (Django admin); `v2-deterministic` is active.
+
+## Evaluating a ranking change
+
+Ranking changes are measured offline on a fixed benchmark, `apps/backend/evaluation/benchmark-v1.json`:
+persona developers with hand-judged candidate repositories (0 not relevant, 1 relevant, 2 highly
+relevant). No GitHub calls, no stored data changes.
+
+```bash
+npm run manage -- evaluate_ranking --config v1-deterministic --config v2-deterministic
+npm run manage -- evaluate_ranking --config v2-deterministic --config-file my-config.json --require-improvement
+```
+
+It prints Precision@5, Precision@10, Recall@10, MRR and NDCG@10 per configuration (the first is
+the baseline, deltas in parentheses) and every developer's top 10 with judgments (`?` = unjudged).
+`--config-file` takes `{"weights": ..., "params": ...}` for a configuration not stored yet;
+`--json OUT` writes the full report. A configuration counts as an **improvement** only when its
+NDCG@10 is higher than the baseline's and no other metric drops by more than `--tolerance`
+(0.01); `--require-improvement` exits non-zero otherwise.
+
+`evaluation/baselines.json` records the stored configurations' metrics, and a test fails when
+they move. After an intended ranking change, run `npm run manage -- evaluate_ranking
+--write-baseline` and commit the file with the change.
+
+To add a real developer to a benchmark, export one user's stored profile and pool (anonymized,
+no judgments), then judge the candidates by hand:
+
+```bash
+npm run manage -- export_benchmark_developer --user-id 2 --as dev-f --out dev-f.json
+```
 
 ## Your data
 

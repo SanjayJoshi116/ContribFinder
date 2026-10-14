@@ -1,0 +1,21 @@
+{
+  "dataset": "benchmark-v1",
+  "min_score": 0.1,
+  "top_n": 50,
+  "configs": {
+    "v1-deterministic": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6333,
+      "recall@10": 0.9276,
+      "mrr": 1.0,
+      "ndcg@10": 0.9459
+    },
+    "v2-deterministic": {
+      "precision@5": 0.9,
+      "precision@10": 0.65,
+      "recall@10": 0.9554,
+      "mrr": 1.0,
+      "ndcg@10": 0.9654
+    }
+  }
+}

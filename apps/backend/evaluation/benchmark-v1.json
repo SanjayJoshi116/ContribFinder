@@ -1,0 +1,2473 @@
+{
+  "format": 1,
+  "name": "benchmark-v1",
+  "description": "Seed benchmark: six persona developers over a shared catalog of fictional bench/ repositories. Judgments (0 not relevant, 1 relevant, 2 highly relevant) were written from each persona description before any configuration was evaluated. No real GitHub user data.",
+  "repositories": {
+    "bench/django-formkit": {
+      "description": "Reusable form widgets and validation helpers for Django projects",
+      "languages": [
+        [
+          "Python",
+          180000
+        ],
+        [
+          "HTML",
+          12000
+        ]
+      ],
+      "topics": [
+        "django",
+        "forms",
+        "web"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "django"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 41,
+          "labels": [
+            "good_first_issue",
+            "documentation"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "django"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 52,
+          "labels": [
+            "bug"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "intermediate",
+          "technologies": [
+            "django",
+            "python"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/drf-filters": {
+      "description": "Declarative filtering backends for Django REST framework APIs",
+      "languages": [
+        [
+          "Python",
+          95000
+        ]
+      ],
+      "topics": [
+        "django-rest-framework",
+        "api"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "django"
+        ],
+        [
+          "pypi",
+          "djangorestframework"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 17,
+          "labels": [
+            "enhancement"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "intermediate",
+          "technologies": [
+            "django-rest-framework",
+            "django"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/django-tasks-lite": {
+      "description": "Lightweight background tasks for Django with Celery and Redis",
+      "languages": [
+        [
+          "Python",
+          70000
+        ]
+      ],
+      "topics": [
+        "django",
+        "celery",
+        "task-queue"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "django"
+        ],
+        [
+          "pypi",
+          "celery"
+        ],
+        [
+          "pypi",
+          "redis"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 9,
+          "labels": [
+            "help_wanted",
+            "testing"
+          ],
+          "contribution_type": "testing",
+          "difficulty": "intermediate",
+          "technologies": [
+            "celery",
+            "pytest"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/flask-auth-kit": {
+      "description": "Session and token authentication helpers for Flask apps",
+      "languages": [
+        [
+          "Python",
+          40000
+        ]
+      ],
+      "topics": [
+        "flask",
+        "authentication",
+        "web"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "flask"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 200,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": []
+    },
+    "bench/fastapi-pagination-x": {
+      "description": "Cursor and offset pagination for FastAPI endpoints",
+      "languages": [
+        [
+          "Python",
+          52000
+        ]
+      ],
+      "topics": [
+        "fastapi",
+        "pagination"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "fastapi"
+        ],
+        [
+          "pypi",
+          "pydantic"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 23,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "fastapi"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/pyfmt-cli": {
+      "description": "Opinionated command-line formatter for Python source files",
+      "languages": [
+        [
+          "Python",
+          120000
+        ]
+      ],
+      "topics": [
+        "cli",
+        "developer-tools",
+        "formatter"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "pytest"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 88,
+          "labels": [
+            "good_first_issue",
+            "documentation"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "python"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/sqlmigrate-py": {
+      "description": "Schema migration tool for PostgreSQL written in Python",
+      "languages": [
+        [
+          "Python",
+          60000
+        ],
+        [
+          "PLpgSQL",
+          4000
+        ]
+      ],
+      "topics": [
+        "database",
+        "postgresql",
+        "migrations"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "psycopg"
+        ],
+        [
+          "pypi",
+          "sqlalchemy"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": []
+    },
+    "bench/ml-trainer": {
+      "description": "Training loop utilities for deep learning experiments with PyTorch",
+      "languages": [
+        [
+          "Python",
+          210000
+        ]
+      ],
+      "topics": [
+        "machine-learning",
+        "deep-learning",
+        "pytorch"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "torch"
+        ],
+        [
+          "pypi",
+          "numpy"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 80
+      },
+      "issues": [
+        {
+          "number": 301,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "pytorch"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/airflow-providers-x": {
+      "description": "Extra Apache Airflow operators and hooks for data pipelines",
+      "languages": [
+        [
+          "Python",
+          140000
+        ]
+      ],
+      "topics": [
+        "airflow",
+        "etl",
+        "data-engineering"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "apache-airflow"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 64,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "intermediate",
+          "technologies": [
+            "airflow",
+            "python"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 70,
+          "labels": [
+            "documentation"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "airflow"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/dbt-utils-plus": {
+      "description": "Reusable dbt macros and tests for analytics engineering",
+      "languages": [
+        [
+          "SQL",
+          30000
+        ],
+        [
+          "Python",
+          8000
+        ]
+      ],
+      "topics": [
+        "dbt",
+        "data-engineering",
+        "sql"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "dbt-core"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 12,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "dbt",
+            "sql"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/sparkline-etl": {
+      "description": "Config-driven ETL framework on PySpark",
+      "languages": [
+        [
+          "Python",
+          88000
+        ]
+      ],
+      "topics": [
+        "etl",
+        "apache-spark",
+        "big-data"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "pyspark"
+        ],
+        [
+          "pypi",
+          "pandas"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": []
+    },
+    "bench/polars-io": {
+      "description": "Fast readers and writers for Polars data frames",
+      "languages": [
+        [
+          "Rust",
+          150000
+        ],
+        [
+          "Python",
+          20000
+        ]
+      ],
+      "topics": [
+        "polars",
+        "dataframe",
+        "data-engineering"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "polars"
+        ],
+        [
+          "cargo",
+          "polars"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 5,
+          "labels": [
+            "performance"
+          ],
+          "contribution_type": "code",
+          "difficulty": "advanced",
+          "technologies": [
+            "polars",
+            "rust"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/kafka-stream-py": {
+      "description": "Consumer groups and stream processing helpers for Kafka in Python",
+      "languages": [
+        [
+          "Python",
+          35000
+        ]
+      ],
+      "topics": [
+        "kafka",
+        "data-pipeline",
+        "streaming"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "confluent-kafka"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 200,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": []
+    },
+    "bench/pandas-profiler": {
+      "description": "Data quality and profiling reports for pandas data frames",
+      "languages": [
+        [
+          "Python",
+          64000
+        ]
+      ],
+      "topics": [
+        "pandas",
+        "data-quality",
+        "data-engineering"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "pandas"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 33,
+          "labels": [
+            "good_first_issue",
+            "testing"
+          ],
+          "contribution_type": "testing",
+          "difficulty": "beginner",
+          "technologies": [
+            "pandas",
+            "pytest"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/react-table-kit": {
+      "description": "Headless table and data grid hooks for React",
+      "languages": [
+        [
+          "TypeScript",
+          260000
+        ]
+      ],
+      "topics": [
+        "react",
+        "table",
+        "ui"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "react"
+        ],
+        [
+          "npm",
+          "typescript"
+        ],
+        [
+          "npm",
+          "vite"
+        ],
+        [
+          "npm",
+          "jest"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 60
+      },
+      "issues": [
+        {
+          "number": 410,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "react",
+            "typescript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 415,
+          "labels": [
+            "bug"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "intermediate",
+          "technologies": [
+            "react"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/next-blog-starter": {
+      "description": "Starter template for a Markdown blog with Next.js and Tailwind CSS",
+      "languages": [
+        [
+          "TypeScript",
+          40000
+        ],
+        [
+          "CSS",
+          3000
+        ]
+      ],
+      "topics": [
+        "nextjs",
+        "template",
+        "blog"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "next"
+        ],
+        [
+          "npm",
+          "react"
+        ],
+        [
+          "npm",
+          "tailwindcss"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 7,
+          "labels": [
+            "good_first_issue",
+            "documentation"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "nextjs"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/tailwind-ui-blocks": {
+      "description": "Copy-paste UI blocks built with React and Tailwind CSS",
+      "languages": [
+        [
+          "TypeScript",
+          90000
+        ],
+        [
+          "CSS",
+          5000
+        ]
+      ],
+      "topics": [
+        "tailwindcss",
+        "design-system",
+        "react"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "tailwindcss"
+        ],
+        [
+          "npm",
+          "react"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 56,
+          "labels": [
+            "help_wanted",
+            "design"
+          ],
+          "contribution_type": "design",
+          "difficulty": "unknown",
+          "technologies": [
+            "tailwindcss"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/vite-plugin-icons": {
+      "description": "Vite plugin that turns SVG icon sets into components",
+      "languages": [
+        [
+          "TypeScript",
+          45000
+        ]
+      ],
+      "topics": [
+        "vite",
+        "developer-tools",
+        "icons"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "vite"
+        ],
+        [
+          "npm",
+          "typescript"
+        ],
+        [
+          "npm",
+          "vitest"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 21,
+          "labels": [
+            "enhancement"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "intermediate",
+          "technologies": [
+            "vite",
+            "typescript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/vue-forms": {
+      "description": "Form state and validation for Vue 3",
+      "languages": [
+        [
+          "TypeScript",
+          70000
+        ],
+        [
+          "Vue",
+          10000
+        ]
+      ],
+      "topics": [
+        "vue",
+        "forms"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "vue"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": []
+    },
+    "bench/svelte-charts": {
+      "description": "Composable charts for Svelte",
+      "languages": [
+        [
+          "JavaScript",
+          30000
+        ],
+        [
+          "Svelte",
+          25000
+        ]
+      ],
+      "topics": [
+        "svelte",
+        "charts",
+        "visualization"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "svelte"
+        ],
+        [
+          "npm",
+          "d3"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": []
+    },
+    "bench/express-rate-limit-x": {
+      "description": "Rate limiting middleware for Express servers",
+      "languages": [
+        [
+          "JavaScript",
+          25000
+        ]
+      ],
+      "topics": [
+        "nodejs",
+        "express",
+        "middleware"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "express"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": []
+    },
+    "bench/eslint-plugin-a11y": {
+      "description": "ESLint rules for accessible JSX",
+      "languages": [
+        [
+          "JavaScript",
+          50000
+        ]
+      ],
+      "topics": [
+        "eslint",
+        "accessibility",
+        "developer-tools"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "eslint"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 14,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "eslint",
+            "javascript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/llm-chat-ui": {
+      "description": "Chat interface components for LLM apps, built with React",
+      "languages": [
+        [
+          "TypeScript",
+          80000
+        ]
+      ],
+      "topics": [
+        "llm",
+        "ai",
+        "react",
+        "chat"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "react"
+        ],
+        [
+          "npm",
+          "typescript"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 45
+      },
+      "issues": []
+    },
+    "bench/tokio-rpc": {
+      "description": "Async RPC framework on Tokio with gRPC transport",
+      "languages": [
+        [
+          "Rust",
+          300000
+        ]
+      ],
+      "topics": [
+        "rust",
+        "grpc",
+        "networking"
+      ],
+      "dependencies": [
+        [
+          "cargo",
+          "tokio"
+        ],
+        [
+          "cargo",
+          "serde"
+        ],
+        [
+          "cargo",
+          "tonic"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 40
+      },
+      "issues": [
+        {
+          "number": 130,
+          "labels": [
+            "performance"
+          ],
+          "contribution_type": "code",
+          "difficulty": "advanced",
+          "technologies": [
+            "tokio",
+            "rust"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 133,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "intermediate",
+          "technologies": [
+            "tokio"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/rustfs-kernel": {
+      "description": "A small teaching operating system kernel in Rust",
+      "languages": [
+        [
+          "Rust",
+          120000
+        ],
+        [
+          "Assembly",
+          6000
+        ]
+      ],
+      "topics": [
+        "operating-system",
+        "kernel",
+        "rust"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 3,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "code",
+          "difficulty": "advanced",
+          "technologies": [
+            "rust",
+            "assembly"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/serde-yaml-ng": {
+      "description": "YAML support for Serde",
+      "languages": [
+        [
+          "Rust",
+          90000
+        ]
+      ],
+      "topics": [
+        "serde",
+        "yaml",
+        "parser"
+      ],
+      "dependencies": [
+        [
+          "cargo",
+          "serde"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 77,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "beginner",
+          "technologies": [
+            "serde",
+            "rust"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/wasm-image": {
+      "description": "Image filters compiled to WebAssembly",
+      "languages": [
+        [
+          "Rust",
+          60000
+        ],
+        [
+          "JavaScript",
+          5000
+        ]
+      ],
+      "topics": [
+        "webassembly",
+        "image-processing"
+      ],
+      "dependencies": [
+        [
+          "cargo",
+          "wasm-bindgen"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": []
+    },
+    "bench/rust-lint-tool": {
+      "description": "A configurable linter for Rust projects",
+      "languages": [
+        [
+          "Rust",
+          110000
+        ]
+      ],
+      "topics": [
+        "cli",
+        "linter",
+        "developer-tools"
+      ],
+      "dependencies": [
+        [
+          "cargo",
+          "serde"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 201,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "rust"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 205,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "intermediate",
+          "technologies": [
+            "rust"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/zig-allocators": {
+      "description": "Experimental memory allocators in Zig",
+      "languages": [
+        [
+          "Zig",
+          40000
+        ]
+      ],
+      "topics": [
+        "systems-programming",
+        "allocator"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 200,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": []
+    },
+    "bench/k8s-operator-kit": {
+      "description": "Toolkit for writing Kubernetes operators in Go",
+      "languages": [
+        [
+          "Go",
+          230000
+        ]
+      ],
+      "topics": [
+        "kubernetes",
+        "operator",
+        "cloud-native"
+      ],
+      "dependencies": [
+        [
+          "go",
+          "k8s.io/client-go"
+        ],
+        [
+          "go",
+          "k8s.io/api"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 55
+      },
+      "issues": [
+        {
+          "number": 612,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "advanced",
+          "technologies": [
+            "kubernetes",
+            "go"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/prom-exporter-x": {
+      "description": "Prometheus exporter for message queue metrics",
+      "languages": [
+        [
+          "Go",
+          40000
+        ]
+      ],
+      "topics": [
+        "prometheus",
+        "monitoring",
+        "exporter"
+      ],
+      "dependencies": [
+        [
+          "go",
+          "github.com/prometheus/client_golang"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 19,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "prometheus",
+            "go"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/terraform-provider-y": {
+      "description": "Terraform provider for a hosted queue service",
+      "languages": [
+        [
+          "Go",
+          150000
+        ],
+        [
+          "HCL",
+          8000
+        ]
+      ],
+      "topics": [
+        "terraform",
+        "infrastructure",
+        "terraform-provider"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 44,
+          "labels": [
+            "bug"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "intermediate",
+          "technologies": [
+            "terraform",
+            "go"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/helm-charts-hub": {
+      "description": "Community Helm charts for self-hosted tools",
+      "languages": [
+        [
+          "Shell",
+          12000
+        ],
+        [
+          "Go",
+          3000
+        ]
+      ],
+      "topics": [
+        "helm",
+        "kubernetes",
+        "charts"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 8,
+          "labels": [
+            "good_first_issue",
+            "documentation"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "helm"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/go-grpc-gateway": {
+      "description": "HTTP/JSON gateway generator for gRPC services in Go",
+      "languages": [
+        [
+          "Go",
+          180000
+        ]
+      ],
+      "topics": [
+        "grpc",
+        "api",
+        "gateway"
+      ],
+      "dependencies": [
+        [
+          "go",
+          "google.golang.org/grpc"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 70
+      },
+      "issues": []
+    },
+    "bench/ci-runner-go": {
+      "description": "Self-hosted CI runner that executes jobs in Docker containers",
+      "languages": [
+        [
+          "Go",
+          95000
+        ],
+        [
+          "Dockerfile",
+          2000
+        ]
+      ],
+      "topics": [
+        "ci",
+        "devops",
+        "docker"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 91,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "devops",
+          "difficulty": "intermediate",
+          "technologies": [
+            "docker",
+            "go"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/learn-web-exercises": {
+      "description": "Beginner exercises for learning HTML, CSS and JavaScript",
+      "languages": [
+        [
+          "HTML",
+          40000
+        ],
+        [
+          "CSS",
+          20000
+        ],
+        [
+          "JavaScript",
+          15000
+        ]
+      ],
+      "topics": [
+        "education",
+        "tutorial",
+        "web",
+        "hacktoberfest"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 120
+      },
+      "issues": [
+        {
+          "number": 501,
+          "labels": [
+            "good_first_issue",
+            "documentation"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "javascript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 502,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "javascript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/js-todo-app": {
+      "description": "A simple to-do app in plain JavaScript, open to first-time contributors",
+      "languages": [
+        [
+          "JavaScript",
+          12000
+        ],
+        [
+          "HTML",
+          3000
+        ],
+        [
+          "CSS",
+          2000
+        ]
+      ],
+      "topics": [
+        "beginner-friendly",
+        "hacktoberfest",
+        "web"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 30
+      },
+      "issues": [
+        {
+          "number": 60,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "beginner",
+          "technologies": [
+            "javascript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/css-art-gallery": {
+      "description": "A gallery of pure CSS drawings; add your own",
+      "languages": [
+        [
+          "CSS",
+          30000
+        ],
+        [
+          "HTML",
+          9000
+        ]
+      ],
+      "topics": [
+        "css",
+        "hacktoberfest",
+        "open-source"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 210,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "design",
+          "difficulty": "beginner",
+          "technologies": [],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/portfolio-template": {
+      "description": "A minimal personal portfolio template",
+      "languages": [
+        [
+          "HTML",
+          8000
+        ],
+        [
+          "CSS",
+          4000
+        ],
+        [
+          "JavaScript",
+          1000
+        ]
+      ],
+      "topics": [
+        "template",
+        "portfolio"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 200,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": []
+    },
+    "bench/unity-platformer": {
+      "description": "Open-source 2D platformer made with Unity",
+      "languages": [
+        [
+          "C#",
+          300000
+        ]
+      ],
+      "topics": [
+        "unity",
+        "game",
+        "gamedev",
+        "hacktoberfest"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 90
+      },
+      "issues": [
+        {
+          "number": 1001,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "csharp",
+            "unity"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    }
+  },
+  "developers": [
+    {
+      "id": "dev-django",
+      "description": "Intermediate Python web developer: Django and DRF APIs on PostgreSQL, some Celery; wants backend web projects.",
+      "experience_level": "intermediate",
+      "skills": {
+        "python": {
+          "confidence": 0.92,
+          "repo_count": 9
+        },
+        "django": {
+          "confidence": 0.85,
+          "repo_count": 6
+        },
+        "django-rest-framework": {
+          "confidence": 0.6,
+          "repo_count": 3
+        },
+        "postgresql": {
+          "confidence": 0.55,
+          "repo_count": 4
+        },
+        "celery": {
+          "confidence": 0.4,
+          "repo_count": 2
+        },
+        "pytest": {
+          "confidence": 0.5,
+          "repo_count": 4
+        },
+        "redis": {
+          "confidence": 0.3,
+          "repo_count": 2
+        },
+        "javascript": {
+          "confidence": 0.3,
+          "repo_count": 2
+        }
+      },
+      "interests": {
+        "web-development": 0.8,
+        "databases": 0.4,
+        "developer-tooling": 0.3
+      },
+      "candidates": [
+        {
+          "repository": "bench/django-formkit",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/drf-filters",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/django-tasks-lite",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/flask-auth-kit",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/fastapi-pagination-x",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/pyfmt-cli",
+          "best_search_rank": 9
+        },
+        {
+          "repository": "bench/sqlmigrate-py",
+          "best_search_rank": 7
+        },
+        {
+          "repository": "bench/ml-trainer",
+          "best_search_rank": 8
+        },
+        {
+          "repository": "bench/airflow-providers-x",
+          "best_search_rank": 10
+        },
+        {
+          "repository": "bench/react-table-kit",
+          "best_search_rank": 12
+        },
+        {
+          "repository": "bench/express-rate-limit-x",
+          "best_search_rank": 11
+        },
+        {
+          "repository": "bench/unity-platformer",
+          "best_search_rank": 3
+        }
+      ],
+      "judgments": {
+        "bench/django-formkit": 2,
+        "bench/drf-filters": 2,
+        "bench/django-tasks-lite": 2,
+        "bench/flask-auth-kit": 1,
+        "bench/fastapi-pagination-x": 1,
+        "bench/pyfmt-cli": 1,
+        "bench/sqlmigrate-py": 1,
+        "bench/ml-trainer": 0,
+        "bench/airflow-providers-x": 0,
+        "bench/react-table-kit": 0,
+        "bench/express-rate-limit-x": 0,
+        "bench/unity-platformer": 0
+      }
+    },
+    {
+      "id": "dev-frontend",
+      "description": "Intermediate frontend developer: React and TypeScript with Vite, some Next.js and Tailwind; wants UI libraries and frontend tooling.",
+      "experience_level": "intermediate",
+      "skills": {
+        "typescript": {
+          "confidence": 0.9,
+          "repo_count": 8
+        },
+        "javascript": {
+          "confidence": 0.8,
+          "repo_count": 7
+        },
+        "react": {
+          "confidence": 0.88,
+          "repo_count": 7
+        },
+        "nextjs": {
+          "confidence": 0.5,
+          "repo_count": 2
+        },
+        "tailwindcss": {
+          "confidence": 0.55,
+          "repo_count": 3
+        },
+        "vite": {
+          "confidence": 0.5,
+          "repo_count": 4
+        },
+        "jest": {
+          "confidence": 0.4,
+          "repo_count": 3
+        },
+        "css": {
+          "confidence": 0.5,
+          "repo_count": 6
+        },
+        "html": {
+          "confidence": 0.4,
+          "repo_count": 6
+        },
+        "nodejs": {
+          "confidence": 0.3,
+          "repo_count": 2
+        }
+      },
+      "interests": {
+        "web-development": 0.9,
+        "developer-tooling": 0.3
+      },
+      "candidates": [
+        {
+          "repository": "bench/react-table-kit",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/next-blog-starter",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/tailwind-ui-blocks",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/vite-plugin-icons",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/vue-forms",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/svelte-charts",
+          "best_search_rank": 8
+        },
+        {
+          "repository": "bench/express-rate-limit-x",
+          "best_search_rank": 9
+        },
+        {
+          "repository": "bench/eslint-plugin-a11y",
+          "best_search_rank": 7
+        },
+        {
+          "repository": "bench/llm-chat-ui",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/django-formkit",
+          "best_search_rank": 11
+        },
+        {
+          "repository": "bench/learn-web-exercises",
+          "best_search_rank": 10
+        },
+        {
+          "repository": "bench/unity-platformer",
+          "best_search_rank": 12
+        }
+      ],
+      "judgments": {
+        "bench/react-table-kit": 2,
+        "bench/next-blog-starter": 1,
+        "bench/tailwind-ui-blocks": 2,
+        "bench/vite-plugin-icons": 2,
+        "bench/vue-forms": 1,
+        "bench/svelte-charts": 1,
+        "bench/express-rate-limit-x": 0,
+        "bench/eslint-plugin-a11y": 1,
+        "bench/llm-chat-ui": 1,
+        "bench/django-formkit": 0,
+        "bench/learn-web-exercises": 0,
+        "bench/unity-platformer": 0
+      }
+    },
+    {
+      "id": "dev-rust",
+      "description": "Experienced Rust systems developer: async networking with Tokio, Serde, some C; interested in systems programming and developer tools.",
+      "experience_level": "experienced",
+      "skills": {
+        "rust": {
+          "confidence": 0.95,
+          "repo_count": 10
+        },
+        "tokio": {
+          "confidence": 0.7,
+          "repo_count": 4
+        },
+        "serde": {
+          "confidence": 0.75,
+          "repo_count": 6
+        },
+        "webassembly": {
+          "confidence": 0.4,
+          "repo_count": 2
+        },
+        "c": {
+          "confidence": 0.5,
+          "repo_count": 3
+        },
+        "cpp": {
+          "confidence": 0.3,
+          "repo_count": 1
+        },
+        "linux": {
+          "confidence": 0.4,
+          "repo_count": 2
+        },
+        "grpc": {
+          "confidence": 0.3,
+          "repo_count": 1
+        }
+      },
+      "interests": {
+        "systems-programming": 0.9,
+        "developer-tooling": 0.5
+      },
+      "candidates": [
+        {
+          "repository": "bench/tokio-rpc",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/rustfs-kernel",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/serde-yaml-ng",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/wasm-image",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/rust-lint-tool",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/zig-allocators",
+          "best_search_rank": 8
+        },
+        {
+          "repository": "bench/polars-io",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/go-grpc-gateway",
+          "best_search_rank": 7
+        },
+        {
+          "repository": "bench/pyfmt-cli",
+          "best_search_rank": 9
+        },
+        {
+          "repository": "bench/unity-platformer",
+          "best_search_rank": 10
+        },
+        {
+          "repository": "bench/ci-runner-go",
+          "best_search_rank": 11
+        }
+      ],
+      "judgments": {
+        "bench/tokio-rpc": 2,
+        "bench/rustfs-kernel": 2,
+        "bench/serde-yaml-ng": 2,
+        "bench/wasm-image": 1,
+        "bench/rust-lint-tool": 2,
+        "bench/zig-allocators": 1,
+        "bench/polars-io": 1,
+        "bench/go-grpc-gateway": 0,
+        "bench/pyfmt-cli": 0,
+        "bench/unity-platformer": 0
+      }
+    },
+    {
+      "id": "dev-data",
+      "description": "Intermediate data engineer: Python, SQL, Airflow and pandas, some Spark and dbt; wants data pipeline and data quality projects.",
+      "experience_level": "intermediate",
+      "skills": {
+        "python": {
+          "confidence": 0.9,
+          "repo_count": 8
+        },
+        "sql": {
+          "confidence": 0.75,
+          "repo_count": 5
+        },
+        "airflow": {
+          "confidence": 0.7,
+          "repo_count": 3
+        },
+        "pandas": {
+          "confidence": 0.75,
+          "repo_count": 6
+        },
+        "spark": {
+          "confidence": 0.5,
+          "repo_count": 2
+        },
+        "dbt": {
+          "confidence": 0.45,
+          "repo_count": 2
+        },
+        "kafka": {
+          "confidence": 0.3,
+          "repo_count": 1
+        },
+        "postgresql": {
+          "confidence": 0.5,
+          "repo_count": 3
+        },
+        "docker": {
+          "confidence": 0.4,
+          "repo_count": 3
+        }
+      },
+      "interests": {
+        "data-engineering": 0.9,
+        "databases": 0.6
+      },
+      "candidates": [
+        {
+          "repository": "bench/airflow-providers-x",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/dbt-utils-plus",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/sparkline-etl",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/polars-io",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/kafka-stream-py",
+          "best_search_rank": 7
+        },
+        {
+          "repository": "bench/pandas-profiler",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/sqlmigrate-py",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/django-formkit",
+          "best_search_rank": 9
+        },
+        {
+          "repository": "bench/ml-trainer",
+          "best_search_rank": 8
+        },
+        {
+          "repository": "bench/fastapi-pagination-x",
+          "best_search_rank": 10
+        },
+        {
+          "repository": "bench/pyfmt-cli",
+          "best_search_rank": 11
+        }
+      ],
+      "judgments": {
+        "bench/airflow-providers-x": 2,
+        "bench/dbt-utils-plus": 2,
+        "bench/sparkline-etl": 2,
+        "bench/polars-io": 1,
+        "bench/kafka-stream-py": 1,
+        "bench/pandas-profiler": 2,
+        "bench/sqlmigrate-py": 1,
+        "bench/django-formkit": 0,
+        "bench/ml-trainer": 0,
+        "bench/fastapi-pagination-x": 0,
+        "bench/pyfmt-cli": 0
+      }
+    },
+    {
+      "id": "dev-go-infra",
+      "description": "Experienced Go infrastructure engineer: Kubernetes, Docker, Prometheus and Terraform; wants cloud-native and DevOps tooling.",
+      "experience_level": "experienced",
+      "skills": {
+        "go": {
+          "confidence": 0.93,
+          "repo_count": 9
+        },
+        "kubernetes": {
+          "confidence": 0.8,
+          "repo_count": 5
+        },
+        "docker": {
+          "confidence": 0.75,
+          "repo_count": 6
+        },
+        "prometheus": {
+          "confidence": 0.6,
+          "repo_count": 3
+        },
+        "terraform": {
+          "confidence": 0.55,
+          "repo_count": 3
+        },
+        "helm": {
+          "confidence": 0.5,
+          "repo_count": 2
+        },
+        "grpc": {
+          "confidence": 0.5,
+          "repo_count": 2
+        },
+        "linux": {
+          "confidence": 0.5,
+          "repo_count": 4
+        },
+        "shell": {
+          "confidence": 0.5,
+          "repo_count": 4
+        }
+      },
+      "interests": {
+        "infrastructure-cloud": 0.85,
+        "devops": 0.8
+      },
+      "candidates": [
+        {
+          "repository": "bench/k8s-operator-kit",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/prom-exporter-x",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/terraform-provider-y",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/helm-charts-hub",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/go-grpc-gateway",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/ci-runner-go",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/tokio-rpc",
+          "best_search_rank": 8
+        },
+        {
+          "repository": "bench/airflow-providers-x",
+          "best_search_rank": 9
+        },
+        {
+          "repository": "bench/express-rate-limit-x",
+          "best_search_rank": 10
+        },
+        {
+          "repository": "bench/rustfs-kernel",
+          "best_search_rank": 7
+        }
+      ],
+      "judgments": {
+        "bench/k8s-operator-kit": 2,
+        "bench/prom-exporter-x": 2,
+        "bench/terraform-provider-y": 2,
+        "bench/helm-charts-hub": 1,
+        "bench/go-grpc-gateway": 1,
+        "bench/ci-runner-go": 2,
+        "bench/tokio-rpc": 0,
+        "bench/airflow-providers-x": 0,
+        "bench/express-rate-limit-x": 0,
+        "bench/rustfs-kernel": 0
+      }
+    },
+    {
+      "id": "dev-beginner",
+      "description": "Beginner web developer: plain JavaScript, HTML and CSS from a course, a little Python; wants first contributions to welcoming web projects.",
+      "experience_level": "beginner",
+      "skills": {
+        "javascript": {
+          "confidence": 0.45,
+          "repo_count": 3
+        },
+        "html": {
+          "confidence": 0.5,
+          "repo_count": 3
+        },
+        "css": {
+          "confidence": 0.5,
+          "repo_count": 3
+        },
+        "python": {
+          "confidence": 0.2,
+          "repo_count": 1
+        }
+      },
+      "interests": {
+        "web-development": 0.7,
+        "education": 0.4,
+        "open-source": 0.3
+      },
+      "candidates": [
+        {
+          "repository": "bench/learn-web-exercises",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/js-todo-app",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/css-art-gallery",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/portfolio-template",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/react-table-kit",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/next-blog-starter",
+          "best_search_rank": 7
+        },
+        {
+          "repository": "bench/eslint-plugin-a11y",
+          "best_search_rank": 8
+        },
+        {
+          "repository": "bench/express-rate-limit-x",
+          "best_search_rank": 9
+        },
+        {
+          "repository": "bench/unity-platformer",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/tailwind-ui-blocks",
+          "best_search_rank": 10
+        }
+      ],
+      "judgments": {
+        "bench/learn-web-exercises": 2,
+        "bench/js-todo-app": 2,
+        "bench/css-art-gallery": 2,
+        "bench/portfolio-template": 1,
+        "bench/react-table-kit": 0,
+        "bench/next-blog-starter": 1,
+        "bench/eslint-plugin-a11y": 0,
+        "bench/express-rate-limit-x": 0,
+        "bench/unity-platformer": 0,
+        "bench/tailwind-ui-blocks": 1
+      }
+    }
+  ]
+}

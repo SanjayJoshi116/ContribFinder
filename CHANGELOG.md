@@ -7,6 +7,56 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-14
+
+Phase 8b: Recommendation evaluation (OpenSpec change `phase-8b-evaluation`; SRS-2 §30, §61). Offline
+and deterministic: no GitHub, LLM or embedding calls, no API, model or migration changes.
+
+### Added
+
+- Benchmark dataset format (JSON, format 1): benchmark developers as frozen matching inputs
+  (skills, interests, experience level), a candidate pool per developer (repository data, activity
+  snapshot, search rank, eligible issues with their analysis) and graded judgments (0, 1, 2).
+  Loading validates the whole file and names the developer and field of every error.
+- Seed benchmark `apps/backend/evaluation/benchmark-v1.json`: six persona developers (Django
+  backend, React/TypeScript frontend, Rust systems, data engineer, Go infrastructure, beginner web)
+  over 40 fictional `bench/` repositories, judged from the persona descriptions before any
+  evaluation run. No real GitHub user data.
+- Metrics: Precision@5, Precision@10, Recall@10, MRR and NDCG@10 (gain `2^grade - 1`) per
+  developer and as the mean over developers, plus unjudged results in the top 10.
+- `evaluate_ranking` command: scores stored configurations and unsaved ones from a JSON file
+  against a dataset, prints dataset-level metrics with deltas against the first (baseline)
+  configuration and every developer's top 10; `--json` report; `--require-improvement` exits
+  non-zero unless NDCG@10 is higher and no other metric drops by more than `--tolerance` (0.01).
+- `export_benchmark_developer` command: exports one user's stored features and candidate pool as
+  an anonymized, unjudged benchmark developer (no username, email, GitHub id or token).
+- Regression baseline `apps/backend/evaluation/baselines.json` (pinned min score 0.10, top N 50):
+  a test recomputes v1 and v2 metrics on `benchmark-v1` and fails when the ranking moves;
+  `evaluate_ranking --write-baseline` updates it deliberately.
+
+### Changed
+
+- Recommendation generation ranks through `services/ranking/pipeline.rank_pool`, the stage
+  evaluation also uses. Behavior is unchanged (a parity test compares the two).
+
+### Benchmark results (`benchmark-v1`)
+
+| Config | P@5 | P@10 | R@10 | MRR | NDCG@10 |
+|---|---|---|---|---|---|
+| v1-deterministic | 0.9333 | 0.6333 | 0.9276 | 1.0000 | 0.9459 |
+| v2-deterministic | 0.9000 | 0.6500 | 0.9554 | 1.0000 | 0.9654 |
+
+Under the improvement rule, v2 is **not** an improvement over v1: NDCG@10 rises (+0.0195) but
+Precision@5 drops by 0.0333 (an off-topic repository with open issues enters two personas' top 5).
+v2 stays active; this is recorded, not tuned, in this release.
+
+### Known limitations
+
+- The seed judgments come from persona descriptions, not real developers; add real exports to
+  strengthen the benchmark.
+- Evaluation covers repository ranking only: issue-level relevance, discovery (which repositories
+  enter the pool) and feedback-based online metrics are not measured.
+
 ## [0.7.0] - 2026-10-13
 
 Phase 7: Issues (OpenSpec change `phase-7-issues`; FR-ISSUE-001..005, MVP+). Issue analysis and
@@ -439,7 +489,9 @@ Phase 1: Foundation (OpenSpec change `phase-1-foundation`; FR-AUTH-001..003).
 - The API contract version (`/api/v1`, OpenAPI `1.0.0`) is versioned separately from the app
   version.
 
-[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.3.0...v0.4.0

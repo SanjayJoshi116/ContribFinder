@@ -1,14 +1,13 @@
 """Recommendation generation (spec: recommendation-engine; design D7).
 
-Stages run in memory on stored data: load → technologies → signals → issue matching (for
-candidates that pass the relevance gate) → score → rank → explain.
+Stages run in memory on stored data: load → ``rank_pool`` (technologies → signals → issue
+matching for candidates that pass the relevance gate → score → rank) → explain.
 The result replaces the developer's recommendations in one transaction, upserted per
 repository so ids survive regenerations. No GitHub or AI calls.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -28,15 +27,15 @@ from recommendations.models import (
 )
 from services.errors import PermanentJobError
 from services.github.sync import JobCancelled
-from services.matching import signals as sig
-from services.matching.features import DeveloperFeatures, RepoData, load_candidates, load_developer
-from services.matching.issues import NO_MATCH, MatchedIssue, load_issues, match_issues
+from services.matching.features import DeveloperFeatures, load_candidates, load_developer
+from services.matching.issues import MatchedIssue, load_issues
 from services.matching.issues import snapshot as issue_snapshot
-from services.matching.technologies import Tech, repository_technologies
+from services.matching.technologies import Tech
 
 from . import config as scoring_config
 from .explain import reasons
-from .score import Scored, has_relevance, rank, score_candidate
+from .pipeline import rank_pool
+from .score import Scored
 
 STEP = "recommendations"
 Step = SyncJob.StepState
@@ -101,8 +100,12 @@ class RecommendationService:
             dev = load_developer(profile)
             candidates = load_candidates(profile)
             self._check_cancelled()
-            kept = rank(
-                self._score(candidates, dev, config, now),
+            kept = rank_pool(
+                dev,
+                candidates,
+                config.weights,
+                config.params,
+                lambda ids: load_issues(ids, now, settings.ISSUE_MAX_AGE_DAYS),
                 min_score=settings.RECOMMENDATION_MIN_SCORE,
                 top_n=settings.RECOMMENDATIONS_TOP_N,
             )
@@ -122,42 +125,6 @@ class RecommendationService:
         }
         self.job.steps = {**self.job.steps, STEP: str(Step.DONE)}
         self.job.save(update_fields=["metadata", "steps", "updated_at"])
-
-    def _score(
-        self,
-        candidates: list[RepoData],
-        dev: DeveloperFeatures,
-        config: ScoringConfig,
-        now: datetime,
-    ) -> Iterator[Scored]:
-        """Repository signals for every candidate; issue matching only for those that pass
-        the relevance gate, with their eligible issues loaded in one query."""
-        computed = []
-        for repo in candidates:
-            techs = repository_technologies(
-                repo.languages, repo.topics, repo.dependencies, config.params["tech_sources"]
-            )
-            computed.append((repo, techs, sig.compute(repo, techs, dev, config.params)))
-        issue_params = config.params.get("issues")
-        issues = (
-            load_issues(
-                [repo.id for repo, _, signals in computed if has_relevance(signals)],
-                now,
-                settings.ISSUE_MAX_AGE_DAYS,
-            )
-            if issue_params
-            else {}
-        )
-        for repo, techs, signals in computed:
-            match = (
-                match_issues(issues[repo.id], dev, issue_params) if repo.id in issues else NO_MATCH
-            )
-            signals = {
-                **signals,
-                "issue_fit": match.issue_fit,
-                "difficulty_fit": match.difficulty_fit,
-            }
-            yield score_candidate(repo, techs, signals, config.weights, config.params, match)
 
     def _persist(
         self,
