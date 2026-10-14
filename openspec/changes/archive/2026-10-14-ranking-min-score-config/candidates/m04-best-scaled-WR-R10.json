@@ -1,0 +1,77 @@
+{
+  "weights": {
+    "skill": 0.4,
+    "language": 0.2,
+    "interest": 0.15,
+    "framework": 0.1,
+    "activity": 0.05,
+    "openness": 0.0,
+    "issue_fit": 0.05,
+    "difficulty_fit": 0.05
+  },
+  "params": {
+    "bands": {
+      "strong": 0.55,
+      "good": 0.35
+    },
+    "activity": {
+      "recently_active": 1.0,
+      "moderately_active": 0.6,
+      "low_activity": 0.2
+    },
+    "openness": {
+      "contributing": 0.4,
+      "good_first_issue": 0.3,
+      "help_wanted": 0.2,
+      "issue_templates": 0.1
+    },
+    "tech_sources": {
+      "dependency": 1.0,
+      "topic": 0.6
+    },
+    "issues": {
+      "weights": {
+        "technology": 0.6,
+        "difficulty": 0.25,
+        "approachability": 0.15
+      },
+      "min_score": 0.3,
+      "per_recommendation": 5,
+      "saturation": 3.0,
+      "approachability": {
+        "good_first_issue": 1.0,
+        "help_wanted": 0.6
+      },
+      "difficulty_fit": {
+        "beginner": {
+          "beginner": 1.0,
+          "intermediate": 0.5,
+          "advanced": 0.0,
+          "unknown": 0.3
+        },
+        "intermediate": {
+          "beginner": 0.7,
+          "intermediate": 1.0,
+          "advanced": 0.5,
+          "unknown": 0.4
+        },
+        "experienced": {
+          "beginner": 0.4,
+          "intermediate": 0.8,
+          "advanced": 1.0,
+          "unknown": 0.5
+        },
+        "unknown": {
+          "beginner": 0.8,
+          "intermediate": 0.7,
+          "advanced": 0.4,
+          "unknown": 0.4
+        }
+      },
+      "difficulty_fit_mode": "best"
+    },
+    "relevance_scaling": true,
+    "min_score": 0.1,
+    "min_score_basis": "relevance"
+  }
+}

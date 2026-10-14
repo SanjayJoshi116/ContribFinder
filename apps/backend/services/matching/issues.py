@@ -16,6 +16,7 @@ from typing import Any
 
 from issues.models import Difficulty, Issue
 from services.profiling.taxonomy import SKILLS_BY_SLUG
+from services.ranking.config import DIFFICULTY_FIT_BEST, DIFFICULTY_FIT_WEIGHTED
 
 from .features import DeveloperFeatures
 from .signals import ZERO, Signal, signal_of
@@ -213,16 +214,23 @@ def match_issues(
     known = [level for level in LEVELS[:3] if by_difficulty[level]]
     if known:
         best = max(known, key=lambda level: (table[level], by_difficulty[level]))
-        difficulty_fit = signal_of(
-            float(table[best]),
-            [
-                {
-                    "best": str(best),
-                    "count": by_difficulty[best],
-                    "by_difficulty": {str(k): v for k, v in sorted(by_difficulty.items())},
-                }
-            ],
-        )
+        evidence: dict[str, Any] = {
+            "best": str(best),
+            "count": by_difficulty[best],
+            "by_difficulty": {str(k): v for k, v in sorted(by_difficulty.items())},
+        }
+        mode = params.get("difficulty_fit_mode", DIFFICULTY_FIT_BEST)
+        if mode == DIFFICULTY_FIT_WEIGHTED:
+            # Score-weighted mean fit of the issues with known difficulty, scaled by issue fit:
+            # one weak fitting issue no longer counts like several good ones.
+            fitting = [m for m in kept if m.issue.difficulty in known]
+            total = sum(m.score for m in fitting)
+            mean = sum(table[m.issue.difficulty] * m.score for m in fitting) / total if total else 0
+            value = mean * issue_fit.value
+            evidence |= {"mode": DIFFICULTY_FIT_WEIGHTED, "mean": round(mean, 4)}
+        else:
+            value = float(table[best])
+        difficulty_fit = signal_of(value, [evidence])
     else:
         difficulty_fit = ZERO
 

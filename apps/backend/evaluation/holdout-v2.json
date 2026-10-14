@@ -1,0 +1,1241 @@
+{
+  "format": 1,
+  "name": "holdout-v2",
+  "description": "Fresh acceptance holdout for ranking-min-score-config: four persona developers not in benchmark-v1 or holdout-v1, with weak-but-relevant candidates near the minimum score and busy off-topic candidates with open issues. Judgments written from the persona descriptions before any candidate of that change was evaluated. No real GitHub user data.",
+  "repositories": {
+    "bench/unity-platformer": {
+      "description": "Open-source 2D platformer made with Unity",
+      "languages": [
+        [
+          "C#",
+          300000
+        ]
+      ],
+      "topics": [
+        "unity",
+        "game",
+        "gamedev",
+        "hacktoberfest"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 90
+      },
+      "issues": [
+        {
+          "number": 1001,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "csharp",
+            "unity"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/react-table-kit": {
+      "description": "Headless table and data grid hooks for React",
+      "languages": [
+        [
+          "TypeScript",
+          260000
+        ]
+      ],
+      "topics": [
+        "react",
+        "table",
+        "ui"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "react"
+        ],
+        [
+          "npm",
+          "typescript"
+        ],
+        [
+          "npm",
+          "vite"
+        ],
+        [
+          "npm",
+          "jest"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 60
+      },
+      "issues": [
+        {
+          "number": 410,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "react",
+            "typescript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 415,
+          "labels": [
+            "bug"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "intermediate",
+          "technologies": [
+            "react"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/svelte-charts": {
+      "description": "Composable charts for Svelte",
+      "languages": [
+        [
+          "JavaScript",
+          30000
+        ],
+        [
+          "Svelte",
+          25000
+        ]
+      ],
+      "topics": [
+        "svelte",
+        "charts",
+        "visualization"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "svelte"
+        ],
+        [
+          "npm",
+          "d3"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": []
+    },
+    "bench/ci-runner-go": {
+      "description": "Self-hosted CI runner that executes jobs in Docker containers",
+      "languages": [
+        [
+          "Go",
+          95000
+        ],
+        [
+          "Dockerfile",
+          2000
+        ]
+      ],
+      "topics": [
+        "ci",
+        "devops",
+        "docker"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 25,
+        "commits_90d": 15,
+        "prs_merged_90d": 4,
+        "contributors": 12
+      },
+      "issues": [
+        {
+          "number": 91,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "devops",
+          "difficulty": "intermediate",
+          "technologies": [
+            "docker",
+            "go"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/learn-web-exercises": {
+      "description": "Beginner exercises for learning HTML, CSS and JavaScript",
+      "languages": [
+        [
+          "HTML",
+          40000
+        ],
+        [
+          "CSS",
+          20000
+        ],
+        [
+          "JavaScript",
+          15000
+        ]
+      ],
+      "topics": [
+        "education",
+        "tutorial",
+        "web",
+        "hacktoberfest"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 120
+      },
+      "issues": [
+        {
+          "number": 501,
+          "labels": [
+            "good_first_issue",
+            "documentation"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "javascript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        },
+        {
+          "number": 502,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "javascript"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/react-native-camera-x": {
+      "description": "Camera module for React Native apps",
+      "languages": [
+        [
+          "TypeScript",
+          120000
+        ],
+        [
+          "Kotlin",
+          30000
+        ]
+      ],
+      "topics": [
+        "react-native",
+        "camera",
+        "mobile"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "react-native"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 70
+      },
+      "issues": [
+        {
+          "number": 900,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "react-native"
+          ],
+          "updated_at": "2026-09-25T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/ml-trainer": {
+      "description": "Training loop utilities for deep learning experiments with PyTorch",
+      "languages": [
+        [
+          "Python",
+          210000
+        ]
+      ],
+      "topics": [
+        "machine-learning",
+        "deep-learning",
+        "pytorch"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "torch"
+        ],
+        [
+          "pypi",
+          "numpy"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 3,
+        "commits_90d": 60,
+        "prs_merged_90d": 20,
+        "contributors": 80
+      },
+      "issues": [
+        {
+          "number": 301,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "pytorch"
+          ],
+          "updated_at": "2026-09-20T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/aspnet-minimal-auth": {
+      "description": "Authentication and authorization helpers for ASP.NET Core minimal APIs",
+      "languages": [
+        [
+          "C#",
+          150000
+        ]
+      ],
+      "topics": [
+        "aspnetcore",
+        "dotnet",
+        "authentication"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 2,
+        "commits_90d": 70,
+        "prs_merged_90d": 25,
+        "contributors": 35
+      },
+      "issues": [
+        {
+          "number": 51,
+          "labels": [
+            "enhancement"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "intermediate",
+          "technologies": [
+            "dotnet",
+            "csharp"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/efcore-bulk-x": {
+      "description": "Bulk insert and update extensions for Entity Framework Core on SQL Server",
+      "languages": [
+        [
+          "C#",
+          90000
+        ]
+      ],
+      "topics": [
+        "dotnet",
+        "entity-framework",
+        "sql-server"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 30,
+        "commits_90d": 12,
+        "prs_merged_90d": 3,
+        "contributors": 10
+      },
+      "issues": [
+        {
+          "number": 12,
+          "labels": [
+            "bug"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "intermediate",
+          "technologies": [
+            "csharp"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/dotnet-cli-templates": {
+      "description": "Project templates for .NET web services",
+      "languages": [
+        [
+          "C#",
+          20000
+        ],
+        [
+          "PowerShell",
+          3000
+        ]
+      ],
+      "topics": [
+        "dotnet",
+        "templates"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 180,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": []
+    },
+    "bench/blazor-charts-lite": {
+      "description": "Small chart components for Blazor, mostly TypeScript interop",
+      "languages": [
+        [
+          "TypeScript",
+          60000
+        ],
+        [
+          "C#",
+          9000
+        ]
+      ],
+      "topics": [
+        "blazor",
+        "charts"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "typescript"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 30,
+        "commits_90d": 12,
+        "prs_merged_90d": 3,
+        "contributors": 10
+      },
+      "issues": []
+    },
+    "bench/laravel-first-steps": {
+      "description": "Beginner-friendly Laravel example app with guided issues",
+      "languages": [
+        [
+          "PHP",
+          60000
+        ],
+        [
+          "Blade",
+          15000
+        ]
+      ],
+      "topics": [
+        "laravel",
+        "php",
+        "education",
+        "hacktoberfest"
+      ],
+      "dependencies": [],
+      "has_contributing": true,
+      "has_issue_templates": true,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 2,
+        "commits_90d": 70,
+        "prs_merged_90d": 25,
+        "contributors": 60
+      },
+      "issues": [
+        {
+          "number": 301,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "documentation",
+          "difficulty": "beginner",
+          "technologies": [
+            "laravel"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        },
+        {
+          "number": 305,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "php"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/php-validation-kit": {
+      "description": "Input validation rules for plain PHP projects",
+      "languages": [
+        [
+          "PHP",
+          30000
+        ]
+      ],
+      "topics": [
+        "php",
+        "validation"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 180,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": []
+    },
+    "bench/wp-contact-block": {
+      "description": "WordPress contact form block, mostly JavaScript with a small PHP part",
+      "languages": [
+        [
+          "JavaScript",
+          45000
+        ],
+        [
+          "PHP",
+          5000
+        ],
+        [
+          "CSS",
+          4000
+        ]
+      ],
+      "topics": [
+        "wordpress",
+        "block"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 30,
+        "commits_90d": 12,
+        "prs_merged_90d": 3,
+        "contributors": 10
+      },
+      "issues": [
+        {
+          "number": 22,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "javascript"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/symfony-messenger-x": {
+      "description": "Extra transports for Symfony Messenger",
+      "languages": [
+        [
+          "PHP",
+          80000
+        ]
+      ],
+      "topics": [
+        "symfony",
+        "php",
+        "messaging"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 2,
+        "commits_90d": 70,
+        "prs_merged_90d": 25,
+        "contributors": 25
+      },
+      "issues": [
+        {
+          "number": 9,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "advanced",
+          "technologies": [
+            "symfony"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/d3-annotation-kit": {
+      "description": "Annotation layers for D3 charts",
+      "languages": [
+        [
+          "JavaScript",
+          70000
+        ]
+      ],
+      "topics": [
+        "d3",
+        "visualization",
+        "charts"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "d3"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 30,
+        "commits_90d": 12,
+        "prs_merged_90d": 3,
+        "contributors": 10
+      },
+      "issues": [
+        {
+          "number": 40,
+          "labels": [
+            "help_wanted"
+          ],
+          "contribution_type": "feature",
+          "difficulty": "advanced",
+          "technologies": [
+            "d3",
+            "javascript"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/geo-maps-js": {
+      "description": "Map projections and choropleth helpers on D3",
+      "languages": [
+        [
+          "JavaScript",
+          50000
+        ],
+        [
+          "TypeScript",
+          10000
+        ]
+      ],
+      "topics": [
+        "d3",
+        "maps",
+        "geo",
+        "visualization"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "d3"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 180,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": []
+    },
+    "bench/three-scene-kit": {
+      "description": "Scene helpers for three.js, with a small data plotting module",
+      "languages": [
+        [
+          "JavaScript",
+          120000
+        ]
+      ],
+      "topics": [
+        "threejs",
+        "webgl",
+        "3d"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "three"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 2,
+        "commits_90d": 70,
+        "prs_merged_90d": 25,
+        "contributors": 45
+      },
+      "issues": []
+    },
+    "bench/ansible-hardening": {
+      "description": "Ansible roles for Linux server hardening",
+      "languages": [
+        [
+          "Python",
+          20000
+        ],
+        [
+          "Shell",
+          5000
+        ]
+      ],
+      "topics": [
+        "ansible",
+        "security",
+        "linux",
+        "devops"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "ansible"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "low_activity",
+        "days_since_push": 180,
+        "commits_90d": 1,
+        "prs_merged_90d": 0,
+        "contributors": 3
+      },
+      "issues": [
+        {
+          "number": 17,
+          "labels": [
+            "bug"
+          ],
+          "contribution_type": "bug_fix",
+          "difficulty": "intermediate",
+          "technologies": [
+            "ansible"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/ansible-lint-rules-x": {
+      "description": "Extra rules for ansible-lint",
+      "languages": [
+        [
+          "Python",
+          35000
+        ]
+      ],
+      "topics": [
+        "ansible",
+        "linter",
+        "devops"
+      ],
+      "dependencies": [
+        [
+          "pypi",
+          "ansible-core"
+        ]
+      ],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 30,
+        "commits_90d": 12,
+        "prs_merged_90d": 3,
+        "contributors": 10
+      },
+      "issues": [
+        {
+          "number": 28,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "ansible",
+            "python"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    },
+    "bench/shell-backup-scripts": {
+      "description": "Backup and rotation scripts for small servers",
+      "languages": [
+        [
+          "Shell",
+          15000
+        ]
+      ],
+      "topics": [
+        "backup",
+        "sysadmin"
+      ],
+      "dependencies": [],
+      "has_contributing": false,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": false,
+      "has_help_wanted_label": false,
+      "snapshot": {
+        "activity_label": "moderately_active",
+        "days_since_push": 30,
+        "commits_90d": 12,
+        "prs_merged_90d": 3,
+        "contributors": 10
+      },
+      "issues": []
+    },
+    "bench/k8s-dashboard-ui": {
+      "description": "Web dashboard for Kubernetes clusters, built with React",
+      "languages": [
+        [
+          "TypeScript",
+          200000
+        ],
+        [
+          "Go",
+          20000
+        ]
+      ],
+      "topics": [
+        "kubernetes",
+        "dashboard",
+        "react"
+      ],
+      "dependencies": [
+        [
+          "npm",
+          "react"
+        ]
+      ],
+      "has_contributing": true,
+      "has_issue_templates": false,
+      "has_good_first_issue_label": true,
+      "has_help_wanted_label": true,
+      "snapshot": {
+        "activity_label": "recently_active",
+        "days_since_push": 2,
+        "commits_90d": 70,
+        "prs_merged_90d": 25,
+        "contributors": 90
+      },
+      "issues": [
+        {
+          "number": 700,
+          "labels": [
+            "good_first_issue"
+          ],
+          "contribution_type": "code",
+          "difficulty": "beginner",
+          "technologies": [
+            "react",
+            "typescript"
+          ],
+          "updated_at": "2026-10-01T12:00:00+00:00"
+        }
+      ]
+    }
+  },
+  "developers": [
+    {
+      "id": "h2-dotnet",
+      "description": "Intermediate C# backend developer: ASP.NET Core web APIs on SQL Server; wants .NET backend libraries, not games or frontend.",
+      "experience_level": "intermediate",
+      "skills": {
+        "csharp": {
+          "confidence": 0.9,
+          "repo_count": 7
+        },
+        "dotnet": {
+          "confidence": 0.8,
+          "repo_count": 5
+        },
+        "sql-server": {
+          "confidence": 0.5,
+          "repo_count": 3
+        },
+        "docker": {
+          "confidence": 0.3,
+          "repo_count": 2
+        },
+        "typescript": {
+          "confidence": 0.25,
+          "repo_count": 1
+        }
+      },
+      "interests": {
+        "web-development": 0.6,
+        "databases": 0.4
+      },
+      "candidates": [
+        {
+          "repository": "bench/aspnet-minimal-auth",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/efcore-bulk-x",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/dotnet-cli-templates",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/blazor-charts-lite",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/unity-platformer",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/react-table-kit",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/ci-runner-go",
+          "best_search_rank": 7
+        }
+      ],
+      "judgments": {
+        "bench/aspnet-minimal-auth": 2,
+        "bench/efcore-bulk-x": 2,
+        "bench/dotnet-cli-templates": 1,
+        "bench/blazor-charts-lite": 1,
+        "bench/unity-platformer": 0,
+        "bench/react-table-kit": 0,
+        "bench/ci-runner-go": 0
+      }
+    },
+    {
+      "id": "h2-php-beginner",
+      "description": "Beginner PHP developer: one Laravel course project and some WordPress tinkering; wants first contributions in PHP.",
+      "experience_level": "beginner",
+      "skills": {
+        "php": {
+          "confidence": 0.45,
+          "repo_count": 2
+        },
+        "laravel": {
+          "confidence": 0.35,
+          "repo_count": 1
+        },
+        "javascript": {
+          "confidence": 0.2,
+          "repo_count": 1
+        },
+        "css": {
+          "confidence": 0.2,
+          "repo_count": 1
+        }
+      },
+      "interests": {
+        "web-development": 0.5,
+        "education": 0.4,
+        "open-source": 0.3
+      },
+      "candidates": [
+        {
+          "repository": "bench/laravel-first-steps",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/php-validation-kit",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/wp-contact-block",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/symfony-messenger-x",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/learn-web-exercises",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/react-native-camera-x",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/unity-platformer",
+          "best_search_rank": 7
+        }
+      ],
+      "judgments": {
+        "bench/laravel-first-steps": 2,
+        "bench/php-validation-kit": 1,
+        "bench/wp-contact-block": 1,
+        "bench/symfony-messenger-x": 1,
+        "bench/learn-web-exercises": 0,
+        "bench/react-native-camera-x": 0,
+        "bench/unity-platformer": 0
+      }
+    },
+    {
+      "id": "h2-dataviz",
+      "description": "Experienced data-visualization developer: D3 and JavaScript, some Svelte and TypeScript; wants charting and mapping libraries.",
+      "experience_level": "experienced",
+      "skills": {
+        "d3": {
+          "confidence": 0.85,
+          "repo_count": 6
+        },
+        "javascript": {
+          "confidence": 0.9,
+          "repo_count": 8
+        },
+        "typescript": {
+          "confidence": 0.5,
+          "repo_count": 3
+        },
+        "svelte": {
+          "confidence": 0.4,
+          "repo_count": 2
+        },
+        "css": {
+          "confidence": 0.5,
+          "repo_count": 5
+        }
+      },
+      "interests": {
+        "web-development": 0.6
+      },
+      "candidates": [
+        {
+          "repository": "bench/d3-annotation-kit",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/geo-maps-js",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/svelte-charts",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/three-scene-kit",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/react-table-kit",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/k8s-dashboard-ui",
+          "best_search_rank": 6
+        },
+        {
+          "repository": "bench/react-native-camera-x",
+          "best_search_rank": 7
+        }
+      ],
+      "judgments": {
+        "bench/d3-annotation-kit": 2,
+        "bench/geo-maps-js": 2,
+        "bench/svelte-charts": 1,
+        "bench/three-scene-kit": 1,
+        "bench/react-table-kit": 0,
+        "bench/k8s-dashboard-ui": 0,
+        "bench/react-native-camera-x": 0
+      }
+    },
+    {
+      "id": "h2-ansible",
+      "description": "Intermediate DevOps engineer: Ansible and Python automation for Linux servers, shell scripting; wants configuration-management tooling, including quiet projects.",
+      "experience_level": "intermediate",
+      "skills": {
+        "ansible": {
+          "confidence": 0.8,
+          "repo_count": 5
+        },
+        "python": {
+          "confidence": 0.6,
+          "repo_count": 4
+        },
+        "linux": {
+          "confidence": 0.6,
+          "repo_count": 5
+        },
+        "shell": {
+          "confidence": 0.55,
+          "repo_count": 4
+        },
+        "docker": {
+          "confidence": 0.4,
+          "repo_count": 2
+        }
+      },
+      "interests": {
+        "devops": 0.8,
+        "security": 0.4,
+        "infrastructure-cloud": 0.4
+      },
+      "candidates": [
+        {
+          "repository": "bench/ansible-hardening",
+          "best_search_rank": 3
+        },
+        {
+          "repository": "bench/ansible-lint-rules-x",
+          "best_search_rank": 1
+        },
+        {
+          "repository": "bench/shell-backup-scripts",
+          "best_search_rank": 4
+        },
+        {
+          "repository": "bench/ci-runner-go",
+          "best_search_rank": 2
+        },
+        {
+          "repository": "bench/k8s-dashboard-ui",
+          "best_search_rank": 5
+        },
+        {
+          "repository": "bench/ml-trainer",
+          "best_search_rank": 6
+        }
+      ],
+      "judgments": {
+        "bench/ansible-hardening": 2,
+        "bench/ansible-lint-rules-x": 2,
+        "bench/shell-backup-scripts": 1,
+        "bench/ci-runner-go": 1,
+        "bench/k8s-dashboard-ui": 0,
+        "bench/ml-trainer": 0
+      }
+    }
+  ]
+}

@@ -28,6 +28,12 @@ ISSUE_WEIGHT_KEYS = ("technology", "difficulty", "approachability")
 APPROACHABILITY_KEYS = ("good_first_issue", "help_wanted")
 EXPERIENCE_LEVELS = ("beginner", "intermediate", "experienced", "unknown")
 DIFFICULTIES = ("beginner", "intermediate", "advanced", "unknown")
+# Optional (absent = v2 behavior): ``issues.difficulty_fit_mode`` and ``relevance_scaling``.
+DIFFICULTY_FIT_BEST = "best"
+DIFFICULTY_FIT_WEIGHTED = "weighted"
+DIFFICULTY_FIT_MODES = (DIFFICULTY_FIT_BEST, DIFFICULTY_FIT_WEIGHTED)
+# Optional: ``min_score`` (0..1) and ``min_score_basis``; absent = the installation setting.
+MIN_SCORE_BASES = ("score", "relevance")
 
 V1_VERSION = "v1-deterministic"
 V1_WEIGHTS: dict[str, float] = {
@@ -124,6 +130,10 @@ def _issue_params(value: Any, errors: list[str]) -> None:
     if not _is_number(saturation) or saturation <= 0:
         errors.append("issues.saturation must be a number above 0")
     _unit_map(value.get("approachability"), APPROACHABILITY_KEYS, "issues.approachability", errors)
+    if "difficulty_fit_mode" in value and value["difficulty_fit_mode"] not in DIFFICULTY_FIT_MODES:
+        errors.append(
+            f"issues.difficulty_fit_mode must be one of {', '.join(DIFFICULTY_FIT_MODES)}"
+        )
     table = value.get("difficulty_fit")
     if not isinstance(table, Mapping) or set(table) != set(EXPERIENCE_LEVELS):
         errors.append(
@@ -162,4 +172,15 @@ def validate(weights: Any, params: Any, *, stored: bool = False) -> list[str]:
     _unit_map(params.get("tech_sources"), TECH_SOURCE_KEYS, "tech_sources", errors)
     if not legacy or "issues" in params:
         _issue_params(params.get("issues"), errors)
+    if "relevance_scaling" in params and not isinstance(params["relevance_scaling"], bool):
+        errors.append("relevance_scaling must be true or false")
+    if "min_score" in params:
+        value = params["min_score"]
+        if not _is_number(value) or not 0 <= value <= 1:
+            errors.append("min_score must be a number between 0 and 1")
+    if "min_score_basis" in params:
+        if "min_score" not in params:
+            errors.append("min_score_basis requires min_score")
+        elif params["min_score_basis"] not in MIN_SCORE_BASES:
+            errors.append(f"min_score_basis must be one of {', '.join(MIN_SCORE_BASES)}")
     return errors

@@ -1,0 +1,5181 @@
+[
+  {
+    "config": "v1-deterministic",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6333,
+      "recall@10": 0.9276,
+      "mrr": 1.0,
+      "ndcg@10": 0.9459
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9773
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9963
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 0.8333,
+          "mrr": 1.0,
+          "ndcg@10": 0.9435
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "v2-deterministic",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9,
+      "precision@10": 0.65,
+      "recall@10": 0.9554,
+      "mrr": 1.0,
+      "ndcg@10": 0.9654
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9734
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.886
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.998
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.9573
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9775
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c01-best-plain-WR.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9425
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9948
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c02-best-plain-WB.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9,
+      "precision@10": 0.6333,
+      "recall@10": 0.9276,
+      "mrr": 1.0,
+      "ndcg@10": 0.9587
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9734
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.886
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.998
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.9573
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 0.8333,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c03-best-plain-WI.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8333,
+      "precision@10": 0.65,
+      "recall@10": 0.9554,
+      "mrr": 1.0,
+      "ndcg@10": 0.956
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9716
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.8394
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.998
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.9538
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9734
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c04-best-scaled-W2.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9427
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9977
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7944
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c05-best-scaled-WR.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6333,
+      "recall@10": 0.9206,
+      "mrr": 1.0,
+      "ndcg@10": 0.9485
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9977
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.8,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8296
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c06-best-scaled-WB.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9427
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9977
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7944
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c07-best-scaled-WI.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9576
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9977
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.8843
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c08-weighted-plain-W2.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9,
+      "precision@10": 0.6333,
+      "recall@10": 0.9276,
+      "mrr": 1.0,
+      "ndcg@10": 0.9582
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9734
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.8807
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.998
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.9593
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 0.8333,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c09-weighted-plain-WR.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.94
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9802
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c10-weighted-plain-WB.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9542
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9773
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.886
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.998
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c11-weighted-plain-WI.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9,
+      "precision@10": 0.65,
+      "recall@10": 0.9554,
+      "mrr": 1.0,
+      "ndcg@10": 0.9645
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9734
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.8807
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.998
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.9573
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9775
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c12-weighted-scaled-W2.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9397
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9802
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7944
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c13-weighted-scaled-WR.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6333,
+      "recall@10": 0.9206,
+      "mrr": 1.0,
+      "ndcg@10": 0.9485
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9977
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.8,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8296
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c14-weighted-scaled-WB.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9397
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9802
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7944
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c15-weighted-scaled-WI.json",
+    "dataset": "benchmark-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.9333,
+      "precision@10": 0.6167,
+      "recall@10": 0.8998,
+      "mrr": 1.0,
+      "ndcg@10": 0.9397
+    },
+    "developers": [
+      {
+        "id": "dev-django",
+        "ranked": 9,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9802
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-tasks-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-frontend",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.7,
+          "recall@10": 0.875,
+          "mrr": 1.0,
+          "ndcg@10": 0.7944
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tailwind-ui-blocks",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/next-blog-starter",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vite-plugin-icons",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-rust",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.7,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/rust-lint-tool",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/rustfs-kernel",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/serde-yaml-ng",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/tokio-rpc",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/wasm-image",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/polars-io",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/zig-allocators",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-data",
+        "ranked": 11,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 0.8571,
+          "mrr": 1.0,
+          "ndcg@10": 0.962
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/airflow-providers-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sparkline-etl",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/dbt-utils-plus",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/kafka-stream-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sqlmigrate-py",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/django-formkit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "dev-go-infra",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/k8s-operator-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ci-runner-go",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/terraform-provider-y",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/prom-exporter-x",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/helm-charts-hub",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "dev-beginner",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.6667,
+          "mrr": 1.0,
+          "ndcg@10": 0.9018
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/js-todo-app",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/css-art-gallery",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/portfolio-template",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/eslint-plugin-a11y",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/express-rate-limit-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  }
+]

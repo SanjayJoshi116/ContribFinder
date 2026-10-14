@@ -8,6 +8,7 @@ from services.evaluation.dataset import parse
 from services.evaluation.metrics import METRICS
 from services.evaluation.runner import (
     ConfigError,
+    ConfigSpec,
     Report,
     active_config,
     compare,
@@ -88,3 +89,16 @@ def test_drop_within_tolerance() -> None:
     candidate = report("new", **{"ndcg@10": 0.6, "precision@5": 0.495, "mrr": 0.49})
     (verdict,) = compare(report("base"), [candidate])
     assert verdict.improvement
+
+
+def test_configuration_minimum_and_override() -> None:
+    dataset = parse(minimal())
+    strict = ConfigSpec("strict", V2_WEIGHTS, {**V2_PARAMS, "min_score": 0.99})
+    own = evaluate(dataset, strict, min_score=0.1, top_n=50)
+    assert own.min_score == 0.99 and not own.min_score_overridden
+    assert own.developers[0].ranked == 0  # nothing reaches 0.99
+    forced = evaluate(dataset, strict, min_score=0.1, top_n=50, override=True)
+    assert forced.min_score == 0.1 and forced.min_score_overridden
+    assert forced.developers[0].ranked == 1
+    data = forced.as_dict()
+    assert data["min_score_overridden"] is True and data["min_score_basis"] == "score"

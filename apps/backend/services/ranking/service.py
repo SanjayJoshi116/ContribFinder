@@ -224,7 +224,7 @@ class RecommendationService:
                     position=index,
                 )
                 for s in kept
-                for index, reason in enumerate(reasons(s.signals, config.weights))
+                for index, reason in enumerate(reasons(s.signals, config.weights, config.params))
             )
             RecommendedIssue.objects.filter(recommendation__developer=profile).delete()
             RecommendedIssue.objects.bulk_create(

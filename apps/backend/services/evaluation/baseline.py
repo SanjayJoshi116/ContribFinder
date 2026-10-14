@@ -14,7 +14,7 @@ from .runner import Report
 
 BASELINES = DATASETS_DIR / "baselines.json"
 # Pinned so that a local .env (RECOMMENDATION_MIN_SCORE, RECOMMENDATIONS_TOP_N) cannot change
-# the recorded numbers.
+# the recorded numbers. MIN_SCORE is the default; a configuration's own min_score wins.
 MIN_SCORE = 0.10
 TOP_N = 50
 
@@ -25,11 +25,28 @@ def read(path: Path = BASELINES) -> dict[str, Any]:
 
 
 def write(reports: Sequence[Report], path: Path = BASELINES) -> None:
-    first = reports[0]
+    """Format 2: each configuration's effective minimum score and basis next to its metrics."""
     data = {
-        "dataset": first.dataset,
-        "min_score": first.min_score,
-        "top_n": first.top_n,
-        "configs": {r.config: r.metrics for r in reports},
+        "format": 2,
+        "dataset": reports[0].dataset,
+        "top_n": reports[0].top_n,
+        "configs": {
+            r.config: {
+                "min_score": r.min_score,
+                "min_score_basis": r.min_score_basis,
+                "metrics": r.metrics,
+            }
+            for r in reports
+        },
     }
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def entries(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """``{version: {min_score, min_score_basis, metrics}}`` from format 1 or 2."""
+    if data.get("format", 1) == 1:
+        return {
+            version: {"min_score": data["min_score"], "min_score_basis": "score", "metrics": m}
+            for version, m in data["configs"].items()
+        }
+    return dict(data["configs"])

@@ -223,10 +223,36 @@ Evaluation
   [x] Generation and evaluation share one ranking stage (rank_pool)
 
 ============================================================================
+SHIPPED - v0.9.0 - Ranking experiment: v3 candidates (MVP+)
+============================================================================
+
+Evaluation
+  [x] Holdout benchmark holdout-v1 (acceptance only); replacement rule for the active config
+  [x] 15 predeclared v3 candidates evaluated and recorded; none qualified, v2 stays active
+
+Scoring options (off in stored configurations)
+  [x] issues.difficulty_fit_mode: best | weighted
+  [x] relevance_scaling: offer signals scaled by relevance strength
+
+============================================================================
+SHIPPED - v0.10.0 - Ranking experiment: configuration minimum score (MVP+)
+============================================================================
+
+Scoring
+  [x] min_score and min_score_basis (score | relevance) in the scoring configuration
+  [x] evaluate_ranking --min-score as an explicit override; effective values in reports
+  [x] baselines.json format 2
+
+Evaluation
+  [x] Fresh holdout holdout-v2; rule against reusing a seen holdout
+  [x] 16 candidates re-run; none qualified, v2 stays active (diagnosis in RESULTS.md)
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Benchmark from real, hand-judged developer exports; issue-level evaluation
+  [ ]          Review benchmark-v1 judgments (real hand-judged developers) before more tuning
   [ ]          Personalized ranking, notifications, contribution tracking

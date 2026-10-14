@@ -79,16 +79,20 @@ class DeveloperResult:
 class Report:
     config: str
     dataset: str
-    min_score: float
+    min_score: float  # effective: the configuration's own unless overridden
     top_n: int
     metrics: dict[str, float]  # dataset-level means, rounded
     developers: tuple[DeveloperResult, ...]
+    min_score_basis: str = "score"
+    min_score_overridden: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "config": self.config,
             "dataset": self.dataset,
             "min_score": self.min_score,
+            "min_score_basis": self.min_score_basis,
+            "min_score_overridden": self.min_score_overridden,
             "top_n": self.top_n,
             "metrics": self.metrics,
             "developers": [
@@ -110,7 +114,18 @@ def _issues_from(
     return lambda ids: {i: issues[i] for i in ids if i in issues}
 
 
-def evaluate(dataset: Dataset, spec: ConfigSpec, *, min_score: float, top_n: int) -> Report:
+def evaluate(
+    dataset: Dataset,
+    spec: ConfigSpec,
+    *,
+    min_score: float,
+    top_n: int,
+    override: bool = False,
+) -> Report:
+    """Rank and score every developer. ``min_score`` is the default, as in generation: a
+    configuration's own ``min_score`` wins, unless ``override`` forces ``min_score`` on it."""
+    params = {**spec.params, "min_score": min_score} if override else spec.params
+    effective = params.get("min_score", min_score)
     results = []
     per_developer = []
     for dev in dataset.developers:
@@ -118,7 +133,7 @@ def evaluate(dataset: Dataset, spec: ConfigSpec, *, min_score: float, top_n: int
             dev.features,
             dev.candidates,
             spec.weights,
-            spec.params,
+            params,
             _issues_from(dev.issues),
             min_score=min_score,
             top_n=top_n,
@@ -138,10 +153,12 @@ def evaluate(dataset: Dataset, spec: ConfigSpec, *, min_score: float, top_n: int
     return Report(
         config=spec.label,
         dataset=dataset.name,
-        min_score=min_score,
+        min_score=effective,
         top_n=top_n,
         metrics=metrics.mean(per_developer),
         developers=tuple(results),
+        min_score_basis=params.get("min_score_basis", "score"),
+        min_score_overridden=override,
     )
 
 

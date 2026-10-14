@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.8.0** (Phase 8b: Recommendation evaluation, MVP+). After signing in with
+**Version 0.10.0** (ranking experiments: configuration minimum score; no new ranking adopted; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -112,6 +112,22 @@ the baseline, deltas in parentheses) and every developer's top 10 with judgments
 `--json OUT` writes the full report. A configuration counts as an **improvement** only when its
 NDCG@10 is higher than the baseline's and no other metric drops by more than `--tolerance`
 (0.01); `--require-improvement` exits non-zero otherwise.
+
+Holdout datasets (`evaluation/holdout-v1.json`, `holdout-v2.json`, four other personas each)
+guard against tuning to the benchmark: pass one with `--dataset`. A new configuration replaces the
+active one only when it is an improvement over every stored configuration on `benchmark-v1` and
+does not regress on the current acceptance holdout by more than the tolerance; a holdout never
+chooses between candidates. Once a search has recorded results on a holdout, it cannot accept a
+later search's candidate: both existing holdouts are used, so the next search adds `holdout-v3`.
+
+Configurations can opt into these scoring options (no stored configuration uses them yet):
+`params.issues.difficulty_fit_mode: "weighted"` (difficulty fit grows with the number and quality
+of fitting issues instead of one fitting issue scoring 1.0) and `params.relevance_scaling: true`
+(activity, openness and the issue signals count in proportion to how relevant the project is),
+plus their own minimum score: `params.min_score` with `params.min_score_basis` `"score"` (the
+whole score) or `"relevance"` (the skill, language, framework and interest part only). Without
+them, `RECOMMENDATION_MIN_SCORE` applies. `evaluate_ranking --min-score` overrides every
+configuration's minimum and says so in the output.
 
 `evaluation/baselines.json` records the stored configurations' metrics, and a test fails when
 they move. After an intended ranking change, run `npm run manage -- evaluate_ranking

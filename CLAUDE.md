@@ -106,7 +106,9 @@ ContribFinder/
 │  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
 │  │  │                     saved and dismissed API (Phase 8a)
 │  │  ├─ embeddings/        (Phase 6, future)
-│  │  ├─ evaluation/        data only: benchmark-v1.json (seed benchmark), baselines.json
+│  │  ├─ evaluation/        data only: benchmark-v1.json (seed benchmark), holdout-v1.json and
+│  │  │                     holdout-v2.json (acceptance only, never for choosing; both used, so
+│  │  │                     the next search adds holdout-v3), baselines.json (format 2)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError), feedback.py (record, save,
 │  │     │                  dismiss, restore), data_deletion.py (GitHub data / account deletion)
@@ -187,7 +189,10 @@ Local, no Docker (primary on this machine):
 - `npm run manage -- evaluate_ranking --config <v1> --config <v2>` scores configurations on the
   benchmark (`apps/backend/evaluation/`); a ranking change is an improvement only if it wins there
   (README "Evaluating a ranking change"). After an intended ranking change, rerun with
-  `--write-baseline` and commit `baselines.json`, or the baseline test fails.
+  `--write-baseline` and commit `baselines.json`, or the baseline test fails. A new config also
+  must not regress on a fresh acceptance holdout (`holdout-v1`/`-v2` are used; add `holdout-v3`
+  first; spec `recommendation-evaluation`). A config's own `min_score` wins over the setting;
+  `--min-score` overrides it.
 
 Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
 `REDIS_URL` with container hostnames; Postgres is on host port 5433.
@@ -562,6 +567,30 @@ Deviations from the sketch below, as built:
 Sketch:
 - Fixed benchmark developers with hand-labeled relevant repos; compute Precision@5/10,
   Recall@10, MRR and NDCG per ScoringConfig. A ranking change counts as an improvement only if it wins here.
+
+**Ranking experiment — v3 candidates** (MVP+)  ✅ shipped in v0.9.0 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-14-ranking-v3-deterministic/` (results in
+`candidates/RESULTS.md`). Specs: deltas to `recommendation-engine` and `recommendation-evaluation`.
+- Added `holdout-v1` (acceptance only) and the replacement rule; optional parameters
+  `issues.difficulty_fit_mode` (`best`/`weighted`) and `relevance_scaling`, off in v1/v2.
+- 15 predeclared candidates; none beat both v1 and v2 on `benchmark-v1`, so no v3 was seeded and v2
+  stays active. Relevance scaling fixed the off-topic top-5 problem but pushed weak relevant
+  repositories under the global `RECOMMENDATION_MIN_SCORE`.
+- Carry-over: closed by the next experiment below (its diagnosis also corrects this one's).
+
+**Ranking experiment — configuration minimum score** (MVP+)  ✅ shipped in v0.10.0 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-14-ranking-min-score-config/` (results in
+`candidates/RESULTS.md`). Specs: deltas to `recommendation-engine` and `recommendation-evaluation`.
+- Added `params.min_score` / `min_score_basis` (`score` | `relevance`; absent = setting),
+  `evaluate_ranking --min-score` as override, `baselines.json` format 2, fresh `holdout-v2` and the
+  rule that a seen holdout cannot accept a later search (next search adds `holdout-v3`).
+- 16 candidates; none qualified on `benchmark-v1` and each matched its v3 base exactly: the minimum
+  score was never the constraint. The repositories relevance scaling drops for dev-beginner have a
+  relevance part near 0.008 and are judged 1; both holdouts favor the candidates.
+- Carry-over: review `benchmark-v1` judgments (ideally real hand-judged developers through
+  `export_benchmark_developer`) in its own change before any further ranking search.
 
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 

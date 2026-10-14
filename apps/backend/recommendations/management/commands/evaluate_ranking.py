@@ -53,7 +53,12 @@ class Command(BaseCommand):
             help="Exit non-zero unless every configuration after the first improves on it.",
         )
         parser.add_argument("--tolerance", type=float, default=DEFAULT_TOLERANCE)
-        parser.add_argument("--min-score", type=float, help="Default: RECOMMENDATION_MIN_SCORE.")
+        parser.add_argument(
+            "--min-score",
+            type=float,
+            help="Override every configuration's minimum score. Default: each configuration's "
+            "own min_score, else RECOMMENDATION_MIN_SCORE.",
+        )
         parser.add_argument("--top-n", type=int, help="Default: RECOMMENDATIONS_TOP_N.")
         parser.add_argument(
             "--write-baseline",
@@ -69,12 +74,16 @@ class Command(BaseCommand):
         except (DatasetError, ConfigError) as exc:
             raise CommandError(str(exc)) from exc
         pinned = options["write_baseline"]
+        override = options["min_score"] is not None
         min_score = options["min_score"]
         if min_score is None:
             min_score = baseline.MIN_SCORE if pinned else settings.RECOMMENDATION_MIN_SCORE
         top_n = options["top_n"] or (baseline.TOP_N if pinned else settings.RECOMMENDATIONS_TOP_N)
 
-        reports = [evaluate(dataset, spec, min_score=min_score, top_n=top_n) for spec in specs]
+        reports = [
+            evaluate(dataset, spec, min_score=min_score, top_n=top_n, override=override)
+            for spec in specs
+        ]
         self._print(dataset.name, len(dataset.developers), reports)
 
         if options["json"]:
@@ -115,10 +124,14 @@ class Command(BaseCommand):
 
     def _print(self, dataset: str, developers: int, reports: list[Report]) -> None:
         first = reports[0]
-        self.stdout.write(
-            f"Dataset {dataset}: {developers} developers; "
-            f"min score {first.min_score}, top N {first.top_n}\n"
-        )
+        self.stdout.write(f"Dataset {dataset}: {developers} developers; top N {first.top_n}")
+        for report in reports:
+            source = "overridden" if report.min_score_overridden else "configuration or default"
+            self.stdout.write(
+                f"  {report.config}: min score {report.min_score} on {report.min_score_basis} "
+                f"({source})"
+            )
+        self.stdout.write("")
         width = max(len(r.config) for r in reports)
         self.stdout.write(f"{'config':<{width}}  " + "  ".join(f"{m:>17}" for m in METRICS))
         for report in reports:

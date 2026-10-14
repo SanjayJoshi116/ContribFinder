@@ -1,0 +1,3114 @@
+[
+  {
+    "config": "v2-deterministic",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9342
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8995
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8995
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c01-best-plain-WR.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9678
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9383
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c02-best-plain-WB.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9509
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9306
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9352
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c03-best-plain-WI.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9342
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8995
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8995
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c04-best-scaled-W2.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.85,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9701
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 5,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9475
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c05-best-scaled-WR.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9371
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 4,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8155
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c06-best-scaled-WB.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9361
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 4,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8116
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c07-best-scaled-WI.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9688
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9422
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c08-weighted-plain-W2.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.942
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9306
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8995
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c09-weighted-plain-WR.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9678
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9383
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c10-weighted-plain-WB.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9581
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8995
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c11-weighted-plain-WI.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.942
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9306
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/unity-platformer",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8995
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c12-weighted-scaled-W2.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.85,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9701
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 5,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9475
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c13-weighted-scaled-WR.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9371
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 4,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8155
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c14-weighted-scaled-WB.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.8,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9361
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 4,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.6,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.8116
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "config": "G:\\Projects\\ContribFinder\\openspec\\changes\\ranking-v3-deterministic\\candidates\\c15-weighted-scaled-WI.json",
+    "dataset": "holdout-v1",
+    "min_score": 0.1,
+    "top_n": 50,
+    "metrics": {
+      "precision@5": 0.85,
+      "precision@10": 0.475,
+      "recall@10": 0.95,
+      "mrr": 1.0,
+      "ndcg@10": 0.9701
+    },
+    "developers": [
+      {
+        "id": "hold-java",
+        "ranked": 6,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 0.8,
+          "mrr": 1.0,
+          "ndcg@10": 0.9377
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/spring-batch-kit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hibernate-audit",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/junit-extensions-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/jvm-metrics-agent",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/go-grpc-gateway",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/drf-filters",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-ml",
+        "ranked": 10,
+        "metrics": {
+          "precision@5": 1.0,
+          "precision@10": 0.6,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 1.0
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/hf-dataset-tools",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/sklearn-pipelines",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pandas-profiler",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/notebook-lint",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/flask-auth-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-py-beginner",
+        "ranked": 7,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.5,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9951
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/python-beginner-katas",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/flask-todo-tutorial",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/pyfmt-cli",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/ml-trainer",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/fastapi-pagination-x",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/torch-vision-extras",
+            "judgment": 0
+          }
+        ]
+      },
+      {
+        "id": "hold-vue",
+        "ranked": 8,
+        "metrics": {
+          "precision@5": 0.8,
+          "precision@10": 0.4,
+          "recall@10": 1.0,
+          "mrr": 1.0,
+          "ndcg@10": 0.9475
+        },
+        "unjudged_top10": 0,
+        "top10": [
+          {
+            "repository": "bench/vue-forms",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/vue-i18n-tools",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/vue-datepicker-lite",
+            "judgment": 2
+          },
+          {
+            "repository": "bench/learn-web-exercises",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/svelte-charts",
+            "judgment": 1
+          },
+          {
+            "repository": "bench/react-table-kit",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/llm-chat-ui",
+            "judgment": 0
+          },
+          {
+            "repository": "bench/react-native-camera-x",
+            "judgment": 0
+          }
+        ]
+      }
+    ]
+  }
+]

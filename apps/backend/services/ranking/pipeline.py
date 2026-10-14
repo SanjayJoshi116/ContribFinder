@@ -15,7 +15,7 @@ from services.matching.features import DeveloperFeatures, RepoData
 from services.matching.issues import NO_MATCH, IssueFeature, match_issues
 from services.matching.technologies import repository_technologies
 
-from .score import Scored, has_relevance, rank, score_candidate
+from .score import BASIS_SCORE, Scored, has_relevance, rank, score_candidate
 
 IssuesFor = Callable[[Sequence[int]], Mapping[int, Iterable[IssueFeature]]]
 
@@ -32,7 +32,8 @@ def rank_pool(
 ) -> list[Scored]:
     """Rank a developer's candidates under one configuration. ``issues_for`` is called once,
     with the ids of the candidates that pass the relevance gate, and only when the
-    configuration matches issues (v1 does not)."""
+    configuration matches issues (v1 does not). ``min_score`` is the installation default: a
+    configuration's own ``min_score`` (and ``min_score_basis``) wins."""
     computed = []
     for repo in candidates:
         techs = repository_technologies(
@@ -50,4 +51,9 @@ def rank_pool(
         match = match_issues(issues[repo.id], dev, issue_params) if repo.id in issues else NO_MATCH
         signals = {**signals, "issue_fit": match.issue_fit, "difficulty_fit": match.difficulty_fit}
         scored.append(score_candidate(repo, techs, signals, weights, params, match))
-    return rank(scored, min_score=min_score, top_n=top_n)
+    return rank(
+        scored,
+        min_score=params.get("min_score", min_score),
+        top_n=top_n,
+        basis=params.get("min_score_basis", BASIS_SCORE),
+    )

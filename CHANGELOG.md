@@ -7,6 +7,98 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-14
+
+Ranking experiment (OpenSpec change `ranking-min-score-config`): the minimum score moves into the
+scoring configuration and the relevance-scaled v3 candidates are re-run with it. **No candidate
+qualified, so there is no ranking change: `v2-deterministic` stays active and v1/v2 score
+bit-for-bit as before.** Full results:
+`openspec/changes/archive/2026-10-14-ranking-min-score-config/candidates/RESULTS.md`.
+
+### Added
+
+- Configuration minimum score: `params.min_score` (0..1) with `params.min_score_basis` `score`
+  (whole score) or `relevance` (skill, language, framework and interest contributions only, which
+  relevance scaling never changes). Without them, `RECOMMENDATION_MIN_SCORE` applies. Generation
+  and evaluation resolve it the same way; validation rejects out-of-range values, unknown bases and
+  a basis without a minimum.
+- `evaluate_ranking --min-score` is now an explicit override of every configuration's minimum;
+  the output and the JSON report show each configuration's effective minimum, basis and whether it
+  was overridden.
+- Fresh acceptance holdout `apps/backend/evaluation/holdout-v2.json`: four persona developers
+  (C#/.NET, PHP/Laravel beginner, D3 data visualization, Ansible DevOps), with weak-but-relevant
+  candidates near the cut and busy off-topic ones, hashed before any candidate ran.
+- Holdout rule: a holdout whose results for a search were recorded cannot accept a later search's
+  candidate. `holdout-v1` and `holdout-v2` are both used; the next search adds `holdout-v3`.
+
+### Changed
+
+- `baselines.json` format 2: each configuration's effective minimum score and basis next to its
+  metrics (v1/v2 values unchanged; the baseline test reads formats 1 and 2).
+
+### Experiment results
+
+16 predeclared candidates (the eight relevance-scaled v3 candidates × {min score 0.05 on score,
+0.10 on relevance}). None was an improvement over both v1 and v2 on `benchmark-v1`; every one
+scored exactly like its v3 base.
+
+- **Correction to 0.9.0:** relevance scaling does not collide with the minimum score. The two
+  relevant repositories it drops for the beginner persona have a relevance part near 0.008; under
+  v2 they reach the list only because activity, openness and issue signals lift them over 0.10.
+  v2's Recall@10 advantage on `benchmark-v1` rests on those two judgments.
+- On the fresh `holdout-v2` every candidate beats v2 (Precision@5 +0.10, NDCG@10 up to +0.0193, no
+  recall loss), and `holdout-v1` agrees. Holdouts only accept or reject, so nothing was activated.
+
+### Known limitations
+
+- Next step is data, not tuning: review `benchmark-v1`'s judgments, preferably by adding real,
+  hand-judged developers via `export_benchmark_developer`, in a change of its own.
+
+## [0.9.0] - 2026-10-14
+
+Ranking experiment (OpenSpec change `ranking-v3-deterministic`): an attempt to find a
+`v3-deterministic` that beats v2 on the benchmark. **No candidate qualified, so there is no ranking
+change: `v2-deterministic` stays active and v1/v2 score bit-for-bit as before.** Full results:
+`openspec/changes/archive/2026-10-14-ranking-v3-deterministic/candidates/RESULTS.md`.
+
+### Added
+
+- Holdout benchmark `apps/backend/evaluation/holdout-v1.json`: four persona developers (Java/Spring,
+  Python ML, beginner Python, Vue) over 27 fictional repositories, judged before any candidate
+  was evaluated and used only to accept or reject a configuration, never to choose one.
+- Replacement rule (spec `recommendation-evaluation`): a configuration replaces the active one only
+  when it improves on every stored configuration on `benchmark-v1` and does not regress on
+  `holdout-v1` beyond the tolerance.
+- Optional scoring parameters, off in every stored configuration:
+  - `params.issues.difficulty_fit_mode`: `best` (default, v2 behavior) or `weighted` (score-weighted
+    mean fit of the relevant issues, scaled by issue fit, so one weak fitting issue no longer
+    scores 1.0);
+  - `params.relevance_scaling`: activity, openness, issue fit and difficulty fit count in proportion
+    to the candidate's relevance strength (weighted mean of skill, language, framework, interest).
+  Reason weights follow the same (scaled) contributions as the score. Unknown values are rejected
+  by validation.
+
+### Experiment results
+
+15 predeclared candidates (difficulty mode × relevance scaling × 4 weight vectors) on
+`benchmark-v1`; none was an improvement over both v1 and v2.
+
+- Relevance scaling fixes the targeted failure (off-topic repositories leave the Django persona's
+  top 5; Precision@5 reaches 0.9333 for every scaled candidate) but collides with the global
+  `RECOMMENDATION_MIN_SCORE` (0.10): weak but relevant repositories fall under it, and Recall@10
+  drops to 0.8998–0.9206 (v2: 0.9554).
+- Weighted difficulty fit alone barely changes the rankings (best: `c11`, ties v2 except NDCG@10
+  −0.0009).
+- On `holdout-v1` (recorded after the choice) no candidate regresses against v2 and the scaled
+  ones gain up to +0.0359 NDCG@10; the holdout has few weak matches near the minimum score.
+
+### Known limitations
+
+- Next step: make the minimum score part of the scoring configuration (or apply it to the
+  relevance part only) and re-run the scaled candidates in a new change with its own grid.
+- Holdout and benchmark judgments are by the same author; real hand-judged exports would be
+  stronger evidence.
+
 ## [0.8.0] - 2026-10-14
 
 Phase 8b: Recommendation evaluation (OpenSpec change `phase-8b-evaluation`; SRS-2 §30, §61). Offline
@@ -489,7 +581,9 @@ Phase 1: Foundation (OpenSpec change `phase-1-foundation`; FR-AUTH-001..003).
 - The API contract version (`/api/v1`, OpenAPI `1.0.0`) is versioned separately from the app
   version.
 
-[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.5.0...v0.6.0
