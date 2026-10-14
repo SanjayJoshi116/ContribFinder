@@ -9,6 +9,7 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from issues.models import ContributionType, Difficulty, RecommendedIssue
 from jobs.serializers import SyncJobSerializer
 from repositories.models import ActivityLabel, Repository, RepositorySnapshot
 from repositories.serializers import CandidateRepositorySerializer
@@ -40,6 +41,51 @@ class ReasonSerializer(serializers.ModelSerializer[RecommendationReason]):
     class Meta:
         model = RecommendationReason
         fields = ["type", "text", "detail"]
+        read_only_fields = fields
+
+
+class IssueReasonSerializer(serializers.Serializer[dict[str, Any]]):
+    type = serializers.ChoiceField(choices=["technology", "difficulty", "approachability"])
+    text = serializers.CharField()
+    detail = serializers.DictField()
+
+
+class RelevantIssueSerializer(serializers.ModelSerializer[RecommendedIssue]):
+    """A relevant issue of a recommendation, without its internal score."""
+
+    id = serializers.IntegerField(source="issue.id", read_only=True)
+    number = serializers.IntegerField(source="issue.number", read_only=True)
+    title = serializers.CharField(source="issue.title", read_only=True)
+    url = serializers.URLField(source="issue.html_url", read_only=True)
+    labels = serializers.ListField(
+        child=serializers.CharField(),
+        source="issue.labels",
+        read_only=True,
+        help_text="Canonical label categories (ContribFinder analysis).",
+    )
+    contribution_type = serializers.ChoiceField(
+        choices=ContributionType.choices, source="issue.contribution_type", read_only=True
+    )
+    difficulty = serializers.ChoiceField(
+        choices=Difficulty.choices,
+        source="issue.difficulty",
+        read_only=True,
+        help_text="Estimated; unknown when the evidence is not enough.",
+    )
+    reasons = IssueReasonSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = RecommendedIssue
+        fields = [
+            "id",
+            "number",
+            "title",
+            "url",
+            "labels",
+            "contribution_type",
+            "difficulty",
+            "reasons",
+        ]
         read_only_fields = fields
 
 
@@ -87,6 +133,7 @@ class RecommendationSerializer(serializers.ModelSerializer[Recommendation]):
     size = serializers.ChoiceField(choices=RepositorySize.choices, read_only=True)
     openness = OpennessSerializer(source="repository", read_only=True)
     saved = serializers.BooleanField(read_only=True, help_text="Whether the user saved it.")
+    relevant_issue_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Recommendation
@@ -101,6 +148,7 @@ class RecommendationSerializer(serializers.ModelSerializer[Recommendation]):
             "size",
             "openness",
             "saved",
+            "relevant_issue_count",
             "generated_at",
         ]
         read_only_fields = fields
@@ -130,6 +178,9 @@ class RecommendationDetailSerializer(RecommendationSerializer):
     languages = serializers.SerializerMethodField()
     readme_excerpt = serializers.SerializerMethodField()
     activity_signals = serializers.SerializerMethodField()
+    issues = RelevantIssueSerializer(
+        source="recommended_issues", many=True, read_only=True, help_text="Best first."
+    )
 
     class Meta(RecommendationSerializer.Meta):
         fields = [
@@ -137,6 +188,7 @@ class RecommendationDetailSerializer(RecommendationSerializer):
             "languages",
             "readme_excerpt",
             "activity_signals",
+            "issues",
         ]
         read_only_fields = fields
 

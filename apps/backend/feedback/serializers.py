@@ -11,14 +11,26 @@ from repositories.models import ActivityLabel
 from repositories.serializers import CandidateRepositorySerializer
 from services.feedback import CLIENT_ACTIONS
 
-from .models import DismissedRepository, SavedRepository
+from .models import DismissedRepository, FeedbackAction, SavedRepository
 
 
-class FeedbackSerializer(serializers.Serializer[dict[str, str]]):
+class FeedbackSerializer(serializers.Serializer[dict[str, Any]]):
     action = serializers.ChoiceField(
         choices=[str(action) for action in CLIENT_ACTIONS],
         help_text="Saves and dismissals are recorded by their own endpoints.",
     )
+    issue_id = serializers.IntegerField(
+        required=False,
+        help_text="Required for opened_issue: one of the recommendation's relevant issues.",
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        opened_issue = attrs["action"] == FeedbackAction.OPENED_ISSUE
+        if opened_issue and attrs.get("issue_id") is None:
+            raise serializers.ValidationError({"issue_id": "Required for opened_issue."})
+        if not opened_issue and "issue_id" in attrs:
+            raise serializers.ValidationError({"issue_id": "Only allowed for opened_issue."})
+        return attrs
 
 
 class SaveResultSerializer(serializers.Serializer[dict[str, bool]]):

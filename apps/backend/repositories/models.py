@@ -82,6 +82,9 @@ class Repository(models.Model):
     community_synced_at = models.DateTimeField(null=True, blank=True)
     dependencies_synced_at = models.DateTimeField(null=True, blank=True)
     activity_synced_at = models.DateTimeField(null=True, blank=True)
+    issues_synced_at = models.DateTimeField(null=True, blank=True)
+    # The last issue fetch stopped at ISSUES_MAX_PAGES: older open issues were not stored.
+    issues_truncated = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = "repositories"

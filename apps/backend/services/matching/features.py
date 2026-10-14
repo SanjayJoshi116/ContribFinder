@@ -24,6 +24,7 @@ class SkillFeature:
 class DeveloperFeatures:
     skills: dict[str, SkillFeature]
     interests: dict[str, tuple[str, float]]  # slug -> (name, strength)
+    experience_level: str = "unknown"  # internal: issue difficulty fit only, never shown
 
     def confidence(self, slug: str) -> float:
         skill = self.skills.get(slug)
@@ -68,6 +69,7 @@ def load_developer(profile: DeveloperProfile) -> DeveloperFeatures:
             for s in skills
         },
         interests={i.interest.slug: (i.interest.name, i.strength) for i in interests},
+        experience_level=profile.experience_level,
     )
 
 

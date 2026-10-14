@@ -78,7 +78,7 @@ def test_feedback_survives_recommendation_and_repository_deletion(user, recs) ->
     Repository.objects.filter(pk=event.repository_id).delete()
     event.refresh_from_db()
     assert event.repository is None
-    assert event.config_version == "v1-deterministic"
+    assert event.config_version == "v2-deterministic"
 
 
 def test_saves_dismissals_and_feedback_cascade_with_the_user(user, recs) -> None:

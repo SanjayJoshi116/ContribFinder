@@ -202,6 +202,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/issues/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['issues_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/profile': {
     parameters: {
       query?: never
@@ -548,6 +564,19 @@ export interface components {
      * @enum {string}
      */
     CategoryEnum: 'language' | 'framework' | 'library' | 'database' | 'cloud' | 'devops' | 'tool'
+    /**
+     * @description * `code` - Code
+     *     * `documentation` - Documentation
+     *     * `testing` - Testing
+     *     * `bug_fix` - Bug Fix
+     *     * `feature` - Feature
+     *     * `devops` - Devops
+     *     * `design` - Design
+     *     * `unknown` - Unknown
+     * @enum {string}
+     */
+    ContributionTypeEnum:
+      'code' | 'documentation' | 'testing' | 'bug_fix' | 'feature' | 'devops' | 'design' | 'unknown'
     DeveloperInterest: {
       readonly id: number
       readonly interest: components['schemas']['Interest']
@@ -563,7 +592,7 @@ export interface components {
       readonly summary: string
       readonly languages: components['schemas']['ProfileLanguage'][]
       readonly preferred_project_size: components['schemas']['PreferredProjectSizeEnum']
-      readonly preferred_issue_difficulty: components['schemas']['PreferredIssueDifficultyEnum']
+      readonly preferred_issue_difficulty: components['schemas']['DifficultyEnum']
       /** Format: date-time */
       readonly analyzed_at: string
       readonly skill_count: number
@@ -578,6 +607,14 @@ export interface components {
       readonly evidence_summary: components['schemas']['EvidenceSummary']
       readonly evidence: components['schemas']['SkillEvidence'][]
     }
+    /**
+     * @description * `beginner` - Beginner
+     *     * `intermediate` - Intermediate
+     *     * `advanced` - Advanced
+     *     * `unknown` - Unknown
+     * @enum {string}
+     */
+    DifficultyEnum: 'beginner' | 'intermediate' | 'advanced' | 'unknown'
     DisconnectResult: {
       /**
        * @description Whether GitHub confirmed revocation. Local credentials are deleted either way.
@@ -632,6 +669,8 @@ export interface components {
        *     * `opened_issue` - opened_issue
        */
       action: components['schemas']['ActionEnum']
+      /** @description Required for opened_issue: one of the recommendation's relevant issues. */
+      issue_id?: number
     }
     /** @description Synced GitHub profile. The README body is not included here (Phase 3 analyses it). */
     GitHubProfile: {
@@ -683,6 +722,83 @@ export interface components {
      * @enum {string}
      */
     InterestEvidenceSourceEnum: 'readme' | 'repo_description' | 'topic' | 'contribution'
+    IssueAnalysis: {
+      /** @description Canonical label categories. */
+      labels: string[]
+      contribution_type: components['schemas']['ContributionTypeEnum']
+      contribution_type_evidence: {
+        [key: string]: unknown
+      }
+      /**
+       * @description Estimated; unknown when the evidence is not enough.
+       *
+       *     * `beginner` - Beginner
+       *     * `intermediate` - Intermediate
+       *     * `advanced` - Advanced
+       *     * `unknown` - Unknown
+       */
+      difficulty: components['schemas']['DifficultyEnum']
+      difficulty_evidence: {
+        [key: string]: unknown
+      }
+      readonly technologies: components['schemas']['IssueTechnology'][]
+      reasons: components['schemas']['IssueReason'][]
+      recommendation: components['schemas']['IssueRecommendation']
+    }
+    IssueDetail: {
+      id: number
+      github: components['schemas']['IssueGitHub']
+      analysis: components['schemas']['IssueAnalysis']
+    }
+    /** @description As GitHub sent it. ``body`` is plain text: render it escaped, never as HTML. */
+    IssueGitHub: {
+      repository_full_name: string
+      number: number
+      title: string
+      body: string
+      labels: string[]
+      state: string
+      comments: number
+      /** Format: date-time */
+      created_at: string | null
+      /** Format: date-time */
+      updated_at: string | null
+      /** Format: uri */
+      url: string
+    }
+    IssueReason: {
+      type: components['schemas']['IssueReasonTypeEnum']
+      text: string
+      detail: {
+        [key: string]: unknown
+      }
+    }
+    /**
+     * @description * `technology` - technology
+     *     * `difficulty` - difficulty
+     *     * `approachability` - approachability
+     * @enum {string}
+     */
+    IssueReasonTypeEnum: 'technology' | 'difficulty' | 'approachability'
+    IssueRecommendation: {
+      id: number
+      repository_full_name: string
+      match_label: components['schemas']['MatchLabelEnum']
+    }
+    IssueTechnology: {
+      slug: string
+      name: string
+      source: components['schemas']['IssueTechnologySourceEnum']
+      /** @description The developer has demonstrated it. */
+      matched: boolean
+    }
+    /**
+     * @description * `title` - title
+     *     * `label` - label
+     *     * `body` - body
+     * @enum {string}
+     */
+    IssueTechnologySourceEnum: 'title' | 'label' | 'body'
     /**
      * @description * `github_profile_sync` - Github Profile Sync
      *     * `profile_analysis` - Profile Analysis
@@ -864,14 +980,6 @@ export interface components {
       }
     }
     /**
-     * @description * `beginner` - Beginner
-     *     * `intermediate` - Intermediate
-     *     * `advanced` - Advanced
-     *     * `unknown` - Unknown
-     * @enum {string}
-     */
-    PreferredIssueDifficultyEnum: 'beginner' | 'intermediate' | 'advanced' | 'unknown'
-    /**
      * @description * `any` - Any
      *     * `small` - Small
      *     * `medium` - Medium
@@ -887,10 +995,30 @@ export interface components {
       repo_count: number
     }
     Reason: {
-      readonly type: components['schemas']['TypeEnum']
+      readonly type: components['schemas']['ReasonTypeEnum']
       readonly text: string
       readonly detail: unknown
     }
+    /**
+     * @description * `skill` - Skill
+     *     * `language` - Language
+     *     * `framework` - Framework
+     *     * `interest` - Interest
+     *     * `activity` - Activity
+     *     * `openness` - Openness
+     *     * `issue_availability` - Issue Availability
+     *     * `difficulty` - Difficulty
+     * @enum {string}
+     */
+    ReasonTypeEnum:
+      | 'skill'
+      | 'language'
+      | 'framework'
+      | 'interest'
+      | 'activity'
+      | 'openness'
+      | 'issue_availability'
+      | 'difficulty'
     Recommendation: {
       readonly id: number
       /** @description For the saved and dismissed endpoints. */
@@ -912,6 +1040,7 @@ export interface components {
       readonly openness: components['schemas']['Openness']
       /** @description Whether the user saved it. */
       readonly saved: boolean
+      readonly relevant_issue_count: number
       /** Format: date-time */
       readonly generated_at: string
     }
@@ -936,11 +1065,14 @@ export interface components {
       readonly openness: components['schemas']['Openness']
       /** @description Whether the user saved it. */
       readonly saved: boolean
+      readonly relevant_issue_count: number
       /** Format: date-time */
       readonly generated_at: string
       readonly languages: components['schemas']['LanguageShare'][]
       readonly readme_excerpt: string
       readonly activity_signals: components['schemas']['ActivitySignals'] | null
+      /** @description Best first. */
+      readonly issues: components['schemas']['RelevantIssue'][]
     }
     RecommendationStatus: {
       job: components['schemas']['SyncJob'] | null
@@ -948,6 +1080,27 @@ export interface components {
       last_generated_at: string | null
       count: number
       config_version: string | null
+    }
+    /** @description A relevant issue of a recommendation, without its internal score. */
+    RelevantIssue: {
+      readonly id: number
+      readonly number: number
+      readonly title: string
+      /** Format: uri */
+      readonly url: string
+      /** @description Canonical label categories (ContribFinder analysis). */
+      readonly labels: string[]
+      readonly contribution_type: components['schemas']['ContributionTypeEnum']
+      /**
+       * @description Estimated; unknown when the evidence is not enough.
+       *
+       *     * `beginner` - Beginner
+       *     * `intermediate` - Intermediate
+       *     * `advanced` - Advanced
+       *     * `unknown` - Unknown
+       */
+      readonly difficulty: components['schemas']['DifficultyEnum']
+      readonly reasons: components['schemas']['IssueReason'][]
     }
     Repository: {
       readonly id: number
@@ -1098,16 +1251,6 @@ export interface components {
       category: string
       matched: boolean
     }
-    /**
-     * @description * `skill` - Skill
-     *     * `language` - Language
-     *     * `framework` - Framework
-     *     * `interest` - Interest
-     *     * `activity` - Activity
-     *     * `openness` - Openness
-     * @enum {string}
-     */
-    TypeEnum: 'skill' | 'language' | 'framework' | 'interest' | 'activity' | 'openness'
   }
   responses: never
   parameters: never
@@ -1505,6 +1648,43 @@ export interface operations {
       }
     }
   }
+  issues_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IssueDetail']
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
   profile_retrieve: {
     parameters: {
       query?: never
@@ -1775,6 +1955,28 @@ export interface operations {
          *     * `low_activity` - Low Activity
          */
         activity?: 'low_activity' | 'moderately_active' | 'recently_active'
+        /**
+         * @description At least one relevant issue of this contribution type.
+         *
+         *     * `code` - Code
+         *     * `documentation` - Documentation
+         *     * `testing` - Testing
+         *     * `bug_fix` - Bug Fix
+         *     * `feature` - Feature
+         *     * `devops` - Devops
+         *     * `design` - Design
+         */
+        contribution_type?:
+          'bug_fix' | 'code' | 'design' | 'devops' | 'documentation' | 'feature' | 'testing'
+        /**
+         * @description At least one relevant issue of this estimated difficulty.
+         *
+         *     * `beginner` - Beginner
+         *     * `intermediate` - Intermediate
+         *     * `advanced` - Advanced
+         *     * `unknown` - Unknown
+         */
+        difficulty?: 'advanced' | 'beginner' | 'intermediate' | 'unknown'
         /**
          * @description Catalog skill slug the repository uses, e.g. django or react.
          *

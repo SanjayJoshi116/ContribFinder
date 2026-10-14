@@ -50,6 +50,7 @@ const RECOMMENDATION = {
   activity_label: 'recently_active',
   size: 'large',
   openness: OPENNESS,
+  relevant_issue_count: 0,
   generated_at: '2026-09-29T10:00:00Z',
 }
 
@@ -59,6 +60,7 @@ const DETAIL = {
     { language: 'Python', share: 0.95 },
     { language: 'Shell', share: 0.05 },
   ],
+  issues: [],
   readme_excerpt: 'HTTPX is a fully featured HTTP client for Python.',
   activity_signals: {
     captured_at: '2026-09-29T09:00:00Z',
@@ -121,6 +123,74 @@ describe('recommendation cards', () => {
     )
     const section = screen.getByRole('region', { name: 'Recommended projects' })
     expect(section.textContent).not.toMatch(/%/)
+  })
+
+  it('shows the number of relevant issues', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/recommendations/status': () => json(GENERATED),
+      'GET /api/v1/recommendations': () =>
+        page([
+          RECOMMENDATION,
+          {
+            ...RECOMMENDATION,
+            id: 8,
+            repository: { ...REPOSITORY, name: 'one' },
+            relevant_issue_count: 1,
+          },
+          {
+            ...RECOMMENDATION,
+            id: 9,
+            repository: { ...REPOSITORY, name: 'many' },
+            relevant_issue_count: 3,
+          },
+        ]),
+    })
+    renderRoute('/app')
+
+    const none = await screen.findByRole('article', { name: 'httpx' })
+    expect(within(none).queryByText(/relevant issue/)).not.toBeInTheDocument()
+    const one = screen.getByRole('article', { name: 'one' })
+    expect(within(one).getByRole('link', { name: '1 relevant issue' })).toHaveAttribute(
+      'href',
+      '/app/recommendations/8#relevant-issues',
+    )
+    const many = screen.getByRole('article', { name: 'many' })
+    expect(within(many).getByText('3 relevant issues')).toBeInTheDocument()
+  })
+
+  it('filters by issue difficulty and contribution type through the URL', async () => {
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/recommendations/status': () => json({ ...GENERATED, count: 25 }),
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION]),
+      'GET /api/v1/recommendations?difficulty=beginner': () => page([RECOMMENDATION]),
+      'GET /api/v1/recommendations?difficulty=beginner&contribution_type=documentation': () =>
+        page([]),
+    })
+    const { router } = renderRoute('/app')
+    await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Issue difficulty' }),
+      'beginner',
+    )
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Contribution type' }),
+      'documentation',
+    )
+
+    expect(await screen.findByText('No recommendations match these filters.')).toBeInTheDocument()
+    expect(router.state.location.search).toBe(
+      '?difficulty=beginner&contribution_type=documentation',
+    )
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).endsWith('?difficulty=beginner&contribution_type=documentation'),
+      ),
+    ).toBe(true)
   })
 
   it('hides filters when everything fits on one page', async () => {
@@ -256,6 +326,67 @@ describe('recommendation detail page', () => {
     expect(await screen.findByText('No README available.')).toBeInTheDocument()
     const github = screen.getByRole('region', { name: 'From GitHub' })
     expect(within(github).getAllByText('Not available').length).toBeGreaterThan(0)
+  })
+
+  it('lists relevant issues under ContribFinder analysis', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/recommendations/7': () =>
+        json({
+          ...DETAIL,
+          relevant_issue_count: 2,
+          issues: [
+            {
+              id: 31,
+              number: 12,
+              title: 'Fix typo in the Django guide',
+              url: 'https://github.com/encode/httpx/issues/12',
+              labels: ['good_first_issue', 'documentation'],
+              contribution_type: 'documentation',
+              difficulty: 'beginner',
+              reasons: [
+                { type: 'technology', text: 'Mentions Django, which you use', detail: {} },
+                { type: 'approachability', text: 'Labeled "good first issue"', detail: {} },
+              ],
+            },
+            {
+              id: 32,
+              number: 13,
+              title: 'Crash on startup',
+              url: 'https://github.com/encode/httpx/issues/13',
+              labels: ['bug'],
+              contribution_type: 'bug_fix',
+              difficulty: 'unknown',
+              reasons: [{ type: 'technology', text: 'Mentions Python, which you use', detail: {} }],
+            },
+          ],
+        }),
+    })
+    renderRoute('/app/recommendations/7')
+
+    const analysis = await screen.findByRole('region', { name: 'ContribFinder analysis' })
+    const issues = within(analysis).getByRole('list', { name: 'Relevant issues' })
+    const items = within(issues).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(
+      within(items[0]).getByRole('link', { name: '#12 Fix typo in the Django guide' }),
+    ).toHaveAttribute('href', '/app/issues/31')
+    expect(items[0]).toHaveTextContent('Type: Documentation · Difficulty: Beginner (estimated)')
+    expect(items[0]).toHaveTextContent('Mentions Django, which you use')
+    expect(items[0]).not.toHaveTextContent('good first issue') // only the top reason
+    expect(items[1]).toHaveTextContent('Type: Bug fix · Difficulty: Not enough evidence')
+  })
+
+  it('says when no relevant issues were found', async () => {
+    mockFetch({ ...ME_ROUTE, 'GET /api/v1/recommendations/7': () => json(DETAIL) })
+    renderRoute('/app/recommendations/7')
+    const analysis = await screen.findByRole('region', { name: 'ContribFinder analysis' })
+    expect(
+      within(analysis).getByText(
+        'No open issues matching your profile were found in this project.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'From GitHub' })).toBeInTheDocument()
   })
 
   it('explains a recommendation that no longer exists', async () => {

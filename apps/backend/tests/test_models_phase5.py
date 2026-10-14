@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from developers.models import DeveloperProfile
 from recommendations.models import Recommendation, RecommendationReason, ScoringConfig
-from services.ranking.config import V1_PARAMS, V1_WEIGHTS
+from services.ranking.config import V1_PARAMS, V1_WEIGHTS, V2_PARAMS, V2_WEIGHTS
 
 from .repo_fixtures import make_candidate_repo
 
@@ -34,23 +34,26 @@ def make_recommendation(profile, repo, config=None, rank=1) -> Recommendation:
     )
 
 
-def test_seed_is_active_and_valid() -> None:
-    seed = ScoringConfig.objects.get(version="v1-deterministic")
-    assert seed.is_active
-    assert seed.weights == V1_WEIGHTS
-    assert seed.params == V1_PARAMS
-    seed.full_clean()  # no ValidationError
+def test_seeds_v1_stored_and_v2_active() -> None:
+    v1 = ScoringConfig.objects.get(version="v1-deterministic")
+    assert not v1.is_active
+    assert (v1.weights, v1.params) == (V1_WEIGHTS, V1_PARAMS)
+    v2 = ScoringConfig.objects.get(version="v2-deterministic")
+    assert v2.is_active
+    assert (v2.weights, v2.params) == (V2_WEIGHTS, V2_PARAMS)
+    assert "experimental" in v2.description.lower()
+    v2.full_clean()  # no ValidationError
 
 
 def test_only_one_active_config() -> None:
     with pytest.raises(IntegrityError), transaction.atomic():
         ScoringConfig.objects.create(
-            version="v2", weights=V1_WEIGHTS, params=V1_PARAMS, is_active=True
+            version="v3", weights=V2_WEIGHTS, params=V2_PARAMS, is_active=True
         )
 
 
 def test_invalid_weights_rejected_by_clean() -> None:
-    config = ScoringConfig(version="bad", weights={**V1_WEIGHTS, "skill": 0.30}, params=V1_PARAMS)
+    config = ScoringConfig(version="bad", weights={**V2_WEIGHTS, "skill": 0.30}, params=V2_PARAMS)
     with pytest.raises(ValidationError, match="sum to 1"):
         config.full_clean()
 
@@ -58,7 +61,7 @@ def test_invalid_weights_rejected_by_clean() -> None:
 def test_config_in_use_cannot_be_deleted(profile) -> None:
     make_recommendation(profile, make_candidate_repo(1))
     with pytest.raises(ProtectedError):
-        ScoringConfig.objects.get(version="v1-deterministic").delete()
+        ScoringConfig.objects.get(version="v2-deterministic").delete()
 
 
 def test_recommendations_cascade_with_profile(profile) -> None:

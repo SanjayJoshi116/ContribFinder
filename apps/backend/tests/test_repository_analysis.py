@@ -185,6 +185,7 @@ def test_stale_parts_per_data_type() -> None:
         community_synced_at=now - timedelta(days=8),
         dependencies_synced_at=now - timedelta(days=1),
         activity_synced_at=now - timedelta(hours=2),
+        issues_synced_at=now - timedelta(hours=2),
     )
     assert stale_parts(repo, now) == ["metadata", "community"]
     never = make_candidate_repo(8)
@@ -293,6 +294,7 @@ def test_refresh_fetches_only_stale_parts_with_app_credentials(respx_mock, monke
         community_synced_at=now,
         dependencies_synced_at=now,
         activity_synced_at=now - timedelta(days=2),
+        issues_synced_at=now,
     )
     routes = mock_repo_api(respx_mock, "encode/httpx", 7)
 
@@ -301,7 +303,7 @@ def test_refresh_fetches_only_stale_parts_with_app_credentials(respx_mock, monke
     repo.refresh_from_db()
     assert repo.lifecycle == Lifecycle.RECOMMENDABLE
     assert routes["metadata"].called and routes["commits"].called
-    for part in ("readme", "community", "labels", "contents"):
+    for part in ("readme", "community", "labels", "contents", "issues"):
         assert not routes[part].called, part
     expected = base64.b64encode(b"test-client-id:test-client-secret").decode()
     assert routes["metadata"].calls.last.request.headers["Authorization"] == f"Basic {expected}"

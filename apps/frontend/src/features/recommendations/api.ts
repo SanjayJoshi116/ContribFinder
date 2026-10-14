@@ -12,7 +12,15 @@ export const recommendationListKey = [...ROOT, 'list'] as const
 export const recommendationDetailKey = (id: number) => [...ROOT, 'detail', id] as const
 export const RECOMMENDATION_POLL_INTERVAL_MS = 3000
 
-export const FILTER_KEYS = ['language', 'framework', 'activity', 'size', 'match'] as const
+export const FILTER_KEYS = [
+  'language',
+  'framework',
+  'activity',
+  'size',
+  'match',
+  'difficulty',
+  'contribution_type',
+] as const
 export type FilterKey = (typeof FILTER_KEYS)[number]
 export type RecommendationFilters = Partial<Record<FilterKey, string>> & { page?: number }
 

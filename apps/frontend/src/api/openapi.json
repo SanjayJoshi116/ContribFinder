@@ -487,6 +487,59 @@
         }
       }
     },
+    "/api/v1/issues/{id}": {
+      "get": {
+        "operationId": "issues_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "tags": ["issues"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/v1/profile": {
       "get": {
         "operationId": "profile_retrieve",
@@ -859,6 +912,24 @@
               "enum": ["low_activity", "moderately_active", "recently_active"]
             },
             "description": "* `recently_active` - Recently Active\n* `moderately_active` - Moderately Active\n* `low_activity` - Low Activity"
+          },
+          {
+            "in": "query",
+            "name": "contribution_type",
+            "schema": {
+              "type": "string",
+              "enum": ["bug_fix", "code", "design", "devops", "documentation", "feature", "testing"]
+            },
+            "description": "At least one relevant issue of this contribution type.\n\n* `code` - Code\n* `documentation` - Documentation\n* `testing` - Testing\n* `bug_fix` - Bug Fix\n* `feature` - Feature\n* `devops` - Devops\n* `design` - Design"
+          },
+          {
+            "in": "query",
+            "name": "difficulty",
+            "schema": {
+              "type": "string",
+              "enum": ["advanced", "beginner", "intermediate", "unknown"]
+            },
+            "description": "At least one relevant issue of this estimated difficulty.\n\n* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
           },
           {
             "in": "query",
@@ -1836,6 +1907,20 @@
         "type": "string",
         "description": "* `language` - Language\n* `framework` - Framework\n* `library` - Library\n* `database` - Database\n* `cloud` - Cloud\n* `devops` - Devops\n* `tool` - Tool"
       },
+      "ContributionTypeEnum": {
+        "enum": [
+          "code",
+          "documentation",
+          "testing",
+          "bug_fix",
+          "feature",
+          "devops",
+          "design",
+          "unknown"
+        ],
+        "type": "string",
+        "description": "* `code` - Code\n* `documentation` - Documentation\n* `testing` - Testing\n* `bug_fix` - Bug Fix\n* `feature` - Feature\n* `devops` - Devops\n* `design` - Design\n* `unknown` - Unknown"
+      },
       "DeveloperInterest": {
         "type": "object",
         "properties": {
@@ -1892,7 +1977,7 @@
           "preferred_issue_difficulty": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/PreferredIssueDifficultyEnum"
+                "$ref": "#/components/schemas/DifficultyEnum"
               }
             ],
             "readOnly": true
@@ -1959,6 +2044,11 @@
           }
         },
         "required": ["confidence", "evidence", "evidence_summary", "id", "skill"]
+      },
+      "DifficultyEnum": {
+        "enum": ["beginner", "intermediate", "advanced", "unknown"],
+        "type": "string",
+        "description": "* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
       },
       "DisconnectResult": {
         "type": "object",
@@ -2088,6 +2178,10 @@
               }
             ],
             "description": "Saves and dismissals are recorded by their own endpoints.\n\n* `viewed` - viewed\n* `opened_repository` - opened_repository\n* `opened_issue` - opened_issue"
+          },
+          "issue_id": {
+            "type": "integer",
+            "description": "Required for opened_issue: one of the recommendation's relevant issues."
           }
         },
         "required": ["action"]
@@ -2243,6 +2337,194 @@
         "enum": ["readme", "repo_description", "topic", "contribution"],
         "type": "string",
         "description": "* `readme` - Readme\n* `repo_description` - Repo Description\n* `topic` - Topic\n* `contribution` - Contribution"
+      },
+      "IssueAnalysis": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Canonical label categories."
+          },
+          "contribution_type": {
+            "$ref": "#/components/schemas/ContributionTypeEnum"
+          },
+          "contribution_type_evidence": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "difficulty": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DifficultyEnum"
+              }
+            ],
+            "description": "Estimated; unknown when the evidence is not enough.\n\n* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
+          },
+          "difficulty_evidence": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "technologies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueTechnology"
+            },
+            "readOnly": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueReason"
+            }
+          },
+          "recommendation": {
+            "$ref": "#/components/schemas/IssueRecommendation"
+          }
+        },
+        "required": [
+          "contribution_type",
+          "contribution_type_evidence",
+          "difficulty",
+          "difficulty_evidence",
+          "labels",
+          "reasons",
+          "recommendation",
+          "technologies"
+        ]
+      },
+      "IssueDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "github": {
+            "$ref": "#/components/schemas/IssueGitHub"
+          },
+          "analysis": {
+            "$ref": "#/components/schemas/IssueAnalysis"
+          }
+        },
+        "required": ["analysis", "github", "id"]
+      },
+      "IssueGitHub": {
+        "type": "object",
+        "description": "As GitHub sent it. ``body`` is plain text: render it escaped, never as HTML.",
+        "properties": {
+          "repository_full_name": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "string"
+          },
+          "comments": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "body",
+          "comments",
+          "created_at",
+          "labels",
+          "number",
+          "repository_full_name",
+          "state",
+          "title",
+          "updated_at",
+          "url"
+        ]
+      },
+      "IssueReason": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/IssueReasonTypeEnum"
+          },
+          "text": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["detail", "text", "type"]
+      },
+      "IssueReasonTypeEnum": {
+        "enum": ["technology", "difficulty", "approachability"],
+        "type": "string",
+        "description": "* `technology` - technology\n* `difficulty` - difficulty\n* `approachability` - approachability"
+      },
+      "IssueRecommendation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "repository_full_name": {
+            "type": "string"
+          },
+          "match_label": {
+            "$ref": "#/components/schemas/MatchLabelEnum"
+          }
+        },
+        "required": ["id", "match_label", "repository_full_name"]
+      },
+      "IssueTechnology": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/IssueTechnologySourceEnum"
+          },
+          "matched": {
+            "type": "boolean",
+            "description": "The developer has demonstrated it."
+          }
+        },
+        "required": ["matched", "name", "slug", "source"]
+      },
+      "IssueTechnologySourceEnum": {
+        "enum": ["title", "label", "body"],
+        "type": "string",
+        "description": "* `title` - title\n* `label` - label\n* `body` - body"
       },
       "JobTypeEnum": {
         "enum": [
@@ -2577,11 +2859,6 @@
         },
         "required": ["awaiting_analysis", "by_source", "eligible", "ineligible", "total"]
       },
-      "PreferredIssueDifficultyEnum": {
-        "enum": ["beginner", "intermediate", "advanced", "unknown"],
-        "type": "string",
-        "description": "* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
-      },
       "PreferredProjectSizeEnum": {
         "enum": ["any", "small", "medium", "large"],
         "type": "string",
@@ -2612,7 +2889,7 @@
           "type": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TypeEnum"
+                "$ref": "#/components/schemas/ReasonTypeEnum"
               }
             ],
             "readOnly": true
@@ -2626,6 +2903,20 @@
           }
         },
         "required": ["detail", "text", "type"]
+      },
+      "ReasonTypeEnum": {
+        "enum": [
+          "skill",
+          "language",
+          "framework",
+          "interest",
+          "activity",
+          "openness",
+          "issue_availability",
+          "difficulty"
+        ],
+        "type": "string",
+        "description": "* `skill` - Skill\n* `language` - Language\n* `framework` - Framework\n* `interest` - Interest\n* `activity` - Activity\n* `openness` - Openness\n* `issue_availability` - Issue Availability\n* `difficulty` - Difficulty"
       },
       "Recommendation": {
         "type": "object",
@@ -2702,6 +2993,10 @@
             "readOnly": true,
             "description": "Whether the user saved it."
           },
+          "relevant_issue_count": {
+            "type": "integer",
+            "readOnly": true
+          },
           "generated_at": {
             "type": "string",
             "format": "date-time",
@@ -2715,6 +3010,7 @@
           "match_label",
           "openness",
           "reasons",
+          "relevant_issue_count",
           "repository",
           "repository_id",
           "saved",
@@ -2797,6 +3093,10 @@
             "readOnly": true,
             "description": "Whether the user saved it."
           },
+          "relevant_issue_count": {
+            "type": "integer",
+            "readOnly": true
+          },
           "generated_at": {
             "type": "string",
             "format": "date-time",
@@ -2821,6 +3121,14 @@
             ],
             "nullable": true,
             "readOnly": true
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelevantIssue"
+            },
+            "readOnly": true,
+            "description": "Best first."
           }
         },
         "required": [
@@ -2828,11 +3136,13 @@
           "activity_signals",
           "generated_at",
           "id",
+          "issues",
           "languages",
           "match_label",
           "openness",
           "readme_excerpt",
           "reasons",
+          "relevant_issue_count",
           "repository",
           "repository_id",
           "saved",
@@ -2865,6 +3175,71 @@
           }
         },
         "required": ["config_version", "count", "job", "last_generated_at"]
+      },
+      "RelevantIssue": {
+        "type": "object",
+        "description": "A relevant issue of a recommendation, without its internal score.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "number": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "title": {
+            "type": "string",
+            "readOnly": true
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true,
+            "description": "Canonical label categories (ContribFinder analysis)."
+          },
+          "contribution_type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContributionTypeEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "difficulty": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DifficultyEnum"
+              }
+            ],
+            "readOnly": true,
+            "description": "Estimated; unknown when the evidence is not enough.\n\n* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueReason"
+            },
+            "readOnly": true
+          }
+        },
+        "required": [
+          "contribution_type",
+          "difficulty",
+          "id",
+          "labels",
+          "number",
+          "reasons",
+          "title",
+          "url"
+        ]
       },
       "Repository": {
         "type": "object",
@@ -3338,11 +3713,6 @@
           }
         },
         "required": ["category", "matched", "name", "slug"]
-      },
-      "TypeEnum": {
-        "enum": ["skill", "language", "framework", "interest", "activity", "openness"],
-        "type": "string",
-        "description": "* `skill` - Skill\n* `language` - Language\n* `framework` - Framework\n* `interest` - Interest\n* `activity` - Activity\n* `openness` - Openness"
       }
     },
     "securitySchemes": {

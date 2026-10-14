@@ -56,6 +56,7 @@ def test_list_shape_without_score(signed_in_client: APIClient, generated) -> Non
         "size",
         "openness",
         "saved",
+        "relevant_issue_count",
         "generated_at",
     }
     assert not {"score", "rank", "signal_scores"} & set(first)
@@ -84,7 +85,8 @@ def test_irrelevant_candidate_is_not_recommended(generated) -> None:
         ("language=go", []),
         ("framework=django", ["encode/django-tool"]),
         ("activity=low_activity", ["someone/pylib"]),
-        ("match=strong", ["encode/django-tool", "someone/pylib"]),
+        ("match=strong", ["encode/django-tool"]),
+        ("match=good", ["someone/pylib"]),
         ("size=medium&language=python&activity=recently_active", ["encode/django-tool"]),
     ],
 )
@@ -141,7 +143,7 @@ def test_status_after_generation(signed_in_client: APIClient, generated) -> None
     assert body["job"]["job_type"] == "recommendation_generation"
     assert body["job"]["status"] == "COMPLETED"
     assert body["count"] == Recommendation.objects.count()
-    assert body["config_version"] == "v1-deterministic"
+    assert body["config_version"] == "v2-deterministic"
     assert body["last_generated_at"] is not None
 
 

@@ -20,6 +20,7 @@ from feedback.models import (
     RecommendationFeedback,
     SavedRepository,
 )
+from issues.models import Issue
 from recommendations.models import Recommendation
 from repositories.models import Repository
 
@@ -46,6 +47,7 @@ def _event(
     repository: Repository,
     recommendation: Recommendation | None,
     action: str,
+    issue: Issue | None = None,
 ) -> RecommendationFeedback:
     return RecommendationFeedback.objects.create(
         user=user,
@@ -53,16 +55,21 @@ def _event(
         recommendation=recommendation,
         repository_full_name=repository.full_name,
         action=action,
+        issue=issue,
+        issue_number=issue.number if issue else None,
         match_label=recommendation.match_label if recommendation else "",
         rank=recommendation.rank if recommendation else None,
         config_version=recommendation.scoring_config.version if recommendation else "",
     )
 
 
-def record(user: User, recommendation: Recommendation, action: str) -> bool:
-    """Record an event with a snapshot of the recommendation. A ``viewed`` event within
-    ``FEEDBACK_VIEW_DEDUP_MINUTES`` of the previous one is skipped. Returns whether an event
-    was stored."""
+def record(
+    user: User, recommendation: Recommendation, action: str, *, issue: Issue | None = None
+) -> bool:
+    """Record an event with a snapshot of the recommendation (and, for ``opened_issue``, of
+    the issue; the caller checks it is one of the recommendation's relevant issues). A
+    ``viewed`` event within ``FEEDBACK_VIEW_DEDUP_MINUTES`` of the previous one is skipped.
+    Returns whether an event was stored."""
     if action == FeedbackAction.VIEWED:
         since = timezone.now() - timedelta(minutes=settings.FEEDBACK_VIEW_DEDUP_MINUTES)
         if RecommendationFeedback.objects.filter(
@@ -72,7 +79,7 @@ def record(user: User, recommendation: Recommendation, action: str) -> bool:
             created_at__gte=since,
         ).exists():
             return False
-    _event(user, recommendation.repository, recommendation, action)
+    _event(user, recommendation.repository, recommendation, action, issue)
     return True
 
 

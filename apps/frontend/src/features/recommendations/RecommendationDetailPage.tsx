@@ -6,6 +6,7 @@ import { recordFeedback } from '@/features/feedback/api'
 import { DismissButton, SaveButton } from '@/features/feedback/RecommendationActions'
 
 import { useRecommendation } from './api'
+import { RelevantIssues } from './RelevantIssues'
 import { ACTIVITY_TEXT, SIZE_TEXT } from './messages'
 import { MatchBadge, TechnologyChips } from './RecommendationCard'
 
@@ -181,6 +182,7 @@ export function RecommendationDetailPage() {
           {rec.activity_label ? ACTIVITY_TEXT[rec.activity_label] : 'Activity unknown'} ·{' '}
           {SIZE_TEXT[rec.size]}
         </p>
+        <RelevantIssues issues={rec.issues} />
       </section>
 
       <section className="space-y-4 rounded-md border p-4" aria-labelledby="github-heading">

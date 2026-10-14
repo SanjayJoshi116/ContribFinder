@@ -26,7 +26,7 @@ class Signal:
 ZERO = Signal(0.0)
 
 
-def _signal(value: float, evidence: list[dict[str, Any]]) -> Signal:
+def signal_of(value: float, evidence: list[dict[str, Any]]) -> Signal:
     value = round(min(1.0, max(0.0, value)), 4)
     return Signal(value, tuple(evidence)) if value > 0 else ZERO
 
@@ -51,7 +51,7 @@ def skill_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
         {"slug": t.slug, "name": t.name, "confidence": round(c, 2), "sources": list(t.sources)}
         for t, c in matched[:MAX_EVIDENCE]
     ]
-    return _signal(value, evidence)
+    return signal_of(value, evidence)
 
 
 def language_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
@@ -64,7 +64,7 @@ def language_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
         {"slug": t.slug, "name": t.name, "share": t.share, "confidence": round(c, 2)}
         for t, c in matched[:MAX_EVIDENCE]
     ]
-    return _signal(value, evidence)
+    return signal_of(value, evidence)
 
 
 def framework_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
@@ -86,7 +86,7 @@ def framework_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal
         }
         for t, s in matched[:MAX_EVIDENCE]
     ]
-    return _signal(value, evidence)
+    return signal_of(value, evidence)
 
 
 def repository_interests(repo: RepoData) -> dict[str, tuple[str, str]]:
@@ -112,7 +112,7 @@ def interest_match(repo: RepoData, dev: DeveloperFeatures) -> Signal:
         {"slug": slug, "name": name, "strength": round(strength, 2), "via": via, "match": text}
         for slug, via, text, (name, strength) in matched[:MAX_EVIDENCE]
     ]
-    return _signal(value, evidence)
+    return signal_of(value, evidence)
 
 
 def activity_signal(repo: RepoData, values: Mapping[str, float]) -> Signal:
@@ -125,7 +125,7 @@ def activity_signal(repo: RepoData, values: Mapping[str, float]) -> Signal:
         "commits_90d": snapshot.commits_90d,
         "prs_merged_90d": snapshot.prs_merged_90d,
     }
-    return _signal(values.get(snapshot.activity_label, 0.0), [evidence])
+    return signal_of(values.get(snapshot.activity_label, 0.0), [evidence])
 
 
 OPENNESS_FLAGS = (
@@ -139,13 +139,15 @@ OPENNESS_FLAGS = (
 def contribution_openness(repo: RepoData, points: Mapping[str, float]) -> Signal:
     present = [key for key, attr in OPENNESS_FLAGS if getattr(repo, attr)]
     value = sum(points[key] for key in present)
-    return _signal(value, [{"flag": key} for key in present])
+    return signal_of(value, [{"flag": key} for key in present])
 
 
 def compute(
     repo: RepoData, techs: Mapping[str, Tech], dev: DeveloperFeatures, params: Mapping[str, Any]
 ) -> dict[str, Signal]:
-    """Every signal for one candidate, keyed like ``ScoringConfig.weights``."""
+    """Every repository signal for one candidate, keyed like ``ScoringConfig.weights``. The
+    issue signals start at 0: issue matching (``matching.issues``) fills them in for
+    candidates that pass the relevance gate."""
     return {
         "skill": skill_match(techs, dev),
         "language": language_match(techs, dev),
@@ -153,4 +155,6 @@ def compute(
         "framework": framework_match(techs, dev),
         "activity": activity_signal(repo, params["activity"]),
         "openness": contribution_openness(repo, params["openness"]),
+        "issue_fit": ZERO,
+        "difficulty_fit": ZERO,
     }

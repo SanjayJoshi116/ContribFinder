@@ -84,6 +84,8 @@ def process_repository_backlog() -> int:
     for repo_id, parts in batch:
         if parts == ["readme"]:
             sync_repository_readme.delay(repo_id)
+        elif parts == ["issues"]:
+            sync_repository_issues.delay(repo_id)
         else:
             sync_repository.delay(repo_id)
     logger.info("Queued %s repository refreshes", len(batch))
@@ -124,12 +126,21 @@ def sync_repository_readme(self: Any, repo_id: int) -> None:
     _refresh(self, repo_id, ["readme"])
 
 
+@shared_task(
+    bind=True, name="repositories.sync_repository_issues", acks_late=True, max_retries=None
+)
+def sync_repository_issues(self: Any, repo_id: int) -> None:
+    """Refresh only a repository's open issues (their staleness age is the shortest)."""
+    _refresh(self, repo_id, ["issues"])
+
+
 __all__ = [
     "generate_candidates",
     "mark_stale_repositories",
     "process_repository_backlog",
     "stale_parts",
     "sync_repository",
+    "sync_repository_issues",
     "sync_repository_readme",
 ]
 

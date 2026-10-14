@@ -27,6 +27,8 @@ class ReasonType(models.TextChoices):
     INTEREST = "interest"
     ACTIVITY = "activity"
     OPENNESS = "openness"
+    ISSUE_AVAILABILITY = "issue_availability"
+    DIFFICULTY = "difficulty"
 
 
 class ScoringConfig(models.Model):
@@ -79,6 +81,9 @@ class Recommendation(models.Model):
         max_length=20, choices=ActivityLabel.choices, blank=True
     )  # "" when the repository has no activity snapshot
     size = models.CharField(max_length=10, choices=RepositorySize.choices)
+    relevant_issue_count = models.PositiveSmallIntegerField(default=0)
+    issue_difficulties = models.JSONField(default=list, blank=True)  # distinct values
+    issue_contribution_types = models.JSONField(default=list, blank=True)  # distinct values
     generated_at = models.DateTimeField()
 
     class Meta:

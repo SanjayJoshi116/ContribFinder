@@ -47,12 +47,14 @@ const RECOMMENDATION = {
     help_wanted: null,
   },
   saved: false,
+  relevant_issue_count: 0,
   generated_at: '2026-09-29T10:00:00Z',
 }
 
 const DETAIL = {
   ...RECOMMENDATION,
   languages: [{ language: 'Python', share: 1 }],
+  issues: [],
   readme_excerpt: '',
   activity_signals: null,
 }

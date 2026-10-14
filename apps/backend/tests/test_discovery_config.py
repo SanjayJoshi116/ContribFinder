@@ -42,7 +42,7 @@ def test_invalid_query_shares_rejected(shares) -> None:
 
 
 def test_unknown_stale_part_rejected() -> None:
-    with override_settings(REPO_STALE_AFTER={**settings.REPO_STALE_AFTER, "issues": 1}):
+    with override_settings(REPO_STALE_AFTER={**settings.REPO_STALE_AFTER, "pulls": 1}):
         assert "core.E023" in ids(discovery_config_check())
 
 

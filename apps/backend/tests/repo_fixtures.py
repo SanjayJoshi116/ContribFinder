@@ -47,6 +47,7 @@ def mock_repo_api(
     labels: tuple[str, ...] = ("good first issue", "Help Wanted"),
     manifests: dict[str, str] | None = None,
     commits: int = 42,
+    issues: list[dict[str, Any]] | None = None,
     **payload: Any,
 ) -> dict[str, respx.Route]:
     base = f"{API}/repos/{full_name}"
@@ -111,6 +112,7 @@ def mock_repo_api(
         "release": router.get(f"{base}/releases/latest").respond(
             200, json={"published_at": (now - timedelta(days=20)).isoformat()}
         ),
+        "issues": router.get(f"{base}/issues").respond(200, json=issues or []),
     }
     for name, text in manifests.items():
         routes[f"file:{name}"] = router.get(f"{base}/contents/{name}").respond(200, text=text)
@@ -158,3 +160,41 @@ def add_candidate(
         last_seen_at=seen,
     )
     return cand
+
+
+def issue_payload(number: int, **extra: Any) -> dict[str, Any]:
+    """One item of ``GET /repos/{o}/{r}/issues``."""
+    now = timezone.now()
+    return {
+        "id": 70_000 + number,
+        "number": number,
+        "title": f"Issue {number}",
+        "body": "Something to fix.",
+        "labels": [],
+        "state": "open",
+        "locked": False,
+        "assignee": None,
+        "assignees": [],
+        "comments": 2,
+        "html_url": f"https://github.com/o/r/issues/{number}",
+        "created_at": (now - timedelta(days=10)).isoformat(),
+        "updated_at": (now - timedelta(days=1)).isoformat(),
+        **extra,
+    }
+
+
+def make_issue(repo: Repository, number: int, **fields: Any) -> Any:
+    from issues.models import Issue
+
+    now = timezone.now()
+    defaults: dict[str, Any] = {
+        "repository": repo,
+        "github_id": repo.github_id * 10_000 + number,
+        "number": number,
+        "title": f"Issue {number}",
+        "html_url": f"https://github.com/{repo.full_name}/issues/{number}",
+        "github_created_at": now - timedelta(days=10),
+        "github_updated_at": now - timedelta(days=1),
+        "analyzed_at": now,
+    }
+    return Issue.objects.create(**{**defaults, **fields})

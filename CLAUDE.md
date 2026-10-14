@@ -98,7 +98,8 @@ ContribFinder/
 │  │  │                     RepositoryDependency, UserRepository (owner | contributor),
 │  │  │                     RepositoryReadme, RepositorySnapshot, RepositoryCandidate,
 │  │  │                     CandidateDiscovery; discovery API; discovery/refresh/beat tasks
-│  │  ├─ issues/            Issue (Phase 7)
+│  │  ├─ issues/            Issue (shared, analysis on the row), RecommendedIssue; issue
+│  │  │                     detail API (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason; API; generation
 │  │  │                     and freshness tasks
 │  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
@@ -113,7 +114,10 @@ ContribFinder/
 │  │     │                  experience, summary, analysis (Phase 3)
 │  │     ├─ discovery/      queries, filters (prefilter/eligibility), DiscoveryService (Phase 4)
 │  │     ├─ repositories/   analysis, lifecycle, staleness (shared repository data, Phase 4)
-│  │     ├─ matching/       activity, technologies, features (loading), signals (Phase 4–5)
+│  │     ├─ issues/         labels (normalization), classify (type, difficulty),
+│  │     │                  technologies, analysis (Phase 7)
+│  │     ├─ matching/       activity, technologies, features (loading), signals,
+│  │     │                  issues (issue matching) (Phase 4–7)
 │  │     ├─ ranking/        config (validation), score, explain, service (generation),
 │  │     │                  freshness (Phase 5)
 │  │     └─ ai/             provider interfaces only (future)
@@ -495,7 +499,35 @@ reasons · open on GitHub · filter · save · refresh · see last-synced time �
   state, a new ScoringConfig version that includes semantic weight. Tasks `generate_*_embedding(s)`.
 - AI failures fall back to deterministic scoring.
 
-**Phase 7 — Issues** (MVP+)
+**Phase 7 — Issues** (MVP+)  ✅ shipped in v0.7.0
+
+Archived: `openspec/changes/archive/2026-10-13-phase-7-issues/`. Specs: `issue-ingestion`,
+`issue-analysis`, `issue-matching` (plus deltas to `repository-analysis`, `recommendation-engine`,
+`recommendation-explanations`, `recommendations-view`, `recommendation-feedback`). No carry-overs;
+Docker Compose verification stays future scope.
+
+Deviations from the sketch below, as built:
+- The client method is `list_open_issues` (one page of 100 most recently updated, PRs dropped,
+  410 = none). Issues are an analysis part (`REPO_STALE_AFTER["issues"]`, 6 h); the backlog
+  queues `repositories.sync_repository_issues` when only issues are stale. No separate
+  `github:issues:*` cache key: the ETag cache covers it.
+- Analysis lives on the `Issue` row (canonical labels, type, difficulty, technologies, evidence)
+  and is recomputed on every fetch. Difficulty is a vote: a level needs 2 agreeing signals and
+  no contradiction. Two or more technologies vote intermediate (otherwise intermediate could
+  never win); an empty body or no technology abstains. HTML/CSS are not issue technologies, and
+  `bug` is a title keyword for `[Bug]:` prefixes (both found in manual testing).
+- Issue matching runs inside generation for candidates past the relevance gate (one query) and
+  feeds the `issue_fit` and `difficulty_fit` signals. All numbers, including approachability
+  values, are `params.issues` of the new active config `v2-deterministic`. Stored configs are
+  validated with `stored=True`, so v1 (no issue signals) still scores, with issue weights 0.
+- `Recommendation` stores `relevant_issue_count`, `issue_difficulties` and
+  `issue_contribution_types` snapshots for the filters. `RecommendedIssue.reasons` is JSON, not
+  `RecommendationReason` rows. Persist locks the matched issues and drops any deleted meanwhile.
+- `issues.Difficulty` is `developers.IssueDifficulty` (one OpenAPI `DifficultyEnum`).
+- `opened_issue` feedback requires `issue_id` of one of the recommendation's relevant issues and
+  stores `issue` (`SET_NULL`) plus `issue_number`.
+
+Sketch:
 - FR-ISSUE-001: `GitHubClient.get_issues`, task `sync_repository_issues`, `Issue` model.
 - FR-ISSUE-002: label normalization (good first issue, help wanted, docs, bug, enhancement, …).
 - FR-ISSUE-003: contribution type (label and keyword rules first).

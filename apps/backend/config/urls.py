@@ -14,6 +14,7 @@ api_v1: list[URLPattern | URLResolver] = [
     path("recommendations", RecommendationListView.as_view(), name="recommendations"),
     path("recommendations/", include("recommendations.urls")),
     path("", include("feedback.urls")),
+    path("issues/", include("issues.urls")),
 ]
 
 urlpatterns = [

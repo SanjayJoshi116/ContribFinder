@@ -30,6 +30,7 @@ from .errors import (
     GitHubClientError,
     GitHubConflict,
     GitHubForbidden,
+    GitHubGone,
     GitHubNotFound,
     GitHubRateLimited,
     GitHubTransientError,
@@ -178,6 +179,50 @@ class PullSample:
     opened: int
     merged: int
     capped: bool
+
+
+@dataclass(frozen=True)
+class IssueData:
+    """An open issue (never a pull request) of a repository, as GitHub sent it."""
+
+    github_id: int
+    number: int
+    title: str
+    body: str
+    labels: tuple[str, ...]
+    state: str
+    is_locked: bool
+    has_assignee: bool
+    comments: int
+    html_url: str
+    created_at: datetime | None
+    updated_at: datetime | None
+
+    @classmethod
+    def from_api(cls, data: dict[str, Any]) -> IssueData:
+        return cls(
+            github_id=int(data["id"]),
+            number=int(data["number"]),
+            title=str(data.get("title") or ""),
+            body=data.get("body") or "",
+            labels=tuple(
+                str(label.get("name", "")) if isinstance(label, dict) else str(label)
+                for label in data.get("labels") or ()
+            ),
+            state=str(data.get("state") or "open"),
+            is_locked=bool(data.get("locked")),
+            has_assignee=bool(data.get("assignee") or data.get("assignees")),
+            comments=int(data.get("comments") or 0),
+            html_url=str(data["html_url"]),
+            created_at=_dt(data.get("created_at")),
+            updated_at=_dt(data.get("updated_at")),
+        )
+
+
+@dataclass(frozen=True)
+class IssuePage:
+    issues: list[IssueData]
+    truncated: bool
 
 
 def _repo_from_api_url(url: str) -> str:
@@ -357,6 +402,21 @@ class GitHubClient:
         page = self._paginate(f"/repos/{full_name}/labels", {}, max_pages=LABELS_MAX_PAGES)
         return [str(label.get("name", "")) for label in page.items]
 
+    def list_open_issues(self, full_name: str) -> IssuePage:
+        """Open issues, most recently updated first, up to ``ISSUES_MAX_PAGES`` pages. Pull
+        requests (which the issues listing includes) are dropped. A repository with issues
+        disabled (410) has none."""
+        try:
+            page = self._paginate(
+                f"/repos/{full_name}/issues",
+                {"state": "open", "sort": "updated", "direction": "desc"},
+                max_pages=settings.ISSUES_MAX_PAGES,
+            )
+        except GitHubGone:
+            return IssuePage(issues=[], truncated=False)
+        issues = [IssueData.from_api(item) for item in page.items if "pull_request" not in item]
+        return IssuePage(issues=issues, truncated=page.truncated)
+
     def count_commits_since(self, full_name: str, since: datetime) -> int:
         """Default-branch commits since ``since`` (truncated to the UTC day, so the URL and
         its ETag are stable within a day). An empty repository (409) has 0."""
@@ -526,6 +586,8 @@ def _error_for(response: httpx.Response, path: str) -> Exception:
         return GitHubNotFound(where)
     if status == 409:
         return GitHubConflict(where)
+    if status == 410:
+        return GitHubGone(where)
     if status == 451:
         return GitHubUnavailableForLegalReasons(where)
     if status == 422:

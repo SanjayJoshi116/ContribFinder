@@ -9,7 +9,7 @@ from django.conf import settings
 
 from repositories.models import Repository
 
-PARTS = ("metadata", "readme", "community", "dependencies", "activity")
+PARTS = ("metadata", "readme", "community", "dependencies", "activity", "issues")
 
 
 def part_timestamps(repo: Repository) -> dict[str, datetime | None]:
@@ -19,6 +19,7 @@ def part_timestamps(repo: Repository) -> dict[str, datetime | None]:
         "community": repo.community_synced_at,
         "dependencies": repo.dependencies_synced_at,
         "activity": repo.activity_synced_at,
+        "issues": repo.issues_synced_at,
     }
 
 
@@ -27,7 +28,8 @@ def stale_parts(
 ) -> list[str]:
     """Data types that are missing or older than their configured age (hours), in ``PARTS``
     order. A repository that was never analyzed needs every part: its metadata may come from
-    a search result, which carries no languages."""
+    a search result, which carries no languages. An analyzed repository whose issues were
+    never fetched (analyzed before issues existed) has them stale."""
     if repo.activity_synced_at is None:
         return list(PARTS)
     ages = ages if ages is not None else settings.REPO_STALE_AFTER

@@ -1,4 +1,4 @@
-import type { MatchLabel, RecommendationStatus } from '@/api/types'
+import type { ContributionType, Difficulty, MatchLabel, RecommendationStatus } from '@/api/types'
 import { isActive } from '@/features/sync/api'
 
 /** What users see instead of a score: a label backed by reasons. Never a percentage. */
@@ -20,6 +20,34 @@ export const SIZE_TEXT: Record<string, string> = {
   medium: 'Medium project',
   large: 'Large project',
   unknown: 'Size unknown',
+}
+
+/** Issue analysis is an estimate: "unknown" means the evidence was not enough, not an error. */
+export const NOT_ENOUGH_EVIDENCE = 'Not enough evidence'
+
+export const DIFFICULTY_TEXT: Record<Difficulty, string> = {
+  beginner: 'Beginner',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+  unknown: NOT_ENOUGH_EVIDENCE,
+}
+
+/** An issue's estimated difficulty in words; "unknown" is a lack of evidence, not an error. */
+export function difficultyText(difficulty: Difficulty): string {
+  return difficulty === 'unknown'
+    ? NOT_ENOUGH_EVIDENCE
+    : `${DIFFICULTY_TEXT[difficulty]} (estimated)`
+}
+
+export const CONTRIBUTION_TYPE_TEXT: Record<ContributionType, string> = {
+  code: 'Code',
+  documentation: 'Documentation',
+  testing: 'Testing',
+  bug_fix: 'Bug fix',
+  feature: 'Feature',
+  devops: 'DevOps',
+  design: 'Design',
+  unknown: NOT_ENOUGH_EVIDENCE,
 }
 
 export interface Option {
@@ -58,6 +86,16 @@ export const MATCH_OPTIONS: Option[] = Object.entries(MATCH_TEXT).map(([value, l
   value,
   label,
 }))
+// Recommendations with at least one relevant issue of that kind.
+export const DIFFICULTY_OPTIONS: Option[] = [
+  { value: 'beginner', label: 'Beginner issues' },
+  { value: 'intermediate', label: 'Intermediate issues' },
+  { value: 'advanced', label: 'Advanced issues' },
+  { value: 'unknown', label: 'Issues not yet estimated' },
+]
+export const CONTRIBUTION_TYPE_OPTIONS: Option[] = Object.entries(CONTRIBUTION_TYPE_TEXT)
+  .filter(([value]) => value !== 'unknown')
+  .map(([value, label]) => ({ value, label }))
 
 /** Why the list is empty, or null when there is nothing to explain. */
 export function emptyReason(status: RecommendationStatus | undefined, filtered: boolean): string {

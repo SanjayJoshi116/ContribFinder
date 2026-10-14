@@ -3,6 +3,7 @@ wrappers around ``services.feedback``."""
 
 from django.db.models import Prefetch, QuerySet
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView, get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
@@ -11,6 +12,7 @@ from rest_framework.views import APIView
 
 from core.authentication import current_user
 from core.serializers import error_responses
+from issues.models import RecommendedIssue
 from recommendations.models import Recommendation
 from repositories.models import RepositorySnapshot
 from services import feedback
@@ -45,7 +47,19 @@ class FeedbackView(APIView):
         recommendation = _own_recommendation(request, pk)
         body = FeedbackSerializer(data=request.data)
         body.is_valid(raise_exception=True)
-        feedback.record(current_user(request), recommendation, body.validated_data["action"])
+        issue = None
+        if (issue_id := body.validated_data.get("issue_id")) is not None:
+            relevant = (
+                RecommendedIssue.objects.filter(recommendation=recommendation, issue_id=issue_id)
+                .select_related("issue")
+                .first()
+            )
+            if relevant is None:
+                raise ValidationError({"issue_id": "Not a relevant issue of this recommendation."})
+            issue = relevant.issue
+        feedback.record(
+            current_user(request), recommendation, body.validated_data["action"], issue=issue
+        )
         return Response(status=204)
 
 

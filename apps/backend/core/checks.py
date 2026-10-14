@@ -73,7 +73,8 @@ def profiling_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
 
 
 QUERY_STRATEGIES = ("language", "skill", "interest", "topic")
-STALE_PARTS = ("metadata", "readme", "community", "dependencies", "activity")
+STALE_PARTS = ("metadata", "readme", "community", "dependencies", "activity", "issues")
+ISSUE_DIFFICULTY_KEYS = ("short_body", "long_body", "many_technologies", "long_discussion")
 ACTIVITY_KEYS = (
     "recent_push_days",
     "recent_commits",
@@ -187,3 +188,35 @@ def feedback_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckM
     if not _is_int(value) or value <= 0:
         return [Error("FEEDBACK_VIEW_DEDUP_MINUTES must be a positive integer.", id="core.E020")]
     return []
+
+
+@register()
+def issue_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    """Issue fetch budget, body cap, age limit and difficulty thresholds (Phase 7)."""
+    errors: list[CheckMessage] = []
+    for name in ("ISSUES_MAX_PAGES", "ISSUE_BODY_MAX_CHARS", "ISSUE_MAX_AGE_DAYS"):
+        value = getattr(settings, name)
+        if not _is_int(value) or value <= 0:
+            errors.append(Error(f"{name} must be a positive integer.", id="core.E020"))
+    thresholds = settings.ISSUE_DIFFICULTY
+    difficulty_errors = _keys_errors(
+        "ISSUE_DIFFICULTY", thresholds, ISSUE_DIFFICULTY_KEYS, "core.E040"
+    )
+    errors += difficulty_errors
+    if not difficulty_errors:
+        if not 0 < thresholds["short_body"] < thresholds["long_body"]:
+            errors.append(
+                Error(
+                    "ISSUE_DIFFICULTY: short_body must be positive and lower than long_body.",
+                    id="core.E040",
+                )
+            )
+        if thresholds["many_technologies"] < 2 or thresholds["long_discussion"] < 1:
+            errors.append(
+                Error(
+                    "ISSUE_DIFFICULTY: many_technologies must be at least 2 and "
+                    "long_discussion at least 1.",
+                    id="core.E040",
+                )
+            )
+    return errors

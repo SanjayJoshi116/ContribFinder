@@ -3,14 +3,16 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.6.0** (Phase 8a: Feedback and data controls, MVP complete). After signing in with
+**Version 0.7.0** (Phase 7: Issues, MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
 then ranks them with deterministic, versioned scoring and shows each recommendation with a match
 label (Strong, Good, Partial) and the reasons behind it, never a percentage. You can save or
 dismiss projects, refresh everything, and delete your GitHub data or your account at any time
-(see the in-app privacy page). Issues and semantic matching come after the MVP.
+(see the in-app privacy page). Each recommendation also lists the open issues that fit you, with
+their contribution type and an estimated difficulty (or "Not enough evidence"). Semantic matching
+comes later.
 
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
@@ -88,8 +90,9 @@ activity thresholds (`DISCOVERY_*`, `REPO_*`, `ACTIVITY_THRESHOLDS`) are configu
 A completed sync or re-analysis starts a discovery run automatically, and a completed discovery
 starts a recommendation generation. Ranking limits and sizes (`RECOMMENDATION_*`,
 `RECOMMENDATIONS_TOP_N`, `REPO_SIZE_THRESHOLDS`) and the view de-duplication window
-(`FEEDBACK_VIEW_DEDUP_MINUTES`) are in `.env.example` too; scoring weights live in the active
-`ScoringConfig` (Django admin).
+(`FEEDBACK_VIEW_DEDUP_MINUTES`) are in `.env.example` too, as are the issue fetch budget and
+difficulty thresholds (`ISSUES_MAX_PAGES`, `ISSUE_*`). Scoring weights and issue matching
+parameters live in the active `ScoringConfig` (Django admin); `v2-deterministic` is active.
 
 ## Your data
 

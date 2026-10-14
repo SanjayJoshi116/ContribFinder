@@ -7,6 +7,73 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-13
+
+Phase 7: Issues (OpenSpec change `phase-7-issues`; FR-ISSUE-001..005, MVP+). Issue analysis and
+matching are deterministic and rule-based: no LLM or embedding calls.
+
+### Added
+
+- New `issues` app. `Issue` stores the open issues of every pooled repository once, shared by all
+  developers: GitHub fields (title, plain-text body capped at `ISSUE_BODY_MAX_CHARS`, raw labels,
+  locked, assignee, comments, times) plus ContribFinder analysis with its evidence.
+  `RecommendedIssue` holds each recommendation's relevant issues (rank, internal score, reasons)
+  and is rebuilt with it.
+- Issue ingestion (FR-ISSUE-001): `GitHubClient.list_open_issues` (most recently updated first,
+  `ISSUES_MAX_PAGES` pages of 100, pull requests dropped, truncation recorded, 410 = issues
+  disabled). Issues are a repository analysis part with their own staleness
+  (`REPO_STALE_AFTER["issues"]`, 6 h); the backlog queues the new task
+  `repositories.sync_repository_issues` when only issues are stale. Each fetch replaces the
+  stored set, so closed issues disappear; a failed fetch keeps them and is recorded.
+- Label normalization (FR-ISSUE-002): an alias table with scope-prefix stripping (`Type: Bug`,
+  `kind/docs`, `good-first-issue`) maps raw labels to 13 canonical categories
+  (`ISSUE_TAXONOMY_VERSION`). Raw labels are kept as sent.
+- Contribution type (FR-ISSUE-003): code, documentation, testing, bug fix, feature, DevOps,
+  design or unknown, from label priority first and title keywords second, with the deciding
+  label or keyword recorded.
+- Difficulty (FR-ISSUE-004): beginner, intermediate, advanced or unknown from signal votes
+  (difficulty labels, description length, technologies mentioned, documentation work, discussion
+  size; thresholds in `ISSUE_DIFFICULTY`). A level needs two agreeing votes and no contradiction,
+  so a label alone never decides. Every vote is stored as evidence.
+- Issue technologies: the skill catalog detects technologies in an issue's title, labels and body
+  (ambiguous words only in labels; HTML and CSS left out).
+- Issue matching (FR-ISSUE-005): eligible issues (open, unlocked, unassigned, updated within
+  `ISSUE_MAX_AGE_DAYS`) are scored per developer from technology match, difficulty fit with the
+  internal experience level and approachability labels. Up to 5 relevant issues per
+  recommendation, each with reasons built only from those parts.
+- Two repository signals, `issue_fit` and `difficulty_fit`, with reason types
+  `issue_availability` and `difficulty`. Issues alone never make a project a recommendation.
+- API: `relevant_issue_count` on recommendation list items; `difficulty` and `contribution_type`
+  filters; relevant issues on the recommendation detail; `GET /api/v1/issues/{id}` with GitHub
+  data and ContribFinder analysis as separate objects (404 unless relevant to one of the user's
+  recommendations). `opened_issue` feedback now requires `issue_id` and stores the issue and a
+  number snapshot.
+- Frontend: "N relevant issues" on cards, the two new filters, a "Relevant issues" section on
+  the repository detail page, and the issue page `/app/issues/:id` ("From GitHub" vs
+  "ContribFinder analysis", description as plain text, "Not enough evidence" for unknown values,
+  GitHub link recording `opened_issue`).
+- Settings `ISSUES_MAX_PAGES`, `ISSUE_BODY_MAX_CHARS`, `ISSUE_MAX_AGE_DAYS`, `ISSUE_DIFFICULTY`
+  with system check `core.E040`.
+
+### Changed
+
+- **Ranking change:** new scoring configuration `v2-deterministic` (skill 0.35, language 0.15,
+  interest 0.15, framework 0.10, activity 0.10, openness 0.05, issue fit 0.05, difficulty fit
+  0.05, plus issue matching parameters) is activated by migration. The freshness sweep
+  regenerates every user's recommendations under it. Projects without relevant issues score a
+  little lower than under v1 (for example Strong can become Good). `v1-deterministic` stays
+  stored and can be re-activated from the admin; it scores the issue signals as 0.
+- Issue difficulty and the profile's preferred difficulty share one choice set (OpenAPI
+  `DifficultyEnum`).
+
+### Known limitations
+
+- One page of the most recently updated issues per repository: older good first issues in large
+  repositories can be missed (truncation is recorded).
+- Rule-based difficulty is often `unknown` (shown as "Not enough evidence").
+- Every issue refresh (6 h) makes the pool's recommendations due for regeneration.
+- Docker Compose verification remains future scope.
+
 ## [0.6.0] - 2026-10-01
 
 Phase 8a: Feedback and data controls (OpenSpec change `phase-8a-feedback-data-controls`;

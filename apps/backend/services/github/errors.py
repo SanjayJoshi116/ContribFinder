@@ -44,3 +44,7 @@ class GitHubConflict(GitHubClientError):
 
 class GitHubUnavailableForLegalReasons(GitHubClientError):
     """451: the repository is blocked (e.g. DMCA takedown)."""
+
+
+class GitHubGone(GitHubClientError):
+    """410: e.g. listing issues of a repository with issues disabled."""

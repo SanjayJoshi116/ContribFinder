@@ -8,11 +8,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from services.matching.features import RepoData
+from services.matching.issues import NO_MATCH, IssueMatch
 from services.matching.signals import Signal
 from services.matching.technologies import Tech
 
-# Signals that say the repository fits the developer. Activity and openness describe the
-# repository only, so they can order relevant candidates but never make one relevant.
+# Signals that say the repository fits the developer. Activity, openness and the issue signals
+# describe what the repository offers, so they can order relevant candidates but never make
+# one relevant.
 RELEVANCE_SIGNALS = ("skill", "language", "framework", "interest")
 
 STRONG = "strong"
@@ -27,11 +29,13 @@ class Scored:
     signals: Mapping[str, Signal]
     score: float
     label: str
+    issues: IssueMatch = NO_MATCH
 
 
 def weighted_score(signals: Mapping[str, Signal], weights: Mapping[str, float]) -> float:
-    """Internal ranking value in 0..1 (never shown as a percentage)."""
-    return round(sum(weights[name] * signals[name].value for name in weights), 4)
+    """Internal ranking value in 0..1 (never shown as a percentage). A signal the
+    configuration has no weight for (issue signals under v1) counts as 0."""
+    return round(sum(weights.get(name, 0.0) * signal.value for name, signal in signals.items()), 4)
 
 
 def match_label(score: float, bands: Mapping[str, float]) -> str:
@@ -48,13 +52,18 @@ def score_candidate(
     signals: Mapping[str, Signal],
     weights: Mapping[str, float],
     params: Mapping[str, Any],
+    issues: IssueMatch = NO_MATCH,
 ) -> Scored:
     value = weighted_score(signals, weights)
-    return Scored(repo, techs, signals, value, match_label(value, params["bands"]))
+    return Scored(repo, techs, signals, value, match_label(value, params["bands"]), issues)
+
+
+def has_relevance(signals: Mapping[str, Signal]) -> bool:
+    return any(signals[name].value > 0 for name in RELEVANCE_SIGNALS)
 
 
 def is_relevant(scored: Scored) -> bool:
-    return any(scored.signals[name].value > 0 for name in RELEVANCE_SIGNALS)
+    return has_relevance(scored.signals)
 
 
 def rank(scored: Iterable[Scored], *, min_score: float, top_n: int) -> list[Scored]:

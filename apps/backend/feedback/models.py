@@ -29,6 +29,11 @@ class RecommendationFeedback(models.Model):
     recommendation = models.ForeignKey(
         Recommendation, null=True, blank=True, on_delete=models.SET_NULL, related_name="feedback"
     )
+    # opened_issue only: the issue (nulled when it is closed or removed) and its number.
+    issue = models.ForeignKey(
+        "issues.Issue", null=True, blank=True, on_delete=models.SET_NULL, related_name="feedback"
+    )
+    issue_number = models.PositiveIntegerField(null=True, blank=True)
     repository_full_name = models.CharField(max_length=255)
     action = models.CharField(max_length=20, choices=FeedbackAction.choices)
     # Snapshot of the recommendation at the time; blank/null when there was none.

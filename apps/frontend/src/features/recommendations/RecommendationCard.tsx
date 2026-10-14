@@ -89,6 +89,16 @@ export function RecommendationCard({
       )}
       <footer className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         {activity_label && <span>{ACTIVITY_TEXT[activity_label]}</span>}
+        {recommendation.relevant_issue_count > 0 && (
+          <Link
+            to={`/app/recommendations/${recommendation.id}#relevant-issues`}
+            className="text-foreground rounded-full border px-2 py-0.5 hover:underline"
+          >
+            {recommendation.relevant_issue_count === 1
+              ? '1 relevant issue'
+              : `${recommendation.relevant_issue_count} relevant issues`}
+          </Link>
+        )}
         <a
           href={repository.html_url}
           target="_blank"

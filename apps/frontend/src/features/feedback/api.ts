@@ -14,12 +14,17 @@ import { recommendationDetailKey, recommendationListKey } from '@/features/recom
 export const savedKey = ['profile', 'saved'] as const
 export const dismissedKey = ['profile', 'dismissed'] as const
 
-/** Fire-and-forget interaction event: never blocks navigation, never shows an error. */
-export function recordFeedback(recommendationId: number, action: FeedbackAction): void {
+/** Fire-and-forget interaction event: never blocks navigation, never shows an error.
+ * ``opened_issue`` needs the issue id, one of the recommendation's relevant issues. */
+export function recordFeedback(
+  recommendationId: number,
+  action: FeedbackAction,
+  extra: { issue_id?: number } = {},
+): void {
   apiFetch<void>(`/recommendations/${recommendationId}/feedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ action, ...extra }),
     keepalive: true,
   }).catch(() => undefined)
 }

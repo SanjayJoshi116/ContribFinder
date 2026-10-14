@@ -13,6 +13,8 @@ import {
 } from './api'
 import {
   ACTIVITY_OPTIONS,
+  CONTRIBUTION_TYPE_OPTIONS,
+  DIFFICULTY_OPTIONS,
   FRAMEWORK_OPTIONS,
   LANGUAGE_OPTIONS,
   MATCH_OPTIONS,
@@ -29,6 +31,8 @@ const FILTERS: { key: FilterKey; label: string; options: Option[] }[] = [
   { key: 'activity', label: 'Activity', options: ACTIVITY_OPTIONS },
   { key: 'size', label: 'Size', options: SIZE_OPTIONS },
   { key: 'match', label: 'Match', options: MATCH_OPTIONS },
+  { key: 'difficulty', label: 'Issue difficulty', options: DIFFICULTY_OPTIONS },
+  { key: 'contribution_type', label: 'Contribution type', options: CONTRIBUTION_TYPE_OPTIONS },
 ]
 
 /** One API page (the backend's page size). */

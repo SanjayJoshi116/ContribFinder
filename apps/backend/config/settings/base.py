@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "developers",
     "recommendations",
     "feedback",
+    "issues",
 ]
 
 MIDDLEWARE = [
@@ -172,6 +173,8 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
+    # Issue difficulty and the profile's preferred difficulty share one choice set.
+    "ENUM_NAME_OVERRIDES": {"DifficultyEnum": "developers.models.IssueDifficulty"},
 }
 
 # --- Celery ----------------------------------------------------------------
@@ -284,6 +287,7 @@ REPO_README_MAX_BYTES = env.int("REPO_README_MAX_BYTES", default=200 * 1024)
 REPO_SNAPSHOT_HISTORY = env.int("REPO_SNAPSHOT_HISTORY", default=10)
 # Hours after which each data type of a repository is stale (SRS-2 §24).
 REPO_STALE_AFTER: dict[str, int] = {
+    "issues": 6,
     "metadata": 12,
     "activity": 24,
     "community": 168,
@@ -324,6 +328,22 @@ RECOMMENDATION_README_EXCERPT_CHARS = env.int("RECOMMENDATION_README_EXCERPT_CHA
 # --- Feedback (Phase 8a) ---
 # A second "viewed" event for the same recommendation within this window is not recorded.
 FEEDBACK_VIEW_DEDUP_MINUTES = env.int("FEEDBACK_VIEW_DEDUP_MINUTES", default=30)
+
+# --- Issues (Phase 7) ---
+# Issue matching weights, thresholds and the difficulty fit table are ScoringConfig params.
+ISSUES_MAX_PAGES = env.int("ISSUES_MAX_PAGES", default=1)
+ISSUE_BODY_MAX_CHARS = env.int("ISSUE_BODY_MAX_CHARS", default=10_000)
+ISSUE_MAX_AGE_DAYS = env.int("ISSUE_MAX_AGE_DAYS", default=365)
+# Difficulty votes: a body under short_body votes beginner, over long_body advanced; at most
+# one technology votes beginner, many_technologies or more advanced; long_discussion comments
+# or more vote advanced.
+ISSUE_DIFFICULTY: dict[str, int] = {
+    "short_body": 600,
+    "long_body": 4000,
+    "many_technologies": 3,
+    "long_discussion": 15,
+    **env.json("ISSUE_DIFFICULTY", default={}),
+}
 
 CELERY_BEAT_SCHEDULE = {
     "recover-stale-jobs": {

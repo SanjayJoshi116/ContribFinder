@@ -161,7 +161,7 @@ Feedback (FR-FEEDBACK)
   [x] FR-FEEDBACK-001  Record views (de-duplicated within FEEDBACK_VIEW_DEDUP_MINUTES)
   [x] FR-FEEDBACK-002  Save / unsave; saved projects kept when no longer recommended
   [x] FR-FEEDBACK-003  Dismiss with Undo; dismissed repositories excluded from ranking; restore
-  [x] FR-FEEDBACK-004  Repository interactions (opened on GitHub); opened_issue waits for Phase 7
+  [x] FR-FEEDBACK-004  Repository interactions (opened on GitHub); opened_issue in Phase 7
   [x] Feedback stored independently with snapshots (label, rank, config); analytics only
 
 Data controls (FR-DATA)
@@ -189,11 +189,32 @@ Developer experience
   [x] Carry-over closed: Ctrl+C stops npm start in an interactive Windows console
 
 ============================================================================
+SHIPPED - v0.7.0 - Phase 7: Issues (MVP+)
+============================================================================
+
+Issues (FR-ISSUE)
+  [x] FR-ISSUE-001  Open issues of pooled repositories (one page, PRs dropped, 6 h freshness)
+  [x] FR-ISSUE-002  Label normalization (aliases, scope prefixes, 13 categories)
+  [x] FR-ISSUE-003  Contribution type (labels first, title keywords second, evidence)
+  [x] FR-ISSUE-004  Difficulty estimate (signal votes, unknown without agreeing evidence)
+  [x] FR-ISSUE-005  Relevant issues per recommendation with reasons; issue detail page
+  [x] Issue technologies from the skill catalog (HTML/CSS excluded)
+  [x] FR-FEEDBACK-004  opened_issue recorded with the issue and its number
+
+Recommendations
+  [x] issue_fit and difficulty_fit signals; v2-deterministic scoring config (active)
+  [x] Reasons: issue_availability, difficulty
+  [x] Filters: difficulty, contribution_type
+
+Frontend
+  [x] Relevant issue count on cards; "Relevant issues" on the repository detail page
+  [x] /app/issues/:id: "From GitHub" vs "ContribFinder analysis", plain-text description
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
-  [ ] Phase 7  Issues: FR-ISSUE-001..005 (ingestion, labels, type, difficulty, evidence)
   [ ] Phase 8b Recommendation evaluation (Precision@k, Recall@10, MRR, NDCG)
   [ ]          Personalized ranking, notifications, contribution tracking

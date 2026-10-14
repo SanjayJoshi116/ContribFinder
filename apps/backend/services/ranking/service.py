@@ -1,12 +1,14 @@
 """Recommendation generation (spec: recommendation-engine; design D7).
 
-Stages run in memory on stored data: load → technologies → signals → score → rank → explain.
+Stages run in memory on stored data: load → technologies → signals → issue matching (for
+candidates that pass the relevance gate) → score → rank → explain.
 The result replaces the developer's recommendations in one transaction, upserted per
 repository so ids survive regenerations. No GitHub or AI calls.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -16,6 +18,7 @@ from django.utils import timezone
 
 from developers.models import DeveloperProfile
 from feedback.models import DismissedRepository
+from issues.models import Issue, RecommendedIssue
 from jobs.models import SyncJob
 from recommendations.models import (
     Recommendation,
@@ -27,11 +30,13 @@ from services.errors import PermanentJobError
 from services.github.sync import JobCancelled
 from services.matching import signals as sig
 from services.matching.features import DeveloperFeatures, RepoData, load_candidates, load_developer
+from services.matching.issues import NO_MATCH, MatchedIssue, load_issues, match_issues
+from services.matching.issues import snapshot as issue_snapshot
 from services.matching.technologies import Tech, repository_technologies
 
 from . import config as scoring_config
 from .explain import reasons
-from .score import Scored, rank, score_candidate
+from .score import Scored, has_relevance, rank, score_candidate
 
 STEP = "recommendations"
 Step = SyncJob.StepState
@@ -73,7 +78,7 @@ def active_config() -> ScoringConfig:
     config = ScoringConfig.objects.filter(is_active=True).first()
     if config is None:
         raise NoScoringConfig("No active scoring configuration")
-    if errors := scoring_config.validate(config.weights, config.params):
+    if errors := scoring_config.validate(config.weights, config.params, stored=True):
         raise NoScoringConfig(f"Active scoring configuration is invalid: {'; '.join(errors)}")
     return config
 
@@ -97,7 +102,7 @@ class RecommendationService:
             candidates = load_candidates(profile)
             self._check_cancelled()
             kept = rank(
-                (self._score(repo, dev, config) for repo in candidates),
+                self._score(candidates, dev, config, now),
                 min_score=settings.RECOMMENDATION_MIN_SCORE,
                 top_n=settings.RECOMMENDATIONS_TOP_N,
             )
@@ -118,12 +123,41 @@ class RecommendationService:
         self.job.steps = {**self.job.steps, STEP: str(Step.DONE)}
         self.job.save(update_fields=["metadata", "steps", "updated_at"])
 
-    def _score(self, repo: RepoData, dev: DeveloperFeatures, config: ScoringConfig) -> Scored:
-        techs = repository_technologies(
-            repo.languages, repo.topics, repo.dependencies, config.params["tech_sources"]
+    def _score(
+        self,
+        candidates: list[RepoData],
+        dev: DeveloperFeatures,
+        config: ScoringConfig,
+        now: datetime,
+    ) -> Iterator[Scored]:
+        """Repository signals for every candidate; issue matching only for those that pass
+        the relevance gate, with their eligible issues loaded in one query."""
+        computed = []
+        for repo in candidates:
+            techs = repository_technologies(
+                repo.languages, repo.topics, repo.dependencies, config.params["tech_sources"]
+            )
+            computed.append((repo, techs, sig.compute(repo, techs, dev, config.params)))
+        issue_params = config.params.get("issues")
+        issues = (
+            load_issues(
+                [repo.id for repo, _, signals in computed if has_relevance(signals)],
+                now,
+                settings.ISSUE_MAX_AGE_DAYS,
+            )
+            if issue_params
+            else {}
         )
-        signals = sig.compute(repo, techs, dev, config.params)
-        return score_candidate(repo, techs, signals, config.weights, config.params)
+        for repo, techs, signals in computed:
+            match = (
+                match_issues(issues[repo.id], dev, issue_params) if repo.id in issues else NO_MATCH
+            )
+            signals = {
+                **signals,
+                "issue_fit": match.issue_fit,
+                "difficulty_fit": match.difficulty_fit,
+            }
+            yield score_candidate(repo, techs, signals, config.weights, config.params, match)
 
     def _persist(
         self,
@@ -153,6 +187,16 @@ class RecommendationService:
                 )
             )
             kept = [s for s in kept if s.repo.id not in dismissed]
+            # Lock the matched issues so a concurrent issue refresh cannot delete one before
+            # commit; one it already deleted is dropped.
+            alive = set(
+                Issue.objects.select_for_update()
+                .filter(pk__in=[m.issue.id for s in kept for m in s.issues.issues])
+                .values_list("pk", flat=True)
+            )
+            issues: dict[int, list[MatchedIssue]] = {
+                s.repo.id: [m for m in s.issues.issues if m.issue.id in alive] for s in kept
+            }
             existing = {
                 r.repository_id: r
                 for r in Recommendation.objects.select_for_update().filter(developer=profile)
@@ -170,6 +214,7 @@ class RecommendationService:
                     "technologies": technologies_json(dict(s.techs), dev),
                     "activity_label": snapshot.activity_label if snapshot else "",
                     "size": repository_size(snapshot.contributors if snapshot else None, sizes),
+                    **issue_snapshot(issues[s.repo.id]),
                     "generated_at": now,
                 }
                 if (rec := existing.pop(s.repo.id, None)) is not None:
@@ -193,6 +238,9 @@ class RecommendationService:
                         "technologies",
                         "activity_label",
                         "size",
+                        "relevant_issue_count",
+                        "issue_difficulties",
+                        "issue_contribution_types",
                         "generated_at",
                     ],
                 )
@@ -210,6 +258,18 @@ class RecommendationService:
                 )
                 for s in kept
                 for index, reason in enumerate(reasons(s.signals, config.weights))
+            )
+            RecommendedIssue.objects.filter(recommendation__developer=profile).delete()
+            RecommendedIssue.objects.bulk_create(
+                RecommendedIssue(
+                    recommendation=by_repo[s.repo.id],
+                    issue_id=matched.issue.id,
+                    rank=position,
+                    score=matched.score,
+                    reasons=list(matched.reasons),
+                )
+                for s in kept
+                for position, matched in enumerate(issues[s.repo.id], start=1)
             )
         return kept
 

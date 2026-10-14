@@ -23,8 +23,16 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from issues.models import Issue
 from repositories.models import Lifecycle, Repository, RepositoryReadme, RepositorySnapshot
-from services.github.client import CommunityProfile, GitHubClient, GitHubRepo, PullSample
+from services.github.client import (
+    CommunityProfile,
+    GitHubClient,
+    GitHubRepo,
+    IssueData,
+    IssuePage,
+    PullSample,
+)
 from services.github.errors import (
     GitHubForbidden,
     GitHubNotFound,
@@ -37,6 +45,7 @@ from services.github.storage import (
     replace_topics,
     upsert_repository,
 )
+from services.issues.analysis import IssueInput, analyze
 from services.matching.activity import WINDOW_DAYS, ActivityData, compute_activity
 
 from . import lifecycle
@@ -50,6 +59,28 @@ ERROR_CODES: dict[type[Exception], str] = {
     GitHubUnavailableForLegalReasons: "unavailable",
     GitHubForbidden: "forbidden",
 }
+# Issue columns written by each fetch (everything but the identity).
+ISSUE_FIELDS = (
+    "repository",
+    "number",
+    "title",
+    "body",
+    "raw_labels",
+    "state",
+    "is_locked",
+    "has_assignee",
+    "comments",
+    "html_url",
+    "github_created_at",
+    "github_updated_at",
+    "labels",
+    "contribution_type",
+    "contribution_type_evidence",
+    "difficulty",
+    "difficulty_evidence",
+    "technologies",
+    "analyzed_at",
+)
 GOOD_FIRST_ISSUE = "good first issue"
 HELP_WANTED = "help wanted"
 
@@ -70,6 +101,7 @@ class _Fetched:
     labels: list[str] | None = None
     dependencies: dict[tuple[str, str], str] | None = None
     activity: ActivityData | None = None
+    issues: IssuePage | None = None
 
 
 def normalize_label(name: str) -> str:
@@ -158,6 +190,9 @@ class RepositoryAnalysisService:
                 contributors=contributors,
                 latest_release_at=release,
             )
+        if "issues" in parts:
+            self._check_cancelled()
+            out.issues = c.list_open_issues(name)
         return out
 
     # --- storing (one transaction) ---------------------------------------------------------
@@ -201,6 +236,11 @@ class RepositoryAnalysisService:
             self._store_snapshot(repo, f.activity, now)
             repo.activity_synced_at = now
             fields.append("activity_synced_at")
+        if f.issues is not None:
+            self._store_issues(repo, f.issues.issues, now)
+            repo.issues_synced_at = now
+            repo.issues_truncated = f.issues.truncated
+            fields += ["issues_synced_at", "issues_truncated"]
         if fields:
             repo.save(update_fields=fields)
 
@@ -228,6 +268,50 @@ class RepositoryAnalysisService:
         stale_ids = list(old.values_list("pk", flat=True)[keep:])
         if stale_ids:
             RepositorySnapshot.objects.filter(pk__in=stale_ids).delete()
+
+    def _store_issues(self, repo: Repository, fetched: list[IssueData], now: datetime) -> None:
+        """Replace the repository's issues with the fetched set: issues no longer returned
+        (closed) are deleted, the others keep their row and get fresh fields and analysis."""
+        limit = settings.ISSUE_BODY_MAX_CHARS
+        thresholds = settings.ISSUE_DIFFICULTY
+        ids = {i.github_id for i in fetched}
+        Issue.objects.filter(repository=repo).exclude(github_id__in=ids).delete()
+        existing = {i.github_id: i for i in Issue.objects.filter(github_id__in=ids)}
+        to_create: list[Issue] = []
+        to_update: list[Issue] = []
+        for data in fetched:
+            body = data.body[:limit]
+            result = analyze(IssueInput(data.title, body, data.labels, data.comments), thresholds)
+            values = {
+                "repository": repo,
+                "number": data.number,
+                "title": data.title[:1024],
+                "body": body,
+                "raw_labels": list(data.labels),
+                "state": data.state,
+                "is_locked": data.is_locked,
+                "has_assignee": data.has_assignee,
+                "comments": data.comments,
+                "html_url": data.html_url,
+                "github_created_at": data.created_at,
+                "github_updated_at": data.updated_at,
+                "labels": result.labels,
+                "contribution_type": result.contribution_type,
+                "contribution_type_evidence": result.contribution_type_evidence,
+                "difficulty": result.difficulty,
+                "difficulty_evidence": result.difficulty_evidence,
+                "technologies": result.technologies,
+                "analyzed_at": now,
+            }
+            if (issue := existing.get(data.github_id)) is not None:
+                for name, value in values.items():
+                    setattr(issue, name, value)
+                to_update.append(issue)
+            else:
+                to_create.append(Issue(github_id=data.github_id, **values))
+        if to_update:
+            Issue.objects.bulk_update(to_update, list(ISSUE_FIELDS))
+        Issue.objects.bulk_create(to_create)
 
 
 __all__ = ["PARTS", "Outcome", "RepositoryAnalysisService", "normalize_label"]

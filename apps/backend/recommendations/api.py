@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from core.authentication import current_user
 from core.serializers import error_responses
 from feedback.models import SavedRepository
+from issues.models import ContributionType, Difficulty, RecommendedIssue
 from jobs.models import SyncJob
 from repositories.models import ActivityLabel, RepositoryLanguage, RepositorySnapshot
 from services.jobs import RECOMMENDATIONS
@@ -49,6 +50,16 @@ class RecommendationFilter(filters.FilterSet):  # type: ignore[misc]
     activity = filters.ChoiceFilter(choices=ActivityLabel.choices, field_name="activity_label")
     size = filters.ChoiceFilter(choices=RepositorySize.choices, field_name="size")
     match = filters.ChoiceFilter(choices=MatchLabel.choices, field_name="match_label")
+    difficulty = filters.ChoiceFilter(
+        choices=Difficulty.choices,
+        method="filter_difficulty",
+        help_text="At least one relevant issue of this estimated difficulty.",
+    )
+    contribution_type = filters.ChoiceFilter(
+        choices=[c for c in ContributionType.choices if c[0] != ContributionType.UNKNOWN],
+        method="filter_contribution_type",
+        help_text="At least one relevant issue of this contribution type.",
+    )
 
     class Meta:
         model = Recommendation
@@ -69,6 +80,14 @@ class RecommendationFilter(filters.FilterSet):  # type: ignore[misc]
 
     def filter_framework(self, queryset: QuerySet[Any], name: str, value: str) -> QuerySet[Any]:
         return queryset.filter(technologies__contains=[{"slug": value}])
+
+    def filter_difficulty(self, queryset: QuerySet[Any], name: str, value: str) -> QuerySet[Any]:
+        return queryset.filter(issue_difficulties__contains=[value])
+
+    def filter_contribution_type(
+        self, queryset: QuerySet[Any], name: str, value: str
+    ) -> QuerySet[Any]:
+        return queryset.filter(issue_contribution_types__contains=[value])
 
 
 def _user_recommendations(request: Request) -> QuerySet[Recommendation]:
@@ -119,6 +138,10 @@ class RecommendationDetailView(RetrieveAPIView[Recommendation]):
                     "repository__snapshots",
                     queryset=RepositorySnapshot.objects.order_by("-captured_at", "-pk"),
                     to_attr="ordered_snapshots",
+                ),
+                Prefetch(
+                    "recommended_issues",
+                    queryset=RecommendedIssue.objects.select_related("issue").order_by("rank"),
                 ),
             )
         )

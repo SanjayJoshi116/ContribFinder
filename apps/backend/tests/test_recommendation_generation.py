@@ -25,7 +25,7 @@ from repositories.models import (
 from services import jobs
 from services.github.sync import JobCancelled
 from services.ranking import freshness
-from services.ranking.config import V1_PARAMS, V1_WEIGHTS
+from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 from services.ranking.service import RecommendationService
 
 from .repo_fixtures import add_candidate, make_candidate_repo
@@ -126,9 +126,9 @@ def test_generation_ranks_labels_and_explains(user, developer, pool, respx_mock)
     recs = list(Recommendation.objects.filter(developer=developer).order_by("rank"))
     assert [r.repository.full_name for r in recs][:2] == ["encode/django-tool", "someone/pylib"]
     top = recs[0]
-    assert top.scoring_config.version == "v1-deterministic"
+    assert top.scoring_config.version == "v2-deterministic"
     assert top.match_label == "strong"
-    assert set(top.signal_scores) == set(V1_WEIGHTS)
+    assert set(top.signal_scores) == set(V2_WEIGHTS)
     assert top.size == "medium" and top.activity_label == "recently_active"
     assert {"slug": "django", "name": "Django", "category": "framework", "matched": True} in (
         top.technologies
@@ -140,7 +140,7 @@ def test_generation_ranks_labels_and_explains(user, developer, pool, respx_mock)
     go = next((r for r in recs if r.repository_id == pool["go"].pk), None)
     assert go is None or "language" not in {r.type for r in go.reasons.all()}
     assert job.steps["recommendations"] == "done"
-    assert job.metadata["config_version"] == "v1-deterministic"
+    assert job.metadata["config_version"] == "v2-deterministic"
     assert not respx_mock.calls
 
 
@@ -259,7 +259,7 @@ class TestFreshness:
         generate(user)
         ScoringConfig.objects.update(is_active=False)
         ScoringConfig.objects.create(
-            version="v2", weights=V1_WEIGHTS, params=V1_PARAMS, is_active=True
+            version="v3", weights=V2_WEIGHTS, params=V2_PARAMS, is_active=True
         )
         assert self.due() == [developer.pk]
 

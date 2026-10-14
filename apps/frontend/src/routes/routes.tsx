@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router'
 
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { SavedPage } from '@/features/feedback/SavedPage'
+import { IssueDetailPage } from '@/features/issues/IssueDetailPage'
 import { RecommendationDetailPage } from '@/features/recommendations/RecommendationDetailPage'
 
 import { AppShell } from './AppShell'
@@ -21,6 +22,7 @@ export const routes: RouteObject[] = [
         children: [
           { path: '/app', element: <AppShell /> },
           { path: '/app/recommendations/:id', element: <RecommendationDetailPage /> },
+          { path: '/app/issues/:id', element: <IssueDetailPage /> },
           { path: '/app/saved', element: <SavedPage /> },
           { path: '/onboarding', element: <OnboardingPage /> },
         ],

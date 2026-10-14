@@ -12,7 +12,18 @@ from typing import Any
 
 from services.matching.signals import Signal
 
-ORDER = ("skill", "language", "framework", "interest", "activity", "openness")
+ORDER = (
+    "skill",
+    "language",
+    "framework",
+    "interest",
+    "issue_availability",
+    "difficulty",
+    "activity",
+    "openness",
+)
+# Recommendation reason type per signal, where the two differ.
+REASON_TYPES = {"issue_fit": "issue_availability", "difficulty_fit": "difficulty"}
 
 ACTIVITY_TEXT = {
     "recently_active": "Recently active",
@@ -24,6 +35,17 @@ OPENNESS_TEXT = {
     "good_first_issue": "good first issue labels",
     "help_wanted": "help wanted labels",
     "issue_templates": "issue templates",
+}
+
+
+CONTRIBUTION_TYPE_TEXT = {
+    "code": "code",
+    "documentation": "documentation",
+    "testing": "testing",
+    "bug_fix": "bug fix",
+    "feature": "feature",
+    "devops": "DevOps",
+    "design": "design",
 }
 
 
@@ -110,6 +132,29 @@ def _openness(items: Sequence[Mapping[str, Any]]) -> str:
     return f"Has {join([OPENNESS_TEXT[i['flag']] for i in items])}"
 
 
+def _issue_availability(items: Sequence[Mapping[str, Any]]) -> str:
+    facts = items[0]
+    count = facts["count"]
+    text = (
+        "1 open issue matches your profile"
+        if count == 1
+        else f"{count} open issues match your profile"
+    )
+    known = [(t, n) for t, n in facts["by_type"].items() if t in CONTRIBUTION_TYPE_TEXT]
+    if known:
+        kind, n = min(known, key=lambda tn: (-tn[1], tn[0]))
+        text += f", including {_plural(n, f'{CONTRIBUTION_TYPE_TEXT[kind]} issue')}"
+    return text
+
+
+def _difficulty(items: Sequence[Mapping[str, Any]]) -> str:
+    facts = items[0]
+    level, count = facts["best"], facts["count"]
+    if count == 1:
+        return f"1 issue looks {level}-level (estimated)"
+    return f"Some issues look {level}-level (estimated)"
+
+
 TEMPLATES: dict[str, Callable[[Sequence[Mapping[str, Any]]], str]] = {
     "skill": _skill,
     "language": _language,
@@ -117,6 +162,8 @@ TEMPLATES: dict[str, Callable[[Sequence[Mapping[str, Any]]], str]] = {
     "interest": _interest,
     "activity": _activity,
     "openness": _openness,
+    "issue_availability": _issue_availability,
+    "difficulty": _difficulty,
 }
 
 
@@ -124,9 +171,9 @@ def reasons(signals: Mapping[str, Signal], weights: Mapping[str, float]) -> list
     """Reasons for every signal above 0 with evidence, highest contribution first."""
     result = [
         Reason(
-            type=name,
-            text=TEMPLATES[name](signal.evidence),
-            weight=round(weights[name] * signal.value, 4),
+            type=REASON_TYPES.get(name, name),
+            text=TEMPLATES[REASON_TYPES.get(name, name)](signal.evidence),
+            weight=round(weights.get(name, 0.0) * signal.value, 4),
             detail={"items": [dict(item) for item in signal.evidence]},
         )
         for name, signal in signals.items()
