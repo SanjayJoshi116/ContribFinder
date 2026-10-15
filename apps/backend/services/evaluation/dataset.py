@@ -23,7 +23,11 @@ from services.profiling.taxonomy import INTERESTS_BY_SLUG, SKILLS_BY_SLUG
 FORMAT = 1
 DATASETS_DIR = Path(__file__).resolve().parents[2] / "evaluation"
 DEFAULT_DATASET = DATASETS_DIR / "benchmark-v1.json"
+REAL_BENCHMARK = DATASETS_DIR / "benchmark-v2.json"
 GRADES = (0, 1, 2)
+PERSONA = "persona"
+REAL = "real"
+KINDS = (PERSONA, REAL)
 
 
 class DatasetError(Exception):
@@ -40,6 +44,7 @@ class BenchmarkDeveloper:
     candidates: tuple[RepoData, ...]
     issues: Mapping[int, list[IssueFeature]]  # repository id -> eligible issues
     judgments: Mapping[str, int]  # repository full name -> grade
+    kind: str = PERSONA  # persona (invented) or real (judged export of a real developer)
 
 
 @dataclass(frozen=True)
@@ -49,6 +54,19 @@ class Dataset:
     developers: tuple[BenchmarkDeveloper, ...]
     repository_count: int
     source: str = field(default="")
+
+
+def selection_dataset(real_benchmark: Path = REAL_BENCHMARK) -> Path:
+    """The dataset candidate configurations are chosen on: ``benchmark-v2`` once it exists with
+    a judged real developer, otherwise ``benchmark-v1``."""
+    try:
+        raw = json.loads(real_benchmark.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return DEFAULT_DATASET
+    developers = raw.get("developers", []) if isinstance(raw, dict) else []
+    if any(isinstance(d, dict) and d.get("kind") == REAL for d in developers):
+        return real_benchmark
+    return DEFAULT_DATASET
 
 
 def load(path: Path | str = DEFAULT_DATASET) -> Dataset:
@@ -255,6 +273,9 @@ def _developer(
     errors: list[str],
 ) -> BenchmarkDeveloper | None:
     before = len(errors)
+    kind = data.get("kind", PERSONA)
+    if kind not in KINDS:
+        errors.append(f"{where}: kind must be one of {', '.join(KINDS)}")
     level = data.get("experience_level", ExperienceLevel.UNKNOWN)
     if level not in ExperienceLevel.values:
         errors.append(f"{where}: unknown experience_level {level!r}")
@@ -363,4 +384,5 @@ def _developer(
         candidates=tuple(sorted(candidates, key=lambda r: r.full_name)),
         issues={repo_id: found for repo_id, found in issues.items() if repo_id in pool_ids},
         judgments=judgments,
+        kind=kind,
     )

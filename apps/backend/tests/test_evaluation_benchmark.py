@@ -44,21 +44,40 @@ def test_fresh_holdout_loads() -> None:
 @pytest.mark.django_db
 def test_baseline_metrics_unchanged() -> None:
     recorded = baseline.read()
-    entries = baseline.entries(recorded)
-    dataset = load(DEFAULT_DATASET)
-    assert recorded["dataset"] == dataset.name
-    assert set(entries) >= {"v1-deterministic", "v2-deterministic"}
+    names = baseline.dataset_names(recorded)
+    assert "benchmark-v1" in names
     mismatches = []
-    for version, entry in entries.items():
-        report = evaluate(
-            dataset, stored_config(version), min_score=baseline.MIN_SCORE, top_n=recorded["top_n"]
-        )
-        if (report.min_score, report.min_score_basis) != (
-            entry["min_score"],
-            entry["min_score_basis"],
-        ):
-            mismatches.append(f"{version} min score: recorded {entry['min_score']}")
-        for name, value in entry["metrics"].items():
-            if report.metrics[name] != value:
-                mismatches.append(f"{version} {name}: recorded {value}, now {report.metrics[name]}")
-    assert not mismatches, "Ranking changed on benchmark-v1:\n" + "\n".join(mismatches)
+    for name in names:
+        path = DATASETS_DIR / f"{name}.json"
+        if not path.exists():  # e.g. benchmark-v2 kept local, not committed
+            continue
+        dataset = load(path)
+        entries = baseline.entries(recorded, name)
+        assert {"v1-deterministic", "v2-deterministic"} <= set(entries)
+        for version, entry in entries.items():
+            report = evaluate(
+                dataset,
+                stored_config(version),
+                min_score=baseline.MIN_SCORE,
+                top_n=recorded["top_n"],
+            )
+            if (report.min_score, report.min_score_basis) != (
+                entry["min_score"],
+                entry["min_score_basis"],
+            ):
+                mismatches.append(f"{name} {version} min score: recorded {entry['min_score']}")
+            for metric, value in entry["metrics"].items():
+                if report.metrics[metric] != value:
+                    mismatches.append(
+                        f"{name} {version} {metric}: recorded {value}, now {report.metrics[metric]}"
+                    )
+    assert not mismatches, "Ranking changed:" + "".join(f"\n  {m}" for m in mismatches)
+
+
+def test_baseline_formats(tmp_path) -> None:
+    metrics = {"ndcg@10": 0.5}
+    v1 = {"format": 1, "dataset": "d", "min_score": 0.1, "configs": {"a": metrics}}
+    v2 = {"format": 2, "dataset": "d", "configs": {"a": {"min_score": 0.1, "metrics": metrics}}}
+    assert baseline.entries(v1, "d")["a"]["metrics"] == metrics
+    assert baseline.entries(v2, "d")["a"]["min_score"] == 0.1
+    assert baseline.dataset_names(v1) == ["d"]

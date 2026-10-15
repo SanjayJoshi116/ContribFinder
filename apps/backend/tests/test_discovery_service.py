@@ -24,6 +24,7 @@ from repositories.models import (
     CandidateDiscovery,
     Repository,
     RepositoryCandidate,
+    RepositoryTopic,
     UserRepository,
 )
 from services import jobs
@@ -95,6 +96,14 @@ def run(user, **kw) -> SyncJob:
 HTTPX = repo_payload("encode/httpx", 101)
 RICH = repo_payload("Textualize/rich", 102)
 TOOL = repo_payload("astral-sh/ruff", 103)
+
+
+@pytest.fixture(autouse=True)
+def single_band(settings) -> None:
+    """One open-ended band: the pre-band plan shape, so provenance reads ``language:Python``.
+    Banded runs override this explicitly."""
+    settings.DISCOVERY_STAR_BANDS = [[20, None]]
+    settings.DISCOVERY_MAX_QUERIES = 10
 
 
 @pytest.fixture
@@ -438,3 +447,64 @@ def test_parallel_failure_keeps_finished_work_and_raises(user, developer, respx_
     assert job.metadata["analysis_outcomes"] == {"analyzed": 1}
     lifecycles = dict(Repository.objects.values_list("full_name", "lifecycle"))
     assert lifecycles == {"encode/httpx": "recommendable", "Textualize/rich": "discovered"}
+
+
+def test_banded_run_keeps_both_sizes(user, developer, respx_mock, settings) -> None:
+    settings.DISCOVERY_STAR_BANDS = [[20, 999], [1000, None]]
+    settings.DISCOVERY_MAX_QUERIES = 20
+    settings.DISCOVERY_MAX_POOL = 4
+    settings.DISCOVERY_MAX_ANALYSES_PER_RUN = 0
+    small = [repo_payload(f"small/p{i}", 500 + i, stargazers_count=100 + i) for i in range(3)]
+    large = [repo_payload(f"large/p{i}", 600 + i, stargazers_count=50_000 + i) for i in range(3)]
+    requested: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        q = request.url.params["q"]
+        requested.append(q)
+        if not q.startswith("language:Python archived:false"):
+            return httpx.Response(200, json={"items": []})
+        return httpx.Response(200, json={"items": small if "stars:20..999" in q else large})
+
+    respx_mock.get(f"{API}/search/repositories").mock(side_effect=respond)
+    job = run(user)
+    python = [q for q in requested if q.startswith("language:Python archived")]
+    assert len(python) == 2 and "stars:>=1000" in python[1]
+    kept = set(RepositoryCandidate.objects.values_list("repository__full_name", flat=True))
+    assert kept == {"small/p0", "small/p1", "large/p0", "large/p1"}  # ranks 1-2 of each band
+    assert job.metadata["pool_bands"] == {"below": 0, "20..999": 2, "1000+": 2}
+    queries = set(CandidateDiscovery.objects.values_list("query", flat=True))
+    assert queries == {"language:Python stars:20..999", "language:Python stars:>=1000"}
+
+
+def test_contributed_list_rejected_as_not_code(user, developer, respx_mock) -> None:
+    books = make_candidate_repo(301, "EbookFoundation/free-programming-books", primary_language="")
+    UserRepository.objects.create(user=user, repository=books, relation="contributor")
+    mock_search(respx_mock, {})
+    job = run(user)
+    assert not RepositoryCandidate.objects.filter(repository=books).exists()
+    assert job.metadata["rejections"] == {"not_code": 1}
+
+
+def test_pool_step_removes_lists_found_before_the_rule(user, developer, respx_mock) -> None:
+    lists = make_candidate_repo(
+        302,
+        "public-apis/public-apis",
+        lifecycle="recommendable",
+        is_eligible=True,
+        activity_synced_at=timezone.now(),
+    )
+    RepositoryTopic.objects.create(repository=lists, topic="lists")
+    code = make_candidate_repo(303, "encode/httpx", lifecycle="recommendable", is_eligible=True)
+    add_candidate(developer, lists, rank=1)
+    add_candidate(developer, code, rank=2)
+    mock_search(respx_mock, {})
+    with override_settings(DISCOVERY_MAX_ANALYSES_PER_RUN=0):
+        job = run(user)
+    assert list(RepositoryCandidate.objects.values_list("repository_id", flat=True)) == [code.pk]
+    lists.refresh_from_db()
+    assert (lists.is_eligible, lists.ineligible_reason, lists.lifecycle) == (
+        False,
+        "not_code",
+        "indexed",
+    )
+    assert job.metadata["pool_not_code"] == 1 and job.metadata["pool_size"] == 1

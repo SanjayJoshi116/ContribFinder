@@ -58,3 +58,32 @@ def test_unknown_stale_part_rejected() -> None:
 def test_inconsistent_activity_thresholds_rejected(override) -> None:
     with override_settings(ACTIVITY_THRESHOLDS={**settings.ACTIVITY_THRESHOLDS, **override}):
         assert "core.E024" in ids(discovery_config_check())
+
+
+@pytest.mark.parametrize(
+    ("bands", "message"),
+    [
+        ([], "non-empty list"),
+        ([[20, None], [1000, None]], "only the last band"),
+        ([[20, 999], [500, None]], "ascending"),
+        ([[20, 10]], "at least its low"),
+        ([[20]], "band 0 must be"),
+        ([[30, None]], "first band must start"),
+        ([[20, 99], [100, 999], [1000, None]], "at least the number of bands"),
+    ],
+)
+def test_invalid_star_bands_rejected(bands, message: str) -> None:
+    with override_settings(DISCOVERY_STAR_BANDS=bands, DISCOVERY_MAX_QUERIES=2):
+        errors = [m for m in discovery_config_check() if m.id == "core.E025"]
+        assert errors and message in errors[0].msg
+
+
+def test_single_open_band_is_valid() -> None:
+    with override_settings(DISCOVERY_STAR_BANDS=[[20, None]], DISCOVERY_MAX_QUERIES=10):
+        assert discovery_config_check() == []
+
+
+@pytest.mark.parametrize("topics", ["awesome", ["awesome", ""], [1]])
+def test_invalid_excluded_topics_rejected(topics) -> None:
+    with override_settings(DISCOVERY_EXCLUDED_TOPICS=topics):
+        assert "core.E026" in ids(discovery_config_check())

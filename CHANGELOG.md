@@ -7,6 +7,81 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-15
+
+Discovery project-size mix (OpenSpec change `discovery-size-mix`): the candidate pool now holds
+smaller projects as well as the most popular ones, and curated lists or documentation
+repositories no longer become candidates. **No ranking change**: scoring configurations, signals
+and `baselines.json` are unchanged. The re-exported `real-a` pool (40 candidates) has a median of
+56.5 contributors (was 906) and 19 candidates under 50 (was 2 of 39).
+
+### Added
+
+- Star bands: each search query runs once per band in `DISCOVERY_STAR_BANDS` (default `20..999`
+  and `1000+`). Search ranks restart in each band, so the pool cap keeps a mix of sizes. A system
+  check validates the bands (ascending, non-overlapping, only the last open-ended, first lower
+  bound equal to `DISCOVERY_MIN_STARS`, budget at least the number of bands).
+- Reason `not_code` in pre-filtering and eligibility: repositories named `awesome` or `awesome-*`,
+  tagged with a `DISCOVERY_EXCLUDED_TOPICS` topic, or without a detected primary language.
+- The pool step re-checks `not_code` on stored data, so lists found by earlier runs leave the pool
+  and become ineligible (job metadata `pool_not_code`).
+- Discovery job metadata `pool_bands`: pool candidates per band, plus `below` the lowest band.
+
+### Changed
+
+- `DISCOVERY_MAX_QUERIES` counts search requests (one query in one band); the default rises from
+  10 to 20, so a run still makes 10 distinct queries. Provenance query text includes the band.
+
+### Known limitations
+
+- Documentation-style repositories with a code language and no list topic
+  (`system-design-primer`, `developer-roadmap`) still pass; ranking and the judge handle them.
+- Judging `real-a` and building `benchmark-v2` is still open (carried over from 0.11.0).
+
+## [0.11.0] - 2026-10-14
+
+Benchmark tooling for real developers (OpenSpec change `benchmark-real-judgments`): real,
+anonymized developers can now be judged blind by a person who knows them and merged into a
+selection benchmark, so the ranking is no longer judged only by its author. **No ranking change.
+The judging itself is carried over: `benchmark-v2` was not built, so `benchmark-v1` remains the
+selection benchmark.**
+
+### Added
+
+- Developer kind in datasets: `persona` (default) or `real`. Reports on a dataset with both kinds
+  also show the persona and real means (`evaluate_ranking` rows "persona only" / "real only", and
+  `subsets` in the JSON report).
+- `benchmark_sheet`: a blind judging sheet (CSV with a grading guide) for an exported developer,
+  one row per candidate in alphabetical order with description, languages, topics, contribution
+  files, activity and open issue count, and nothing a scoring configuration computed.
+- `import_judgments`: reads the graded sheet back into the export (grades 0, 1, 2 or blank; at
+  least one relevant), marks the developer `real` and validates; nothing is written on an error.
+- `build_benchmark`: merges datasets and judged exports into one benchmark. Duplicate developer ids
+  fail; a repository described differently by two inputs fails unless `--on-conflict first`.
+- Selection benchmark: `evaluate_ranking` defaults to `evaluation/benchmark-v2.json` once it holds a
+  judged real developer, otherwise `benchmark-v1`. The replacement rule uses the same benchmark.
+- README "Judging real developers": consent, bigger local pool, export, sheet, import, build.
+  Exports and sheets go in the repository's `judging/` folder, which is gitignored.
+
+### Changed
+
+- `baselines.json` format 3, keyed by dataset; `--write-baseline` rewrites only the evaluated
+  dataset's entry (`benchmark-v1` values unchanged). The baseline test checks every recorded
+  dataset present on disk, so a local-only `benchmark-v2` is skipped.
+
+### Fixed
+
+- `export_benchmark_developer` and the new commands create the output folder and report write
+  errors as command errors instead of tracebacks.
+
+### Known limitations
+
+- Judging is unfinished: the first real export (`real-a`, 39 candidates) has 3 graded rows.
+- Discovery bias found while judging: almost every candidate is a very large project (median 906
+  contributors, 2 of 39 under 50), several are lists or documentation. Search uses GitHub best
+  match with only a star minimum, and the pool cap keeps the best-ranked. Fix the size mix in its
+  own change, then re-export and judge.
+
 ## [0.10.0] - 2026-10-14
 
 Ranking experiment (OpenSpec change `ranking-min-score-config`): the minimum score moves into the

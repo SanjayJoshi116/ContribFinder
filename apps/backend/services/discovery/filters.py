@@ -7,7 +7,7 @@ when the repository passes. Pure functions.
 
 from __future__ import annotations
 
-from collections.abc import Set
+from collections.abc import Collection, Set
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Protocol
@@ -22,6 +22,7 @@ INACTIVE = "inactive"
 NO_LICENSE = "no_license"
 FEW_STARS = "few_stars"
 OWN_REPOSITORY = "own_repository"
+NOT_CODE = "not_code"
 REPOSITORY_UNAVAILABLE = "repository_unavailable"
 
 
@@ -42,16 +43,23 @@ class RepoLike(Protocol):
     def pushed_at(self) -> datetime | None: ...
     @property
     def license_spdx(self) -> str: ...
+    @property
+    def primary_language(self) -> str: ...
 
 
 @dataclass(frozen=True)
 class FilterConfig:
     min_stars: int
     max_push_age_days: int
+    excluded_topics: frozenset[str] = frozenset()
 
     @classmethod
     def from_settings(cls) -> FilterConfig:
-        return cls(settings.DISCOVERY_MIN_STARS, settings.DISCOVERY_MAX_PUSH_AGE_DAYS)
+        return cls(
+            settings.DISCOVERY_MIN_STARS,
+            settings.DISCOVERY_MAX_PUSH_AGE_DAYS,
+            frozenset(t.lower() for t in settings.DISCOVERY_EXCLUDED_TOPICS),
+        )
 
 
 def prefilter(
@@ -77,13 +85,15 @@ def prefilter(
     )
     if reason is None and check_stars and repo.stars < cfg.min_stars:
         return FEW_STARS
+    if reason is None and not_code(repo.full_name, _topics(repo), repo.primary_language, cfg):
+        return NOT_CODE
     return reason
 
 
 def eligibility(repo: Repository, *, now: datetime, cfg: FilterConfig) -> str | None:
     if repo.lifecycle == Lifecycle.FAILED:
         return REPOSITORY_UNAVAILABLE
-    return _repository_rules(
+    reason = _repository_rules(
         archived=repo.is_archived,
         fork=repo.is_fork,
         pushed_at=repo.pushed_at,
@@ -91,6 +101,31 @@ def eligibility(repo: Repository, *, now: datetime, cfg: FilterConfig) -> str | 
         now=now,
         cfg=cfg,
     )
+    if reason is None and not_code(repo.full_name, _topics(repo), repo.primary_language, cfg):
+        return NOT_CODE
+    return reason
+
+
+def not_code(
+    full_name: str, topics: Collection[str], primary_language: str, cfg: FilterConfig
+) -> bool:
+    """Curated lists and documentation repositories are not contribution targets (design D4):
+    named ``awesome`` / ``awesome-*``, tagged with an excluded topic, or without any detected
+    programming language."""
+    name = full_name.rsplit("/", 1)[-1].lower()
+    if name == "awesome" or name.startswith("awesome-"):
+        return True
+    if any(t.lower() in cfg.excluded_topics for t in topics):
+        return True
+    return not primary_language
+
+
+def _topics(repo: RepoLike) -> Collection[str]:
+    """A search result carries its topics; a stored repository has them as rows."""
+    if isinstance(repo, Repository):
+        return list(repo.topics.values_list("topic", flat=True)) if repo.pk else []
+    topics: Collection[str] = getattr(repo, "topics", ())
+    return topics
 
 
 def _repository_rules(

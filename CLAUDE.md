@@ -101,14 +101,16 @@ ContribFinder/
 │  │  ├─ issues/            Issue (shared, analysis on the row), RecommendedIssue; issue
 │  │  │                     detail API (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason; API; generation
-│  │  │                     and freshness tasks; evaluate_ranking and export_benchmark_developer
-│  │  │                     commands (Phase 8b)
+│  │  │                     and freshness tasks; evaluate_ranking, export_benchmark_developer,
+│  │  │                     benchmark_sheet, import_judgments, build_benchmark commands
 │  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
 │  │  │                     saved and dismissed API (Phase 8a)
 │  │  ├─ embeddings/        (Phase 6, future)
 │  │  ├─ evaluation/        data only: benchmark-v1.json (seed benchmark), holdout-v1.json and
 │  │  │                     holdout-v2.json (acceptance only, never for choosing; both used, so
-│  │  │                     the next search adds holdout-v3), baselines.json (format 2)
+│  │  │                     the next search adds holdout-v3), benchmark-v2.json (personas plus
+│  │  │                     judged real developers; selection benchmark once it exists),
+│  │  │                     baselines.json (format 3, keyed by dataset)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError), feedback.py (record, save,
 │  │     │                  dismiss, restore), data_deletion.py (GitHub data / account deletion)
@@ -124,8 +126,9 @@ ContribFinder/
 │  │     │                  issues (issue matching) (Phase 4–7)
 │  │     ├─ ranking/        config (validation), pipeline (rank_pool, shared by generation and
 │  │     │                  evaluation), score, explain, service (generation), freshness (Phase 5)
-│  │     ├─ evaluation/     dataset (benchmark load/validate), metrics, runner (evaluate, compare),
-│  │     │                  baseline, export (Phase 8b)
+│  │     ├─ evaluation/     dataset (benchmark load/validate, selection_dataset), metrics, runner
+│  │     │                  (evaluate, compare, persona/real subsets), baseline, export, sheet
+│  │     │                  (blind judging sheets), build (merge datasets) (Phase 8b+)
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
@@ -193,6 +196,11 @@ Local, no Docker (primary on this machine):
   must not regress on a fresh acceptance holdout (`holdout-v1`/`-v2` are used; add `holdout-v3`
   first; spec `recommendation-evaluation`). A config's own `min_score` wins over the setting;
   `--min-score` overrides it.
+- Real judged developers (README "Judging real developers"): `export_benchmark_developer` →
+  `benchmark_sheet` (blind CSV) → `import_judgments` → `build_benchmark`. `evaluate_ranking`
+  defaults to the selection benchmark: `benchmark-v2` once it holds a `real` developer, else
+  `benchmark-v1`. Exports and sheets go in the gitignored `judging/` (paths `../../judging/...`,
+  since commands run in `apps/backend`); committing `benchmark-v2` is the judge's call.
 
 Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
 `REDIS_URL` with container hostnames; Postgres is on host port 5433.
@@ -370,7 +378,11 @@ Deviations from the sketch below, as built:
   `DISCOVERY_ANALYSIS_CONCURRENCY` threads; the backlog uses the app's client credentials.
 - Eligibility (`is_eligible`, `ineligible_reason`) is stored separately from the lifecycle.
 - The pool cap keeps the best candidates in analysis order (interacted, best search rank);
-  locally `.env` sets `DISCOVERY_MAX_POOL=10` and `DISCOVERY_MAX_ANALYSES_PER_RUN=10`.
+  locally `.env` sets `DISCOVERY_MAX_POOL` and `DISCOVERY_MAX_ANALYSES_PER_RUN` (10 for fast
+  runs, 40 for benchmark exports).
+- Since `discovery-size-mix`: each query runs once per star band (`DISCOVERY_STAR_BANDS`, the
+  budget counts requests; ranks restart per band, so the cap keeps a size mix; job metadata
+  `pool_bands`), and lists/docs repositories are rejected or made ineligible as `not_code`.
 - Added beyond the FRs: dead-worker recovery (`SyncJob.heartbeat`, `jobs.recover_stale_jobs`,
   `SYNC_STALE_AFTER_SECONDS` 10 min), `REDIS_SOCKET_TIMEOUT`, and a threaded local worker.
 
@@ -589,8 +601,34 @@ Archived: `openspec/changes/archive/2026-10-14-ranking-min-score-config/` (resul
 - 16 candidates; none qualified on `benchmark-v1` and each matched its v3 base exactly: the minimum
   score was never the constraint. The repositories relevance scaling drops for dev-beginner have a
   relevance part near 0.008 and are judged 1; both holdouts favor the candidates.
-- Carry-over: review `benchmark-v1` judgments (ideally real hand-judged developers through
-  `export_benchmark_developer`) in its own change before any further ranking search.
+- Carry-over: closed in part by the change below (tooling shipped; judging carried over).
+
+**Benchmark tooling — real developers** (MVP+)  ✅ shipped in v0.11.0 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-14-benchmark-real-judgments/`. Spec: delta to
+`recommendation-evaluation`.
+- Developer `kind` (`persona` | `real`) with persona/real means in reports; `benchmark_sheet`
+  (blind CSV), `import_judgments`, `build_benchmark`; `selection_dataset()` picks `benchmark-v2`
+  once it holds a judged real developer, else `benchmark-v1`; `baselines.json` format 3 (by dataset).
+- Exports and sheets live in the gitignored repo-root `judging/` (`../../judging/...` from
+  `apps/backend`, where `npm run manage` runs); commands create output folders.
+- Carry-over 1 (discovery bias): closed by `discovery-size-mix` below.
+- Carry-over 2: re-export `real-a`, judge every row, import, build `benchmark-v2`, evaluate
+  v1/v2 (all/persona/real) and `--write-baseline` for it, before any further ranking search.
+  Still open after v0.12.0 (the re-export is done, see below).
+
+**Discovery project-size mix** (MVP+)  ✅ shipped in v0.12.0 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-15-discovery-size-mix/`. Spec: delta to
+`repository-discovery`.
+- Star bands per query (`DISCOVERY_STAR_BANDS`, default `20..999` and `1000+`, validated by a
+  system check); `DISCOVERY_MAX_QUERIES` counts requests (default 20); job metadata `pool_bands`.
+- `not_code` rejects or makes ineligible lists and docs repositories (`awesome-*` names,
+  `DISCOVERY_EXCLUDED_TOPICS`, no primary language); the pool step re-checks stored data
+  (`pool_not_code`), since fresh analyses skip eligibility.
+- Re-export `judging/real-a-v2.json` (40 candidates): median contributors 906 → 56.5, under 50
+  2/39 → 19/40. Docs-style repositories with a code language (`system-design-primer`) still pass.
+- Carry-over: judge `real-a-v2` (benchmark-tooling carry-over 2 above) before any ranking search.
 
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 

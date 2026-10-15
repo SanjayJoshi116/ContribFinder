@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from recommendations.models import ScoringConfig
 from services.evaluation import baseline
-from services.evaluation.dataset import DEFAULT_DATASET, DatasetError, load
+from services.evaluation.dataset import DatasetError, load, selection_dataset
 from services.evaluation.metrics import METRICS
 from services.evaluation.runner import (
     DEFAULT_TOLERANCE,
@@ -45,7 +45,12 @@ class Command(BaseCommand):
             help="Unsaved configuration: JSON with weights and params (repeatable). "
             "Evaluated after the stored versions.",
         )
-        parser.add_argument("--dataset", default=str(DEFAULT_DATASET), metavar="PATH")
+        parser.add_argument(
+            "--dataset",
+            metavar="PATH",
+            help="Default: the selection benchmark (benchmark-v2 once it holds a judged real "
+            "developer, otherwise benchmark-v1).",
+        )
         parser.add_argument("--json", metavar="OUT", help="Also write the full report here.")
         parser.add_argument(
             "--require-improvement",
@@ -69,7 +74,7 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         try:
-            dataset = load(options["dataset"])
+            dataset = load(options["dataset"] or selection_dataset())
             specs = self._specs(options)
         except (DatasetError, ConfigError) as exc:
             raise CommandError(str(exc)) from exc
@@ -144,6 +149,10 @@ class Command(BaseCommand):
                     delta = value - first.metrics[name]
                     cells.append(f"{value:.4f} ({delta:+.4f})".rjust(17))
             self.stdout.write(f"{report.config:<{width}}  " + "  ".join(cells))
+            for kind, means in report.subsets.items():
+                label = f"  {kind} only"
+                subset = "  ".join(f"{means[name]:>17.4f}" for name in METRICS)
+                self.stdout.write(f"{label:<{width}}  {subset}")
 
         for index, dev in enumerate(first.developers):
             self.stdout.write(f"\n{dev.id}")

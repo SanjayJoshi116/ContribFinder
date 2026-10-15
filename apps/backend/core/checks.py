@@ -103,6 +103,35 @@ def _keys_errors(name: str, value: object, keys: tuple[str, ...], code: str) -> 
     return errors
 
 
+def _star_band_errors(bands: object) -> list[CheckMessage]:
+    """Ascending, non-overlapping [low, high] bands; only the last may be open-ended (null);
+    the first starts at DISCOVERY_MIN_STARS; the request budget covers one query in all."""
+
+    def error(message: str) -> list[CheckMessage]:
+        return [Error(f"DISCOVERY_STAR_BANDS: {message}", id="core.E025")]
+
+    if not isinstance(bands, list) or not bands:
+        return error("must be a non-empty list of [low, high] bands.")
+    previous_high = -1
+    for index, band in enumerate(bands):
+        last = index == len(bands) - 1
+        if not (isinstance(band, list) and len(band) == 2 and _is_int(band[0])):
+            return error(f"band {index} must be [low, high] with an integer low.")
+        low, high = band
+        if high is None and not last:
+            return error("only the last band can be open-ended (null).")
+        if high is not None and (not _is_int(high) or high < low):
+            return error(f"band {index} must have an integer high of at least its low.")
+        if low <= previous_high:
+            return error("bands must be ascending and must not overlap.")
+        previous_high = high if high is not None else low
+    if bands[0][0] != settings.DISCOVERY_MIN_STARS:
+        return error("the first band must start at DISCOVERY_MIN_STARS.")
+    if _is_int(settings.DISCOVERY_MAX_QUERIES) and len(bands) > settings.DISCOVERY_MAX_QUERIES:
+        return error("DISCOVERY_MAX_QUERIES must be at least the number of bands.")
+    return []
+
+
 @register()
 def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
     """Discovery budgets, staleness and activity thresholds are configuration (Phase 4)."""
@@ -134,6 +163,12 @@ def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
     errors += _keys_errors(
         "DISCOVERY_QUERY_SHARES", settings.DISCOVERY_QUERY_SHARES, QUERY_STRATEGIES, "core.E022"
     )
+    errors += _star_band_errors(settings.DISCOVERY_STAR_BANDS)
+    topics = settings.DISCOVERY_EXCLUDED_TOPICS
+    if not isinstance(topics, list) or not all(isinstance(t, str) and t for t in topics):
+        errors.append(
+            Error("DISCOVERY_EXCLUDED_TOPICS must be a list of topic names.", id="core.E026")
+        )
     errors += _keys_errors("REPO_STALE_AFTER", settings.REPO_STALE_AFTER, STALE_PARTS, "core.E023")
     thresholds = settings.ACTIVITY_THRESHOLDS
     activity_errors = _keys_errors("ACTIVITY_THRESHOLDS", thresholds, ACTIVITY_KEYS, "core.E024")

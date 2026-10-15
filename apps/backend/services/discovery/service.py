@@ -13,7 +13,7 @@ import logging
 import queue
 import threading
 from collections import Counter
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -43,14 +43,16 @@ from services.repositories.analysis import RepositoryAnalysisService
 from services.repositories.lifecycle import IN_PROGRESS
 from services.repositories.staleness import stale_parts
 
-from .filters import FilterConfig, prefilter
+from .filters import NOT_CODE, FilterConfig, not_code, prefilter
 from .queries import (
     DiscoveryInput,
     InterestSignal,
     PlannedQuery,
     QueryConfig,
     SkillSignal,
+    band_label,
     plan_queries,
+    star_bands,
 )
 
 logger = logging.getLogger(__name__)
@@ -250,6 +252,7 @@ class DiscoveryService:
         pool = RepositoryCandidate.objects.filter(developer=self.profile)
         cutoff = self.now - timedelta(days=settings.DISCOVERY_CANDIDATE_RETENTION_DAYS)
         expired, _ = pool.filter(last_seen_at__lt=cutoff).delete()
+        not_code_removed = self._remove_not_code(pool)
         evicted = 0
         if pool.count() > settings.DISCOVERY_MAX_POOL:
             # Keep the best candidates in analysis order (previously interacted, best search
@@ -268,10 +271,49 @@ class DiscoveryService:
                 .values_list("pk", flat=True)[: settings.DISCOVERY_MAX_POOL]
             )
             evicted, _ = pool.exclude(pk__in=keep).delete()
-        self._update_metadata(pool_expired=expired, pool_evicted=evicted, pool_size=pool.count())
+        self._update_metadata(
+            pool_expired=expired,
+            pool_not_code=not_code_removed,
+            pool_evicted=evicted,
+            pool_size=pool.count(),
+            pool_bands=_band_counts(pool.values_list("repository__stars", flat=True)),
+        )
         return Step.DONE
 
     # --- helpers ------------------------------------------------------------------------
+
+    def _remove_not_code(self, pool: Any) -> int:
+        """Re-check ``not_code`` on stored data for the whole pool (spec: "Candidate pool
+        maintenance"): a list found before the rule, or analyzed recently, would otherwise stay
+        eligible until its next analysis. Its candidate leaves the pool and the shared
+        repository becomes ineligible, as eligibility would make it. Returns the removals."""
+        cfg = FilterConfig.from_settings()
+        rows = pool.select_related("repository").prefetch_related("repository__topics")
+        flagged = [
+            c
+            for c in rows
+            if not_code(
+                c.repository.full_name,
+                [t.topic for t in c.repository.topics.all()],
+                c.repository.primary_language,
+                cfg,
+            )
+        ]
+        if not flagged:
+            return 0
+        repo_ids = [c.repository_id for c in flagged]
+        with transaction.atomic():
+            Repository.objects.filter(pk__in=repo_ids, lifecycle=Lifecycle.RECOMMENDABLE).update(
+                lifecycle=Lifecycle.INDEXED, lifecycle_changed_at=self.now
+            )
+            Repository.objects.filter(pk__in=repo_ids).update(
+                is_eligible=False, ineligible_reason=NOT_CODE
+            )
+            RepositoryCandidate.objects.filter(pk__in=[c.pk for c in flagged]).delete()
+        logger.info(
+            "Discovery for user %s removed %d not_code candidates", self.user.pk, len(flagged)
+        )
+        return len(flagged)
 
     def _input(self) -> DiscoveryInput:
         skills = []
@@ -387,6 +429,20 @@ class DiscoveryService:
     def _update_metadata(self, **values: Any) -> None:
         self.job.metadata = {**self.job.metadata, **values}
         self.job.save(update_fields=["metadata", "updated_at"])
+
+
+def _band_counts(stars: Iterable[int]) -> dict[str, int]:
+    """Pool candidates per star band (design D3), by current stars; ``below`` holds those
+    under the lowest band (previously interacted repositories)."""
+    bands = star_bands()
+    counts = dict.fromkeys(["below", *(band_label(b) for b in bands)], 0)
+    for value in stars:
+        label = next(
+            (band_label(b) for b in reversed(bands) if value >= b[0]),
+            "below",
+        )
+        counts[label] += 1
+    return counts
 
 
 def _interacted_discoveries() -> Any:

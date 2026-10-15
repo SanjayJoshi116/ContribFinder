@@ -60,11 +60,14 @@ class DiscoveryInput:
     now: datetime
 
 
+Band = tuple[int, int | None]  # stars [low, high]; high None = no upper bound
+
+
 @dataclass(frozen=True)
 class QueryConfig:
-    max_queries: int
+    max_queries: int  # search requests: one query in one band
     shares: Mapping[str, int]
-    min_stars: int
+    bands: tuple[Band, ...]
     max_push_age_days: int
     min_skill_confidence: float
 
@@ -73,10 +76,27 @@ class QueryConfig:
         return cls(
             max_queries=settings.DISCOVERY_MAX_QUERIES,
             shares=dict(settings.DISCOVERY_QUERY_SHARES),
-            min_stars=settings.DISCOVERY_MIN_STARS,
+            bands=star_bands(),
             max_push_age_days=settings.DISCOVERY_MAX_PUSH_AGE_DAYS,
             min_skill_confidence=settings.DISCOVERY_MIN_SKILL_CONFIDENCE,
         )
+
+
+def star_bands() -> tuple[Band, ...]:
+    return tuple(
+        (int(low or 0), None if high is None else int(high))
+        for low, high in settings.DISCOVERY_STAR_BANDS
+    )
+
+
+def band_label(band: Band) -> str:
+    low, high = band
+    return f"{low}..{high}" if high is not None else f"{low}+"
+
+
+def _stars(band: Band) -> str:
+    low, high = band
+    return f"stars:{low}..{high}" if high is not None else f"stars:>={low}"
 
 
 @dataclass(frozen=True)
@@ -139,12 +159,21 @@ def plan_queries(data: DiscoveryInput, cfg: QueryConfig) -> list[PlannedQuery]:
         if count >= TOPIC_MIN_REPOSITORIES and topic not in covered_topics:
             add("topic", f"topic:{topic}", f"topic:{topic}")
 
-    quotas = allocate(cfg.max_queries, cfg.shares, {s: len(cores.get(s, [])) for s in STRATEGIES})
-    qualifiers = _qualifiers(data, cfg)
+    # Every query runs in every star band (design D1, D2): the budget counts requests, and a
+    # query is planned in all bands or not at all. With one band the plan is the pre-band one.
+    budget = cfg.max_queries // len(cfg.bands)
+    quotas = allocate(budget, cfg.shares, {s: len(cores.get(s, [])) for s in STRATEGIES})
+    banded = len(cfg.bands) > 1
     return [
-        PlannedQuery(SOURCE_BY_STRATEGY[strategy], f"{core} {qualifiers}", key, core)
+        PlannedQuery(
+            SOURCE_BY_STRATEGY[strategy],
+            f"{core} {_qualifiers(data, cfg, band)}",
+            f"{key}@{index}" if banded else key,
+            f"{core} {_stars(band)}" if banded else core,
+        )
         for strategy in STRATEGIES
         for key, core in cores.get(strategy, [])[: quotas[strategy]]
+        for index, band in enumerate(cfg.bands)
     ]
 
 
@@ -215,9 +244,8 @@ def _quote(value: str) -> str:
     return value if re.fullmatch(r"[A-Za-z0-9-]+", value) else f'"{value}"'
 
 
-def _qualifiers(data: DiscoveryInput, cfg: QueryConfig) -> str:
+def _qualifiers(data: DiscoveryInput, cfg: QueryConfig, band: Band) -> str:
     pushed = (data.now - timedelta(days=cfg.max_push_age_days)).date().isoformat()
     return (
-        f"archived:false fork:false is:public pushed:>={pushed} "
-        f"stars:>={cfg.min_stars} -user:{data.login}"
+        f"archived:false fork:false is:public pushed:>={pushed} {_stars(band)} -user:{data.login}"
     )

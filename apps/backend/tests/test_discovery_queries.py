@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -8,6 +9,7 @@ from services.discovery.queries import (
     QueryConfig,
     SkillSignal,
     allocate,
+    band_label,
     plan_queries,
 )
 
@@ -16,7 +18,7 @@ QUALIFIERS = "archived:false fork:false is:public pushed:>=2026-04-02 stars:>=20
 CFG = QueryConfig(
     max_queries=10,
     shares={"language": 2, "skill": 4, "interest": 3, "topic": 1},
-    min_stars=20,
+    bands=((20, None),),
     max_push_age_days=180,
     min_skill_confidence=0.3,
 )
@@ -162,3 +164,35 @@ def test_sparse_profile_gives_empty_plan() -> None:
 )
 def test_multi_character_linguist_names_are_quoted(slug: str, expected: str) -> None:
     assert cores(plan_queries(data([skill(slug)]), CFG))[0][1] == expected
+
+
+BANDED = replace(CFG, max_queries=20, bands=((20, 999), (1000, None)))
+
+
+def test_every_query_in_every_band() -> None:
+    plan = plan_queries(data([skill("python", 0.9), skill("django", 0.7)]), BANDED)
+    assert [(q.core, q.key) for q in plan] == [
+        ("language:Python stars:20..999", "language:python@0"),
+        ("language:Python stars:>=1000", "language:python@1"),
+        ("topic:django language:Python stars:20..999", "skill:django@0"),
+        ("topic:django language:Python stars:>=1000", "skill:django@1"),
+    ]
+    assert plan[0].q == (
+        "language:Python archived:false fork:false is:public pushed:>=2026-04-02 "
+        "stars:20..999 -user:octocat"
+    )
+    assert plan[1].q.endswith(" stars:>=1000 -user:octocat")
+
+
+def test_budget_counts_requests() -> None:
+    skills = [skill(s, 0.9 - i * 0.01) for i, s in enumerate(["python", "go", "rust", "java"])]
+    interests = [("ai-ml", 0.9), ("developer-tooling", 0.8), ("databases", 0.6)]
+    plan = plan_queries(data(skills, interests), replace(BANDED, max_queries=9))
+    assert len(plan) == 8  # 9 // 2 = 4 queries, each in both bands
+    assert len({q.core.rsplit(" stars:", 1)[0] for q in plan}) == 4
+
+
+def test_default_settings_plan_ten_queries_in_two_bands() -> None:
+    cfg = QueryConfig.from_settings()
+    assert cfg.max_queries == 20 and cfg.bands == ((20, 999), (1000, None))
+    assert [band_label(b) for b in cfg.bands] == ["20..999", "1000+"]

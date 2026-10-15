@@ -4,12 +4,14 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from django.utils import timezone
 
-from repositories.models import Repository
+from repositories.models import Repository, RepositoryTopic
 from services.discovery.filters import FilterConfig, eligibility, prefilter
 from services.github.client import GitHubRepo
 
 NOW = datetime(2026, 9, 29, tzinfo=UTC)
-CFG = FilterConfig(min_stars=20, max_push_age_days=180)
+CFG = FilterConfig(
+    min_stars=20, max_push_age_days=180, excluded_topics=frozenset({"awesome-list", "books"})
+)
 
 BASE = GitHubRepo(
     github_id=1,
@@ -80,6 +82,9 @@ def test_stars_not_checked_for_previously_interacted() -> None:
         ({"license_spdx": ""}, "no_license"),
         ({"lifecycle": "failed"}, "repository_unavailable"),
         ({"stars": 0}, None),  # stars are a search-time rule only
+        ({"primary_language": ""}, "not_code"),
+        ({"full_name": "vinta/awesome-python"}, "not_code"),
+        ({"primary_language": "", "is_archived": True}, "archived"),
     ],
 )
 def test_eligibility(fields, reason) -> None:
@@ -90,8 +95,50 @@ def test_eligibility(fields, reason) -> None:
         "full_name": "encode/httpx",
         "html_url": "https://github.com/encode/httpx",
         "license_spdx": "MIT",
+        "primary_language": "Python",
         "pushed_at": NOW - timedelta(days=3),
         "synced_at": timezone.now(),
     }
     repo = Repository(**{**defaults, **fields})
     assert eligibility(repo, now=NOW, cfg=CFG) == reason
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"full_name": "vinta/awesome-python"},
+        {"full_name": "sindresorhus/Awesome"},
+        {"topics": ("python", "Awesome-List")},
+        {"topics": ("books",)},
+        {"primary_language": ""},
+    ],
+)
+def test_lists_and_docs_are_not_code(change) -> None:
+    assert check(replace(BASE, **change)) == "not_code"
+    assert check(replace(BASE, **change), check_stars=False) == "not_code"  # interacted too
+
+
+def test_awesome_inside_a_name_is_code() -> None:
+    assert check(replace(BASE, full_name="x/make-awesome", topics=("list-view",))) is None
+
+
+def test_repository_rules_win_over_not_code() -> None:
+    assert check(replace(BASE, primary_language="", is_archived=True)) == "archived"
+
+
+@pytest.mark.django_db
+def test_list_already_in_pool_becomes_ineligible() -> None:
+    repo = Repository.objects.create(
+        github_id=2,
+        owner_login="EbookFoundation",
+        name="free-programming-books",
+        full_name="EbookFoundation/free-programming-books",
+        html_url="https://github.com/EbookFoundation/free-programming-books",
+        license_spdx="CC-BY-4.0",
+        primary_language="Python",
+        pushed_at=NOW - timedelta(days=3),
+        synced_at=timezone.now(),
+    )
+    assert eligibility(repo, now=NOW, cfg=CFG) is None
+    RepositoryTopic.objects.create(repository=repo, topic="books")
+    assert eligibility(repo, now=NOW, cfg=CFG) == "not_code"

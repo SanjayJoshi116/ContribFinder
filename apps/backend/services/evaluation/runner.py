@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +85,8 @@ class Report:
     developers: tuple[DeveloperResult, ...]
     min_score_basis: str = "score"
     min_score_overridden: bool = False
+    # Means per developer kind (persona, real); only when the dataset holds both kinds.
+    subsets: dict[str, dict[str, float]] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -93,6 +95,7 @@ class Report:
             "min_score": self.min_score,
             "min_score_basis": self.min_score_basis,
             "min_score_overridden": self.min_score_overridden,
+            "subsets": self.subsets,
             "top_n": self.top_n,
             "metrics": self.metrics,
             "developers": [
@@ -128,6 +131,7 @@ def evaluate(
     effective = params.get("min_score", min_score)
     results = []
     per_developer = []
+    by_kind: dict[str, list[metrics.DeveloperMetrics]] = {}
     for dev in dataset.developers:
         ranked = rank_pool(
             dev.features,
@@ -141,6 +145,7 @@ def evaluate(
         names = [s.repo.full_name for s in ranked]
         found = metrics.developer_metrics(names, dev.judgments)
         per_developer.append(found)
+        by_kind.setdefault(dev.kind, []).append(found)
         results.append(
             DeveloperResult(
                 id=dev.id,
@@ -159,6 +164,11 @@ def evaluate(
         developers=tuple(results),
         min_score_basis=params.get("min_score_basis", "score"),
         min_score_overridden=override,
+        subsets=(
+            {kind: metrics.mean(found) for kind, found in sorted(by_kind.items())}
+            if len(by_kind) > 1
+            else {}
+        ),
     )
 
 

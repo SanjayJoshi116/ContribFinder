@@ -171,3 +171,12 @@ def test_all_errors_are_collected() -> None:
     raw["developers"][0]["skills"]["python"]["confidence"] = 2
     raw["repositories"]["bench/go-proxy"]["snapshot"] = {"activity_label": "busy"}
     assert len(errors_of(raw)) == 2
+
+
+def test_kind_defaults_to_persona_and_is_validated() -> None:
+    raw = minimal()
+    assert parse(raw).developers[0].kind == "persona"
+    raw["developers"][0]["kind"] = "real"
+    assert parse(raw).developers[0].kind == "real"
+    raw["developers"][0]["kind"] = "robot"
+    assert errors_of(raw) == ["developer dev-a: kind must be one of persona, real"]

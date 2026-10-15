@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.10.0** (ranking experiments: configuration minimum score; no new ranking adopted; MVP+). After signing in with
+**Version 0.12.0** (discovery finds smaller projects too and drops lists/docs repositories; no ranking change; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -88,6 +88,11 @@ npm run manage -- reanalyze_profiles   # rebuild profiles from stored data (no G
 Profile scoring is configurable in `.env` (`EVIDENCE_WEIGHTS` and friends, see `.env.example`).
 Run `reanalyze_profiles` after changing it. Repository discovery budgets, filters, staleness and
 activity thresholds (`DISCOVERY_*`, `REPO_*`, `ACTIVITY_THRESHOLDS`) are configured the same way.
+Every search query runs once per star band (`DISCOVERY_STAR_BANDS`, default 20–999 and 1000+), so
+the pool holds smaller projects as well as the most popular ones; `DISCOVERY_MAX_QUERIES` counts
+these requests (default 20). Curated lists and documentation repositories (named `awesome-*`,
+tagged with a `DISCOVERY_EXCLUDED_TOPICS` topic, or without a detected language) are rejected as
+`not_code`.
 A completed sync or re-analysis starts a discovery run automatically, and a completed discovery
 starts a recommendation generation. Ranking limits and sizes (`RECOMMENDATION_*`,
 `RECOMMENDATIONS_TOP_N`, `REPO_SIZE_THRESHOLDS`) and the view de-duplication window
@@ -133,12 +138,44 @@ configuration's minimum and says so in the output.
 they move. After an intended ranking change, run `npm run manage -- evaluate_ranking
 --write-baseline` and commit the file with the change.
 
-To add a real developer to a benchmark, export one user's stored profile and pool (anonymized,
-no judgments), then judge the candidates by hand:
+### Judging real developers
 
-```bash
-npm run manage -- export_benchmark_developer --user-id 2 --as dev-f --out dev-f.json
-```
+The personas were invented and judged by the same author who designed the ranking, so the
+benchmark also takes real developers judged by a person who knows them. Export only accounts whose
+owner agreed. Exports and sheets go in the repository's `judging/` folder, which is gitignored
+(they are anonymized, but they describe a real person's skills). `npm run manage` runs in
+`apps/backend`, so relative paths start there: `../../judging` below is that folder (created if
+missing).
+
+1. **Bigger pool.** The local `.env` caps discovery at 10 candidates. For the export, set
+   `DISCOVERY_MAX_POOL=40` and `DISCOVERY_MAX_ANALYSES_PER_RUN=40`, run `npm start`, sign in as the
+   developer and press **Refresh**; wait until the stage line shows recommendations are done. This
+   uses that account's GitHub API budget.
+2. **Export** (no GitHub calls; no username, email, GitHub id or token; neutral id):
+   ```bash
+   npm run manage -- export_benchmark_developer --user-id 2 --as real-a --out ../../judging/real-a.json
+   ```
+3. **Judge blind.** Write a sheet and grade it in a spreadsheet (2 highly relevant, 1 relevant,
+   0 not relevant, blank = not judged; try to grade every row). The sheet shows each repository's
+   description, languages, topics, contribution files, activity and open issue count, in
+   alphabetical order, and nothing the ranking computed:
+   ```bash
+   npm run manage -- benchmark_sheet --export ../../judging/real-a.json --out ../../judging/real-a.csv
+   ```
+4. **Import** the grades (validated; nothing is written on an error):
+   ```bash
+   npm run manage -- import_judgments --export ../../judging/real-a.json --sheet ../../judging/real-a.csv
+   ```
+5. **Build** `benchmark-v2` from the personas and the judged exports (add `--on-conflict first`
+   if two exports describe the same repository differently, e.g. exported on different days):
+   ```bash
+   npm run manage -- build_benchmark --name benchmark-v2 --out evaluation/benchmark-v2.json \
+     --input evaluation/benchmark-v1.json --input ../../judging/real-a.json
+   ```
+
+Once `benchmark-v2.json` holds a judged real developer, it is the **selection benchmark**:
+`evaluate_ranking` uses it by default and reports the persona and real developers' means
+separately. Committing it is the judge's decision; if it stays local, the baseline test skips it.
 
 ## Your data
 

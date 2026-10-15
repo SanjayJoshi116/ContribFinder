@@ -41,3 +41,6 @@ playwright-report/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Real-developer benchmark exports and judging sheets (README "Judging real developers")
+/judging/

@@ -262,9 +262,9 @@ GITHUB_CONTRIB_MAX_PRS = env.int("GITHUB_CONTRIB_MAX_PRS", default=200)
 GITHUB_CONTRIB_MAX_REPOS = env.int("GITHUB_CONTRIB_MAX_REPOS", default=20)
 
 # --- Repository discovery (Phase 4) ---
-# Search queries per discovery run, split across strategies by these shares (in this order;
-# unused slots pass to the next strategy).
-DISCOVERY_MAX_QUERIES = env.int("DISCOVERY_MAX_QUERIES", default=10)
+# Search requests per discovery run (one query in one star band), split across strategies by
+# these shares (in this order; unused slots pass to the next strategy).
+DISCOVERY_MAX_QUERIES = env.int("DISCOVERY_MAX_QUERIES", default=20)
 DISCOVERY_QUERY_SHARES: dict[str, int] = {
     "language": 2,
     "skill": 4,
@@ -274,6 +274,28 @@ DISCOVERY_QUERY_SHARES: dict[str, int] = {
 }
 DISCOVERY_RESULTS_PER_QUERY = env.int("DISCOVERY_RESULTS_PER_QUERY", default=30)
 DISCOVERY_MIN_STARS = env.int("DISCOVERY_MIN_STARS", default=20)
+# Every query runs once per star band ([low, high], high null = open-ended), so smaller projects
+# are found as well as the most popular ones. The first band starts at DISCOVERY_MIN_STARS.
+DISCOVERY_STAR_BANDS: list[list[int | None]] = env.json(
+    "DISCOVERY_STAR_BANDS", default=[[20, 999], [1000, None]]
+)
+# Curated lists and documentation repositories are not contribution targets (`not_code`).
+DISCOVERY_EXCLUDED_TOPICS: list[str] = env.json(
+    "DISCOVERY_EXCLUDED_TOPICS",
+    default=[
+        "awesome",
+        "awesome-list",
+        "awesome-lists",
+        "curated-list",
+        "list",
+        "lists",
+        "books",
+        "free-books",
+        "interview-questions",
+        "cheatsheet",
+        "cheatsheets",
+    ],
+)
 DISCOVERY_MAX_PUSH_AGE_DAYS = env.int("DISCOVERY_MAX_PUSH_AGE_DAYS", default=180)
 DISCOVERY_MIN_SKILL_CONFIDENCE = env.float("DISCOVERY_MIN_SKILL_CONFIDENCE", default=0.3)
 DISCOVERY_MAX_ANALYSES_PER_RUN = env.int("DISCOVERY_MAX_ANALYSES_PER_RUN", default=60)

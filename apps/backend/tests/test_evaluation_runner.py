@@ -1,5 +1,6 @@
 """Evaluation runner and improvement rule (Phase 8b, group 4)."""
 
+import copy
 import json
 
 import pytest
@@ -102,3 +103,21 @@ def test_configuration_minimum_and_override() -> None:
     assert forced.developers[0].ranked == 1
     data = forced.as_dict()
     assert data["min_score_overridden"] is True and data["min_score_basis"] == "score"
+
+
+@pytest.mark.django_db
+def test_subsets_only_for_mixed_datasets() -> None:
+    spec = stored_config("v2-deterministic")
+    single = evaluate(parse(minimal()), spec, min_score=0.1, top_n=50)
+    assert single.subsets == {}
+
+    raw = minimal()
+    real = copy.deepcopy(raw["developers"][0])
+    real |= {"id": "real-a", "kind": "real", "judgments": {"bench/go-proxy": 1}}
+    raw["developers"].append(real)
+    mixed = evaluate(parse(raw), spec, min_score=0.1, top_n=50)
+    assert set(mixed.subsets) == {"persona", "real"}
+    persona, found = mixed.developers
+    assert mixed.subsets["persona"] == persona.metrics  # one developer each: its own metrics
+    assert mixed.subsets["real"] == found.metrics
+    assert mixed.as_dict()["subsets"] == mixed.subsets

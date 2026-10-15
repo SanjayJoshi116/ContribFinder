@@ -30,7 +30,12 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
         text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
         if options["out"]:
-            Path(options["out"]).write_text(text, encoding="utf-8")
+            out = Path(options["out"])
+            try:
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(text, encoding="utf-8")
+            except OSError as exc:
+                raise CommandError(f"Cannot write the export: {exc}") from exc
             candidates = len(data["developers"][0]["candidates"])
             self.stdout.write(
                 f"Exported {options['developer_id']} ({candidates} candidates) to "

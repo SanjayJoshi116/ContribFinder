@@ -248,11 +248,36 @@ Evaluation
   [x] 16 candidates re-run; none qualified, v2 stays active (diagnosis in RESULTS.md)
 
 ============================================================================
+SHIPPED - v0.11.0 - Benchmark tooling for real developers (MVP+)
+============================================================================
+
+Evaluation
+  [x] Developer kind (persona | real); persona and real means in reports
+  [x] benchmark_sheet (blind CSV) and import_judgments (validated)
+  [x] build_benchmark (merge datasets; conflict handling)
+  [x] Selection benchmark: benchmark-v2 once it holds a judged real developer, else benchmark-v1
+  [x] baselines.json format 3 (keyed by dataset)
+  [x] Gitignored judging/ folder for exports and sheets
+  [~] Judge real developers and build benchmark-v2 (real-a exported, 3 of 39 graded; carried over)
+
+============================================================================
+SHIPPED - v0.12.0 - Discovery project-size mix (MVP+)
+============================================================================
+
+Repository discovery
+  [x] Star bands per query (DISCOVERY_STAR_BANDS); budget counts requests (default 20)
+  [x] System check for the band configuration
+  [x] not_code rule (awesome-* names, excluded topics, no primary language) in prefilter and eligibility
+  [x] Pool step re-checks not_code on stored data (pool_not_code)
+  [x] Job metadata pool_bands
+  [x] real-a re-exported (real-a-v2): median contributors 906 -> 56.5, under 50: 2/39 -> 19/40
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
-  [ ]          Benchmark from real, hand-judged developer exports; issue-level evaluation
-  [ ]          Review benchmark-v1 judgments (real hand-judged developers) before more tuning
+  [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
+  [ ]          Issue-level evaluation
   [ ]          Personalized ranking, notifications, contribution tracking

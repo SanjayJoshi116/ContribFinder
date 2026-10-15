@@ -25,11 +25,11 @@ def read(path: Path = BASELINES) -> dict[str, Any]:
 
 
 def write(reports: Sequence[Report], path: Path = BASELINES) -> None:
-    """Format 2: each configuration's effective minimum score and basis next to its metrics."""
-    data = {
-        "format": 2,
-        "dataset": reports[0].dataset,
-        "top_n": reports[0].top_n,
+    """Format 3: one entry per dataset. Rewrites only the evaluated dataset's entry and keeps
+    the others; each configuration has its effective minimum score and basis with its metrics."""
+    existing = read(path) if path.exists() else {}
+    datasets = {name: {"configs": entries(existing, name)} for name in dataset_names(existing)}
+    datasets[reports[0].dataset] = {
         "configs": {
             r.config: {
                 "min_score": r.min_score,
@@ -37,16 +37,28 @@ def write(reports: Sequence[Report], path: Path = BASELINES) -> None:
                 "metrics": r.metrics,
             }
             for r in reports
-        },
+        }
     }
+    data = {"format": 3, "top_n": reports[0].top_n, "datasets": dict(sorted(datasets.items()))}
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-def entries(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """``{version: {min_score, min_score_basis, metrics}}`` from format 1 or 2."""
-    if data.get("format", 1) == 1:
+def dataset_names(data: dict[str, Any]) -> list[str]:
+    if not data:
+        return []
+    if data.get("format", 1) < 3:
+        return [data["dataset"]]
+    return list(data["datasets"])
+
+
+def entries(data: dict[str, Any], dataset: str = "benchmark-v1") -> dict[str, dict[str, Any]]:
+    """``{version: {min_score, min_score_basis, metrics}}`` for one dataset, from formats 1-3."""
+    version = data.get("format", 1)
+    if version == 1:
         return {
-            version: {"min_score": data["min_score"], "min_score_basis": "score", "metrics": m}
-            for version, m in data["configs"].items()
+            config: {"min_score": data["min_score"], "min_score_basis": "score", "metrics": m}
+            for config, m in data["configs"].items()
         }
-    return dict(data["configs"])
+    if version == 2:
+        return dict(data["configs"])
+    return dict(data["datasets"][dataset]["configs"])

@@ -129,6 +129,7 @@ def make_candidate_repo(github_id: int, full_name: str | None = None, **fields: 
         "full_name": full_name,
         "html_url": f"https://github.com/{full_name}",
         "license_spdx": "MIT",
+        "primary_language": "Python",
         "stars": 500,
         "pushed_at": timezone.now() - timedelta(days=3),
         "synced_at": timezone.now(),
