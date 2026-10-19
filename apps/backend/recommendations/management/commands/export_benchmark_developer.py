@@ -22,12 +22,28 @@ class Command(BaseCommand):
             "--as", dest="developer_id", required=True, help="Benchmark developer id, e.g. dev-f."
         )
         parser.add_argument("--out", metavar="PATH", help="Output file. Default: stdout.")
+        parser.add_argument(
+            "--include-interacted",
+            action="store_true",
+            help="Keep repositories the user contributed to or interacted with. They identify "
+            "the person: never commit such an export.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         try:
-            data = export_developer(options["user_id"], options["developer_id"], timezone.now())
+            data, dropped = export_developer(
+                options["user_id"],
+                options["developer_id"],
+                timezone.now(),
+                include_interacted=options["include_interacted"],
+            )
         except NotAnalyzed as exc:
             raise CommandError(str(exc)) from exc
+        if dropped:
+            self.stderr.write(
+                f"Left out {dropped} repositories the user interacted with "
+                "(--include-interacted keeps them)."
+            )
         text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
         if options["out"]:
             out = Path(options["out"])

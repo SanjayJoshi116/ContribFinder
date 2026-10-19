@@ -188,11 +188,10 @@ class LogoutView(APIView):
 
 
 def _revoke_and_unlink(user: User) -> str:
-    """Stop the user's jobs, ask GitHub to revoke the grant and delete the stored credential.
-    Returns the revocation outcome; a failed revocation never keeps the credential."""
+    """Ask GitHub to revoke the grant and delete the stored credential. Returns the revocation
+    outcome; a failed revocation never keeps the credential. Jobs are cancelled by the data
+    deletion that follows; a job still running meanwhile can write nothing (job_write)."""
     account = GitHubAccount.objects.filter(user=user).first()
-    # Stop background syncs first so no further GitHub requests are made for this user.
-    jobs.cancel_active_syncs(user)
     if account is None:
         return "not_connected"
     try:
@@ -223,6 +222,10 @@ class GitHubDisconnectView(APIView):
             request=request,
             metadata={"revocation": revocation, "deleted": deleted},
         )
+        # A new (unusable) password value changes the session auth hash, so the user's other
+        # sessions, on any device, stop authenticating; this one ends now.
+        user.set_unusable_password()
+        user.save(update_fields=["password"])
         logout(request)
         return Response(DisconnectResultSerializer({"revocation": revocation}).data)
 
@@ -247,6 +250,7 @@ class AccountView(APIView):
             request=request,
             metadata={"revocation": revocation, "deleted": deleted},
         )
+        audit.anonymize_user_entries(user)
         logout(request)
         user.delete()
         return Response(status=204)

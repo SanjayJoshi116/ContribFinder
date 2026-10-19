@@ -115,11 +115,20 @@ def fetch_identity(access_token: str) -> GitHubIdentity:
 
 def revoke_grant(access_token: str) -> None:
     """Revoke the OAuth grant (all tokens for this app/user pair). Raises OAuthError."""
+    _revoke("grant", access_token)
+
+
+def revoke_token(access_token: str) -> None:
+    """Revoke this one token; other tokens of the grant stay valid. Raises OAuthError."""
+    _revoke("token", access_token)
+
+
+def _revoke(kind: str, access_token: str) -> None:
     try:
         with _client() as client:
             response = client.request(
                 "DELETE",
-                f"{settings.GITHUB_API_BASE_URL}/applications/{settings.GITHUB_CLIENT_ID}/grant",
+                f"{settings.GITHUB_API_BASE_URL}/applications/{settings.GITHUB_CLIENT_ID}/{kind}",
                 auth=(settings.GITHUB_CLIENT_ID, settings.GITHUB_CLIENT_SECRET),
                 headers={
                     "Accept": "application/vnd.github+json",
@@ -129,6 +138,6 @@ def revoke_grant(access_token: str) -> None:
             )
     except httpx.HTTPError as exc:
         raise OAuthError("github_unavailable", f"Revocation failed: {type(exc).__name__}") from None
-    # 404 means the grant is already gone, which is the state we want.
+    # 404 means it is already gone, which is the state we want.
     if response.status_code not in (204, 404):
         raise OAuthError("revocation_failed", f"Revocation returned {response.status_code}")

@@ -29,7 +29,8 @@ from developers.models import (
 )
 from github.models import GitHubProfile
 from repositories.models import Repository, UserRepository
-from services.errors import PermanentJobError
+from services.errors import JobCancelled, PermanentJobError
+from services.job_guard import job_write
 
 from .collectors import contribution_skills, dependency_skills, language_skills, topic_skills
 from .confidence import compute_confidence
@@ -239,20 +240,28 @@ def _upsert_catalog_interests(slugs: list[str]) -> dict[str, Interest]:
 
 
 class ProfileAnalysisService:
-    def __init__(self, user: User, config: AnalysisConfig | None = None) -> None:
+    def __init__(
+        self, user: User, config: AnalysisConfig | None = None, *, job_id: int | None = None
+    ) -> None:
         self.user = user
         self.config = config or AnalysisConfig.from_settings()
+        # The job this analysis runs under: its result is written only while the job runs, so
+        # a deletion during analysis is never undone (design D1). None outside a job.
+        self.job_id = job_id
 
     def run(self) -> DeveloperProfile:
         try:
             now = timezone.now()
             result = analyze(build_input(self.user, now), self.config)
-            return self._persist(result, now)
+            guard = transaction.atomic() if self.job_id is None else job_write(self.job_id)
+            with guard:
+                return self._persist(result, now)
+        except JobCancelled:
+            raise
         except Exception as exc:
             logger.exception("Profile analysis failed for user %s", self.user.pk)
             raise ProfileAnalysisError(type(exc).__name__) from exc
 
-    @transaction.atomic
     def _persist(self, result: AnalysisResult, now: datetime) -> DeveloperProfile:
         profile, _ = DeveloperProfile.objects.select_for_update().get_or_create(
             user=self.user, defaults={"analyzed_at": now}

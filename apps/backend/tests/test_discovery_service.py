@@ -349,7 +349,7 @@ def test_active_discovery_not_duplicated(user, developer, monkeypatch) -> None:
 class _StubService:
     fail = False
 
-    def __init__(self, *args: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     def run(self) -> None:
@@ -395,7 +395,7 @@ def test_disconnect_cancels_discovery_and_releases_repository(
         return httpx.Response(200, text="# httpx")
 
     apis["encode/httpx"]["readme"].mock(side_effect=cancel_then_respond)
-    from services.github.sync import JobCancelled
+    from services.errors import JobCancelled
 
     with pytest.raises(JobCancelled):
         DiscoveryService(job).run()

@@ -10,9 +10,15 @@ const UNTIL_DELETED = 'Until you delete your GitHub data, disconnect GitHub or d
 
 const CATEGORIES: Category[] = [
   {
-    name: 'GitHub account identifier and username',
-    purpose: 'To sign you in and link your account to GitHub.',
-    retention: 'Until you disconnect GitHub or delete your account.',
+    name: 'GitHub account ID',
+    purpose:
+      'The number GitHub gives your account. It links you back to your ContribFinder account when you sign in again.',
+    retention: 'Until you delete your account.',
+  },
+  {
+    name: 'GitHub username, avatar and display name',
+    purpose: 'To show who is signed in.',
+    retention: UNTIL_DELETED,
   },
   {
     name: 'GitHub access credential (encrypted)',
@@ -48,6 +54,12 @@ const CATEGORIES: Category[] = [
     retention: UNTIL_DELETED,
   },
   {
+    name: 'Candidate projects and search queries',
+    purpose:
+      'Projects found for you, and the GitHub searches built from your skills and interests that found them.',
+    retention: UNTIL_DELETED,
+  },
+  {
     name: 'Recommendations',
     purpose: 'Matched projects and the reasons they match.',
     retention: UNTIL_DELETED,
@@ -64,10 +76,22 @@ const CATEGORIES: Category[] = [
     retention: UNTIL_DELETED,
   },
   {
+    name: 'Sync and job history',
+    purpose: 'When your data was last synced, analyzed and matched, and whether a step failed.',
+    retention: UNTIL_DELETED,
+  },
+  {
+    name: 'Sign-in sessions',
+    purpose: 'To keep you signed in on this device.',
+    retention:
+      'Until you sign out, or for 14 days. Disconnecting GitHub ends your sessions on every device.',
+  },
+  {
     name: 'Audit entries',
     purpose:
-      'A record of sign-ins, disconnects and deletions, for security. They never contain credentials.',
-    retention: 'Kept after account deletion, without any link to you.',
+      'A record of sign-ins, disconnects and deletions, with a one-way hash of the network address, for security. They never contain credentials.',
+    retention:
+      'Kept after account deletion, without any link to you: your GitHub ID, username and address hash are removed from them.',
   },
 ]
 

@@ -293,11 +293,27 @@ Quality
   [x] Codebase review: Bug_Backlog.md (147 verified findings, 11 fix batches)
 
 ============================================================================
+SHIPPED - v0.12.2 - Privacy and deletion finality (backlog batch 2)
+============================================================================
+
+Data controls
+  [x] Job write guard (job_write, save_progress): running jobs never write deleted data back
+  [x] Display name cleared with GitHub data
+  [x] Account deletion anonymizes audit entries (GitHub ID, username, address hash)
+  [x] Privacy page matches what is stored (account ID, candidates, job history, sessions)
+
+Authentication
+  [x] Disconnect ends the user's sessions on every device
+  [x] Returning sign-in revokes the replaced token (Celery, best effort)
+
+Evaluation
+  [x] Benchmark export leaves out interacted repositories (--include-interacted keeps them)
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
-  [ ] Bug_Backlog.md batch 2  Privacy and deletion finality (before benchmark-v2: E-3)
   [ ] Bug_Backlog.md batch 3  Evaluation tooling (before judging real-a-v2)
   [ ] Bug_Backlog.md batches 4-11  Jobs, GitHub errors, recommendations, discovery, signals,
                                frontend, scripts, cleanup

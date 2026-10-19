@@ -8,14 +8,17 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from recommendations.models import Recommendation, ScoringConfig
+from repositories.models import UserRepository
 from services.evaluation.dataset import DatasetError, parse
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 
+from .repo_fixtures import add_candidate
 from .test_evaluation_dataset import minimal
 from .test_issue_matching import django_issues
 from .test_recommendation_generation import (  # noqa: F401 - pytest fixtures
     developer,
     pool,
+    ready_repo,
 )
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
@@ -222,3 +225,34 @@ def test_export_without_profile(user, tmp_path) -> None:
             "export_benchmark_developer", "--user-id", str(user.pk), "--as", "x", "--out", str(out)
         )
     assert not out.exists()
+
+
+def _export(user, *extra: str) -> tuple[list[str], str]:
+    out, err = StringIO(), StringIO()
+    call_command(
+        "export_benchmark_developer",
+        "--user-id",
+        str(user.pk),
+        "--as",
+        "dev-x",
+        *extra,
+        stdout=out,
+        stderr=err,
+    )
+    data = json.loads(out.getvalue())
+    return sorted(c["repository"] for c in data["developers"][0]["candidates"]), err.getvalue()
+
+
+def test_export_leaves_out_interacted_repositories(user, developer, pool) -> None:  # noqa: F811
+    contributed = ready_repo(9, "friend/contributed")
+    add_candidate(developer, contributed, source="previously_interacted", query="", rank=None)
+    UserRepository.objects.create(user=user, repository=contributed, relation="contributor")
+    searched = sorted(r.full_name for r in pool.values())
+
+    names, err = _export(user)
+    assert names == searched
+    assert "Left out 1 repositories" in err
+
+    names, err = _export(user, "--include-interacted")
+    assert names == sorted([*searched, "friend/contributed"])
+    assert err == ""

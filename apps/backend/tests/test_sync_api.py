@@ -13,7 +13,7 @@ from rest_framework.test import APIClient
 from github.models import GitHubAccount, GitHubProfile
 from jobs.models import SyncJob
 from repositories.models import Repository, RepositoryLanguage, RepositoryTopic, UserRepository
-from services import data_deletion
+from services import jobs
 
 from .factories import GitHubAccountFactory
 
@@ -23,8 +23,8 @@ SYNC = SyncJob.JobType.GITHUB_PROFILE_SYNC
 DELAY = "github.tasks.sync_github_profile.delay"
 
 
-def make_job(user, status: str, **fields) -> SyncJob:
-    return SyncJob.objects.create(user=user, job_type=SYNC, status=status, **fields)
+def make_job(user, status: str, job_type: str = SYNC, **fields) -> SyncJob:
+    return SyncJob.objects.create(user=user, job_type=job_type, status=status, **fields)
 
 
 # --- POST /profile/sync ---------------------------------------------------------------
@@ -259,15 +259,18 @@ def test_disconnect_cancels_active_sync(
     ).respond(204)
     job = make_job(user, status)
     seen: list[str] = []
-    real_delete = data_deletion.delete_github_data
+    real_cancel = jobs.cancel_active_syncs
 
     def spy(u):
-        seen.append(SyncJob.objects.get(pk=job.pk).status)  # cancelled before any deletion
-        return real_delete(u)
+        seen.append(SyncJob.objects.get(pk=job.pk).status)
+        cancelled = real_cancel(u)
+        # Deletion runs only after this returns, so the job is cancelled before any row goes.
+        seen.append(SyncJob.objects.get(pk=job.pk).status)
+        return cancelled
 
-    monkeypatch.setattr(data_deletion, "delete_github_data", spy)
+    monkeypatch.setattr(jobs, "cancel_active_syncs", spy)
     signed_in_client.post("/api/v1/auth/github/disconnect")
-    assert seen == ["CANCELLED"]
+    assert seen == [status, "CANCELLED"]
     assert not SyncJob.objects.filter(pk=job.pk).exists()  # job history is GitHub data
 
 

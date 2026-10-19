@@ -70,6 +70,9 @@ def delete_github_data(user: User) -> dict[str, int]:
             "jobs": SyncJob.objects.filter(user=user).delete()[0],
         }
         counts["repositories"] = _delete_orphans(repository_ids)
+        # The display name comes from the GitHub profile; the next sign-in sets it again.
+        user.display_name = ""
+        user.save(update_fields=["display_name"])
         transaction.on_commit(lambda: purge_user_github_cache(user.pk))
     return counts
 

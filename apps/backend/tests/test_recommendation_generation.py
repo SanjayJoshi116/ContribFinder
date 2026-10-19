@@ -23,7 +23,7 @@ from repositories.models import (
     RepositoryTopic,
 )
 from services import jobs
-from services.github.sync import JobCancelled
+from services.errors import JobCancelled
 from services.ranking import freshness
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 from services.ranking.service import RecommendationService

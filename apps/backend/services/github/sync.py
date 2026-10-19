@@ -15,7 +15,6 @@ from datetime import datetime
 from typing import Any
 
 from django.conf import settings
-from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
@@ -26,9 +25,11 @@ from repositories.models import (
     Repository,
     UserRepository,
 )
+from services.errors import JobCancelled
+from services.job_guard import job_write, save_progress
 from services.profiling.analysis import ProfileAnalysisService
 
-from .client import GitHubClient, PullRequestRef, PushRef
+from .client import GitHubClient, GitHubUser, PullRequestRef, PushRef
 from .errors import GitHubClientError, GitHubForbidden, GitHubNotFound, GitHubValidationError
 from .storage import (
     read_manifests,
@@ -57,10 +58,6 @@ SKIPPABLE = (GitHubNotFound, GitHubForbidden, GitHubClientError)
 FINISHED = {Step.DONE, Step.NOT_FOUND, Step.SKIPPED}
 
 
-class JobCancelled(Exception):
-    """The job was cancelled (e.g. GitHub disconnected); stop without further requests."""
-
-
 def initial_steps() -> dict[str, str]:
     return dict.fromkeys(STEPS, Step.PENDING)
 
@@ -80,8 +77,7 @@ class GitHubSyncService:
             for step in STEPS:
                 if self.job.steps.get(step) in FINISHED:
                     continue
-                self._check_cancelled()
-                self._set_step(step, Step.RUNNING)
+                self._set_step(step, Step.RUNNING)  # raises JobCancelled unless RUNNING
                 try:
                     outcome = getattr(self, f"_step_{step}")(client)
                 except Exception:
@@ -93,6 +89,11 @@ class GitHubSyncService:
 
     def _step_profile(self, client: GitHubClient) -> str:
         gh = client.get_authenticated_user()
+        with job_write(self.job.pk):
+            self._store_profile(gh)
+        return Step.DONE
+
+    def _store_profile(self, gh: GitHubUser) -> None:
         GitHubProfile.objects.update_or_create(
             user=self.user,
             defaults={
@@ -111,14 +112,14 @@ class GitHubSyncService:
                 "synced_at": timezone.now(),
             },
         )
-        return Step.DONE
 
     def _step_readme(self, client: GitHubClient) -> str:
         profile = self._profile()
         content = client.get_profile_readme(profile.login)
         profile.has_profile_readme = content is not None
         profile.profile_readme = content or ""
-        profile.save(update_fields=["has_profile_readme", "profile_readme"])
+        with job_write(self.job.pk):
+            profile.save(update_fields=["has_profile_readme", "profile_readme"])
         return Step.DONE if content is not None else Step.NOT_FOUND
 
     def _step_repositories(self, client: GitHubClient) -> str:
@@ -130,7 +131,7 @@ class GitHubSyncService:
         selected = owned[:cap]
 
         now = timezone.now()
-        with transaction.atomic():
+        with job_write(self.job.pk):
             stored = [upsert_repository(r, now) for r in selected]
             keep = {repo.pk for repo in stored}
             links = UserRepository.objects.filter(
@@ -165,15 +166,15 @@ class GitHubSyncService:
                 languages = client.get_languages(repo.full_name)
             except GitHubNotFound:
                 languages = {}  # deleted between listing and now: nothing to record
-            with transaction.atomic():
+            with job_write(self.job.pk):
                 replace_languages(repo, languages)
-            done.append(repo.pk)
-            self._update_metadata(languages_done=done)
+                done.append(repo.pk)
+                self._update_metadata(languages_done=done)
         return Step.DONE
 
     def _step_topics(self, client: GitHubClient) -> str:
         topics_by_repo: dict[str, list[str]] = self.job.metadata.get("repo_topics", {})
-        with transaction.atomic():
+        with job_write(self.job.pk):
             for repo_pk, topics in topics_by_repo.items():
                 replace_topics(int(repo_pk), topics)
         return Step.DONE
@@ -195,7 +196,7 @@ class GitHubSyncService:
             except SKIPPABLE:
                 dependencies = None  # unreadable right now: keep what we knew
             if dependencies is not None:
-                with transaction.atomic():
+                with job_write(self.job.pk):
                     replace_dependencies(repo, dependencies)
             done.append(repo.pk)
             self._update_metadata(dependencies_done=done)
@@ -232,7 +233,7 @@ class GitHubSyncService:
         by_pk: dict[int, dict[str, Any]] = {
             pk: item for item in plan if (pk := done.get(item["full_name"])) is not None
         }
-        with transaction.atomic():
+        with job_write(self.job.pk):
             links = UserRepository.objects.filter(
                 user=self.user, relation=UserRepository.Relation.CONTRIBUTOR
             )
@@ -251,7 +252,8 @@ class GitHubSyncService:
         return Step.DONE
 
     def _step_analysis(self, client: GitHubClient) -> str:
-        ProfileAnalysisService(self.user).run()  # raises ProfileAnalysisError: not retried
+        # Raises ProfileAnalysisError (not retried), or JobCancelled after a deletion.
+        ProfileAnalysisService(self.user, job_id=self.job.pk).run()
         return Step.DONE
 
     def _store_contributed_repository(
@@ -264,7 +266,7 @@ class GitHubSyncService:
             languages = client.get_languages(gh.full_name)
         except SKIPPABLE:
             return None
-        with transaction.atomic():
+        with job_write(self.job.pk):
             repo = upsert_repository(gh, timezone.now())
             replace_languages(repo, languages)
             replace_topics(repo.pk, gh.topics)
@@ -310,11 +312,11 @@ class GitHubSyncService:
 
     def _set_step(self, step: str, state: str) -> None:
         self.job.steps = {**self.job.steps, step: str(state)}
-        self.job.save(update_fields=["steps", "updated_at"])
+        save_progress(self.job, steps=self.job.steps)
 
     def _update_metadata(self, **values: Any) -> None:
         self.job.metadata = {**self.job.metadata, **values}
-        self.job.save(update_fields=["metadata", "updated_at"])
+        save_progress(self.job, metadata=self.job.metadata)
 
 
 def _parse_dt(value: str | None) -> datetime | None:

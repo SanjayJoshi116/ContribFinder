@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from datetime import timedelta
@@ -433,3 +434,59 @@ def test_sign_in_after_disconnect_relinks_same_user(client: Client) -> None:
 
     assert User.objects.count() == 1
     assert GitHubAccount.objects.get().user == user
+
+
+# --- Replaced token revocation (privacy-deletion-finality) -----------------------------
+
+NEW_TOKEN = "gho_ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210"
+APP_TOKEN_URL = f"https://api.github.com/applications/{settings.GITHUB_CLIENT_ID}/token"
+
+
+def _sign_in_twice(client: Client, router: respx.MockRouter, capture) -> None:
+    mock_github_ok(router)
+    callback(client, code=CODE, state=start(client))
+    other = Client()
+    router.post(TOKEN_URL).respond(
+        200, json={"access_token": NEW_TOKEN, "scope": "", "token_type": "bearer"}
+    )
+    with capture(execute=True):
+        response = callback(other, code=CODE, state=start(other))
+    assert response["Location"] == f"{settings.FRONTEND_URL}{settings.FRONTEND_SIGNED_IN_PATH}"
+
+
+@respx.mock
+def test_returning_sign_in_revokes_only_the_replaced_token(
+    client: Client, django_capture_on_commit_callbacks
+) -> None:
+    token_route = respx.mock.delete(APP_TOKEN_URL).respond(204)
+    grant_route = respx.mock.delete(GRANT_URL).respond(204)
+
+    _sign_in_twice(client, respx.mock, django_capture_on_commit_callbacks)
+
+    assert token_route.call_count == 1
+    assert json.loads(token_route.calls.last.request.content) == {"access_token": TOKEN}
+    assert not grant_route.called
+    account = GitHubAccount.objects.get()
+    assert decrypt_token(account.access_token_encrypted) == NEW_TOKEN
+
+
+@respx.mock
+def test_same_token_is_not_revoked(client: Client, django_capture_on_commit_callbacks) -> None:
+    token_route = respx.mock.delete(APP_TOKEN_URL).respond(204)
+    mock_github_ok(respx.mock)
+    callback(client, code=CODE, state=start(client))
+    other = Client()
+    with django_capture_on_commit_callbacks(execute=True):
+        callback(other, code=CODE, state=start(other))
+    assert not token_route.called
+
+
+@respx.mock
+def test_failed_revocation_still_signs_in(
+    client: Client, django_capture_on_commit_callbacks, caplog: pytest.LogCaptureFixture
+) -> None:
+    respx.mock.delete(APP_TOKEN_URL).mock(side_effect=httpx.ConnectTimeout("timed out"))
+    with caplog.at_level(logging.DEBUG):
+        _sign_in_twice(client, respx.mock, django_capture_on_commit_callbacks)
+    assert "Revoking the replaced GitHub token failed" in caplog.text
+    assert TOKEN not in caplog.text and NEW_TOKEN not in caplog.text

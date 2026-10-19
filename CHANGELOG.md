@@ -7,6 +7,39 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-10-19
+
+Privacy and deletion finality (OpenSpec change `privacy-deletion-finality`, backlog batch 2).
+
+### Added
+
+- `services/job_guard.job_write`: job transactions that write a user's data lock the job row and
+  require it to be RUNNING. Sync, profile analysis, discovery and recommendation writes use it,
+  so a job running during a deletion can no longer write the deleted data back.
+- `export_benchmark_developer --include-interacted`. By default the export now leaves out
+  repositories the user contributed to or interacted with, since that set identifies them.
+
+### Changed
+
+- Disconnect ends the user's sessions on every device (the session auth hash is rotated).
+- "Delete GitHub data", disconnect and account deletion clear the display name taken from GitHub.
+- Account deletion removes the GitHub ID, GitHub username and address hash from the user's audit
+  entries; action, outcome, time, reasons and counts are kept.
+- A returning sign-in that gets a new token revokes the one it replaces: single-token
+  revocation, best effort, in the Celery task `github.revoke_replaced_token`, so sign-in never
+  waits on GitHub. An unchanged token queues nothing.
+- The privacy page lists the GitHub account ID (kept until account deletion), candidate projects
+  and search queries, sync history, sessions, and the audit address hash.
+- `JobCancelled` moved to `services/errors.py`. Job progress writes go through
+  `job_guard.save_progress`, so a cancelled or deleted job ends as a cancel, never a failed save
+  (recommendation generation and the analysis task included). Per-item sync and discovery
+  progress is saved in the same transaction as the item's data.
+
+### Fixed
+
+- Deleted data could reappear when a sync or analysis step finished after the deletion.
+- Disconnect and account deletion cancelled the user's jobs twice.
+
 ## [0.12.1] - 2026-10-19
 
 Security hardening (OpenSpec change `security-hardening`, backlog batch 1).

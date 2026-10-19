@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.1** (security hardening: trusted-proxy throttling, wider log redaction, startup configuration checks, multi-tab sign-in; MVP+). After signing in with
+**Version 0.12.2** (privacy and deletion finality: deleted data stays deleted while jobs run, disconnect ends every session, audit entries anonymized on account deletion, anonymous benchmark exports; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -223,7 +223,8 @@ All commands are in `CLAUDE.md` §6.
 
 `Bug_Backlog.md` lists the findings of a full codebase review (2026-10-19), each verified against
 the code (confirmed, partial or false positive), grouped into 11 fix batches in priority order.
-Batch 1 (security hardening) shipped in 0.12.1.
+Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion finality) in
+0.12.2.
 
 ## Versioning
 

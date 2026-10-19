@@ -34,11 +34,11 @@ from repositories.models import (
     RepositoryCandidate,
     UserRepository,
 )
-from services.errors import PermanentJobError
+from services.errors import JobCancelled, PermanentJobError
 from services.github.client import PUBLIC_SCOPE, GitHubClient, GitHubRepo
 from services.github.errors import GitHubValidationError
 from services.github.storage import replace_topics, upsert_repository
-from services.github.sync import JobCancelled
+from services.job_guard import job_write, save_progress
 from services.repositories.analysis import RepositoryAnalysisService
 from services.repositories.lifecycle import IN_PROGRESS
 from services.repositories.staleness import stale_parts
@@ -96,8 +96,7 @@ class DiscoveryService:
             for step in STEPS:
                 if self.job.steps.get(step) in FINISHED:
                     continue
-                self._check_cancelled()
-                self._set_step(step, Step.RUNNING)
+                self._set_step(step, Step.RUNNING)  # raises JobCancelled unless RUNNING
                 try:
                     outcome = getattr(self, f"_step_{step}")()
                 except Exception:
@@ -134,7 +133,7 @@ class DiscoveryService:
                 skipped.append(query.key)
                 self._update_metadata(queries_skipped=skipped)
                 continue
-            with transaction.atomic():
+            with job_write(self.job.pk):
                 for rank, gh in enumerate(results, start=1):
                     reason = prefilter(gh, login=login, owned=owned, now=self.now, cfg=cfg)
                     if reason:
@@ -142,11 +141,11 @@ class DiscoveryService:
                         continue
                     repo = self._store_search_result(gh)
                     self._record(repo, query.source, query.core, rank)
-            found += len(results)
-            done.append(query.key)
-            self._update_metadata(
-                queries_done=done, rejections=dict(rejections), results_found=found
-            )
+                found += len(results)
+                done.append(query.key)
+                self._update_metadata(
+                    queries_done=done, rejections=dict(rejections), results_found=found
+                )
         return Step.DONE
 
     def _step_interactions(self) -> str:
@@ -156,7 +155,7 @@ class DiscoveryService:
         contributed = Repository.objects.filter(
             user_links__user=self.user, user_links__relation=UserRepository.Relation.CONTRIBUTOR
         ).distinct()
-        with transaction.atomic():
+        with job_write(self.job.pk):
             for repo in contributed:
                 reason = prefilter(
                     repo, login=login, owned=owned, now=self.now, cfg=cfg, check_stars=False
@@ -424,11 +423,11 @@ class DiscoveryService:
 
     def _set_step(self, step: str, state: str) -> None:
         self.job.steps = {**self.job.steps, step: str(state)}
-        self.job.save(update_fields=["steps", "updated_at"])
+        save_progress(self.job, steps=self.job.steps)
 
     def _update_metadata(self, **values: Any) -> None:
         self.job.metadata = {**self.job.metadata, **values}
-        self.job.save(update_fields=["metadata", "updated_at"])
+        save_progress(self.job, metadata=self.job.metadata)
 
 
 def _band_counts(stars: Iterable[int]) -> dict[str, int]:

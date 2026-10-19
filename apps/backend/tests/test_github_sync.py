@@ -10,6 +10,7 @@ from github.models import GitHubProfile
 from github.tasks import claim_job, sync_github_profile
 from jobs.models import SyncJob
 from repositories.models import Repository, UserRepository
+from services.errors import JobCancelled
 from services.github.errors import (
     GitHubAuthError,
     GitHubForbidden,
@@ -17,7 +18,7 @@ from services.github.errors import (
     GitHubTransientError,
 )
 from services.github.retry import Fail, Retry, decide_retry
-from services.github.sync import GitHubSyncService, JobCancelled, initial_steps
+from services.github.sync import GitHubSyncService, initial_steps
 
 from .factories import GitHubAccountFactory
 

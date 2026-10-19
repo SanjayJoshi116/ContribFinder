@@ -113,8 +113,9 @@ ContribFinder/
 │  │  │                     judged real developers; selection benchmark once it exists),
 │  │  │                     baselines.json (format 3, keyed by dataset)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
-│  │     │                  jobs), errors.py (PermanentJobError), feedback.py (record, save,
-│  │     │                  dismiss, restore), data_deletion.py (GitHub data / account deletion)
+│  │     │                  jobs), errors.py (PermanentJobError, JobCancelled), job_guard.py
+│  │     │                  (job_write, save_progress), feedback.py (record, save, dismiss,
+│  │     │                  restore), data_deletion.py (GitHub data / account deletion)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
 │  │     │                  storage.py (shared repository upserts)
 │  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
@@ -645,8 +646,24 @@ codebase sweep of 2026-10-19, 147 findings in 11 fix batches).
   the npm runners set development (`loadEnv()` in `scripts/env.mjs`), the image sets production.
 - OAuth states: session key `github_oauth_states` (`{state: issued_at}`),
   `OAUTH_STATE_MAX_PENDING` 5, `OAUTH_STATE_TTL_SECONDS` 600.
-- Carry-over: batches 2 (privacy and deletion, incl. E-3 export anonymization) and 3 (evaluation
-  tooling) before judging `real-a-v2` (K-1).
+- Carry-over: closed by batch 2 below (E-3); batch 3 (evaluation tooling) still precedes judging.
+
+**Privacy and deletion finality** (MVP+, fix release)  ✅ shipped in v0.12.2 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-19-privacy-deletion-finality/`. Specs: deltas to
+`data-controls`, `github-authentication`, `recommendation-evaluation`. Batch 2 of `Bug_Backlog.md`.
+- `services/job_guard.py`: `job_write(job_id)` (transaction + `SELECT … FOR UPDATE` on the job,
+  `JobCancelled` unless RUNNING) wraps every job write of user data; `save_progress(job, **fields)`
+  stores steps/metadata only while RUNNING. Deletion cancels jobs first, so it waits for an
+  in-flight write and later writes see the cancel. `JobCancelled` lives in `services/errors.py`.
+  New job services must use both, and fetch before entering `job_write` (never I/O under the lock).
+- `ProfileAnalysisService(user, job_id=...)`; without a job id it writes unguarded (tests only).
+- Disconnect rotates the unusable password (ends every session); delete-data clears
+  `display_name`; account deletion runs `audit.anonymize_user_entries`.
+- Re-sign-in with a new token queues `github.revoke_replaced_token` (encrypted old token only,
+  single-token revoke via `oauth.revoke_token`); the task re-checks the stored token.
+- `export_benchmark_developer` drops interacted repositories unless `--include-interacted`.
+- Carry-over: batch 3 (evaluation tooling) before judging `real-a-v2` (K-1).
 
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 

@@ -19,9 +19,10 @@ from django.utils import timezone
 from accounts.models import User
 from github.models import GitHubAccount
 from jobs.models import SyncJob
+from services.errors import JobCancelled
 from services.github.errors import GitHubError
 from services.github.retry import Retry, decide_retry
-from services.github.sync import STEPS, JobCancelled, initial_steps
+from services.github.sync import STEPS, initial_steps
 
 logger = logging.getLogger(__name__)
 

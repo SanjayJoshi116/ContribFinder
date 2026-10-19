@@ -25,7 +25,7 @@ from repositories.models import (
     RepositoryLanguage,
     UserRepository,
 )
-from services import data_deletion, feedback
+from services import data_deletion, feedback, jobs
 
 from .factories import GitHubAccountFactory
 from .repo_fixtures import add_candidate
@@ -311,3 +311,68 @@ def test_deletion_requires_csrf(user, everything, path: str) -> None:
 @pytest.mark.parametrize("path", ["/api/v1/profile/github-data", "/api/v1/auth/account"])
 def test_deletion_signed_out_is_401(client: Client, path: str) -> None:
     assert client.delete(path).status_code == 401
+
+
+# --- Identity cleanup (privacy-deletion-finality) ---------------------------------------
+
+
+def test_delete_data_clears_display_name(user) -> None:
+    User.objects.filter(pk=user.pk).update(display_name="The Octocat")
+    client, csrf = csrf_client(user)
+    assert client.delete("/api/v1/profile/github-data", HTTP_X_CSRFTOKEN=csrf).status_code == 204
+    assert User.objects.get(pk=user.pk).display_name == ""
+
+
+@respx.mock
+def test_disconnect_clears_display_name_and_ends_every_session(user) -> None:
+    respx.mock.delete(GRANT_URL).respond(204)
+    User.objects.filter(pk=user.pk).update(display_name="The Octocat")
+    other_device = Client()
+    other_device.force_login(user)
+    assert other_device.get("/api/v1/auth/me").status_code == 200
+    client, csrf = csrf_client(user)
+
+    assert client.post("/api/v1/auth/github/disconnect", HTTP_X_CSRFTOKEN=csrf).status_code == 200
+
+    assert User.objects.get(pk=user.pk).display_name == ""
+    assert client.get("/api/v1/auth/me").status_code == 401
+    assert other_device.get("/api/v1/auth/me").status_code == 401
+
+
+@respx.mock
+def test_account_deletion_anonymizes_earlier_audit_entries(client: Client) -> None:
+    mock_github_ok(respx.mock)
+    respx.mock.delete(GRANT_URL).respond(204)
+    callback(client, code="oauth-code-5f3a9c", state=start(client))
+    sign_in = AuditEvent.objects.get(action="sign_in")
+    assert sign_in.metadata["github_username"] and sign_in.ip_hash  # identifying before
+    client.get("/api/v1/auth/csrf/")
+
+    client.delete("/api/v1/auth/account", HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value)
+
+    for event in AuditEvent.objects.all():
+        assert event.user is None
+        assert event.ip_hash == ""
+        assert "github_id" not in event.metadata and "github_username" not in event.metadata
+    sign_in.refresh_from_db()
+    assert sign_in.outcome == "success" and sign_in.created_at
+    assert "created_user" in sign_in.metadata
+    assert AuditEvent.objects.get(action="account_deleted").metadata["revocation"] == "revoked"
+
+
+@respx.mock
+@pytest.mark.parametrize("path", ["/api/v1/auth/github/disconnect", "/api/v1/auth/account"])
+def test_jobs_are_cancelled_once(user, path: str, monkeypatch) -> None:
+    respx.mock.delete(GRANT_URL).respond(204)
+    calls: list[User] = []
+    real = jobs.cancel_active_syncs
+
+    def counting(u: User) -> int:
+        calls.append(u)
+        return real(u)
+
+    monkeypatch.setattr(jobs, "cancel_active_syncs", counting)
+    client, csrf = csrf_client(user)
+    method = client.post if path.endswith("disconnect") else client.delete
+    method(path, HTTP_X_CSRFTOKEN=csrf)
+    assert len(calls) == 1

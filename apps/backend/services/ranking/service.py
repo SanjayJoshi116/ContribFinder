@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import Any
 
 from django.conf import settings
-from django.db import transaction
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
@@ -25,8 +24,8 @@ from recommendations.models import (
     RepositorySize,
     ScoringConfig,
 )
-from services.errors import PermanentJobError
-from services.github.sync import JobCancelled
+from services.errors import JobCancelled, PermanentJobError
+from services.job_guard import job_write, save_progress
 from services.matching.features import DeveloperFeatures, load_candidates, load_developer
 from services.matching.issues import MatchedIssue, load_issues
 from services.matching.issues import snapshot as issue_snapshot
@@ -124,7 +123,7 @@ class RecommendationService:
             "label_counts": labels,
         }
         self.job.steps = {**self.job.steps, STEP: str(Step.DONE)}
-        self.job.save(update_fields=["metadata", "steps", "updated_at"])
+        save_progress(self.job, metadata=self.job.metadata, steps=self.job.steps)
 
     def _persist(
         self,
@@ -137,17 +136,8 @@ class RecommendationService:
         """Write the result and return what was kept after dropping repositories dismissed
         while this run worked."""
         sizes = settings.REPO_SIZE_THRESHOLDS
-        with transaction.atomic():
-            # A disconnect cancels the job; re-check under lock so a cancelled run never
-            # replaces the previous results.
-            status = (
-                SyncJob.objects.select_for_update()
-                .filter(pk=self.job.pk)
-                .values_list("status", flat=True)
-                .first()
-            )
-            if status != SyncJob.Status.RUNNING:
-                raise JobCancelled()
+        # A disconnect or deletion cancels the job; a cancelled run never replaces results.
+        with job_write(self.job.pk):
             dismissed = set(
                 DismissedRepository.objects.filter(user_id=profile.user_id).values_list(
                     "repository_id", flat=True
@@ -246,4 +236,4 @@ class RecommendationService:
 
     def _set_step(self, state: str) -> None:
         self.job.steps = {**self.job.steps, STEP: str(state)}
-        self.job.save(update_fields=["steps", "updated_at"])
+        save_progress(self.job, steps=self.job.steps)

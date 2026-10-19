@@ -426,18 +426,24 @@ describe('privacy page', () => {
       await screen.findByRole('heading', { name: 'Your data in ContribFinder' }),
     ).toBeInTheDocument()
     for (const category of [
-      'GitHub account identifier and username',
+      'GitHub account ID',
+      'GitHub username, avatar and display name',
       'Profile README',
       'Public repository metadata and README content',
       'Public contribution information',
       'Derived developer profile',
+      'Candidate projects and search queries',
       'Recommendations',
       'Saved and hidden projects',
       'Feedback events',
+      'Sync and job history',
+      'Sign-in sessions',
       'Audit entries',
     ])
       expect(screen.getByText(category)).toBeInTheDocument()
-    expect(screen.getAllByText(/^Kept:/).length).toBeGreaterThanOrEqual(9)
+    expect(screen.getAllByText(/^Kept:/).length).toBeGreaterThanOrEqual(14)
+    expect(screen.getByText('Kept: Until you delete your account.')).toBeInTheDocument()
+    expect(screen.getByText(/address hash are removed/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'How to delete it' })).toBeInTheDocument()
   })
 

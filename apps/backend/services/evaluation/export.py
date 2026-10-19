@@ -2,7 +2,8 @@
 recommendation-evaluation "Export a developer snapshot"; design D5).
 
 Reads the same features generation reads, plus eligible issues. No GitHub calls. The result
-holds no username, name, email, GitHub id, avatar or token, and no judgments.
+holds no username, name, email, GitHub id, avatar or token, and no judgments. Repositories the
+user interacted with are left out unless asked for: that set identifies the person.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import Any
 from django.conf import settings
 
 from developers.models import DeveloperProfile
+from repositories.models import CandidateDiscovery, DiscoverySource, UserRepository
 from services.matching.features import load_candidates, load_developer
 from services.matching.issues import load_issues
 
@@ -28,12 +30,35 @@ class NotAnalyzed(Exception):
     pass
 
 
-def export_developer(user_id: int, developer_id: str, now: datetime) -> dict[str, Any]:
+def interacted_repository_ids(profile: DeveloperProfile) -> set[int]:
+    """Repositories the user contributed to or that entered the pool as previously interacted."""
+    ids = set(
+        CandidateDiscovery.objects.filter(
+            candidate__developer=profile, source=DiscoverySource.PREVIOUSLY_INTERACTED
+        ).values_list("candidate__repository_id", flat=True)
+    )
+    ids.update(
+        UserRepository.objects.filter(user_id=profile.user_id).values_list(
+            "repository_id", flat=True
+        )
+    )
+    return ids
+
+
+def export_developer(
+    user_id: int, developer_id: str, now: datetime, *, include_interacted: bool = False
+) -> tuple[dict[str, Any], int]:
+    """The dataset and the number of interacted candidates left out."""
     profile = DeveloperProfile.objects.filter(user_id=user_id, analyzed_at__isnull=False).first()
     if profile is None:
         raise NotAnalyzed(f"User {user_id} has no analyzed developer profile.")
     dev = load_developer(profile)
     candidates = load_candidates(profile)
+    dropped = 0
+    if not include_interacted:
+        interacted = interacted_repository_ids(profile)
+        kept = [repo for repo in candidates if repo.id not in interacted]
+        dropped, candidates = len(candidates) - len(kept), kept
     issues = load_issues([r.id for r in candidates], now, settings.ISSUE_MAX_AGE_DAYS)
 
     repositories: dict[str, Any] = {}
@@ -95,4 +120,4 @@ def export_developer(user_id: int, developer_id: str, now: datetime) -> dict[str
                 "judgments": {},
             }
         ],
-    }
+    }, dropped
