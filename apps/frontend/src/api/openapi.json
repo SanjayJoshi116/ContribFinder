@@ -473,16 +473,6 @@
               }
             },
             "description": ""
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": ""
           }
         }
       }

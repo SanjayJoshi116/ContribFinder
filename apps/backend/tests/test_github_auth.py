@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -11,7 +12,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import AuditEvent, User
-from accounts.views import OAUTH_STATE_SESSION_KEY
+from accounts.views import OAUTH_STATES_SESSION_KEY
 from github.models import GitHubAccount
 from services.crypto import decrypt_token
 
@@ -64,7 +65,7 @@ def test_start_redirects_to_github_with_state_and_no_scopes(client: Client) -> N
     assert query["redirect_uri"] == [settings.GITHUB_OAUTH_REDIRECT_URI]
     assert query["scope"] == [""]
     assert len(query["state"][0]) >= 32
-    assert client.session[OAUTH_STATE_SESSION_KEY] == query["state"][0]
+    assert list(client.session[OAUTH_STATES_SESSION_KEY]) == [query["state"][0]]
 
 
 def test_each_start_issues_a_new_state(client: Client) -> None:
@@ -126,9 +127,9 @@ def test_returning_user_is_updated_not_duplicated(client: Client) -> None:
 @respx.mock
 def test_session_key_rotates_on_login(client: Client) -> None:
     mock_github_ok(respx.mock)
-    start(client)
+    state = start(client)
     pre_login_key = client.session.session_key
-    callback(client, code=CODE, state=client.session[OAUTH_STATE_SESSION_KEY])
+    callback(client, code=CODE, state=state)
     assert client.session.session_key != pre_login_key
 
 
@@ -169,6 +170,40 @@ def test_reused_state_rejected(client: Client, respx_mock: respx.MockRouter) -> 
 
     _assert_auth_error_redirect(response, "invalid_state")
     assert respx_mock.calls.call_count == calls_before
+
+
+@respx.mock
+def test_sign_in_started_in_two_tabs(client: Client) -> None:
+    mock_github_ok(respx.mock)
+    tab_a = start(client)
+    tab_b = start(client)
+
+    response = callback(client, code=CODE, state=tab_a)
+
+    assert response["Location"] == f"{settings.FRONTEND_URL}{settings.FRONTEND_SIGNED_IN_PATH}"
+    assert list(client.session[OAUTH_STATES_SESSION_KEY]) == [tab_b]
+    _assert_auth_error_redirect(callback(client, code=CODE, state=tab_a), "invalid_state")
+
+
+def test_expired_state_rejected_without_calling_github(
+    client: Client, respx_mock: respx.MockRouter, settings
+) -> None:
+    token_route = respx_mock.post(TOKEN_URL)
+    state = start(client)
+    session = client.session
+    session[OAUTH_STATES_SESSION_KEY] = {state: time.time() - settings.OAUTH_STATE_TTL_SECONDS - 1}
+    session.save()
+
+    response = callback(client, code=CODE, state=state)
+
+    _assert_auth_error_redirect(response, "invalid_state")
+    assert not token_route.called
+
+
+def test_pending_states_are_capped_to_the_newest(client: Client, settings) -> None:
+    settings.OAUTH_STATE_MAX_PENDING = 2
+    states = [start(client) for _ in range(4)]
+    assert list(client.session[OAUTH_STATES_SESSION_KEY]) == states[-2:]
 
 
 def test_state_without_session_rejected(client: Client) -> None:

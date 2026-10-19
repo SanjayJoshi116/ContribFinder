@@ -8,6 +8,8 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export function loadEnv() {
   const file = path.join(root, '.env')
   if (existsSync(file)) process.loadEnvFile(file)
+  // Local runners are development; config/celery.py and wsgi.py default to production.
+  process.env.DJANGO_SETTINGS_MODULE ||= 'config.settings.development'
 }
 
 /** Host/port of REDIS_URL, or null when Redis is not configured. */

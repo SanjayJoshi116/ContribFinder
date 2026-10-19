@@ -7,6 +7,40 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-19
+
+Security hardening (OpenSpec change `security-hardening`, backlog batch 1).
+
+### Added
+
+- `Bug_Backlog.md`: full codebase review, 147 findings verified against the code (115 confirmed,
+  31 partial, 1 false positive) and grouped into 11 fix batches. This release is batch 1.
+- `NUM_PROXIES`: number of trusted proxies in front of Django. Throttling, the audit IP hash and
+  HTTPS detection (`X-Forwarded-Proto`) trust forwarded headers only through it; default 0.
+  System check `core.W002` warns when the SSL redirect is on and no proxy is trusted.
+- Production web server, Celery worker and beat run Django system checks at startup and refuse
+  to start on errors (`RUN_STARTUP_CHECKS`).
+- JSON error envelope for Django-level 400 (`bad_request`) and 403 (`permission_denied`).
+- Sign-in from several tabs: each session keeps up to `OAUTH_STATE_MAX_PENDING` (5) single-use
+  states for `OAUTH_STATE_TTL_SECONDS` (600).
+
+### Changed
+
+- **Breaking for deployments behind a proxy:** set `NUM_PROXIES`; `X-Forwarded-For` is no longer
+  used as the client identity by default. `.env.example` sets 1 for the Vite dev proxy.
+- `config/celery.py` defaults to production settings like `wsgi.py`; the npm runners
+  (`scripts/env.mjs`) set development, and the backend image sets production explicitly.
+- HSTS `includeSubDomains` and `preload` are opt-in (`SECURE_HSTS_INCLUDE_SUBDOMAINS`,
+  `SECURE_HSTS_PRELOAD`).
+- `/api/v1/health/` is not throttled and is exempt from the HTTPS redirect.
+- Compose: the frontend container no longer receives `.env`; Redis and Postgres bind 127.0.0.1.
+
+### Fixed
+
+- Rate limits could be bypassed by sending a different `X-Forwarded-For` on each request.
+- Log redaction missed quoted `key='value'` forms, `state` in dicts and JSON, and non-GitHub
+  `Authorization` values; a malformed log call raised into the caller.
+
 ## [0.12.0] - 2026-10-15
 
 Discovery project-size mix (OpenSpec change `discovery-size-mix`): the candidate pool now holds

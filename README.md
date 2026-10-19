@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.0** (discovery finds smaller projects too and drops lists/docs repositories; no ranking change; MVP+). After signing in with
+**Version 0.12.1** (security hardening: trusted-proxy throttling, wider log redaction, startup configuration checks, multi-tab sign-in; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -198,6 +198,16 @@ Compose runs its own Postgres (host port 5433) and Redis, and overrides `DATABAS
 `.env.example`, fill in `DJANGO_SECRET_KEY` and `TOKEN_ENCRYPTION_KEYS` yourself (commands
 are in the file).
 
+## Deploying behind a proxy
+
+Production settings (`config.settings.production`) refuse to start the web server, Celery
+worker or beat when a system check reports an error (for example empty `TOKEN_ENCRYPTION_KEYS`).
+Set `NUM_PROXIES` to the number of proxies you control in front of Django (usually 1 for a
+TLS-terminating load balancer). With `0`, forwarded headers are ignored: every client behind the
+proxy shares one throttle bucket and HTTPS detection fails, so the SSL redirect loops (system
+check `core.W002` warns about this). `/api/v1/health/` is never throttled or redirected, so
+probes can use plain HTTP.
+
 ## Secrets
 
 `TOKEN_ENCRYPTION_KEYS` encrypts stored GitHub tokens. To rotate, put a new key first
@@ -209,8 +219,15 @@ Never commit `.env`.
 `uv run pytest` in `apps/backend` (uses local PostgreSQL) and `npm test` in `apps/frontend`.
 All commands are in `CLAUDE.md` §6.
 
+## Known issues
+
+`Bug_Backlog.md` lists the findings of a full codebase review (2026-10-19), each verified against
+the code (confirmed, partial or false positive), grouped into 11 fix batches in priority order.
+Batch 1 (security hardening) shipped in 0.12.1.
+
 ## Versioning
 
 `VERSION` is the single source of truth. Keep `package.json`, `apps/frontend/package.json` and
 `apps/backend/pyproject.toml` in sync; `npm run check:version` (also run in CI) verifies it.
-Before the MVP, each completed roadmap phase bumps the minor version.
+Before the MVP, each completed roadmap phase bumps the minor version; fix releases bump the patch
+version.

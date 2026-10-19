@@ -5,16 +5,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .health import HEALTHY, run_checks
-from .serializers import HealthSerializer, error_responses
+from .serializers import HealthSerializer
 
 
 class HealthView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+    # Infrastructure probes poll at any rate from one address; the checks are two pings.
+    throttle_classes = []
 
     @extend_schema(
         operation_id="health",
-        responses={200: HealthSerializer, 503: HealthSerializer, **error_responses(429)},
+        responses={200: HealthSerializer, 503: HealthSerializer},
         auth=[],
     )
     def get(self, request: Request) -> Response:

@@ -87,7 +87,8 @@ ContribFinder/
 │  │  ├─ manage.py
 │  │  ├─ config/            settings/{base,development,test,production}.py, urls.py, celery.py,
 │  │  │                     exceptions.py (error envelope)
-│  │  ├─ core/              health, auth class, CSRF/404 JSON views, log redaction, checks
+│  │  ├─ core/              health, auth class, CSRF/400/403/404 JSON views, log redaction, checks,
+│  │  │                     startup (production check gate)
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
 │  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API, recover_stale_jobs task
@@ -136,7 +137,7 @@ ContribFinder/
 │                           manage, check-version
 ├─ package.json             root runner: npm run setup / npm start / stop / manage / check:version
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
-├─ VERSION, CHANGELOG.md, features.txt
+├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches)
 └─ .github/workflows/ci.yml
 ```
 
@@ -629,6 +630,23 @@ Archived: `openspec/changes/archive/2026-10-15-discovery-size-mix/`. Spec: delta
 - Re-export `judging/real-a-v2.json` (40 candidates): median contributors 906 → 56.5, under 50
   2/39 → 19/40. Docs-style repositories with a code language (`system-design-primer`) still pass.
 - Carry-over: judge `real-a-v2` (benchmark-tooling carry-over 2 above) before any ranking search.
+
+**Security hardening** (MVP+, fix release)  ✅ shipped in v0.12.1 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-19-security-hardening/`. Specs: deltas to
+`api-platform`, `github-authentication`. Batch 1 of `Bug_Backlog.md` (repo root: the verified
+codebase sweep of 2026-10-19, 147 findings in 11 fix batches).
+- `NUM_PROXIES` (default 0; `.env.example` 1 for the Vite proxy) is the only trust switch for
+  forwarded headers: DRF throttles, `services.audit.client_ip` (DRF's `get_ident`, so audit and
+  throttling share one rule) and `SECURE_PROXY_SSL_HEADER`.
+  Check `core.W002` warns on SSL redirect with no trusted proxy.
+- `core.startup.run_startup_checks()` runs from `wsgi.py` and Celery `worker_init`/`beat_init` when
+  `RUN_STARTUP_CHECKS` (production only). `config/celery.py` now defaults to production settings;
+  the npm runners set development (`loadEnv()` in `scripts/env.mjs`), the image sets production.
+- OAuth states: session key `github_oauth_states` (`{state: issued_at}`),
+  `OAUTH_STATE_MAX_PENDING` 5, `OAUTH_STATE_TTL_SECONDS` 600.
+- Carry-over: batches 2 (privacy and deletion, incl. E-3 export anonymization) and 3 (evaluation
+  tooling) before judging `real-a-v2` (K-1).
 
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 

@@ -1,29 +1,32 @@
 """Backstop that keeps credentials out of log output.
 
 Primary protection is never logging secrets in the first place; this filter masks
-anything that slips through (query-string, JSON and GitHub token formats).
+anything that slips through (query-string, quoted key=value, JSON/dict, Authorization
+header and GitHub token formats). It never raises into the code that logs.
 """
 
 import logging
 import re
 
 _REDACTED = "[REDACTED]"
+_KEYS = r"access_token|refresh_token|client_secret|code|state"
 
 _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    # key=value (query strings, form bodies, reprs)
-    (
-        re.compile(r"(?i)\b(access_token|refresh_token|client_secret|code|state)=([^&\s'\",]+)"),
-        rf"\1={_REDACTED}",
-    ),
+    # key='value' / key="value" (reprs, keyword arguments)
+    (re.compile(rf"(?i)\b({_KEYS})=(['\"])[^'\"]*\2"), rf"\1=\2{_REDACTED}\2"),
+    # key=value (query strings, form bodies)
+    (re.compile(rf"(?i)\b({_KEYS})=([^&\s'\",]+)"), rf"\1={_REDACTED}"),
     # "key": "value" (JSON / dict reprs)
     (
-        re.compile(
-            r"(?i)(['\"](?:access_token|refresh_token|client_secret|code)['\"]\s*:\s*)"
-            r"(['\"])[^'\"]*\2"
-        ),
+        re.compile(rf"(?i)(['\"](?:{_KEYS}|authorization)['\"]\s*:\s*)(['\"])[^'\"]*\2"),
         rf"\1\2{_REDACTED}\2",
     ),
-    # Authorization header values (Bearer tokens, Basic client credentials)
+    # Authorization header, whatever the scheme (token, Bearer, Basic) or value format
+    (
+        re.compile(r"(?i)\b(Authorization\s*:\s*)([A-Za-z]+\s+)?[^\s'\",]+"),
+        rf"\1\2{_REDACTED}",
+    ),
+    # Bearer/Basic values without the header name
     (re.compile(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9+/=._-]{8,}"), rf"\1 {_REDACTED}"),
     # GitHub token formats: gho_, ghu_, ghp_, ghs_, ghr_, github_pat_
     (re.compile(r"\b(gh[opusr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})\b"), _REDACTED),
@@ -36,9 +39,20 @@ def redact(text: str) -> str:
     return text
 
 
+def _message(record: logging.LogRecord) -> str:
+    try:
+        return record.getMessage()
+    except Exception:
+        # A bad log call (wrong argument count, failing __str__) must not crash the caller.
+        try:
+            return f"{record.msg} (unformatted args: {record.args!r})"
+        except Exception:
+            return "<unprintable log message>"
+
+
 class RedactSecretsFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = redact(record.getMessage())
+        record.msg = redact(_message(record))
         record.args = ()
         if record.exc_info and not record.exc_text:
             record.exc_text = logging.Formatter().formatException(record.exc_info)

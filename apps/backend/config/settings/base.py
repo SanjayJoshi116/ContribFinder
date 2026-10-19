@@ -144,8 +144,18 @@ SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
+# --- Trusted proxies -------------------------------------------------------
+# Number of proxies in front of the app that append to X-Forwarded-For (e.g. 1 for the Vite dev
+# proxy or a TLS-terminating load balancer). 0 trusts no forwarded header: client identity for
+# throttling and audit is the connecting address, and X-Forwarded-Proto is ignored.
+NUM_PROXIES = env.int("NUM_PROXIES", default=0)
+
+# Production sets this: the web server and workers run system checks and refuse to start on errors.
+RUN_STARTUP_CHECKS = False
+
 # --- DRF / OpenAPI ---------------------------------------------------------
 REST_FRAMEWORK = {
+    "NUM_PROXIES": NUM_PROXIES,
     "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -203,6 +213,9 @@ GITHUB_OAUTH_SCOPES = env("GITHUB_OAUTH_SCOPES", default="").split()
 GITHUB_OAUTH_REDIRECT_URI = env(
     "GITHUB_OAUTH_REDIRECT_URI", default=f"{FRONTEND_URL}/api/v1/auth/github/callback"
 )
+# Pending sign-in states per session (one per tab that started sign-in) and their lifetime.
+OAUTH_STATE_MAX_PENDING = env.int("OAUTH_STATE_MAX_PENDING", default=5)
+OAUTH_STATE_TTL_SECONDS = env.int("OAUTH_STATE_TTL_SECONDS", default=600)
 GITHUB_OAUTH_BASE_URL = "https://github.com"
 GITHUB_API_BASE_URL = "https://api.github.com"
 GITHUB_HTTP_TIMEOUT = env.float("GITHUB_HTTP_TIMEOUT", default=10.0)

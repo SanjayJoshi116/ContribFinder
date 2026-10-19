@@ -35,6 +35,23 @@ def github_oauth_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMess
     return []
 
 
+@register()
+def trusted_proxy_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    # Behind a TLS-terminating proxy with NUM_PROXIES=0, every request looks like plain HTTP
+    # (redirect loop) and all clients share the proxy's throttle bucket.
+    if settings.SECURE_SSL_REDIRECT and settings.NUM_PROXIES == 0:
+        return [
+            Warning(
+                "SECURE_SSL_REDIRECT is on but NUM_PROXIES is 0: X-Forwarded-Proto and "
+                "X-Forwarded-For are ignored.",
+                hint="Behind a proxy or load balancer, set NUM_PROXIES to the number of proxies "
+                "you control. Leave it at 0 only if this server terminates TLS itself.",
+                id="core.W002",
+            )
+        ]
+    return []
+
+
 def _weight_errors(name: str, weights: object, sources: list[str], code: str) -> list[CheckMessage]:
     if not isinstance(weights, dict):
         return [Error(f"{name} must be a mapping of source to weight.", id=code)]

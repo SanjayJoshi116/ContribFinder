@@ -1630,14 +1630,6 @@ export interface operations {
           'application/json': components['schemas']['Health']
         }
       }
-      429: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Error']
-        }
-      }
       503: {
         headers: {
           [name: string]: unknown

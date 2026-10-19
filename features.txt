@@ -273,10 +273,34 @@ Repository discovery
   [x] real-a re-exported (real-a-v2): median contributors 906 -> 56.5, under 50: 2/39 -> 19/40
 
 ============================================================================
+SHIPPED - v0.12.1 - Security hardening (backlog batch 1)
+============================================================================
+
+Platform
+  [x] NUM_PROXIES: throttling, audit IP and HTTPS detection trust forwarded headers only through it
+  [x] Health check unthrottled and exempt from the HTTPS redirect
+  [x] Log redaction: quoted values, OAuth state, any Authorization value; filter never raises
+  [x] Production web server, worker and beat refuse to start on system check errors
+  [x] Celery defaults to production settings like WSGI; runners and image set it explicitly
+  [x] JSON envelope for framework-level 400 / 403
+  [x] HSTS includeSubDomains / preload opt-in
+  [x] Compose: frontend gets no secrets; Redis and Postgres bind 127.0.0.1
+
+Authentication
+  [x] Several pending sign-in states per session (multi-tab sign-in)
+
+Quality
+  [x] Codebase review: Bug_Backlog.md (147 verified findings, 11 fix batches)
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
+  [ ] Bug_Backlog.md batch 2  Privacy and deletion finality (before benchmark-v2: E-3)
+  [ ] Bug_Backlog.md batch 3  Evaluation tooling (before judging real-a-v2)
+  [ ] Bug_Backlog.md batches 4-11  Jobs, GitHub errors, recommendations, discovery, signals,
+                               frontend, scripts, cleanup
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation

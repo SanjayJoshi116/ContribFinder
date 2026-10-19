@@ -1,5 +1,6 @@
 import logging
 import secrets
+import time
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -26,7 +27,9 @@ from .serializers import DisconnectResultSerializer, MeSerializer
 
 logger = logging.getLogger(__name__)
 
-OAUTH_STATE_SESSION_KEY = "github_oauth_state"
+# Pending sign-in states, {state: issued_at}: one per tab that started sign-in (several may be
+# open), each single-use and short-lived.
+OAUTH_STATES_SESSION_KEY = "github_oauth_states"
 
 # Error codes the frontend understands (?auth_error=<code>).
 ERROR_CANCELLED = "cancelled"
@@ -60,6 +63,13 @@ def _start_initial_sync(user: User) -> None:
         logger.exception("Could not queue initial GitHub sync")
 
 
+def _pending_states(request: Request) -> dict[str, float]:
+    """Unexpired pending states of this session, oldest first."""
+    oldest = time.time() - settings.OAUTH_STATE_TTL_SECONDS
+    stored: dict[str, float] = request.session.get(OAUTH_STATES_SESSION_KEY, {})
+    return {state: issued for state, issued in stored.items() if issued > oldest}
+
+
 class GitHubLoginView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -72,7 +82,10 @@ class GitHubLoginView(APIView):
     )
     def get(self, request: Request) -> HttpResponseRedirect:
         state = secrets.token_urlsafe(32)
-        request.session[OAUTH_STATE_SESSION_KEY] = state
+        states = _pending_states(request)
+        states[state] = time.time()
+        newest = list(states.items())[-settings.OAUTH_STATE_MAX_PENDING :]
+        request.session[OAUTH_STATES_SESSION_KEY] = dict(newest)
         return HttpResponseRedirect(oauth.build_authorize_url(state))
 
 
@@ -92,15 +105,14 @@ class GitHubCallbackView(APIView):
         auth=[],
     )
     def get(self, request: Request) -> HttpResponseRedirect:
-        # Single use: the stored state is consumed whatever happens next.
-        expected_state = request.session.pop(OAUTH_STATE_SESSION_KEY, None)
-        received_state = request.query_params.get("state", "")
+        # Single use: a matching state is consumed whatever happens next; other tabs' states stay.
+        # A dict lookup is fine here: states are 256-bit random values, timing reveals nothing.
+        states = _pending_states(request)
+        matched = states.pop(request.query_params.get("state", ""), None)
+        if OAUTH_STATES_SESSION_KEY in request.session:  # no session row for stray callbacks
+            request.session[OAUTH_STATES_SESSION_KEY] = states
 
-        if (
-            not expected_state
-            or not received_state
-            or not secrets.compare_digest(str(expected_state), received_state)
-        ):
+        if matched is None:
             return _auth_error(request, ERROR_INVALID_STATE, "state_mismatch")
 
         if error := request.query_params.get("error"):

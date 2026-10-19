@@ -10,6 +10,7 @@ from typing import Any
 
 from django.conf import settings
 from django.http import HttpRequest
+from rest_framework.throttling import BaseThrottle
 
 from accounts.models import AuditEvent, User
 
@@ -37,10 +38,10 @@ def hash_ip(ip: str) -> str:
     return hmac.new(salt, ip.encode(), hashlib.sha256).hexdigest()
 
 
-def _client_ip(request: HttpRequest | None) -> str:
-    if request is None:
-        return ""
-    return str(request.META.get("REMOTE_ADDR", ""))
+def client_ip(request: HttpRequest) -> str:
+    """The client address exactly as DRF throttling identifies it (REST_FRAMEWORK NUM_PROXIES)."""
+    # get_ident reads only headers and META, which a plain HttpRequest has.
+    return str(BaseThrottle().get_ident(request) or "")  # type: ignore[arg-type]
 
 
 def record(
@@ -62,5 +63,5 @@ def record(
         action=action,
         outcome=outcome,
         metadata=metadata,
-        ip_hash=hash_ip(_client_ip(request)),
+        ip_hash=hash_ip(client_ip(request) if request else ""),
     )

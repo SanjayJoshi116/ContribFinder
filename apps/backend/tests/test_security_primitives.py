@@ -1,10 +1,11 @@
+import io
 import logging
 
 import pytest
 from cryptography.fernet import Fernet
 from django.core.checks import Error
 from django.core.exceptions import ImproperlyConfigured
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 
 from accounts.models import AuditEvent
 from core.checks import token_encryption_keys_check
@@ -57,14 +58,11 @@ def test_invalid_keys_rejected(keys: list[str]) -> None:
 
 @pytest.mark.django_db
 def test_audit_record_stores_hashed_ip(user) -> None:
-    class _Req:
-        META = {"REMOTE_ADDR": "203.0.113.9"}
-
     event = audit.record(
         AuditEvent.Action.LOGOUT,
         AuditEvent.Outcome.SUCCESS,
         user=user,
-        request=_Req(),  # type: ignore[arg-type]
+        request=RequestFactory().get("/", REMOTE_ADDR="203.0.113.9"),
         metadata={"github_username": "octocat"},
     )
     assert event.user == user
@@ -91,12 +89,45 @@ def test_audit_rejects_unlisted_metadata_keys() -> None:
         f'{{"access_token": "{TOKEN}"}}',
         f"Authorization: token {TOKEN}",
         "callback ?code=abc123&state=xyz789",
+        "TokenResult(client_secret='s3cr3t', access_token=\"abc123\")",
+        "session {'state': 'xyz789'}",
+        '{"Authorization": "token abc123"}',
+        "Authorization: token abc123defabc123",
+        "Authorization: abc123",
+        "headers={'Authorization': 'Bearer s3cr3t'}",
     ],
 )
 def test_redact_masks_secrets(line: str) -> None:
     redacted = redact(line)
     for secret in (TOKEN, "s3cr3t", "abc123", "xyz789"):
         assert secret not in redacted
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("client_secret='s3cr3t'", "client_secret='[REDACTED]'"),
+        ("Authorization: token abc123", "Authorization: token [REDACTED]"),
+        ("Authorization: abc123", "Authorization: [REDACTED]"),
+        ("{'state': 'xyz789'}", "{'state': '[REDACTED]'}"),
+    ],
+)
+def test_redact_keeps_the_key_visible(line: str, expected: str) -> None:
+    assert redact(line) == expected
+
+
+def test_malformed_log_call_does_not_raise() -> None:
+    logger = logging.getLogger("tests.redaction")
+    stream = logging.StreamHandler(io.StringIO())
+    stream.addFilter(RedactSecretsFilter())
+    logger.addHandler(stream)
+    try:
+        logger.warning("refresh failed for %s: %s", f"access_token={TOKEN}")  # one arg missing
+    finally:
+        logger.removeHandler(stream)
+    output = stream.stream.getvalue()
+    assert "refresh failed for" in output
+    assert TOKEN not in output
 
 
 def test_redaction_filter_applies_to_args_and_exceptions() -> None:
