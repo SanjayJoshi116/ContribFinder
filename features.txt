@@ -310,12 +310,48 @@ Evaluation
   [x] Benchmark export leaves out interacted repositories (--include-interacted keeps them)
 
 ============================================================================
+SHIPPED - v0.12.3 - Evaluation tooling integrity (backlog batch 3)
+============================================================================
+
+Evaluation
+  [x] Baseline format 4: top N per dataset
+  [x] --write-baseline rewrites benchmark-v1, recorded datasets and the selection benchmark
+  [x] --write-baseline merges per configuration; different top N must cover every config
+  [x] --write-baseline refuses --min-score
+  [x] --json creates its folder; write errors are command errors
+  [x] Sheet import: guide lines only above the header, blank rows ignored, repeated rows fail
+  [x] Imported developers described as judged
+  [x] Sheets handle languages without byte counts
+  [x] build_benchmark rejects inputs that are not current-format datasets
+
+============================================================================
+SHIPPED - v0.12.4 - Job lifecycle and claim fencing (backlog batch 4)
+============================================================================
+
+Jobs
+  [x] Claim tokens: only the worker holding the current claim writes, finishes or follows up
+  [x] Lost PENDING/RETRYING jobs requeued; dead RUNNING jobs requeued once as RETRYING
+  [x] Redelivery and recovery stop at SYNC_MAX_ATTEMPTS (worker_lost)
+  [x] No inline retries without Redis (job fails with its final error code)
+  [x] Finished, cancelled or expired jobs show no running step
+  [x] One start helper: stale jobs never block a start, a finished conflict never 500s
+
+Profile analysis
+  [x] Analysis task runs through run_tracked_job
+  [x] Catalog upserts in sorted order (no deadlocks between users)
+  [x] An analysis of older data never overwrites a newer profile
+
+Repositories
+  [x] Analysis claims fenced by token and renewed between data types
+  [x] Claim and release keep the FAILED retry clock and DISCOVERED grace period
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
-  [ ] Bug_Backlog.md batch 3  Evaluation tooling (before judging real-a-v2)
-  [ ] Bug_Backlog.md batches 4-11  Jobs, GitHub errors, recommendations, discovery, signals,
+  [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
+  [ ] Bug_Backlog.md batches 5-11  GitHub errors, recommendations, discovery, signals,
                                frontend, scripts, cleanup
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning

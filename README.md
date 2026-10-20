@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.2** (privacy and deletion finality: deleted data stays deleted while jobs run, disconnect ends every session, audit entries anonymized on account deletion, anonymous benchmark exports; MVP+). After signing in with
+**Version 0.12.4** (job lifecycle and claim fencing: a reclaimed worker can no longer write, lost or crashed jobs recover once and stop at the attempt limit, finished jobs show no running step; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -74,7 +74,11 @@ npm run stop       # stop the stack from another prompt (Ctrl+C in its own conso
 
 Celery beat runs the periodic repository jobs: it marks candidate repositories stale and
 refreshes them in the background with the OAuth app's client credentials (never a user's
-token). Without `REDIS_URL` there is no worker or beat, so those jobs do not run.
+token). Beat also recovers jobs: a job whose worker died (no heartbeat for
+`SYNC_STALE_AFTER_SECONDS`) or whose queued task was lost is requeued once, and a job that used
+every `SYNC_MAX_ATTEMPTS` ends as `worker_lost`. Without `REDIS_URL` there is no worker or
+beat, so those jobs do not run; syncs then run inline in the request and a GitHub error that
+would be retried (rate limit, 5xx) fails the job instead.
 
 Open http://localhost:5173. API health: http://localhost:5173/api/v1/health/.
 
@@ -134,9 +138,13 @@ whole score) or `"relevance"` (the skill, language, framework and interest part 
 them, `RECOMMENDATION_MIN_SCORE` applies. `evaluate_ranking --min-score` overrides every
 configuration's minimum and says so in the output.
 
-`evaluation/baselines.json` records the stored configurations' metrics, and a test fails when
-they move. After an intended ranking change, run `npm run manage -- evaluate_ranking
---write-baseline` and commit the file with the change.
+`evaluation/baselines.json` records the stored configurations' metrics per dataset (with the
+top N they were computed at), and a test fails when they move. After an intended ranking change,
+run `npm run manage -- evaluate_ranking --write-baseline` and commit the file with the change.
+Without `--dataset` it rewrites `benchmark-v1`, every other recorded dataset whose file exists,
+and the selection benchmark. It merges: `--config v2-deterministic` replaces v2's entries and
+keeps v1's. A different `--top-n` must cover every configuration recorded for the dataset, and
+`--min-score` is refused (the test recomputes each configuration at its own minimum score).
 
 ### Judging real developers
 
@@ -162,7 +170,9 @@ missing).
    ```bash
    npm run manage -- benchmark_sheet --export ../../judging/real-a.json --out ../../judging/real-a.csv
    ```
-4. **Import** the grades (validated; nothing is written on an error):
+4. **Import** the grades (validated; nothing is written on an error). `#` guide lines count only
+   above the header; fully blank rows are ignored; a repeated repository or a grade without a
+   repository fails naming the row:
    ```bash
    npm run manage -- import_judgments --export ../../judging/real-a.json --sheet ../../judging/real-a.csv
    ```
@@ -224,7 +234,8 @@ All commands are in `CLAUDE.md` §6.
 `Bug_Backlog.md` lists the findings of a full codebase review (2026-10-19), each verified against
 the code (confirmed, partial or false positive), grouped into 11 fix batches in priority order.
 Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion finality) in
-0.12.2.
+0.12.2, batch 3 (evaluation tooling integrity) in 0.12.3, batch 4 (job lifecycle and claim
+fencing) in 0.12.4.
 
 ## Versioning
 

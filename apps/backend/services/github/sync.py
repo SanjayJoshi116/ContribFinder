@@ -25,8 +25,7 @@ from repositories.models import (
     Repository,
     UserRepository,
 )
-from services.errors import JobCancelled
-from services.job_guard import job_write, save_progress
+from services.job_guard import heartbeat, job_write, save_progress
 from services.profiling.analysis import ProfileAnalysisService
 
 from .client import GitHubClient, GitHubUser, PullRequestRef, PushRef
@@ -89,7 +88,7 @@ class GitHubSyncService:
 
     def _step_profile(self, client: GitHubClient) -> str:
         gh = client.get_authenticated_user()
-        with job_write(self.job.pk):
+        with job_write(self.job):
             self._store_profile(gh)
         return Step.DONE
 
@@ -118,7 +117,7 @@ class GitHubSyncService:
         content = client.get_profile_readme(profile.login)
         profile.has_profile_readme = content is not None
         profile.profile_readme = content or ""
-        with job_write(self.job.pk):
+        with job_write(self.job):
             profile.save(update_fields=["has_profile_readme", "profile_readme"])
         return Step.DONE if content is not None else Step.NOT_FOUND
 
@@ -131,7 +130,7 @@ class GitHubSyncService:
         selected = owned[:cap]
 
         now = timezone.now()
-        with job_write(self.job.pk):
+        with job_write(self.job):
             stored = [upsert_repository(r, now) for r in selected]
             keep = {repo.pk for repo in stored}
             links = UserRepository.objects.filter(
@@ -166,7 +165,7 @@ class GitHubSyncService:
                 languages = client.get_languages(repo.full_name)
             except GitHubNotFound:
                 languages = {}  # deleted between listing and now: nothing to record
-            with job_write(self.job.pk):
+            with job_write(self.job):
                 replace_languages(repo, languages)
                 done.append(repo.pk)
                 self._update_metadata(languages_done=done)
@@ -174,7 +173,7 @@ class GitHubSyncService:
 
     def _step_topics(self, client: GitHubClient) -> str:
         topics_by_repo: dict[str, list[str]] = self.job.metadata.get("repo_topics", {})
-        with job_write(self.job.pk):
+        with job_write(self.job):
             for repo_pk, topics in topics_by_repo.items():
                 replace_topics(int(repo_pk), topics)
         return Step.DONE
@@ -196,7 +195,7 @@ class GitHubSyncService:
             except SKIPPABLE:
                 dependencies = None  # unreadable right now: keep what we knew
             if dependencies is not None:
-                with job_write(self.job.pk):
+                with job_write(self.job):
                     replace_dependencies(repo, dependencies)
             done.append(repo.pk)
             self._update_metadata(dependencies_done=done)
@@ -233,7 +232,7 @@ class GitHubSyncService:
         by_pk: dict[int, dict[str, Any]] = {
             pk: item for item in plan if (pk := done.get(item["full_name"])) is not None
         }
-        with job_write(self.job.pk):
+        with job_write(self.job):
             links = UserRepository.objects.filter(
                 user=self.user, relation=UserRepository.Relation.CONTRIBUTOR
             )
@@ -253,7 +252,7 @@ class GitHubSyncService:
 
     def _step_analysis(self, client: GitHubClient) -> str:
         # Raises ProfileAnalysisError (not retried), or JobCancelled after a deletion.
-        ProfileAnalysisService(self.user, job_id=self.job.pk).run()
+        ProfileAnalysisService(self.user, job=self.job).run()
         return Step.DONE
 
     def _store_contributed_repository(
@@ -266,7 +265,7 @@ class GitHubSyncService:
             languages = client.get_languages(gh.full_name)
         except SKIPPABLE:
             return None
-        with job_write(self.job.pk):
+        with job_write(self.job):
             repo = upsert_repository(gh, timezone.now())
             replace_languages(repo, languages)
             replace_topics(repo.pk, gh.topics)
@@ -307,8 +306,7 @@ class GitHubSyncService:
 
     def _check_cancelled(self) -> None:
         """Cancellation check and heartbeat: called between units of work."""
-        if self.job.heartbeat() in (SyncJob.Status.CANCELLED, None):
-            raise JobCancelled()
+        heartbeat(self.job)  # raises JobCancelled when cancelled, deleted or reclaimed
 
     def _set_step(self, step: str, state: str) -> None:
         self.job.steps = {**self.job.steps, step: str(state)}

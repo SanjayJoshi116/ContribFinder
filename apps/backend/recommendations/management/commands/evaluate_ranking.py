@@ -15,6 +15,7 @@ from services.evaluation.runner import (
     ConfigError,
     ConfigSpec,
     Report,
+    Verdict,
     active_config,
     compare,
     evaluate,
@@ -69,46 +70,68 @@ class Command(BaseCommand):
             "--write-baseline",
             action="store_true",
             help="Rewrite evaluation/baselines.json from the stored configurations (all of "
-            "them unless --config is given), with the pinned min score and top N.",
+            "them unless --config is given), with the pinned min score and top N. Without "
+            "--dataset: benchmark-v1, every recorded dataset and the selection benchmark. "
+            "Configurations not evaluated keep their recorded values.",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        pinned = options["write_baseline"]
         try:
-            dataset = load(options["dataset"] or selection_dataset())
+            if options["dataset"]:
+                paths = [Path(options["dataset"])]
+            elif pinned:
+                paths = baseline.default_datasets()
+            else:
+                paths = [selection_dataset()]
+            datasets = [load(path) for path in paths]
             specs = self._specs(options)
         except (DatasetError, ConfigError) as exc:
             raise CommandError(str(exc)) from exc
-        pinned = options["write_baseline"]
         override = options["min_score"] is not None
         min_score = options["min_score"]
         if min_score is None:
             min_score = baseline.MIN_SCORE if pinned else settings.RECOMMENDATION_MIN_SCORE
         top_n = options["top_n"] or (baseline.TOP_N if pinned else settings.RECOMMENDATIONS_TOP_N)
 
-        reports = [
-            evaluate(dataset, spec, min_score=min_score, top_n=top_n, override=override)
-            for spec in specs
-        ]
-        self._print(dataset.name, len(dataset.developers), reports)
-
-        if options["json"]:
-            Path(options["json"]).write_text(
-                json.dumps({"reports": [r.as_dict() for r in reports]}, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            self.stdout.write(f"Report written to {options['json']}")
-        if options["write_baseline"]:
-            baseline.write(reports)
-            self.stdout.write(f"Baseline written to {baseline.BASELINES}")
-
-        verdicts = compare(reports[0], reports[1:], options["tolerance"])
-        for verdict in verdicts:
-            if verdict.improvement:
-                self.stdout.write(f"{verdict.config}: improvement over {reports[0].config}")
-            else:
-                self.stdout.write(f"{verdict.config}: not an improvement over {reports[0].config}")
+        everything: list[Report] = []
+        verdicts: list[Verdict] = []
+        for index, dataset in enumerate(datasets):
+            if index:
+                self.stdout.write("")
+            reports = [
+                evaluate(dataset, spec, min_score=min_score, top_n=top_n, override=override)
+                for spec in specs
+            ]
+            self._print(dataset.name, len(dataset.developers), reports)
+            found = compare(reports[0], reports[1:], options["tolerance"])
+            prefix = f"{dataset.name}: " if len(datasets) > 1 else ""
+            for verdict in found:
+                result = "improvement" if verdict.improvement else "not an improvement"
+                self.stdout.write(f"{prefix}{verdict.config}: {result} over {reports[0].config}")
                 for failure in verdict.failures:
                     self.stdout.write(f"  - {failure}")
+            everything += reports
+            verdicts += found
+
+        if options["json"]:
+            out = Path(options["json"])
+            text = json.dumps({"reports": [r.as_dict() for r in everything]}, indent=2) + "\n"
+            try:
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(text, encoding="utf-8")
+            except OSError as exc:
+                raise CommandError(f"Report not written to {out}: {exc}") from exc
+            self.stdout.write(f"Report written to {out}")
+        if pinned:
+            try:
+                baseline.write(everything)
+            except baseline.BaselineError as exc:
+                raise CommandError(f"Baseline not written: {exc}") from exc
+            self.stdout.write(
+                f"Baseline written to {baseline.BASELINES} ({', '.join(d.name for d in datasets)})"
+            )
+
         if options["require_improvement"]:
             if not verdicts:
                 raise CommandError("--require-improvement needs at least two configurations.")
@@ -119,6 +142,11 @@ class Command(BaseCommand):
         versions: list[str] = options["config"]
         if options["write_baseline"] and options["config_file"]:
             raise ConfigError("--write-baseline records stored configurations only.")
+        if options["write_baseline"] and options["min_score"] is not None:
+            raise ConfigError(
+                "--write-baseline records each configuration's own minimum score; "
+                "--min-score cannot be used with it."
+            )
         if options["write_baseline"] and not versions:
             versions = list(
                 ScoringConfig.objects.order_by("created_at", "pk").values_list("version", flat=True)

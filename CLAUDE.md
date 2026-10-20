@@ -111,11 +111,12 @@ ContribFinder/
 │  │  │                     holdout-v2.json (acceptance only, never for choosing; both used, so
 │  │  │                     the next search adds holdout-v3), benchmark-v2.json (personas plus
 │  │  │                     judged real developers; selection benchmark once it exists),
-│  │  │                     baselines.json (format 3, keyed by dataset)
+│  │  │                     baselines.json (format 4, keyed by dataset, top N each)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError, JobCancelled), job_guard.py
-│  │     │                  (job_write, save_progress), feedback.py (record, save, dismiss,
-│  │     │                  restore), data_deletion.py (GitHub data / account deletion)
+│  │     │                  (stale_before, job_write, save_progress, heartbeat), feedback.py
+│  │     │                  (record, save, dismiss, restore), data_deletion.py (GitHub data /
+│  │     │                  account deletion)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
 │  │     │                  storage.py (shared repository upserts)
 │  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
@@ -194,7 +195,9 @@ Local, no Docker (primary on this machine):
 - `npm run manage -- evaluate_ranking --config <v1> --config <v2>` scores configurations on the
   benchmark (`apps/backend/evaluation/`); a ranking change is an improvement only if it wins there
   (README "Evaluating a ranking change"). After an intended ranking change, rerun with
-  `--write-baseline` and commit `baselines.json`, or the baseline test fails. A new config also
+  `--write-baseline` and commit `baselines.json`, or the baseline test fails. Without `--dataset`
+  it rewrites `benchmark-v1`, recorded datasets and the selection benchmark, merging per config
+  (format 4, top N per dataset); it refuses `--min-score`. A new config also
   must not regress on a fresh acceptance holdout (`holdout-v1`/`-v2` are used; add `holdout-v3`
   first; spec `recommendation-evaluation`). A config's own `min_score` wins over the setting;
   `--min-score` overrides it.
@@ -663,7 +666,47 @@ Archived: `openspec/changes/archive/2026-10-19-privacy-deletion-finality/`. Spec
 - Re-sign-in with a new token queues `github.revoke_replaced_token` (encrypted old token only,
   single-token revoke via `oauth.revoke_token`); the task re-checks the stored token.
 - `export_benchmark_developer` drops interacted repositories unless `--include-interacted`.
-- Carry-over: batch 3 (evaluation tooling) before judging `real-a-v2` (K-1).
+- Carry-over: closed by batch 3 below.
+
+**Evaluation tooling integrity** (MVP+, fix release)  ✅ shipped in v0.12.3 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-19-evaluation-tooling-integrity/`. Spec: delta to
+`recommendation-evaluation`. Batch 3 of `Bug_Backlog.md`.
+- `baselines.json` format 4 (`top_n` per dataset; `baseline.top_n(data, dataset)` reads 1–4).
+  `baseline.write` merges per config and raises `BaselineError` before writing when a different
+  top N leaves a recorded config out. `baseline.default_datasets()` is what `--write-baseline`
+  rewrites without `--dataset`: `benchmark-v1`, recorded datasets with files, and `benchmark-v2`
+  once it is the selection benchmark. `--min-score` with `--write-baseline` is refused.
+- `read_sheet` skips `#` lines only above the header and parses the rest as one CSV stream;
+  all-blank rows are ignored, repeated repositories and grades without a repository fail naming
+  the CSV line. `import_sheet` sets `sheet.JUDGED` as developer and export description.
+- `build` rejects inputs that are not `dict` with `format == FORMAT`.
+- Write the first `benchmark-v2` baseline without `--config`: a new dataset entry holds only the
+  configs evaluated, and the baseline test requires v1 and v2.
+- Carry-over: judge `real-a-v2` (K-1), build `benchmark-v2`, evaluate v1/v2 and write its
+  baseline, before any further ranking search.
+
+**Job lifecycle and claim fencing** (MVP+, fix release)  ✅ shipped in v0.12.4 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-19-job-claim-fencing/`. Specs: deltas to `sync-jobs`,
+`repository-analysis`, `developer-profile`. Batch 4 of `Bug_Backlog.md`.
+- `claim_job(job_id) -> SyncJob | None` sets `SyncJob.claim_token`; `job_write(job)`,
+  `save_progress(job)`, `job_guard.heartbeat(job)` (replaces `SyncJob.heartbeat()`) and
+  `finish_job(job, ...)` match status RUNNING and the token, so a reclaimed worker gets
+  `JobCancelled` and starts no follow-up. Pass the claimed job object, never an id.
+- Every terminal transition goes through `_end_jobs`: it clears the token and turns `running`
+  steps `failed`. All four `start_*` go through `_start_job(user, job_type)`, which builds the
+  steps from `STEPS_BY_JOB_TYPE`. `job_guard.stale_before(now)` is the one stale cutoff (jobs
+  and repository claims); `_stale_running(now)` the one dead-worker filter. Recovery moves dead
+  RUNNING jobs to RETRYING and requeues PENDING/RETRYING jobs idle for
+  `SYNC_STALE_AFTER_SECONDS + GITHUB_MAX_RETRY_DELAY` (`_requeue`).
+- With `CELERY_TASK_ALWAYS_EAGER`, `run_tracked_job` decides as on the last attempt (no inline
+  retry); tests of the retry path use `override_settings(CELERY_TASK_ALWAYS_EAGER=False)`.
+- Repository claims: `claim_token` and `claimed_at` (claim age) on `Repository`; claim and
+  release leave `lifecycle_changed_at` alone. `lifecycle.renew/hold/release/fail/complete` match
+  the token and raise or no-op on `ClaimLost`; analysis returns `SKIPPED` when reclaimed.
+- `ProfileAnalysisService(user, job=...)` drops a result older than the stored `analyzed_at`.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 

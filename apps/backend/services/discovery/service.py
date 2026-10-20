@@ -34,11 +34,11 @@ from repositories.models import (
     RepositoryCandidate,
     UserRepository,
 )
-from services.errors import JobCancelled, PermanentJobError
+from services.errors import PermanentJobError
 from services.github.client import PUBLIC_SCOPE, GitHubClient, GitHubRepo
 from services.github.errors import GitHubValidationError
 from services.github.storage import replace_topics, upsert_repository
-from services.job_guard import job_write, save_progress
+from services.job_guard import heartbeat, job_write, save_progress
 from services.repositories.analysis import RepositoryAnalysisService
 from services.repositories.lifecycle import IN_PROGRESS
 from services.repositories.staleness import stale_parts
@@ -133,7 +133,7 @@ class DiscoveryService:
                 skipped.append(query.key)
                 self._update_metadata(queries_skipped=skipped)
                 continue
-            with job_write(self.job.pk):
+            with job_write(self.job):
                 for rank, gh in enumerate(results, start=1):
                     reason = prefilter(gh, login=login, owned=owned, now=self.now, cfg=cfg)
                     if reason:
@@ -155,7 +155,7 @@ class DiscoveryService:
         contributed = Repository.objects.filter(
             user_links__user=self.user, user_links__relation=UserRepository.Relation.CONTRIBUTOR
         ).distinct()
-        with job_write(self.job.pk):
+        with job_write(self.job):
             for repo in contributed:
                 reason = prefilter(
                     repo, login=login, owned=owned, now=self.now, cfg=cfg, check_stars=False
@@ -418,8 +418,7 @@ class DiscoveryService:
 
     def _check_cancelled(self) -> None:
         """Cancellation check and heartbeat: called between units of work."""
-        if self.job.heartbeat() in (SyncJob.Status.CANCELLED, None):
-            raise JobCancelled()
+        heartbeat(self.job)  # raises JobCancelled when cancelled, deleted or reclaimed
 
     def _set_step(self, step: str, state: str) -> None:
         self.job.steps = {**self.job.steps, step: str(state)}

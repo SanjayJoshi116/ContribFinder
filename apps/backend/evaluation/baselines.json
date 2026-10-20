@@ -1,8 +1,8 @@
 {
-  "format": 3,
-  "top_n": 50,
+  "format": 4,
   "datasets": {
     "benchmark-v1": {
+      "top_n": 50,
       "configs": {
         "v1-deterministic": {
           "min_score": 0.1,

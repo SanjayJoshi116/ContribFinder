@@ -5,11 +5,13 @@ If the change is intended, run ``npm run manage -- evaluate_ranking --write-base
 commit the updated ``evaluation/baselines.json`` with it.
 """
 
+import json
+
 import pytest
 
 from services.evaluation import baseline
 from services.evaluation.dataset import DATASETS_DIR, DEFAULT_DATASET, load
-from services.evaluation.runner import evaluate, stored_config
+from services.evaluation.runner import Report, evaluate, stored_config
 
 
 def test_seed_benchmark_loads() -> None:
@@ -59,7 +61,7 @@ def test_baseline_metrics_unchanged() -> None:
                 dataset,
                 stored_config(version),
                 min_score=baseline.MIN_SCORE,
-                top_n=recorded["top_n"],
+                top_n=baseline.top_n(recorded, name),
             )
             if (report.min_score, report.min_score_basis) != (
                 entry["min_score"],
@@ -81,3 +83,65 @@ def test_baseline_formats(tmp_path) -> None:
     assert baseline.entries(v1, "d")["a"]["metrics"] == metrics
     assert baseline.entries(v2, "d")["a"]["min_score"] == 0.1
     assert baseline.dataset_names(v1) == ["d"]
+    assert baseline.top_n(v1, "d") == baseline.TOP_N  # no top N recorded
+    v3 = {"format": 3, "top_n": 20, "datasets": {"d": {"configs": v2["configs"]}}}
+    assert baseline.top_n(v3, "d") == 20  # the file's top N applies to every dataset
+    assert baseline.entries(v3, "d")["a"]["min_score"] == 0.1
+    v4 = {"format": 4, "datasets": {"d": {"top_n": 30, "configs": v2["configs"]}}}
+    assert baseline.top_n(v4, "d") == 30
+    assert baseline.entries(v4, "d") == v2["configs"]
+    assert baseline.dataset_names(v4) == ["d"]
+
+
+def report(config: str, ndcg: float, top_n: int = 50, dataset: str = "d") -> Report:
+    return Report(
+        config=config,
+        dataset=dataset,
+        min_score=0.1,
+        top_n=top_n,
+        metrics={"ndcg@10": ndcg},
+        developers=(),
+    )
+
+
+def test_baseline_write_merges(tmp_path) -> None:
+    path = tmp_path / "baselines.json"
+    baseline.write([report("v1", 0.5), report("v2", 0.6), report("v1", 0.4, dataset="e")], path)
+    baseline.write([report("v2", 0.7)], path)  # only v2 rewritten
+    data = baseline.read(path)
+    assert data["format"] == 4
+    assert baseline.top_n(data, "d") == 50
+    assert {k: v["metrics"] for k, v in baseline.entries(data, "d").items()} == {
+        "v1": {"ndcg@10": 0.5},
+        "v2": {"ndcg@10": 0.7},
+    }
+    assert baseline.entries(data, "e")["v1"]["metrics"] == {"ndcg@10": 0.4}
+
+
+def test_baseline_write_upgrades_format_3(tmp_path) -> None:
+    path = tmp_path / "baselines.json"
+    entry = {"min_score": 0.1, "min_score_basis": "score", "metrics": {"ndcg@10": 0.5}}
+    old = {"format": 3, "top_n": 50, "datasets": {"d": {"configs": {"v1": entry}}}}
+    path.write_text(json.dumps(old), encoding="utf-8")
+    baseline.write([report("v2", 0.6)], path)
+    data = baseline.read(path)
+    assert data == {
+        "format": 4,
+        "datasets": {
+            "d": {
+                "top_n": 50,
+                "configs": {"v1": entry, "v2": {**entry, "metrics": {"ndcg@10": 0.6}}},
+            }
+        },
+    }
+
+
+def test_baseline_write_different_top_n(tmp_path) -> None:
+    path = tmp_path / "baselines.json"
+    baseline.write([report("v1", 0.5), report("v2", 0.6)], path)
+    before = path.read_text(encoding="utf-8")
+    with pytest.raises(baseline.BaselineError, match="missing: v1"):
+        baseline.write([report("v2", 0.7, top_n=20), report("v1", 0.1, dataset="e")], path)
+    assert path.read_text(encoding="utf-8") == before
+    baseline.write([report("v1", 0.3, top_n=20), report("v2", 0.4, top_n=20)], path)
+    assert baseline.top_n(baseline.read(path), "d") == 20

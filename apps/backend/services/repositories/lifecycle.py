@@ -1,63 +1,101 @@
-"""Repository processing lifecycle (SRS-2 §23, design D5).
+"""Repository processing lifecycle (SRS-2 §23, design D5, job-claim-fencing D7).
 
 DISCOVERED → FETCHING → ANALYZED → INDEXED → RECOMMENDABLE (or INDEXED when ineligible);
 STALE → REFRESHING → RECOMMENDABLE/INDEXED; FAILED on a permanent GitHub error. Only one
 analysis of a repository runs at a time: ``claim`` takes a row lock and refuses repositories
-another worker is processing, unless that worker stopped updating (stale claim).
+another worker is processing, unless that worker stopped renewing its claim (stale claim).
+
+Each claim gets a token; only the analysis holding the current token can renew, release, fail
+or complete the repository, so a reclaimed analysis changes nothing. ``claimed_at`` is the
+claim's age; ``lifecycle_changed_at`` is the time of the last real transition, which a claim
+and its release leave alone (the FAILED retry delay and the DISCOVERED grace period count
+from it).
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime
 
-from django.conf import settings
 from django.db import transaction
+from django.db.models import F, Q, QuerySet, Value
+from django.db.models.functions import Coalesce, NullIf
 from django.utils import timezone
 
 from repositories.models import Lifecycle, Repository
 from services.discovery.filters import REPOSITORY_UNAVAILABLE, FilterConfig, eligibility
+from services.job_guard import stale_before
 
 IN_PROGRESS = (Lifecycle.FETCHING, Lifecycle.REFRESHING)
 
 
+class ClaimLost(Exception):
+    """Another analysis reclaimed the repository: stop without writing."""
+
+
+def abandoned_claims(now: datetime) -> Q:
+    """In-progress repositories whose analysis stopped renewing its claim."""
+    return Q(lifecycle__in=IN_PROGRESS) & (
+        Q(claimed_at__lt=stale_before(now)) | Q(claimed_at__isnull=True)
+    )
+
+
+def _held(repo: Repository) -> QuerySet[Repository]:
+    return Repository.objects.filter(
+        pk=repo.pk, lifecycle__in=IN_PROGRESS, claim_token=repo.claim_token
+    )
+
+
 def claim(repo_id: int) -> Repository | None:
-    """Move the repository to FETCHING (never analyzed) or REFRESHING, remembering the state
-    to restore on a transient failure. Returns the locked-in repository, or None when it does
-    not exist or another analysis is in progress. Stamped with the wall clock, never a job's
-    reference time, so a long job's claims do not look stale to other workers."""
+    """Move the repository to FETCHING (never analyzed) or REFRESHING under a new claim token,
+    remembering the state to restore on a transient failure. Returns the locked-in repository
+    (carrying the token), or None when it does not exist or another analysis is in progress.
+    Stamped with the wall clock, never a job's reference time, so a long job's claims do not
+    look stale to other workers."""
     now = timezone.now()
-    stale_before = now - timedelta(seconds=settings.SYNC_STALE_AFTER_SECONDS)
     with transaction.atomic():
         repo = Repository.objects.select_for_update().filter(pk=repo_id).first()
         if repo is None:
             return None
         if repo.lifecycle in IN_PROGRESS:
-            if repo.lifecycle_changed_at and repo.lifecycle_changed_at >= stale_before:
+            if repo.claimed_at and repo.claimed_at >= stale_before(now):
                 return None
             # Reclaiming a dead worker's claim: keep the state it saved before it started.
         else:
             repo.previous_lifecycle = repo.lifecycle
         repo.lifecycle = Lifecycle.FETCHING if repo.is_eligible is None else Lifecycle.REFRESHING
-        repo.lifecycle_changed_at = now
-        repo.save(update_fields=["lifecycle", "previous_lifecycle", "lifecycle_changed_at"])
+        repo.claim_token, repo.claimed_at = uuid.uuid4(), now
+        repo.save(update_fields=["lifecycle", "previous_lifecycle", "claim_token", "claimed_at"])
     return repo
 
 
-def release(repo_id: int) -> None:
-    """Undo a claim after a transient failure or cancellation: restore the previous state."""
-    repo = Repository.objects.filter(pk=repo_id, lifecycle__in=IN_PROGRESS).first()
-    if repo is None:
-        return
-    Repository.objects.filter(pk=repo_id, lifecycle__in=IN_PROGRESS).update(
-        lifecycle=repo.previous_lifecycle or Lifecycle.DISCOVERED,
+def renew(repo: Repository) -> None:
+    """Keep a long analysis's claim fresh between the data types it fetches."""
+    if not _held(repo).update(claimed_at=timezone.now()):
+        raise ClaimLost()
+
+
+def hold(repo: Repository) -> None:
+    """Lock the repository inside the store transaction; raises ClaimLost (rolling back the
+    transaction) when this analysis no longer holds the claim."""
+    if not _held(repo).select_for_update().values_list("pk", flat=True).first():
+        raise ClaimLost()
+
+
+def release(repo: Repository) -> None:
+    """Undo a claim after a transient failure or cancellation: restore the previous state, in
+    one update, keeping that state's transition time. No-op when the claim was lost."""
+    _held(repo).update(
+        lifecycle=Coalesce(NullIf(F("previous_lifecycle"), Value("")), Value(Lifecycle.DISCOVERED)),
         previous_lifecycle="",
-        lifecycle_changed_at=timezone.now(),
+        claim_token=None,
+        claimed_at=None,
     )
 
 
-def fail(repo_id: int, code: str) -> None:
+def fail(repo: Repository, code: str) -> None:
     """Permanent failure (not found, blocked): recorded as state, never as empty data."""
-    Repository.objects.filter(pk=repo_id).update(
+    _held(repo).update(
         lifecycle=Lifecycle.FAILED,
         lifecycle_error=code,
         previous_lifecycle="",
@@ -65,31 +103,35 @@ def fail(repo_id: int, code: str) -> None:
         is_eligible=False,
         ineligible_reason=REPOSITORY_UNAVAILABLE,
         lifecycle_changed_at=timezone.now(),
+        claim_token=None,
+        claimed_at=None,
     )
 
 
 def complete(repo: Repository, *, now: datetime | None = None) -> None:
-    """Walk ANALYZED → INDEXED, then RECOMMENDABLE if eligible. Call inside the transaction
-    that stored the analyzed data."""
+    """Finish the analysis as RECOMMENDABLE if eligible, else INDEXED (ANALYZED and INDEXED
+    are passed through within the same transaction). Call after ``hold`` inside the
+    transaction that stored the analyzed data."""
     now = now or timezone.now()
-    fields = ["lifecycle", "lifecycle_changed_at"]
-    for state in (Lifecycle.ANALYZED, Lifecycle.INDEXED):
-        repo.lifecycle, repo.lifecycle_changed_at = state, timezone.now()
-        repo.save(update_fields=fields)
     reason = eligibility(repo, now=now, cfg=FilterConfig.from_settings())
     repo.is_eligible = reason is None
     repo.ineligible_reason = reason or ""
     repo.lifecycle = Lifecycle.RECOMMENDABLE if reason is None else Lifecycle.INDEXED
+    repo.lifecycle_changed_at = timezone.now()
     repo.lifecycle_error = ""
     repo.previous_lifecycle = ""
     repo.stale_parts = []
+    repo.claim_token, repo.claimed_at = None, None
     repo.save(
         update_fields=[
-            *fields,
+            "lifecycle",
+            "lifecycle_changed_at",
             "is_eligible",
             "ineligible_reason",
             "lifecycle_error",
             "previous_lifecycle",
             "stale_parts",
+            "claim_token",
+            "claimed_at",
         ]
     )

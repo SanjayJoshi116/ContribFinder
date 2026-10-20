@@ -2,6 +2,7 @@
 
 import json
 from io import StringIO
+from typing import Any
 
 import pytest
 from django.core.management import call_command
@@ -9,10 +10,13 @@ from django.core.management.base import CommandError
 
 from recommendations.models import Recommendation, ScoringConfig
 from repositories.models import UserRepository
+from services.evaluation import baseline
+from services.evaluation import dataset as datasets
 from services.evaluation.dataset import DatasetError, parse
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 
 from .repo_fixtures import add_candidate
+from .test_evaluation_build import real
 from .test_evaluation_dataset import minimal
 from .test_issue_matching import django_issues
 from .test_recommendation_generation import (  # noqa: F401 - pytest fixtures
@@ -155,6 +159,75 @@ def test_json_report(dataset_path, tmp_path) -> None:
     report = json.loads(out.read_text(encoding="utf-8"))
     assert report["reports"][0]["config"] == "v2-deterministic"
     assert report["reports"][0]["developers"][0]["top10"][0]["judgment"] == 2
+
+
+def test_json_report_in_a_new_folder(dataset_path, tmp_path) -> None:
+    out = tmp_path / "reports" / "nested" / "report.json"
+    assert "Report written to" in run("--dataset", str(dataset_path), "--json", str(out))
+    assert json.loads(out.read_text(encoding="utf-8"))["reports"]
+
+
+def test_unwritable_json_report(dataset_path, tmp_path) -> None:
+    blocker = tmp_path / "file"
+    blocker.write_text("", encoding="utf-8")
+    with pytest.raises(CommandError, match="Report not written to"):
+        run("--dataset", str(dataset_path), "--json", str(blocker / "report.json"))
+
+
+# --- baseline -------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def baseline_dir(tmp_path, monkeypatch):
+    """A datasets folder with benchmark-v1 and its baselines file, used by the command."""
+    folder = tmp_path / "evaluation"
+    folder.mkdir()
+    personas = minimal() | {"name": "benchmark-v1"}
+    (folder / "benchmark-v1.json").write_text(json.dumps(personas), encoding="utf-8")
+    monkeypatch.setattr(datasets, "DATASETS_DIR", folder)
+    monkeypatch.setattr(baseline, "BASELINES", folder / "baselines.json")
+    return folder
+
+
+def recorded() -> dict[str, dict[str, Any]]:
+    data = baseline.read()
+    return {name: baseline.entries(data, name) for name in baseline.dataset_names(data)}
+
+
+def test_write_baseline_covers_every_dataset(baseline_dir) -> None:
+    run("--write-baseline")
+    assert set(recorded()) == {"benchmark-v1"}
+    benchmark = real("real-a") | {"name": "benchmark-v2"}
+    (baseline_dir / "benchmark-v2.json").write_text(json.dumps(benchmark), encoding="utf-8")
+    output = run("--write-baseline")
+    assert "Dataset benchmark-v1:" in output and "Dataset benchmark-v2:" in output
+    found = recorded()
+    assert set(found) == {"benchmark-v1", "benchmark-v2"}
+    for entries in found.values():
+        assert {"v1-deterministic", "v2-deterministic"} <= set(entries)
+    assert baseline.top_n(baseline.read(), "benchmark-v2") == baseline.TOP_N
+
+
+def test_write_baseline_keeps_configs_not_evaluated(baseline_dir) -> None:
+    run("--write-baseline")
+    v1 = recorded()["benchmark-v1"]["v1-deterministic"]
+    run("--write-baseline", "--config", "v2-deterministic")
+    assert recorded()["benchmark-v1"]["v1-deterministic"] == v1
+
+
+def test_write_baseline_different_top_n_for_part(baseline_dir) -> None:
+    run("--write-baseline")
+    before = baseline.BASELINES.read_text(encoding="utf-8")
+    with pytest.raises(CommandError, match="must cover every recorded configuration"):
+        run("--write-baseline", "--config", "v2-deterministic", "--top-n", "20")
+    assert baseline.BASELINES.read_text(encoding="utf-8") == before
+
+
+def test_write_baseline_refuses_min_score(baseline_dir) -> None:
+    out = StringIO()
+    with pytest.raises(CommandError, match="--min-score cannot be used"):
+        call_command("evaluate_ranking", "--write-baseline", "--min-score", "0.2", stdout=out)
+    assert out.getvalue() == "" and not baseline.BASELINES.exists()
 
 
 # --- export ---------------------------------------------------------------------------------

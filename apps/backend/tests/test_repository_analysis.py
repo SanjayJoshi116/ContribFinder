@@ -79,12 +79,8 @@ def test_lifecycle_passes_through_intermediate_states(client, respx_mock, monkey
 
     monkeypatch.setattr(Repository, "save", record)
     analyze(client, repo)
-    assert [s for s in dict.fromkeys(seen) if s != "discovered"] == [
-        "fetching",
-        "analyzed",
-        "indexed",
-        "recommendable",
-    ]
+    # ANALYZED and INDEXED are passed within the store transaction, never saved on their own.
+    assert [s for s in dict.fromkeys(seen) if s != "discovered"] == ["fetching", "recommendable"]
 
 
 def test_ineligible_repository_ends_indexed_with_reason(client, respx_mock) -> None:
@@ -135,15 +131,13 @@ def test_rate_limit_restores_previous_state(client, respx_mock) -> None:
 
 
 def test_concurrent_claim_refused_and_stale_claim_reclaimed(client, respx_mock) -> None:
-    repo = make_candidate_repo(
-        7, "encode/httpx", lifecycle="fetching", lifecycle_changed_at=timezone.now()
-    )
+    repo = make_candidate_repo(7, "encode/httpx", lifecycle="fetching", claimed_at=timezone.now())
     routes = mock_repo_api(respx_mock, "encode/httpx", 7)
     assert analyze(client, repo) == Outcome.SKIPPED
     assert not routes["metadata"].called
 
     Repository.objects.filter(pk=repo.pk).update(
-        lifecycle_changed_at=timezone.now() - timedelta(hours=2), previous_lifecycle="discovered"
+        claimed_at=timezone.now() - timedelta(hours=2), previous_lifecycle="discovered"
     )
     assert analyze(client, repo) == Outcome.ANALYZED
 
@@ -245,9 +239,14 @@ def test_backlog_selects_due_pooled_repositories(profile, monkeypatch) -> None:
         6, lifecycle="failed", lifecycle_changed_at=now - timedelta(hours=1)
     )
     abandoned = make_candidate_repo(
-        8, lifecycle="fetching", lifecycle_changed_at=now - timedelta(hours=1)
+        8,
+        lifecycle="fetching",
+        lifecycle_changed_at=now - timedelta(minutes=1),
+        claimed_at=now - timedelta(hours=1),
     )
-    in_progress = make_candidate_repo(9, lifecycle="refreshing", lifecycle_changed_at=now)
+    in_progress = make_candidate_repo(
+        9, lifecycle="refreshing", lifecycle_changed_at=now - timedelta(days=5), claimed_at=now
+    )
     for repo in (stale, readme_only, waiting, fresh, failed_due, failed_recent):
         add_candidate(profile, repo)
     add_candidate(profile, abandoned)

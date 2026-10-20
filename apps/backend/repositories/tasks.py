@@ -22,7 +22,7 @@ from services.github.errors import GitHubAuthError
 from services.github.retry import Retry, decide_retry
 from services.jobs import run_tracked_job, start_recommendations_after
 from services.repositories.analysis import RepositoryAnalysisService
-from services.repositories.lifecycle import IN_PROGRESS
+from services.repositories.lifecycle import abandoned_claims
 from services.repositories.staleness import stale_parts
 
 logger = logging.getLogger(__name__)
@@ -67,13 +67,12 @@ def process_repository_backlog() -> int:
     now = timezone.now()
     grace = now - timedelta(minutes=settings.REPO_DISCOVERED_GRACE_MINUTES)
     retry = now - timedelta(hours=settings.REPO_FAILED_RETRY_HOURS)
-    abandoned = now - timedelta(seconds=settings.SYNC_STALE_AFTER_SECONDS)
     due = (
         Q(lifecycle=Lifecycle.STALE)
         | Q(lifecycle=Lifecycle.DISCOVERED)
         & (Q(lifecycle_changed_at__lt=grace) | Q(lifecycle_changed_at__isnull=True))
         | Q(lifecycle=Lifecycle.FAILED, lifecycle_changed_at__lt=retry)
-        | Q(lifecycle__in=IN_PROGRESS, lifecycle_changed_at__lt=abandoned)
+        | abandoned_claims(now)
     )
     batch = list(
         _pooled()

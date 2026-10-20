@@ -41,6 +41,10 @@ CONTRIBUTION_FLAGS = (
 )
 
 
+# Replaces the export's request to add judgments (design D6).
+JUDGED = "Real developer judged blind from a judging sheet."
+
+
 class SheetError(Exception):
     pass
 
@@ -54,8 +58,13 @@ def _single_developer(export: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _languages(pairs: list[list[Any]]) -> str:
-    total = sum(size for _, size in pairs) or 1
-    top = sorted(pairs, key=lambda p: (-p[1], p[0]))[:3]
+    """The three main languages with their share. A missing byte count counts as 0; with no
+    counts at all, the first three names in their given order, without shares."""
+    sized = [(name, size or 0) for name, size in pairs]
+    total = sum(size for _, size in sized)
+    if not total:
+        return "; ".join(name for name, _ in sized[:3])
+    top = sorted(sized, key=lambda p: (-p[1], p[0]))[:3]
     return "; ".join(f"{name} {round(100 * size / total)}%" for name, size in top)
 
 
@@ -90,12 +99,32 @@ def write_sheet(export: Mapping[str, Any]) -> str:
 
 
 def read_sheet(text: str) -> dict[str, str]:
-    """``{repository: grade text}`` from a filled sheet (guide lines skipped)."""
-    lines = [line for line in text.lstrip("﻿").splitlines() if not line.startswith("#")]
-    reader = csv.DictReader(lines)
+    """``{repository: grade text}`` from a filled sheet. Guide lines (``#``) are recognized only
+    before the header; the rest is one CSV stream, so quoted multi-line fields stay whole.
+    All-blank rows are skipped. Raises ``SheetError`` naming the row for a repeated repository
+    or a grade or note without a repository."""
+    lines = text.lstrip("﻿").splitlines(keepends=True)
+    start = 0
+    while start < len(lines) and (lines[start].startswith("#") or not lines[start].strip()):
+        start += 1
+    reader = csv.DictReader(io.StringIO("".join(lines[start:])))
     if reader.fieldnames is None or not {"repository", "grade"} <= set(reader.fieldnames):
         raise SheetError("The sheet needs a header with at least repository and grade columns.")
-    return {row["repository"].strip(): (row.get("grade") or "").strip() for row in reader}
+    grades: dict[str, str] = {}
+    for row in reader:
+        cells = {key: (value or "").strip() for key, value in row.items() if key is not None}
+        if not any(cells.values()):
+            continue
+        line = start + reader.line_num
+        name = cells.get("repository", "")
+        if not name:
+            if cells.get("grade") or cells.get("note"):
+                raise SheetError(f"Row {line}: a grade or note without a repository.")
+            continue
+        if name in grades:
+            raise SheetError(f"Row {line}: {name} is listed more than once.")
+        grades[name] = cells.get("grade", "")
+    return grades
 
 
 def import_sheet(export: Mapping[str, Any], grades: Mapping[str, str]) -> dict[str, Any]:
@@ -117,6 +146,8 @@ def import_sheet(export: Mapping[str, Any], grades: Mapping[str, str]) -> dict[s
         raise SheetError("No row is graded 1 or 2.")
     developer["judgments"] = judgments
     developer["kind"] = REAL
+    developer["description"] = JUDGED
+    result["description"] = JUDGED
     try:
         parse(result)
     except DatasetError as exc:

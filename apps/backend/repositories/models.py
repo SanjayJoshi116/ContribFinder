@@ -62,12 +62,18 @@ class Repository(models.Model):
     lifecycle = models.CharField(
         max_length=20, choices=Lifecycle.choices, default=Lifecycle.DISCOVERED
     )
+    # Time of the last lifecycle transition. Claiming for analysis is not a transition: a
+    # released claim keeps the earlier state's time.
     lifecycle_changed_at = models.DateTimeField(null=True, blank=True)
     lifecycle_error = models.CharField(max_length=50, blank=True)
     previous_lifecycle = models.CharField(max_length=20, choices=Lifecycle.choices, blank=True)
     stale_parts = models.JSONField(default=list, blank=True)
     is_eligible = models.BooleanField(null=True, blank=True)
     ineligible_reason = models.CharField(max_length=50, blank=True)
+    # The analysis claim (FETCHING/REFRESHING): token of the analysis holding it and when that
+    # analysis last renewed it. A claim not renewed for SYNC_STALE_AFTER_SECONDS is reclaimable.
+    claim_token = models.UUIDField(null=True, blank=True, editable=False)
+    claimed_at = models.DateTimeField(null=True, blank=True)
 
     # Community files and labels (null = not fetched yet).
     has_contributing = models.BooleanField(null=True, blank=True)

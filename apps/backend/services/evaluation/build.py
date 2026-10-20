@@ -31,6 +31,8 @@ def build(
     seen: dict[str, str] = {}
     resolved: list[str] = []
     for label, raw in inputs:
+        if not isinstance(raw, dict) or raw.get("format") != FORMAT:
+            raise BuildError(f"{label} is not a format {FORMAT} dataset.")
         for full_name, entry in raw.get("repositories", {}).items():
             if full_name not in repositories:
                 repositories[full_name], origin[full_name] = entry, label

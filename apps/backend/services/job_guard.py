@@ -1,14 +1,19 @@
-"""Writes of a user's data inside a job happen only while the job is RUNNING (design D1).
+"""Writes of a user's data inside a job happen only while the job is RUNNING and only by the
+worker holding its current claim (privacy-deletion-finality D1, job-claim-fencing D1).
 
 Deletion cancels the user's jobs first (an UPDATE of the same row), so a write in flight either
 commits before the deletion, which then removes it, or sees the cancellation and writes nothing.
+A reclaim replaces the claim token, so a worker that lost its claim is refused the same way.
 """
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from jobs.models import SyncJob
@@ -16,28 +21,39 @@ from jobs.models import SyncJob
 from .errors import JobCancelled
 
 
+def stale_before(now: datetime) -> datetime:
+    """Work (a job's heartbeat, a repository claim) last updated before this is a dead
+    worker's and may be reclaimed."""
+    return now - timedelta(seconds=settings.SYNC_STALE_AFTER_SECONDS)
+
+
+def held(job: SyncJob) -> QuerySet[SyncJob]:
+    """The job's row, if it is still RUNNING under this worker's claim."""
+    return SyncJob.objects.filter(
+        pk=job.pk, status=SyncJob.Status.RUNNING, claim_token=job.claim_token
+    )
+
+
 @contextmanager
-def job_write(job_id: int) -> Iterator[None]:
-    """A transaction holding the job's row lock; raises JobCancelled unless it is RUNNING.
+def job_write(job: SyncJob) -> Iterator[None]:
+    """A transaction holding the job's row lock; raises JobCancelled unless the job is RUNNING
+    under this worker's claim.
 
     Wrap only the write block: never network I/O, so deletion never waits on GitHub."""
     with transaction.atomic():
-        status = (
-            SyncJob.objects.select_for_update()
-            .filter(pk=job_id)
-            .values_list("status", flat=True)
-            .first()
-        )
-        if status != SyncJob.Status.RUNNING:
+        if not held(job).select_for_update().values_list("pk", flat=True).first():
             raise JobCancelled()
         yield
 
 
 def save_progress(job: SyncJob, **fields: Any) -> None:
     """Store progress fields (steps, metadata) of a RUNNING job, which also counts as a
-    heartbeat. Raises JobCancelled when the job was cancelled or deleted meanwhile."""
-    updated = SyncJob.objects.filter(pk=job.pk, status=SyncJob.Status.RUNNING).update(
-        **fields, updated_at=timezone.now()
-    )
-    if not updated:
+    heartbeat. Raises JobCancelled when the job was cancelled, deleted or reclaimed."""
+    if not held(job).update(**fields, updated_at=timezone.now()):
         raise JobCancelled()
+
+
+def heartbeat(job: SyncJob) -> None:
+    """Mark the job alive between units of work, so it is not reclaimed as a dead worker's.
+    Raises JobCancelled when the job was cancelled, deleted or reclaimed."""
+    save_progress(job)

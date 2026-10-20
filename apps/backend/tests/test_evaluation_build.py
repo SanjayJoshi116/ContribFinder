@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from services.evaluation.build import BuildError, build
 from services.evaluation.dataset import DEFAULT_DATASET, parse, selection_dataset
@@ -45,6 +46,23 @@ def test_conflicting_repository() -> None:
     result, resolved = build("b", "", [("a", minimal()), ("b", other)], on_conflict="first")
     assert resolved == ["bench/django-kit"]
     assert result["repositories"]["bench/django-kit"]["snapshot"]["days_since_push"] == 2
+
+
+def test_input_not_a_dataset(tmp_path) -> None:
+    with pytest.raises(BuildError, match=r"report\.json is not a format 1 dataset"):
+        build("b", "", [("a", minimal()), ("report.json", [])])  # type: ignore[list-item]
+    with pytest.raises(BuildError, match=r"old\.json is not a format 1 dataset"):
+        build("b", "", [("a", minimal()), ("old.json", minimal() | {"format": 0})])
+
+    a, report, out = tmp_path / "a.json", tmp_path / "report.json", tmp_path / "out.json"
+    a.write_text(json.dumps(minimal()), encoding="utf-8")
+    report.write_text(json.dumps([{"config": "v2"}]), encoding="utf-8")
+    with pytest.raises(CommandError, match=f"{report.name} is not a format 1 dataset"):
+        call_command(
+            "build_benchmark", "--name", "x", "--out", str(out), "--input", str(a),
+            "--input", str(report),
+        )  # fmt: skip
+    assert not out.exists()
 
 
 def test_build_command(tmp_path) -> None:

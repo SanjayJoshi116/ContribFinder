@@ -34,7 +34,7 @@ PROFILE = {"id": 424242, "login": "octocat", "name": "The Octocat", "public_repo
 
 def test_guard_allows_running_job(user) -> None:
     job = make_job(user, "RUNNING")
-    with job_write(job.pk):
+    with job_write(job):
         pass
 
 
@@ -42,14 +42,14 @@ def test_guard_allows_running_job(user) -> None:
 def test_guard_refuses_other_states(user, status: str) -> None:
     job = make_job(user, "RUNNING")
     SyncJob.objects.filter(pk=job.pk).update(status=status)
-    with pytest.raises(JobCancelled), job_write(job.pk):
+    with pytest.raises(JobCancelled), job_write(job):
         pytest.fail("the body must not run")
 
 
 def test_guard_refuses_deleted_job(user) -> None:
     job = make_job(user, "RUNNING")
     job.delete()
-    with pytest.raises(JobCancelled), job_write(job.pk):
+    with pytest.raises(JobCancelled), job_write(job):
         pytest.fail("the body must not run")
 
 
@@ -80,7 +80,7 @@ def test_sync_write_committed_before_deletion_is_deleted(user) -> None:
     delete_github_data(user)
 
     assert not GitHubProfile.objects.filter(user=user).exists()
-    with pytest.raises(JobCancelled), job_write(job.pk):
+    with pytest.raises(JobCancelled), job_write(job):
         pass
 
 
@@ -100,7 +100,7 @@ def _analyze_after_deletion(user):
 def test_analysis_finishing_after_deletion_writes_nothing(synced) -> None:
     job = make_job(synced, "RUNNING", job_type="profile_analysis")
     with _analyze_after_deletion(synced), pytest.raises(JobCancelled):
-        ProfileAnalysisService(synced, job_id=job.pk).run()
+        ProfileAnalysisService(synced, job=job).run()
     assert not DeveloperProfile.objects.filter(user=synced).exists()
 
 

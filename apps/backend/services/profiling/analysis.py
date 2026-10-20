@@ -28,6 +28,7 @@ from developers.models import (
     SkillEvidence,
 )
 from github.models import GitHubProfile
+from jobs.models import SyncJob
 from repositories.models import Repository, UserRepository
 from services.errors import JobCancelled, PermanentJobError
 from services.job_guard import job_write
@@ -216,11 +217,15 @@ def build_input(user: User, now: datetime) -> ProfileInput:
 # --- persistence ----------------------------------------------------------------------------
 
 
+# Catalog rows are shared by every user's analysis. Upserting them in one global order
+# (skills, then interests, each sorted) keeps concurrent analyses from deadlocking (B-3).
+
+
 def _upsert_catalog_skills(slugs: list[str]) -> dict[str, Skill]:
     Skill.objects.bulk_create(
         [
             Skill(slug=slug, name=SKILLS_BY_SLUG[slug].name, category=SKILLS_BY_SLUG[slug].category)
-            for slug in slugs
+            for slug in sorted(set(slugs))
         ],
         update_conflicts=True,
         unique_fields=["slug"],
@@ -231,7 +236,7 @@ def _upsert_catalog_skills(slugs: list[str]) -> dict[str, Skill]:
 
 def _upsert_catalog_interests(slugs: list[str]) -> dict[str, Interest]:
     Interest.objects.bulk_create(
-        [Interest(slug=slug, name=INTERESTS_BY_SLUG[slug].name) for slug in slugs],
+        [Interest(slug=slug, name=INTERESTS_BY_SLUG[slug].name) for slug in sorted(set(slugs))],
         update_conflicts=True,
         unique_fields=["slug"],
         update_fields=["name"],
@@ -241,19 +246,19 @@ def _upsert_catalog_interests(slugs: list[str]) -> dict[str, Interest]:
 
 class ProfileAnalysisService:
     def __init__(
-        self, user: User, config: AnalysisConfig | None = None, *, job_id: int | None = None
+        self, user: User, config: AnalysisConfig | None = None, *, job: SyncJob | None = None
     ) -> None:
         self.user = user
         self.config = config or AnalysisConfig.from_settings()
-        # The job this analysis runs under: its result is written only while the job runs, so
-        # a deletion during analysis is never undone (design D1). None outside a job.
-        self.job_id = job_id
+        # The job this analysis runs under: its result is written only while the job runs under
+        # this worker's claim, so a deletion during analysis is never undone. None outside a job.
+        self.job = job
 
     def run(self) -> DeveloperProfile:
         try:
             now = timezone.now()
             result = analyze(build_input(self.user, now), self.config)
-            guard = transaction.atomic() if self.job_id is None else job_write(self.job_id)
+            guard = transaction.atomic() if self.job is None else job_write(self.job)
             with guard:
                 return self._persist(result, now)
         except JobCancelled:
@@ -263,9 +268,13 @@ class ProfileAnalysisService:
             raise ProfileAnalysisError(type(exc).__name__) from exc
 
     def _persist(self, result: AnalysisResult, now: datetime) -> DeveloperProfile:
-        profile, _ = DeveloperProfile.objects.select_for_update().get_or_create(
+        profile, created = DeveloperProfile.objects.select_for_update().get_or_create(
             user=self.user, defaults={"analyzed_at": now}
         )
+        if not created and profile.analyzed_at and profile.analyzed_at > now:
+            # An overlapping analysis read newer data and stored it first: keep that (B-5).
+            logger.info("Profile of user %s already newer; analysis result dropped", self.user.pk)
+            return profile
         # Preferences are left alone: the user will own them once they can edit them.
         profile.summary = result.summary
         profile.experience_level = result.experience_level

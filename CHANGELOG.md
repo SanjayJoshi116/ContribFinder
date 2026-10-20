@@ -7,6 +7,83 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.4] - 2026-10-19
+
+Job lifecycle and claim fencing (OpenSpec change `job-claim-fencing`, backlog batch 4).
+No ranking change.
+
+### Fixed
+
+- A worker whose job was reclaimed can no longer write: every job claim gets a token, and
+  heartbeats, progress, guarded writes, retries and the final state require it. A reclaimed
+  worker stops quietly and never starts a follow-up job (B-2).
+- Repository analyses hold a fenced claim too, renewed between data types, so an analysis
+  longer than `SYNC_STALE_AFTER_SECONDS` is not reclaimed while running and a reclaimed one
+  changes nothing (C-3, C-4, C-19).
+- A claim and its release no longer count as a lifecycle transition: a rate limit during a
+  retry no longer restarts the FAILED retry delay or the DISCOVERED grace period (C-10).
+- PENDING and RETRYING jobs whose task was lost are requeued after
+  `SYNC_STALE_AFTER_SECONDS + GITHUB_MAX_RETRY_DELAY`, so a lost message no longer blocks the
+  user forever (B-1). Abandoned RUNNING jobs move to RETRYING and are requeued once, not on
+  every recovery run (B-12).
+- Broker redelivery stops at `SYNC_MAX_ATTEMPTS` with `worker_lost` (B-10).
+- With `REDIS_URL` empty, a retryable GitHub error fails the job instead of retrying inline in
+  a hot loop (B-9).
+- A FAILED or CANCELLED job never shows a step as running (B-11).
+- Starting a job ignores and expires stale RUNNING jobs for every job type, and no longer
+  fails with HTTP 500 when the conflicting job finished meanwhile (B-7, B-8).
+- Concurrent profile analyses no longer deadlock on the shared skill and interest catalog
+  (B-3), and an analysis of older data no longer overwrites a newer profile (B-5).
+
+### Changed
+
+- The four job start functions share one helper, and the profile analysis task runs through
+  `run_tracked_job` (B-18, B-19). `SyncJob.heartbeat()` is replaced by
+  `services.job_guard.heartbeat(job)`; `job_write` and `finish_job` take the job, and
+  `ProfileAnalysisService` takes `job=`.
+- Repository analysis saves its final state once instead of passing ANALYZED and INDEXED as
+  separate saves (C-22).
+- One stale cutoff (`job_guard.stale_before`) for job heartbeats and repository claims, and
+  one way to end a job (`_end_jobs`) for every terminal state. `evaluate_ranking
+  --write-baseline` takes the dataset file names from `services/evaluation/dataset.py`.
+- Migrations add `SyncJob.claim_token`, `Repository.claim_token` and `Repository.claimed_at`
+  (backfilled from `lifecycle_changed_at` for repositories being analyzed).
+
+## [0.12.3] - 2026-10-19
+
+Evaluation tooling integrity (OpenSpec change `evaluation-tooling-integrity`, backlog batch 3).
+No ranking change: the recorded metrics are identical.
+
+### Changed
+
+- `evaluation/baselines.json` is format 4: each dataset records the top N its metrics were
+  computed at. Formats 1–3 are still read.
+- `evaluate_ranking --write-baseline` without `--dataset` rewrites `benchmark-v1`, every other
+  recorded dataset whose file exists, and the selection benchmark, printing a report for each;
+  `--require-improvement` covers every dataset.
+- `--write-baseline` merges: configurations evaluated in the run replace their entries, the
+  others keep theirs. A run at a different top N must cover every configuration recorded for
+  that dataset.
+- `--write-baseline` refuses `--min-score`.
+- Imported judging sheets set the developer's description to "Real developer judged blind from
+  a judging sheet." instead of the export's request to add judgments.
+
+### Fixed
+
+- `--write-baseline` never refreshed the `benchmark-v1` entry CI checks once `benchmark-v2`
+  existed, and `--config v2-deterministic` dropped v1 from the file.
+- One global top N in the baseline file made the test compare metrics computed at different
+  top N values.
+- Sheet import dropped `#` lines inside quoted multi-line descriptions (losing or misattributing
+  grades), failed on blank rows saved by spreadsheets, and let a repeated repository win
+  silently. Repeated repositories and grades without a repository now fail naming the row.
+- `benchmark_sheet` crashed on languages without byte counts; they count as 0, and a repository
+  with no counts lists its languages without shares.
+- `build_benchmark` crashed on an input that is not a dataset object (e.g. an evaluation
+  report) and merged inputs of another format version; both now fail naming the input.
+- `evaluate_ranking --json` crashed when the output folder was missing; it creates the folder
+  and reports write errors as a command error.
+
 ## [0.12.2] - 2026-10-19
 
 Privacy and deletion finality (OpenSpec change `privacy-deletion-finality`, backlog batch 2).

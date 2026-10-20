@@ -133,45 +133,49 @@ class RepositoryAnalysisService:
         else:
             wanted = stale_parts(repo, now)
         try:
-            fetched = self._fetch(repo, wanted, now)
-        except PERMANENT_ERRORS as exc:
-            code = ERROR_CODES[type(exc)]
-            logger.info("Repository %s unavailable: %s", repo.full_name, code)
-            lifecycle.fail(repo.pk, code)
-            return Outcome.FAILED
-        except BaseException:
-            lifecycle.release(repo.pk)
-            raise
-        try:
+            try:
+                fetched = self._fetch(repo, wanted, now)
+            except PERMANENT_ERRORS as exc:
+                code = ERROR_CODES[type(exc)]
+                logger.info("Repository %s unavailable: %s", repo.full_name, code)
+                lifecycle.fail(repo, code)
+                return Outcome.FAILED
             with transaction.atomic():
+                lifecycle.hold(repo)
                 self._store(repo, fetched, now)
                 lifecycle.complete(repo, now=now)
+        except lifecycle.ClaimLost:
+            return Outcome.SKIPPED  # reclaimed by another analysis, which owns the state now
         except BaseException:
-            lifecycle.release(repo.pk)
+            lifecycle.release(repo)
             raise
         return Outcome.ANALYZED
+
+    def _between_parts(self, repo: Repository) -> None:
+        self._check_cancelled()
+        lifecycle.renew(repo)  # an analysis longer than the stale time is not reclaimed
 
     # --- fetching (no writes) --------------------------------------------------------------
 
     def _fetch(self, repo: Repository, parts: list[str], now: datetime) -> _Fetched:
         c, name, out = self.client, repo.full_name, _Fetched()
         if "metadata" in parts:
-            self._check_cancelled()
+            self._between_parts(repo)
             out.metadata = c.get_repository(name)
             name = out.metadata.full_name  # follows renames
             out.languages = c.get_languages(name)
         if "readme" in parts:
-            self._check_cancelled()
+            self._between_parts(repo)
             out.readme, out.readme_fetched = c.get_readme(name), True
         if "community" in parts:
-            self._check_cancelled()
+            self._between_parts(repo)
             out.community = c.get_community_profile(name)
             out.labels = c.list_label_names(name)
         if "dependencies" in parts:
-            self._check_cancelled()
+            self._between_parts(repo)
             out.dependencies = read_manifests(c, name)
         if "activity" in parts:
-            self._check_cancelled()
+            self._between_parts(repo)
             since = now - timedelta(days=WINDOW_DAYS)
             commits = c.count_commits_since(name, since)
             pulls: PullSample = c.recent_pull_requests(name, since)
@@ -191,7 +195,7 @@ class RepositoryAnalysisService:
                 latest_release_at=release,
             )
         if "issues" in parts:
-            self._check_cancelled()
+            self._between_parts(repo)
             out.issues = c.list_open_issues(name)
         return out
 

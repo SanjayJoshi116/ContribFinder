@@ -8,7 +8,14 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from services.evaluation.sheet import COLUMNS, SheetError, import_sheet, read_sheet, write_sheet
+from services.evaluation.sheet import (
+    COLUMNS,
+    JUDGED,
+    SheetError,
+    import_sheet,
+    read_sheet,
+    write_sheet,
+)
 
 from .test_evaluation_dataset import minimal
 
@@ -51,6 +58,54 @@ def test_round_trip_sets_judgments_and_kind() -> None:
     judged = import_sheet(export(), grades)
     developer = judged["developers"][0]
     assert developer["judgments"] == {"bench/django-kit": 2} and developer["kind"] == "real"
+    assert developer["description"] == JUDGED and judged["description"] == JUDGED
+
+
+def test_hash_line_inside_a_quoted_description() -> None:
+    raw = export()
+    raw["repositories"]["bench/django-kit"]["description"] = "Forms toolkit\n# not a guide line"
+    sheet = write_sheet(raw)
+    assert '"Forms toolkit\n# not a guide line"' in sheet
+    lines = sheet.splitlines()
+    graded = [line.replace(",1,,", ",1,2,") if line.endswith(",1,,") else line for line in lines]
+    grades = read_sheet("\n".join(graded) + "\n")
+    assert grades == {"bench/django-kit": "2", "bench/go-proxy": ""}
+
+
+def test_trailing_blank_rows_are_ignored() -> None:
+    sheet = filled(write_sheet(export()), {"bench/django-kit": "1"})
+    grades = read_sheet(sheet + ",,,,,,,,,\n,,,,,,,,,\n\n")
+    assert grades == {"bench/django-kit": "1", "bench/go-proxy": ""}
+
+
+def test_repeated_repository() -> None:
+    sheet = write_sheet(export())
+    repeated = sheet + "bench/go-proxy,,,,,,,,1,\n"
+    with pytest.raises(SheetError, match="Row 8: bench/go-proxy is listed more than once"):
+        read_sheet(repeated)
+
+
+def test_grade_without_repository() -> None:
+    sheet = write_sheet(export())
+    with pytest.raises(SheetError, match="Row 8: a grade or note without a repository"):
+        read_sheet(sheet + ",,,,,,,,2,\n")
+    with pytest.raises(SheetError, match="Row 8"):
+        read_sheet(sheet + ",,,,,,,,,see above\n")
+
+
+def test_sheet_with_missing_byte_counts(tmp_path) -> None:
+    raw = export()
+    raw["repositories"]["bench/go-proxy"]["languages"] = [["Go", None], ["Shell", None]]
+    raw["repositories"]["bench/django-kit"]["languages"] = [["Python", 300], ["HTML", None]]
+    text = write_sheet(raw)
+    assert "Go; Shell" in text and "Python 100%; HTML 0%" in text
+    exported = tmp_path / "real-a.json"
+    exported.write_text(json.dumps(raw), encoding="utf-8")
+    sheet = tmp_path / "real-a.csv"
+    call_command(
+        "benchmark_sheet", "--export", str(exported), "--out", str(sheet), stdout=StringIO()
+    )
+    assert "Go; Shell" in sheet.read_text(encoding="utf-8-sig")
 
 
 @pytest.mark.parametrize(

@@ -24,8 +24,8 @@ from recommendations.models import (
     RepositorySize,
     ScoringConfig,
 )
-from services.errors import JobCancelled, PermanentJobError
-from services.job_guard import job_write, save_progress
+from services.errors import PermanentJobError
+from services.job_guard import heartbeat, job_write, save_progress
 from services.matching.features import DeveloperFeatures, load_candidates, load_developer
 from services.matching.issues import MatchedIssue, load_issues
 from services.matching.issues import snapshot as issue_snapshot
@@ -137,7 +137,7 @@ class RecommendationService:
         while this run worked."""
         sizes = settings.REPO_SIZE_THRESHOLDS
         # A disconnect or deletion cancels the job; a cancelled run never replaces results.
-        with job_write(self.job.pk):
+        with job_write(self.job):
             dismissed = set(
                 DismissedRepository.objects.filter(user_id=profile.user_id).values_list(
                     "repository_id", flat=True
@@ -231,8 +231,7 @@ class RecommendationService:
         return kept
 
     def _check_cancelled(self) -> None:
-        if self.job.heartbeat() in (SyncJob.Status.CANCELLED, None):
-            raise JobCancelled()
+        heartbeat(self.job)  # raises JobCancelled when cancelled, deleted or reclaimed
 
     def _set_step(self, state: str) -> None:
         self.job.steps = {**self.job.steps, STEP: str(state)}

@@ -310,6 +310,7 @@ def test_task_401_fails_without_retry(pending_job) -> None:
 
 
 @respx.mock
+@override_settings(CELERY_TASK_ALWAYS_EAGER=False)  # with a worker; eager mode never retries
 def test_task_rate_limit_schedules_retry(pending_job) -> None:
     respx.mock.get(f"{API}/user").respond(429, headers={"Retry-After": "60"})
     with (
@@ -346,7 +347,7 @@ def test_task_without_account_fails(pending_job, user) -> None:
 @pytest.mark.parametrize("status", ["RUNNING", "COMPLETED", "FAILED", "CANCELLED"])
 def test_claim_rejects_non_claimable(user, status: str) -> None:
     job = SyncJob.objects.create(user=user, job_type=SYNC, status=status)
-    assert claim_job(job.pk) is False
+    assert claim_job(job.pk) is None
 
 
 def test_claim_reclaims_stale_running(user) -> None:
@@ -356,7 +357,9 @@ def test_claim_reclaims_stale_running(user) -> None:
 
     job = SyncJob.objects.create(user=user, job_type=SYNC, status="RUNNING")
     SyncJob.objects.filter(pk=job.pk).update(updated_at=timezone.now() - timedelta(hours=1))
-    assert claim_job(job.pk) is True
+    claimed = claim_job(job.pk)
+    assert claimed is not None
+    assert claimed.claim_token is not None
 
 
 @respx.mock

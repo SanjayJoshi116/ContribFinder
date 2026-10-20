@@ -49,6 +49,9 @@ class SyncJob(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Set by each claim; only the worker holding the current token may write (job-claim-fencing
+    # D1). Internal: never serialized.
+    claim_token = models.UUIDField(null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ["-created_at"]
@@ -68,13 +71,3 @@ class SyncJob(models.Model):
     @property
     def is_active(self) -> bool:
         return self.status in self.ACTIVE_STATUSES
-
-    def heartbeat(self) -> str | None:
-        """Mark a RUNNING job as alive (so it is not reclaimed as a dead worker's) and return
-        its current status; None when the job no longer exists."""
-        from django.utils import timezone
-
-        jobs = SyncJob.objects.filter(pk=self.pk)
-        if jobs.filter(status=self.Status.RUNNING).update(updated_at=timezone.now()):
-            return self.Status.RUNNING
-        return jobs.values_list("status", flat=True).first()

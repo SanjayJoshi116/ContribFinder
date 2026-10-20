@@ -44,3 +44,5 @@ Thumbs.db
 
 # Real-developer benchmark exports and judging sheets (README "Judging real developers")
 /judging/
+# Same, when a manage command path skips ../../ (commands run in apps/backend)
+/apps/backend/judging/
