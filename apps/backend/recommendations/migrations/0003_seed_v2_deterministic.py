@@ -56,15 +56,25 @@ DESCRIPTION = (
 
 def seed(apps: StateApps, schema_editor: BaseDatabaseSchemaEditor) -> None:
     ScoringConfig = apps.get_model("recommendations", "ScoringConfig")
-    # One active configuration at a time: deactivate first, then activate v2.
-    ScoringConfig.objects.filter(is_active=True).update(is_active=False)
+    # v2 replaces only an earlier seed. A configuration an operator activated stays active, and
+    # v2 is stored inactive (recommendation-evaluation, "Replacing the active configuration").
+    operator_choice = (
+        ScoringConfig.objects.filter(is_active=True)
+        .exclude(version__in=["v1-deterministic", "v2-deterministic"])
+        .exists()
+    )
+    if not operator_choice:
+        # One active configuration at a time: deactivate first, then activate v2.
+        ScoringConfig.objects.filter(is_active=True).exclude(version="v2-deterministic").update(
+            is_active=False
+        )
     ScoringConfig.objects.update_or_create(
         version="v2-deterministic",
         defaults={
             "description": DESCRIPTION,
             "weights": WEIGHTS,
             "params": PARAMS,
-            "is_active": True,
+            "is_active": not operator_choice,
         },
     )
 

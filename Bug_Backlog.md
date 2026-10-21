@@ -119,6 +119,24 @@ test that fails without the fix (Y-8 checked by `npm run e2e`).
 | Y-9 | cleanup | `apps/backend/e2e/management/commands/e2e_seed.py` | An installed app's command imports `tests.repo_fixtures`; a test-helper refactor breaks `npm run e2e` while pytest stays green. Move the shared seeding helpers to a module both use. | open (batch 11) |
 | Y-10 | cleanup | `app/app.test.tsx` (`count`) | Reimplements `callsTo` from `features/feedback/feedback.test.tsx`; move one helper to `test/render.tsx`. | open (batch 11) |
 
+## Batch 10 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `dev-scripts-checks` diff (v0.12.9). Z-2, Z-3, Z-6 and
+Z-7 fixed in 0.12.9 before commit, each with a test where one can run locally (Z-2 is CI config).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| Z-1 | design | `recommendations/migrations/0003_seed_v2_deterministic.py` (`seed`) | `operator_choice` ignores v1, so re-applying 0003 after a rollback activates v2 over an operator who deliberately chose v1 (for example because the benchmark does not favour v2). Matches the spec ("while no configuration or only `v1-deterministic` is active", design D8); changing it needs a spec change, and it only happens on a rollback. | open |
+| Z-2 | gap | `.github/workflows/ci.yml` (`concurrency`) | A group holds one pending run, and a newer one replaces it even with `cancel-in-progress: false` → three quick pushes to `main` skipped the middle commit (G-8 fixed only half). Pushes now group by `github.sha`; pull requests by ref, with cancellation. | fixed (dev-scripts-checks) |
+| Z-3 | bug | `scripts/check-version.mjs`, `scripts/wait-port.mjs` (main guard) | `process.argv[1] === fileURLToPath(import.meta.url)` is false when the repository is reached through a symlink or junction (Node resolves `import.meta.url`, not `argv[1]`) → `npm run check:version` printed nothing and exited 0 with mismatched versions. Both use `isMain(import.meta.url)` (`env.mjs`, compares real paths). | fixed (dev-scripts-checks) |
+| Z-4 | bug | `scripts/stop.mjs` | The process list is read before the records: a runner that starts in between has a record but no listed process → its record is deleted as stale, and a later stop cannot find it. Needs `npm run stop` during `npm start`'s spawn (milliseconds). Read records first. | open (batch 11) |
+| Z-5 | cleanup | `scripts/redis.mjs` (keep-alive record) | The comment says the detached `wsl.exe` is outside the runner's tree; on Windows its parent is still the runner, so `taskkill /T` reaches it too. A failed spawn (`pid` undefined) writes `redis-undefined.json`, later dropped as stale. Fix the comment; record only a real pid. | open (batch 11) |
+| Z-6 | bug | `recommendations/migrations/0002_seed_v1_deterministic.py` (`unseed`) | v2 with recommendations survives 0003's unseed (inactive, v1 activated); 0002's unseed then deleted v1 → v2 stored, nothing active, generation fails. v1 unseed now keeps an active v1 while any other configuration is stored. | fixed (dev-scripts-checks) |
+| Z-7 | test | `scripts/env.test.mjs` | `'C:\work\contribfinder'` written with single backslashes is `C:workcontribfinder` (`\w` is no escape) → the schedule-name test never saw a Windows path. Uses `String.raw` now. | fixed (dev-scripts-checks) |
+| Z-8 | bug | `scripts/stack.mjs` (`ownedByPath`, `recordMatches`) | Matching needs `proc.name === 'node'`; on Linux `ps comm=` may report a newer Node's main thread name (`MainThread`) → `npm run stop` finds nothing there. Unverified; Windows (CIM `Name`) unaffected. Take the executable from `args=`. | open (batch 11) |
+| Z-9 | perf | `scripts/stop.mjs` (kill loop) | Every matched process gets its own `taskkill /T /F` (`killTree`, `spawnSync`), though killing `start` already ends its descendants → about 50–150 ms per mostly dead pid. Skip descendants of chosen pids (needs parent pids from CIM/`ps`) or pass all pids to one `taskkill`. Skipped in the `/simplify` pass (shared `killTree`). | open (batch 11) |
+| Z-10 | cleanup | `tests/test_config_checks.py` | `EXPERIENCE_THRESHOLDS` tests live in a new file instead of `test_profiling_config.py` (whose `test_default_config_is_valid` overlaps `test_defaults_pass`), and `ids()` is now defined in five test modules. Move the tests; share `ids` from one helper. Skipped in the `/simplify` pass (outside the diff). | open (batch 11) |
+
 ## Full-file reviews (2026-10-19)
 
 `code-review` at high effort over whole files, all findings reported. All rows verified against
@@ -267,16 +285,16 @@ Excludes what R-1, R-2, R-7, R-8, R-13 and R-14 already cover.
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| G-1 | bug | `scripts/stop.mjs:151` | Node runners match `scripts/(start\|backend\|worker\|beat\|redis).mjs` without checking the repository path (their command lines are relative) → `npm run stop` kills `node scripts/start.mjs` and friends of any other project on the machine. CLAUDE.md §6 promises "kills this repo's stack only". Check the process's cwd or pass a marker (`CF_STACK_PID`/repo path) on the runner command line. | confirmed |
-| G-2 | bug | `scripts/redis.mjs:81` | No SIGHUP handler; closing the console ends the runner without killing the detached `wsl.exe sleep infinity`, and `npm run stop` never matches `wsl.exe` → the distro and Redis stay awake indefinitely. | confirmed |
-| G-3 | bug | `scripts/child.mjs:58` | POSIX `process.kill(-child.pid, signal)` throws ESRCH if the group already exited → uncaught exception inside the signal handler, and the `killTree` fallback is never scheduled. Spawn `error` (bad `UV_BIN` path) is also unhandled → crash with a stack trace instead of a message. | partial |
-| G-4 | bug | `scripts/wait-port.mjs:128` | `net.connect` has no timeout; against a host that drops packets (remote `REDIS_URL`, firewalled WSL IP) one attempt waits the OS TCP timeout (21 s to 2 min) → the documented `timeoutMs` deadline is overshot several times over. | partial |
+| G-1 | bug | `scripts/stop.mjs:151` | Node runners match `scripts/(start\|backend\|worker\|beat\|redis).mjs` without checking the repository path (their command lines are relative) → `npm run stop` kills `node scripts/start.mjs` and friends of any other project on the machine. CLAUDE.md §6 promises "kills this repo's stack only". Check the process's cwd or pass a marker (`CF_STACK_PID`/repo path) on the runner command line. | fixed (dev-scripts-checks) |
+| G-2 | bug | `scripts/redis.mjs:81` | No SIGHUP handler; closing the console ends the runner without killing the detached `wsl.exe sleep infinity`, and `npm run stop` never matches `wsl.exe` → the distro and Redis stay awake indefinitely. | fixed (dev-scripts-checks) |
+| G-3 | bug | `scripts/child.mjs:58` | POSIX `process.kill(-child.pid, signal)` throws ESRCH if the group already exited → uncaught exception inside the signal handler, and the `killTree` fallback is never scheduled. Spawn `error` (bad `UV_BIN` path) is also unhandled → crash with a stack trace instead of a message. | fixed (dev-scripts-checks) |
+| G-4 | bug | `scripts/wait-port.mjs:128` | `net.connect` has no timeout; against a host that drops packets (remote `REDIS_URL`, firewalled WSL IP) one attempt waits the OS TCP timeout (21 s to 2 min) → the documented `timeoutMs` deadline is overshot several times over. | fixed (dev-scripts-checks) |
 | G-5 | gap | `docker-compose.yml:68` | Frontend service loads the whole `.env` (`GITHUB_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEYS`, `DJANGO_SECRET_KEY`) though it needs only `VITE_*` → secrets present in the frontend container's environment, contrary to the least-exposure rule for secrets (CLAUDE.md §3). | fixed (security-hardening) |
 | G-6 | bug | `docker-compose.yml:43` | Redis published on host port 6379 (all interfaces, no auth) collides with the WSL Redis that `npm start` uses on this machine and exposes the broker to the LAN. Bind `127.0.0.1:` or drop the port mapping. | fixed (security-hardening) |
-| G-7 | bug | `scripts/beat.mjs:146` | Beat schedule file has a fixed name in the OS temp dir → two checkouts (or a worktree) share and overwrite one schedule state file. Include a hash of `root`. | confirmed |
-| G-8 | gap | `.github/workflows/ci.yml:88` | `cancel-in-progress: true` also applies to pushes to `main` → a quick second push cancels the first commit's run, so a broken commit on `main` can go unchecked. Limit cancellation to pull requests. | partial |
-| G-9 | gap | `scripts/check-version.mjs:170` | Checks only the top-level `version` of each `package-lock.json`, not `packages[""].version`, which `npm ci` also compares → a half-updated lock passes the check. | partial |
-| G-10 | cleanup | `scripts/setup.mjs:35` | Setup runs `npm install` in `apps/frontend` (can rewrite the lockfile) where CI uses `npm ci` → a local setup can leave an uncommitted lockfile diff that CI does not reproduce. | confirmed |
+| G-7 | bug | `scripts/beat.mjs:146` | Beat schedule file has a fixed name in the OS temp dir → two checkouts (or a worktree) share and overwrite one schedule state file. Include a hash of `root`. | fixed (dev-scripts-checks) |
+| G-8 | gap | `.github/workflows/ci.yml:88` | `cancel-in-progress: true` also applies to pushes to `main` → a quick second push cancels the first commit's run, so a broken commit on `main` can go unchecked. Limit cancellation to pull requests. | fixed (dev-scripts-checks) |
+| G-9 | gap | `scripts/check-version.mjs:170` | Checks only the top-level `version` of each `package-lock.json`, not `packages[""].version`, which `npm ci` also compares → a half-updated lock passes the check. | fixed (dev-scripts-checks) |
+| G-10 | cleanup | `scripts/setup.mjs:35` | Setup runs `npm install` in `apps/frontend` (can rewrite the lockfile) where CI uses `npm ci` → a local setup can leave an uncommitted lockfile diff that CI does not reproduce. | fixed (dev-scripts-checks) |
 
 ### H: Platform, settings, migrations, remaining frontend, test gaps
 
@@ -291,11 +309,11 @@ H-2 and H-4 confirmed by the reviewer (DRF `get_ident` source; `redact()` probes
 | H-4 | gap | `core/logging.py:15` | Redaction misses `key='value'` reprs, `'state'` in dict/JSON, and `Authorization: token <non-gh>` → client secret or OAuth state can reach logs. Tests cover only unquoted and `gh*_` cases. | fixed (security-hardening) |
 | H-5 | bug | `apps/frontend/src/main.tsx:9` | Production QueryClient keeps default `retry: 3` for 4xx → normal `404 not_analyzed` shows "Loading…" about 7 s over 4 requests; 401s and 429s retried too. Tests set `retry: false`, which hides it. | fixed (frontend-correctness) |
 | H-6 | gap | `config/settings/production.py:7` | System checks (token keys, weights) never run under gunicorn or the Celery worker → misconfigured deploy starts and fails per request (empty `TOKEN_ENCRYPTION_KEYS` → 500 on sign-in). | fixed (security-hardening) |
-| H-7 | gap | `core/checks.py:52` | No checks for `EXPERIENCE_THRESHOLDS`, `SYNC_MAX_ATTEMPTS`, `SYNC_STALE_AFTER_SECONDS`, `JOB_RECOVERY_INTERVAL_SECONDS`, GitHub caps, etc. → e.g. interval 0 = `recover_stale_jobs` hot loop; scalar threshold = every analysis fails. | confirmed |
+| H-7 | gap | `core/checks.py:52` | No checks for `EXPERIENCE_THRESHOLDS`, `SYNC_MAX_ATTEMPTS`, `SYNC_STALE_AFTER_SECONDS`, `JOB_RECOVERY_INTERVAL_SECONDS`, GitHub caps, etc. → e.g. interval 0 = `recover_stale_jobs` hot loop; scalar threshold = every analysis fails. | fixed (dev-scripts-checks) |
 | H-8 | gap | `apps/frontend/src/routes/PrivacyPage.tsx:15` | Says the GitHub identifier is kept until disconnect, but `User.username = gh_<github_id>` survives disconnect. | fixed (privacy-deletion-finality) |
 | H-9 | gap | `apps/frontend/src/routes/PrivacyPage.tsx:11` | "What we store" omits SyncJob history, candidates and search queries, `AuditEvent.ip_hash` (kept after account deletion), session rows. | fixed (privacy-deletion-finality) |
-| H-10 | bug | `recommendations/migrations/0003_seed_v2_deterministic.py:59` | v2 seed deactivates whatever config is active, not just v1 → an operator-chosen config silently replaced by v2 on upgrade. | confirmed |
-| H-11 | bug | `recommendations/migrations/0002_seed_v1_deterministic.py:40` | Re-applying 0002 after unseed checks `exists(active)` including v1 itself → v1 deactivated, no active config, generation fails. Unseed paths untested. | confirmed |
+| H-10 | bug | `recommendations/migrations/0003_seed_v2_deterministic.py:59` | v2 seed deactivates whatever config is active, not just v1 → an operator-chosen config silently replaced by v2 on upgrade. | fixed (dev-scripts-checks) |
+| H-11 | bug | `recommendations/migrations/0002_seed_v1_deterministic.py:40` | Re-applying 0002 after unseed checks `exists(active)` including v1 itself → v1 deactivated, no active config, generation fails. Unseed paths untested. | fixed (dev-scripts-checks) |
 | H-12 | gap | `config/celery.py:5` | Celery and `manage.py` default to development settings, `wsgi.py` to production → with the variable unset, worker and beat run `DEBUG=True` without the `REDIS_URL` guard. | fixed (security-hardening) |
 | H-13 | gap | `config/urls.py:25` | Only `handler404`/`handler500` set → Django-level 400/403 (DisallowedHost, RequestDataTooBig, PermissionDenied) return HTML, breaking the error envelope. | fixed (security-hardening) |
 | H-14 | bug | `core/api.py:11` | `HealthView` is throttled (60/min per IP) → load balancer probes get 429 and mark a healthy instance down. | fixed (security-hardening) |
@@ -303,8 +321,8 @@ H-2 and H-4 confirmed by the reviewer (DRF `get_ident` source; `redact()` probes
 | H-16 | gap | `config/settings/production.py:15` | HSTS `includeSubDomains` + `preload` hard-coded, 1-year max-age → irreversible on a shared parent domain. Make opt-in. | fixed (security-hardening) |
 | H-17 | bug | `apps/frontend/src/features/profile/languages.ts:13` | "Other" summed from shares pre-rounded to 2 decimals → many small languages become 0, "Other" disappears, rows show "0%". | fixed (frontend-correctness) |
 | H-18 | gap | `apps/frontend/package.json:1` | No Playwright config, specs or CI job despite CLAUDE.md §4; OAuth → onboarding → dashboard, dismiss/undo, delete flows covered only by mocked unit tests. | fixed (frontend-correctness) |
-| H-19 | gap | `tests/test_api_platform.py:82` | No tests for: failing cache backend, migration unseed, malformed log call or quoted redaction, Django-level 400, privacy page vs `data_deletion`. | confirmed |
-| H-20 | perf | `config/settings/base.py:182` | `CELERY_RESULT_BACKEND` stores every task result in Redis, never read. Set `CELERY_TASK_IGNORE_RESULT`. | confirmed |
+| H-19 | gap | `tests/test_api_platform.py:82` | No tests for: failing cache backend, migration unseed, malformed log call or quoted redaction, Django-level 400, privacy page vs `data_deletion`. | fixed (dev-scripts-checks) |
+| H-20 | perf | `config/settings/base.py:182` | `CELERY_RESULT_BACKEND` stores every task result in Redis, never read. Set `CELERY_TASK_IGNORE_RESULT`. | fixed (dev-scripts-checks) |
 
 ### Not yet reviewed
 
@@ -347,7 +365,8 @@ scenario or severity is narrower; `false-positive` = not a defect.
 | W batch 6 review | 10 | 10 | 0 | 0 |
 | X batch 7 review | 12 | 11 | 0 | 1 |
 | Y batch 9 review | 10 | 9 | 1 | 0 |
-| **Total** | **195** | **151** | **34** | **3** |
+| Z batch 10 review | 10 | 7 | 3 | 0 |
+| **Total** | **205** | **158** | **37** | **3** |
 
 ## Verification notes
 
@@ -416,13 +435,14 @@ can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
 | 8 | **Signal and explanation accuracy** | B-6, B-14, B-15, B-16, D-7, D-8, D-9, D-11, D-12, D-13, D-15, D-16, D-17, D-18 | Wrong experience level, missed README badges, misclassified issues, reasons not backed by scoring. Ranking-visible: evaluate on the benchmark. |
 | 9 | **Frontend correctness** | F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18 | Query invalidation churn, no 4xx retry, pagination gaps, 401 handling; add Playwright for the main flows. |
 | 10 | **Dev scripts, checks and migrations** | G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20 | `npm run stop` kills only this repo; config checks for unchecked settings; safe seed migrations; tests for those paths. |
-| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12, Y-9, Y-10 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
+| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12, Y-9, Y-10, Z-4, Z-5, Z-8, Z-9, Z-10 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
 | 12 | **Batch 5 follow-ups** | V-1, V-2, V-3, V-4, V-5, V-6, V-7, V-8, V-9 | Review of `github-error-resilience`. Fixed in the same release (0.12.5); V-1 and V-3 replace design decisions D7 (client raises `GitHubInvalidResponse`) and D9 (in-memory throttle fallback instead of fail-open). |
 | 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7…X-9 accepted, X-10 false positive. X-11 and X-12 went to batch 11. |
 | 14 | **Batch 9 follow-ups** | Y-1…Y-10 | Review of `frontend-correctness`. Y-1…Y-5 and Y-8 fixed in the same release (0.12.8); Y-6 and Y-7 open (next frontend change); Y-9 and Y-10 went to batch 11. |
+| 15 | **Batch 10 follow-ups** | Z-1…Z-10 | Review and `/simplify` pass of `dev-scripts-checks`. Z-2, Z-3, Z-6, Z-7 fixed in the same release (0.12.9); Z-1 open (needs a spec change); Z-4, Z-5, Z-8, Z-9, Z-10 went to batch 11. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
-W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8. Next: batch 10 (dev scripts, checks and
-migrations); batch 8 (signal and explanation accuracy) is ranking-visible and waits for K-1.
+W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9. Next: batch 11 (performance and
+cleanup); batch 8 (signal and explanation accuracy) is ranking-visible and waits for K-1.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.

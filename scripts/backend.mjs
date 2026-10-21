@@ -2,9 +2,10 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { runChild } from './child.mjs'
+import { recordProcess, runChild } from './child.mjs'
 import { uv, uvCommand } from './uv.mjs'
 
+recordProcess()
 const backend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'backend')
 
 uv(['run', 'python', 'manage.py', 'migrate', '--noinput'], { cwd: backend })

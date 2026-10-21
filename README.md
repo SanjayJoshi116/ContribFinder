@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.8** (frontend correctness: the dashboard refetches only after a job finishes, errors show at once, an ended session returns to sign-in, every link and page lands somewhere, and browser tests cover the main flows; MVP+). After signing in with
+**Version 0.12.9** (dev scripts, checks and migrations: `npm run stop` stops only this checkout, startup checks cover every numeric setting, and seeding never overrides an operator's active configuration; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -72,6 +72,14 @@ Add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from step 1 to `.env`, then:
 npm start          # WSL Redis + Django :8000 + Celery worker + Celery beat + Vite :5173 (proxies /api)
 npm run stop       # stop the stack from another prompt (Ctrl+C in its own console also works)
 ```
+
+Each runner records its process id in the gitignored `.run/` folder (the Redis runner also records
+the `wsl.exe` keep-alive that holds WSL awake). `npm run stop` stops only recorded processes that
+still run the recorded program, plus this checkout's Django, Celery and Vite (matched by the
+repository path), so another project or a second checkout keeps running; stale records are
+discarded. Closing the console window stops the stack too, keep-alive included. Each checkout
+keeps its own Celery beat schedule file (named after a hash of the repository path). Stacks
+started before 0.12.9 have no records: stop them once with the old `npm run stop` before upgrading.
 
 Celery beat runs the periodic repository jobs: it marks candidate repositories stale and
 refreshes them in the background with the OAuth app's client credentials (never a user's
@@ -235,6 +243,8 @@ Never commit `.env`.
 ## Tests
 
 `uv run pytest` in `apps/backend` (uses local PostgreSQL) and `npm test` in `apps/frontend`.
+`npm run test:scripts` at the root tests the dev runners (process matching, port waits, beat
+schedule name, version check) with Node's built-in test runner.
 All commands are in `CLAUDE.md` §6.
 
 ### End-to-end tests
@@ -260,7 +270,10 @@ Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion fi
 fencing) in 0.12.4, batch 5 (GitHub error resilience) in 0.12.5, together with the follow-ups
 from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consistency) in 0.12.6,
 batch 7 (discovery and repository data) in 0.12.7, batch 9 (frontend correctness) in 0.12.8,
-together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 and Y-7 still open).
+together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 and Y-7 still open),
+and batch 10 (dev scripts, checks and migrations) in 0.12.9, together with the follow-ups from its
+review (rows Z-1…Z-10, batch 15; Z-1 still open). Batches 8 (ranking-visible, waits for K-1) and
+11 (performance and cleanup) remain.
 
 ## Versioning
 

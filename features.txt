@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.8 (2026-10-21)
+Version: 0.12.9 (2026-10-21)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,17 +439,48 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.9 - Dev scripts, checks and migrations (backlog batch 10)
+============================================================================
+
+Local stack
+  [x] npm run stop stops only this checkout (runner records in .run/, path match for
+      Django, Celery and Vite); reused pids left alone, stale records discarded
+  [x] WSL keep-alive recorded and stopped; Redis runner stops on SIGHUP
+  [x] Closing the console stops the whole stack
+  [x] Missing program or already-exited child ends with a message, not a stack trace
+  [x] Port waits keep their deadline against hosts that drop packets
+  [x] One Celery beat schedule file per checkout
+
+Setup, CI, version check
+  [x] npm run setup uses npm ci (lockfiles never rewritten)
+  [x] CI cancels older runs only on pull requests
+  [x] check:version covers packages[""].version of both npm lockfiles
+  [x] npm run test:scripts (Node built-in tests for the runners, also in CI)
+
+Checks, seeds, tests
+  [x] Startup checks for sync, job, GitHub, OAuth, repository and session settings
+      (core.E020, E050, E051) and EXPERIENCE_THRESHOLDS (core.E014)
+  [x] v2 seed keeps an operator's active configuration; v1 re-seed keeps one active
+  [x] Tests: seed migrations both ways, deletion coverage of user-linked models,
+      privacy page names every deleted category
+  [x] Celery task results no longer stored
+  [x] Review follow-ups Z-2, Z-3, Z-6, Z-7: CI group per commit on main, CLIs run
+      through linked paths, seed rollback keeps one active config, Windows-path test
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
-  [ ] Bug_Backlog.md batches 8, 10, 11  signals, scripts, cleanup
+  [ ] Bug_Backlog.md batches 8, 11  signals, cleanup
   [ ] Bug_Backlog.md Y-6, Y-7  5-minute stale profile data, saved-list paging drift
+  [ ] Bug_Backlog.md Z-1  v2 re-seed after a rollback overrides an operator's v1 (spec change)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation
   [ ]          Personalized ranking, notifications, contribution tracking
   [ ] ideas.md  Unplanned gap analysis (2026-10-20): IDF weighting, time decay, diversity,
                 preferences, contribution-success signals, evaluation rigor, online report,
-                dismiss reasons, CSP, dependency scanning
+                dismiss reasons, CSP, dependency scanning; round 5 (2026-10-21): lint
+                scripts/, loud helper modules, migration round trip, config activation

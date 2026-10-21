@@ -2,10 +2,11 @@
 // distro awake for as long as this process lives (WSL stops idle distros, and Redis with them).
 import { spawn } from 'node:child_process'
 
-import { watchStack } from './child.mjs'
+import { recordProcess, watchStack } from './child.mjs'
 import { loadEnv, redisTarget } from './env.mjs'
 import { waitPort } from './wait-port.mjs'
 
+recordProcess()
 loadEnv()
 const target = redisTarget()
 const distro = process.env.WSL_DISTRO ?? 'Ubuntu'
@@ -53,12 +54,14 @@ const keepAlive = spawn('wsl.exe', ['-d', distro, '--', 'sleep', 'infinity'], {
   ...WSL_OPTIONS,
   stdio: 'ignore',
 })
+// Detached, so it is not in this runner's process tree: `npm run stop` finds it by its record.
+recordProcess({ pid: keepAlive.pid, exe: 'wsl', marker: 'sleep infinity' })
 const stop = () => {
   keepAlive.kill()
   process.exit(0)
 }
-process.on('SIGINT', stop)
-process.on('SIGTERM', stop)
+// SIGHUP: the console window was closed.
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, stop)
 watchStack(stop)
 keepAlive.on('exit', (code) => {
   console.error(`WSL keep-alive session ended (code ${code}); Redis may stop.`)

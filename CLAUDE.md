@@ -142,8 +142,9 @@ ContribFinder/
 │                         the query client (retry, stale time, 401) and job-transition refresh;
 │                         e2e/ Playwright specs, playwright.config.ts
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
-│                           redis (WSL), child (process-tree runner), env, wait-port, uv,
-│                           manage, check-version, e2e-backend (seed + Django for Playwright)
+│                           redis (WSL), child (process-tree runner, .run/ records), stack
+│                           (stop matching), env, wait-port, uv, manage, check-version,
+│                           e2e-backend (seed + Django for Playwright); *.test.mjs (node --test)
 ├─ package.json             root runner: npm run setup / npm start / stop / manage / check:version
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
@@ -187,8 +188,17 @@ Local, no Docker (primary on this machine):
   (`CF_STACK_PID`; terminals such as Git Bash end only the top process). A leftover
   `Terminate batch job (Y/N)?` comes from `npm.cmd`: answer Y. Ctrl+C stops the stack,
   also in an interactive Windows console (fixed in Phase 8a, see Known issues below);
-  `npm run stop` from a second prompt works too. It kills this repo's stack only (matched by executable and repo path).
+  `npm run stop` from a second prompt works too. It kills this repo's stack only: runners record
+  themselves in the gitignored `.run/` (`recordProcess` in `child.mjs`; `redis.mjs` also records
+  the `wsl.exe` keep-alive), and `stop.mjs` (`matchStack` in `scripts/stack.mjs`) kills a record
+  only while its live process has the recorded executable and command line, plus this repo's
+  Python/Celery and Vite by path; stale records are deleted (and pruned by `start.mjs`). Closing
+  the console (SIGHUP) stops every runner, keep-alive included. Beat's schedule file is
+  `contribfinder-celerybeat-<sha1(root)[:8]>` (`scheduleFile` in `env.mjs`) in the OS temp dir, one per checkout.
   The SPA proxies `/api`.
+- `npm run test:scripts`: Node built-in tests for the runners (`scripts/*.test.mjs`, also in CI).
+  `npm run setup` uses `npm ci` (never rewrites a lockfile); `npm run check:version` also checks
+  `packages[""].version` of both npm lockfiles.
 - Redis: on Windows, `npm start` starts the `redis-server` service in WSL Ubuntu and keeps the
   distro awake (`scripts/redis.mjs`), then a Celery worker with `--pool=threads --concurrency=4`
   (`scripts/worker.mjs`). `REDIS_URL=redis://localhost:6379/1`: db 1, because db 0 holds unrelated
@@ -852,6 +862,38 @@ deltas to `recommendations-view`, `recommendation-feedback`, `issue-matching`,
   open; Y-9, Y-10 in batch 11.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Dev scripts, checks and migrations** (MVP+, fix release)  ✅ shipped in v0.12.9 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-21-dev-scripts-checks/`. Specs: new `developer-tooling`;
+deltas to `api-platform`, `recommendation-engine`. Batch 10 of `Bug_Backlog.md`.
+- Runners call `recordProcess()` (`child.mjs`), writing `.run/<script>-<pid>.json` with
+  `{ pid, exe, marker }` (marker: the runner's script path) and removing it on exit;
+  `stop.mjs` decides with the pure `matchStack(processes, records, repo, selfPid)`
+  (`scripts/stack.mjs`): executable and marker must still match. A new runner only calls
+  `recordProcess()`; a detached helper records itself with `{ pid, exe, marker }` (the WSL
+  keep-alive: `wsl`, `sleep infinity`).
+- Startup checks: scalar settings go through `_rule_errors(names, POSITIVE_INT |
+  NON_NEGATIVE_INT | POSITIVE_NUMBER)`, mappings through `_keys_errors` (optional `item_ok`);
+  the experience signal names are `services.profiling.experience.SIGNALS`.
+- `runChild` tolerates an already-gone group and reports spawn errors; `waitPort` bounds each
+  attempt by the remaining time; `scheduleFile(root)` (`env.mjs`) names beat's schedule.
+- New check ids: `core.E050` (non-negative integer), `core.E051` (positive number); `core.E020`
+  now also covers sync, job, GitHub, OAuth and repository integers; `core.E014` validates
+  `EXPERIENCE_THRESHOLDS`. A new numeric setting needs a check in `sync_github_config_check` or
+  its group.
+- Seeds: `0002` activates v1 only when no other config is active; `0003` activates v2 only when
+  nothing outside {v1, v2} is active. `tests/test_seed_migrations.py` round-trips them.
+- `tests/test_privacy_coverage.py` fails for a new user-linked model until it is deleted by
+  `delete_github_data` or kept on purpose, and its category is on `PrivacyPage.tsx`.
+- `CELERY_TASK_IGNORE_RESULT = True`.
+- A script that is also a CLI guards it with `isMain(import.meta.url)` (`env.mjs`, real paths),
+  never `argv[1] === fileURLToPath(...)`. `scripts/uv.mjs` is a library, not a CLI.
+- CI concurrency groups pushes by `github.sha` (a group keeps one pending run, so a shared group
+  on `main` drops queued commits) and pull requests by ref with cancellation.
+- Review follow-ups Z-2, Z-3, Z-6, Z-7 of `Bug_Backlog.md` fixed in the same release; Z-1 open
+  (spec change), Z-4, Z-5, Z-8 and the `/simplify` skips Z-9, Z-10 in batch 11.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
@@ -863,7 +905,8 @@ responsiveness, linked PRs), evaluation rigor (bootstrap CIs, inter-rater agreem
 recall), online report per config from feedback, dismiss reasons, CSP, dependency scanning.
 Round 3 (2026-10-21): content-based `not_code`, post-analysis pool cleanup, search budget
 (`no_license` rejections, per-band yield), queuing released-name refreshes. Round 4: data
-versions for client freshness, keyset saved lists, server page clamping, route-level ids.
+versions for client freshness, keyset saved lists, server page clamping, route-level ids. Round 5:
+lint `scripts/`, loud helper modules, generic migration round trip, explicit config activation.
 Ranking-visible ideas wait for K-1; bootstrap CIs should land before or with it.
 
 ## 8. Release housekeeping

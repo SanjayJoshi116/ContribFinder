@@ -7,6 +7,67 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.9] - 2026-10-21
+
+Dev scripts, checks and migrations (OpenSpec change `dev-scripts-checks`, backlog batch 10). No
+ranking, API or frontend behavior change.
+
+### Fixed
+
+- `npm run stop` stops only this checkout's stack. Runners record themselves in the gitignored
+  `.run/`, and a recorded process is stopped only while it still runs the recorded program;
+  Django, Celery and Vite still match by repository path. Another project's or another
+  checkout's `scripts/start.mjs` and friends keep running, and a reused process id is left
+  alone and its record discarded (G-1).
+- The WSL keep-alive that holds Redis awake is recorded and stopped by `npm run stop`, and the
+  Redis runner also stops on SIGHUP, so closing the console no longer leaves WSL and Redis
+  awake (G-2).
+- A runner whose child already exited no longer throws in its signal handler, and a program that
+  cannot be started (for example a wrong `UV_BIN`) prints `Could not start <cmd>: <message>` and
+  exits 1 instead of a stack trace (G-3).
+- Port waits keep their deadline against a host that drops packets: each connection attempt
+  times out within the remaining time (G-4).
+- Each checkout has its own Celery beat schedule file (`contribfinder-celerybeat-<hash>` in the
+  OS temp dir), so two checkouts or worktrees no longer share one (G-7).
+- CI cancels an older run only on pull requests; every push to `main` is checked (G-8).
+- `npm run check:version` also checks `packages[""].version` of both npm lockfiles and names
+  the failing entry (G-9).
+- `npm run setup` installs with `npm ci` at the root and in `apps/frontend`, so it never rewrites
+  a lockfile (G-10).
+- Startup checks cover the remaining numeric settings: sync and job settings, GitHub caps and
+  timeouts, OAuth state limits, repository grace and retry windows,
+  `DISCOVERY_ANALYSIS_CONCURRENCY`, `REPEATED_CONTRIBUTION_MIN_PRS`, `SESSION_COOKIE_AGE` and
+  `REDIS_SOCKET_TIMEOUT` (`core.E020` positive integer, `core.E050` non-negative integer,
+  `core.E051` positive number), and `EXPERIENCE_THRESHOLDS` (`core.E014`: known signals, each a
+  pair of non-negative numbers in order). A recovery interval of 0 no longer loops; a scalar
+  threshold no longer fails every analysis (H-7).
+- Seeding `v2-deterministic` no longer replaces an operator-activated configuration; it is then
+  stored inactive (H-10). Re-applying the `v1-deterministic` seed after a rollback no longer
+  leaves no configuration active (H-11). Databases already migrated keep their current state.
+- Review follow-ups (Z-2, Z-3, Z-6, Z-7): pushes to `main` get a CI concurrency group per commit,
+  so a queued run is no longer replaced by a newer push; `check:version` and `wait-port` run
+  their CLI also when started through a symlink or junction (`check:version` used to print
+  nothing and pass); reversing both seeds while v2 has recommendations keeps v1 as the active
+  configuration instead of leaving none; the beat schedule test hashes real Windows paths.
+
+### Added
+
+- `npm run test:scripts` (also in CI): Node built-in tests for the runners' process matching,
+  port waits, beat schedule name and version check.
+- Tests for seed migrations in both directions, for every user-linked model being either deleted
+  with GitHub data or deliberately kept, and for the privacy page naming each deleted category
+  (H-19).
+
+### Changed
+
+- Celery no longer stores task results (`CELERY_TASK_IGNORE_RESULT`); nothing read them (H-20).
+- Stacks started before this release have no process records: stop them once with the old
+  `npm run stop` before upgrading.
+- Internal cleanup with no behavior change: runner records carry their own match marker (no
+  runner list to keep in sync; runners call `recordProcess()`), `npm run stop` reads the records
+  once, scalar setting checks share one helper (`_rule_errors`), `EXPERIENCE_THRESHOLDS` uses
+  the shared mapping check and the signal names from `services.profiling.experience.SIGNALS`.
+
 ## [0.12.8] - 2026-10-21
 
 Frontend correctness (OpenSpec change `frontend-correctness`, backlog batch 9). No ranking or

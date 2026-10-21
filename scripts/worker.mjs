@@ -1,11 +1,12 @@
 // `npm run start:worker`: wait for the broker, then run a Celery worker for apps/backend.
 import path from 'node:path'
 
-import { runChild } from './child.mjs'
+import { recordProcess, runChild } from './child.mjs'
 import { loadEnv, redisTarget, root } from './env.mjs'
 import { uvCommand } from './uv.mjs'
 import { waitPort } from './wait-port.mjs'
 
+recordProcess()
 loadEnv()
 const target = redisTarget()
 if (!target) {

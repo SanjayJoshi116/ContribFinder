@@ -31,21 +31,30 @@ DESCRIPTION = (
 
 def seed(apps: StateApps, schema_editor: BaseDatabaseSchemaEditor) -> None:
     ScoringConfig = apps.get_model("recommendations", "ScoringConfig")
+    # Active unless another configuration is. v1 itself does not count: re-applying this seed
+    # after a rollback (which re-activates v1) must not leave no configuration active.
+    others_active = (
+        ScoringConfig.objects.filter(is_active=True).exclude(version="v1-deterministic").exists()
+    )
     ScoringConfig.objects.update_or_create(
         version="v1-deterministic",
         defaults={
             "description": DESCRIPTION,
             "weights": WEIGHTS,
             "params": PARAMS,
-            "is_active": not ScoringConfig.objects.filter(is_active=True).exists(),
+            "is_active": not others_active,
         },
     )
 
 
 def unseed(apps: StateApps, schema_editor: BaseDatabaseSchemaEditor) -> None:
-    apps.get_model("recommendations", "ScoringConfig").objects.filter(
-        version="v1-deterministic", recommendations__isnull=True
-    ).delete()
+    ScoringConfig = apps.get_model("recommendations", "ScoringConfig")
+    v1 = ScoringConfig.objects.filter(version="v1-deterministic", recommendations__isnull=True)
+    # An active v1 is the only active configuration (0003's unseed hands over to it): keep it while
+    # any other configuration stays stored, or those would be left with none active.
+    if ScoringConfig.objects.exclude(version="v1-deterministic").exists():
+        v1 = v1.filter(is_active=False)
+    v1.delete()
 
 
 class Migration(migrations.Migration):

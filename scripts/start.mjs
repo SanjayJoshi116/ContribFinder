@@ -3,9 +3,12 @@
 // (blocking) with no periodic jobs.
 import concurrently from 'concurrently'
 
+import { pruneRecords, recordProcess } from './child.mjs'
 import { loadEnv, redisTarget, root } from './env.mjs'
 
 loadEnv()
+pruneRecords()
+recordProcess()
 // Runners stop their process trees when this process is gone (scripts/child.mjs).
 process.env.CF_STACK_PID = String(process.pid)
 const target = redisTarget()

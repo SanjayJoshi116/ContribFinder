@@ -1,6 +1,6 @@
 # Ideas
 
-Gap analysis from 2026-10-20 (v0.12.4); round 3 added 2026-10-21 (v0.12.7). These are not yet planned: each needs an OpenSpec
+Gap analysis from 2026-10-20 (v0.12.4); rounds 3–5 added 2026-10-21 (v0.12.7–v0.12.9). These are not yet planned: each needs an OpenSpec
 change before work starts. Ranking-visible items must win on the benchmark, which needs K-1
 (`Bug_Backlog.md`) first.
 
@@ -201,3 +201,28 @@ Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 |---|---|---|
 | **High value** | keyset saved lists (§14) | data versions (§14) |
 | **Lower value** | route-level ids, production build in CI (§14) | server page clamping (§14, API change) |
+
+## 15. Dev tooling and operations
+
+Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
+
+- **Lint and format `scripts/` in CI.** The runners are tested (`npm run test:scripts`) but no
+  ESLint or Prettier config covers them; the frontend's config does not reach the root.
+- **Helper modules fail loudly when run.** `node scripts/uv.mjs ...` exits 0 without doing
+  anything (it is a library), which once passed for a green mypy run. A guard that prints usage
+  and exits 1 under `isMain` would catch that.
+- **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
+  seeds only. One test that migrates every app back to its first migration and forward again
+  would catch the next irreversible or non-idempotent `RunPython`.
+- **Activation as an explicit operator action.** Seed migrations decide which configuration is
+  active (Z-1). A `activate_scoring_config <version>` command (audit-logged, refusing a config
+  that loses on the benchmark unless forced) would let seeds always store new versions
+  inactive.
+- **One `taskkill` per stop.** See Z-9: one call for all matched pids, or skip descendants.
+
+## Suggested order (round 5)
+
+| | Cheap | Expensive |
+|---|---|---|
+| **High value** | loud helper modules, lint `scripts/` (§15) | activation command (§15, changes seeding) |
+| **Lower value** | one `taskkill` (§15) | generic migration round trip (§15, slow test) |

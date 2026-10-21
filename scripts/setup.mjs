@@ -1,6 +1,7 @@
 // `npm run setup`: one-time local setup without Docker.
 //   1. Create .env from .env.example with generated secrets (never overwrites an existing .env)
-//   2. Install backend deps (uv) and frontend deps (npm)
+//   2. Install backend deps (uv) and the root and frontend deps (`npm ci`, as CI: lockfiles stay
+//      untouched)
 //   3. Apply database migrations (needs the local PostgreSQL role/database, see README)
 import { randomBytes } from 'node:crypto'
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -32,12 +33,11 @@ const backend = path.join(root, 'apps', 'backend')
 uv(['sync'], { cwd: backend })
 
 // Single command string: npm is a .cmd shim on Windows and needs a shell; no args to escape.
-const npm = spawnSync('npm install', {
-  cwd: path.join(root, 'apps', 'frontend'),
-  stdio: 'inherit',
-  shell: true,
-})
-if (npm.status !== 0) process.exit(npm.status ?? 1)
+// The root first: `npm start` needs `concurrently`.
+for (const cwd of [root, path.join(root, 'apps', 'frontend')]) {
+  const npm = spawnSync('npm ci', { cwd, stdio: 'inherit', shell: true })
+  if (npm.status !== 0) process.exit(npm.status ?? 1)
+}
 
 uv(['run', 'python', 'manage.py', 'migrate', '--noinput'], { cwd: backend })
 console.log('\nSetup complete. Run `npm start`.')

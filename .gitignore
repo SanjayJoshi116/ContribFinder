@@ -31,6 +31,9 @@ test-results/
 playwright-report/
 apps/frontend/e2e/.sessions.json
 
+# Local stack runner records (scripts/child.mjs, npm run stop)
+.run/
+
 # Logs
 *.log
 

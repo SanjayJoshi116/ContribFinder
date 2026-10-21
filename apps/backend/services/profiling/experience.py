@@ -17,6 +17,14 @@ from .inputs import ProfileInput
 
 ACTIVE_WITHIN = timedelta(days=2 * 365)
 MIN_SIGNALS = 2
+# Every signal ``experience_signals`` can report; ``EXPERIENCE_THRESHOLDS`` needs one entry each.
+SIGNALS = (
+    "account_age_years",
+    "active_repositories",
+    "merged_external_prs",
+    "contributed_repositories",
+    "well_evidenced_skills",
+)
 
 
 def experience_signals(profile: ProfileInput, well_evidenced_skills: int) -> dict[str, float]:

@@ -5,9 +5,12 @@ on:
   push:
     branches: [main]
 
+# A newer run cancels an older one only on pull requests. Pushes group by commit: a group holds
+# one pending run and a newer one replaces it even without cancel-in-progress, so a shared group
+# on main would skip queued commits.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -96,6 +99,8 @@ jobs:
           cache-dependency-path: apps/frontend/package-lock.json
       - name: Version consistency
         run: node scripts/check-version.mjs
+      - name: Script tests
+        run: node --test "scripts/*.test.mjs"
       - run: uv sync --frozen
         working-directory: apps/backend
       - run: npm ci

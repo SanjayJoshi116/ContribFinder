@@ -1,13 +1,12 @@
 // `npm run stop`: kill a local stack left running (e.g. a closed terminal or an earlier runner
-// that orphaned Celery). Matches only this repository's processes: its runner scripts, its
-// virtualenv (Django, Celery) and its Vite. Redis in WSL is left running.
+// that orphaned Celery). Matches only this repository's processes: the runners and WSL
+// keep-alive it recorded (.run/, scripts/child.mjs), and its virtualenv (Django, Celery) and
+// Vite by path. The redis-server service in WSL is left running; the distro may then idle out.
 import { execFileSync } from 'node:child_process'
 
-import { killTree } from './child.mjs'
+import { killTree, readRecords, removeRecord } from './child.mjs'
 import { root } from './env.mjs'
-
-const repo = root.toLowerCase()
-const runners = /scripts[\\/](start|backend|worker|beat|redis)\.mjs/
+import { matchStack } from './stack.mjs'
 
 function processes() {
   if (process.platform === 'win32') {
@@ -35,23 +34,16 @@ function processes() {
     })
 }
 
-// Match by executable, never by text alone: a shell whose command line merely mentions these
-// scripts (an editor, this very `npm run stop`) must survive.
-const ours = processes().filter(({ pid, name, cmd }) => {
-  if (pid === process.pid) return false
-  const lower = cmd.toLowerCase()
-  if (name === 'node') return runners.test(cmd) || (lower.includes(repo) && lower.includes('vite'))
-  if (/^(python\d*(\.\d+)?|celery)$/.test(name)) {
-    return lower.includes(repo) && /celery|manage\.py"?\s+runserver/.test(lower)
-  }
-  return false
-})
+const { kill: ours, remove } = matchStack(
+  processes(),
+  readRecords(),
+  root.toLowerCase(),
+  process.pid,
+)
 
-if (ours.length === 0) {
-  console.log('Nothing to stop.')
-} else {
-  for (const { pid, cmd } of ours) {
-    console.log(`Stopping ${pid}: ${cmd.slice(0, 100)}`)
-    killTree(pid)
-  }
+if (ours.length === 0) console.log('Nothing to stop.')
+for (const { pid, cmd } of ours) {
+  console.log(`Stopping ${pid}: ${cmd.slice(0, 100)}`)
+  killTree(pid)
 }
+for (const file of remove) removeRecord(file)

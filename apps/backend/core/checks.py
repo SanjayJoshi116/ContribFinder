@@ -1,10 +1,12 @@
-from typing import Any
+from collections.abc import Callable, Iterable
+from typing import Any, TypeGuard
 
 from django.conf import settings
 from django.core.checks import CheckMessage, Error, Warning, register
 from django.core.exceptions import ImproperlyConfigured
 
 from services.crypto import validate_keys
+from services.profiling.experience import SIGNALS as EXPERIENCE_SIGNALS
 
 
 @register()
@@ -86,7 +88,29 @@ def profiling_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
     for name in ("LANGUAGE_MIN_SHARE", "INTEREST_MIN_STRENGTH"):
         if not 0 <= getattr(settings, name) <= 1:
             errors.append(Error(f"{name} must be between 0 and 1.", id="core.E013"))
-    return errors
+    return errors + _experience_errors(settings.EXPERIENCE_THRESHOLDS)
+
+
+def _experience_pair(pair: object) -> bool:
+    return (
+        isinstance(pair, list | tuple)
+        and len(pair) == 2
+        and all(_is_number(v) and v >= 0 for v in pair)
+        and pair[0] <= pair[1]
+    )
+
+
+def _experience_errors(thresholds: object) -> list[CheckMessage]:
+    """Per signal ``[intermediate_from, experienced_from]``; anything else fails every analysis."""
+    return _keys_errors(
+        "EXPERIENCE_THRESHOLDS",
+        thresholds,
+        EXPERIENCE_SIGNALS,
+        "core.E014",
+        item_ok=_experience_pair,
+        item_rule="[intermediate_from, experienced_from]: two non-negative numbers, the first "
+        "not above the second",
+    )
 
 
 QUERY_STRATEGIES = ("language", "skill", "interest", "topic")
@@ -102,11 +126,34 @@ ACTIVITY_KEYS = (
 )
 
 
-def _is_int(value: object) -> bool:
+def _is_int(value: object) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def _keys_errors(name: str, value: object, keys: tuple[str, ...], code: str) -> list[CheckMessage]:
+def _is_number(value: object) -> TypeGuard[int | float]:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+# Scalar rules: (predicate, what the value must be, check id).
+Rule = tuple[Callable[[object], bool], str, str]
+POSITIVE_INT: Rule = (lambda v: _is_int(v) and v > 0, "a positive integer", "core.E020")
+NON_NEGATIVE_INT: Rule = (lambda v: _is_int(v) and v >= 0, "a non-negative integer", "core.E050")
+POSITIVE_NUMBER: Rule = (lambda v: _is_number(v) and v > 0, "a positive number", "core.E051")
+
+
+def _rule_errors(names: Iterable[str], rule: Rule) -> list[CheckMessage]:
+    ok, what, code = rule
+    return [Error(f"{n} must be {what}.", id=code) for n in names if not ok(getattr(settings, n))]
+
+
+def _keys_errors(
+    name: str,
+    value: object,
+    keys: tuple[str, ...],
+    code: str,
+    item_ok: Callable[[object], bool] = NON_NEGATIVE_INT[0],
+    item_rule: str = "a non-negative integer",
+) -> list[CheckMessage]:
     if not isinstance(value, dict):
         return [Error(f"{name} must be a mapping.", id=code)]
     errors: list[CheckMessage] = []
@@ -115,8 +162,8 @@ def _keys_errors(name: str, value: object, keys: tuple[str, ...], code: str) -> 
     if unknown := sorted(set(value) - set(keys)):
         errors.append(Error(f"{name} has unknown keys: {', '.join(unknown)}.", id=code))
     for key, item in value.items():
-        if not _is_int(item) or item < 0:
-            errors.append(Error(f"{name}[{key!r}] must be a non-negative integer.", id=code))
+        if not item_ok(item):
+            errors.append(Error(f"{name}[{key!r}] must be {item_rule}.", id=code))
     return errors
 
 
@@ -152,24 +199,23 @@ def _star_band_errors(bands: object) -> list[CheckMessage]:
 @register()
 def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
     """Discovery budgets, staleness and activity thresholds are configuration (Phase 4)."""
-    errors: list[CheckMessage] = []
-    for name in (
-        "DISCOVERY_MAX_QUERIES",
-        "DISCOVERY_RESULTS_PER_QUERY",
-        "DISCOVERY_MAX_ANALYSES_PER_RUN",
-        "DISCOVERY_MAX_POOL",
-        "DISCOVERY_CANDIDATE_RETENTION_DAYS",
-        "DISCOVERY_MAX_PUSH_AGE_DAYS",
-        "REPO_README_MAX_BYTES",
-        "REPO_SNAPSHOT_HISTORY",
-        "REPO_REFRESH_BATCH",
-        "REPO_REFRESH_RETRY_MINUTES",
-        "RECOMMENDATION_FAILED_RETRY_MINUTES",
-        "THROTTLE_CACHE_BACKOFF_SECONDS",
-    ):
-        value = getattr(settings, name)
-        if not _is_int(value) or value <= 0:
-            errors.append(Error(f"{name} must be a positive integer.", id="core.E020"))
+    errors = _rule_errors(
+        (
+            "DISCOVERY_MAX_QUERIES",
+            "DISCOVERY_RESULTS_PER_QUERY",
+            "DISCOVERY_MAX_ANALYSES_PER_RUN",
+            "DISCOVERY_MAX_POOL",
+            "DISCOVERY_CANDIDATE_RETENTION_DAYS",
+            "DISCOVERY_MAX_PUSH_AGE_DAYS",
+            "REPO_README_MAX_BYTES",
+            "REPO_SNAPSHOT_HISTORY",
+            "REPO_REFRESH_BATCH",
+            "REPO_REFRESH_RETRY_MINUTES",
+            "RECOMMENDATION_FAILED_RETRY_MINUTES",
+            "THROTTLE_CACHE_BACKOFF_SECONDS",
+        ),
+        POSITIVE_INT,
+    )
     if not _is_int(settings.DISCOVERY_MIN_STARS) or settings.DISCOVERY_MIN_STARS < 0:
         errors.append(Error("DISCOVERY_MIN_STARS must be a non-negative integer.", id="core.E020"))
     if settings.DISCOVERY_RESULTS_PER_QUERY > 100:
@@ -234,10 +280,10 @@ def recommendation_config_check(app_configs: Any = None, **kwargs: Any) -> list[
         )
     if not 0 <= settings.RECOMMENDATION_MIN_SCORE <= 1:
         errors.append(Error("RECOMMENDATION_MIN_SCORE must be between 0 and 1.", id="core.E031"))
-    for name in ("RECOMMENDATION_REFRESH_INTERVAL_SECONDS", "RECOMMENDATION_README_EXCERPT_CHARS"):
-        value = getattr(settings, name)
-        if not _is_int(value) or value <= 0:
-            errors.append(Error(f"{name} must be a positive integer.", id="core.E020"))
+    errors += _rule_errors(
+        ("RECOMMENDATION_REFRESH_INTERVAL_SECONDS", "RECOMMENDATION_README_EXCERPT_CHARS"),
+        POSITIVE_INT,
+    )
     sizes = settings.REPO_SIZE_THRESHOLDS
     size_errors = _keys_errors("REPO_SIZE_THRESHOLDS", sizes, ("small", "medium"), "core.E032")
     errors += size_errors
@@ -254,20 +300,15 @@ def recommendation_config_check(app_configs: Any = None, **kwargs: Any) -> list[
 @register()
 def feedback_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
     """View de-duplication window (Phase 8a)."""
-    value = settings.FEEDBACK_VIEW_DEDUP_MINUTES
-    if not _is_int(value) or value <= 0:
-        return [Error("FEEDBACK_VIEW_DEDUP_MINUTES must be a positive integer.", id="core.E020")]
-    return []
+    return _rule_errors(("FEEDBACK_VIEW_DEDUP_MINUTES",), POSITIVE_INT)
 
 
 @register()
 def issue_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
     """Issue fetch budget, body cap, age limit and difficulty thresholds (Phase 7)."""
-    errors: list[CheckMessage] = []
-    for name in ("ISSUES_MAX_PAGES", "ISSUE_BODY_MAX_CHARS", "ISSUE_MAX_AGE_DAYS"):
-        value = getattr(settings, name)
-        if not _is_int(value) or value <= 0:
-            errors.append(Error(f"{name} must be a positive integer.", id="core.E020"))
+    errors = _rule_errors(
+        ("ISSUES_MAX_PAGES", "ISSUE_BODY_MAX_CHARS", "ISSUE_MAX_AGE_DAYS"), POSITIVE_INT
+    )
     thresholds = settings.ISSUE_DIFFICULTY
     difficulty_errors = _keys_errors(
         "ISSUE_DIFFICULTY", thresholds, ISSUE_DIFFICULTY_KEYS, "core.E040"
@@ -290,3 +331,38 @@ def issue_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMess
                 )
             )
     return errors
+
+
+# Integer settings where 0 would loop, never finish or never fetch anything.
+POSITIVE_INT_SETTINGS = (
+    "SYNC_MAX_ATTEMPTS",
+    "SYNC_STALE_AFTER_SECONDS",
+    "JOB_RECOVERY_INTERVAL_SECONDS",
+    "GITHUB_SYNC_MAX_REPOS",
+    "GITHUB_MAX_PAGES",
+    "GITHUB_MAX_RETRY_DELAY",
+    "GITHUB_ETAG_TTL",
+    "GITHUB_MANIFEST_MAX_REPOS",
+    "GITHUB_MANIFEST_MAX_BYTES",
+    "GITHUB_CONTRIB_MAX_PRS",
+    "GITHUB_CONTRIB_MAX_REPOS",
+    "OAUTH_STATE_MAX_PENDING",
+    "OAUTH_STATE_TTL_SECONDS",
+    "REPO_FAILED_RETRY_HOURS",
+    "REPEATED_CONTRIBUTION_MIN_PRS",
+    "DISCOVERY_ANALYSIS_CONCURRENCY",
+    "SESSION_COOKIE_AGE",
+)
+# 0 is meaningful: no cooldown, no grace period.
+NON_NEGATIVE_INT_SETTINGS = ("SYNC_COOLDOWN_SECONDS", "REPO_DISCOVERED_GRACE_MINUTES")
+POSITIVE_NUMBER_SETTINGS = ("GITHUB_HTTP_TIMEOUT", "REDIS_SOCKET_TIMEOUT")
+
+
+@register()
+def sync_github_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    """Job, sync, GitHub client, OAuth and session limits."""
+    return (
+        _rule_errors(POSITIVE_INT_SETTINGS, POSITIVE_INT)
+        + _rule_errors(NON_NEGATIVE_INT_SETTINGS, NON_NEGATIVE_INT)
+        + _rule_errors(POSITIVE_NUMBER_SETTINGS, POSITIVE_NUMBER)
+    )

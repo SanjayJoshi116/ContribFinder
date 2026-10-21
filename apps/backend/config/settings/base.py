@@ -197,6 +197,8 @@ SPECTACULAR_SETTINGS = {
 # --- Celery ----------------------------------------------------------------
 CELERY_BROKER_URL = REDIS_URL or "memory://"
 CELERY_RESULT_BACKEND = REDIS_URL or "cache+memory://"
+# Nothing reads task results (jobs record their state in SyncJob), so none are stored.
+CELERY_TASK_IGNORE_RESULT = True
 CELERY_TASK_ALWAYS_EAGER = not REDIS_URL
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"

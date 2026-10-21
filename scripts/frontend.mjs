@@ -3,9 +3,10 @@
 // on Ctrl+C in Windows consoles.
 import path from 'node:path'
 
-import { runChild } from './child.mjs'
+import { recordProcess, runChild } from './child.mjs'
 import { root } from './env.mjs'
 
+recordProcess()
 const frontend = path.join(root, 'apps', 'frontend')
 runChild(process.execPath, [path.join(frontend, 'node_modules', 'vite', 'bin', 'vite.js')], {
   cwd: frontend,
