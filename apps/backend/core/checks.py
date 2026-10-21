@@ -163,6 +163,8 @@ def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
         "REPO_README_MAX_BYTES",
         "REPO_SNAPSHOT_HISTORY",
         "REPO_REFRESH_BATCH",
+        "REPO_REFRESH_RETRY_MINUTES",
+        "THROTTLE_CACHE_BACKOFF_SECONDS",
     ):
         value = getattr(settings, name)
         if not _is_int(value) or value <= 0:

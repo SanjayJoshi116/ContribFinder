@@ -7,7 +7,6 @@ from rest_framework import serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from config.urls import (  # noqa: F401  (the real error handlers, not copies)
@@ -17,6 +16,7 @@ from config.urls import (  # noqa: F401  (the real error handlers, not copies)
     handler500,
 )
 from config.urls import urlpatterns as app_urlpatterns
+from core.throttling import AnonRateThrottle
 
 
 class _EchoSerializer(serializers.Serializer[dict[str, object]]):

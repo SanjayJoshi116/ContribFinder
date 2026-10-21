@@ -7,6 +7,57 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.5] - 2026-10-21
+
+GitHub error resilience (OpenSpec change `github-error-resilience`, backlog batch 5).
+No ranking change.
+
+### Fixed
+
+- A 403 or 429 that reports a secondary rate limit (or the older abuse-detection message) with
+  no `Retry-After` is now a rate limit with a 60-second wait, not "forbidden": contributor
+  counts are no longer reported as unknown and shared repositories are no longer marked FAILED
+  for every user (A-2, C-6).
+- Renamed repositories are followed: 301/302/307/308 redirects are followed up to 3 hops, only
+  to the API's own origin (scheme, host and port) and with the same credentials. A redirect
+  anywhere else, including plain HTTP on the same host, is a client error and is never
+  requested (A-4, C-1, V-2).
+- A stored token that can no longer be decrypted (after a key rotation drops its key) fails
+  jobs as `github_auth_invalid`, so the user is asked to sign in again (A-6).
+- A 403, 451 or other non-retryable error on one repository's languages skips that repository,
+  keeps its earlier languages and lists it in job metadata `languages_skipped`, instead of
+  failing every sync (A-3). The same errors on the profile README mark the step `skipped` and
+  keep the stored README (A-5). A repository deleted before the topics step no longer fails
+  the sync (A-11).
+- A sync now refreshes the account's username and avatar, so `/auth/me` shows a GitHub rename
+  without signing in again (A-13).
+- A non-JSON or incomplete `GET /user` response during sign-in (including a `null` login)
+  redirects with `auth_error=failed` and is audited, instead of a JSON 500 (A-14, V-7).
+- A deeply nested manifest yields no dependencies instead of raising `RecursionError` (B-13).
+- Repository analysis records repository-specific failures on the repository and lets
+  discovery continue: an unexpected GitHub 4xx is FAILED `client_error`, a response the client
+  cannot read is FAILED `invalid_response` (C-1). The client raises `GitHubInvalidResponse`
+  for a body that is not the JSON it expects, so a `KeyError` or `TypeError` in
+  ContribFinder's own code still propagates as a bug (V-1). Rate limits, transient and auth
+  errors, cancellation, lost claims and database errors still release the claim and propagate.
+- A background refresh that fails without a retry, including rejected app credentials,
+  records its error code and `refresh_failed_at` on the repository, keeps its state, and is
+  not requeued until `REPO_REFRESH_RETRY_MINUTES` (default 60) has passed (C-9, V-4). It
+  leaves alone a repository another analysis completed meanwhile (V-5), and the delay never
+  holds back FAILED retries or dead-worker recovery (V-6).
+- The API keeps working while Redis is down: throttles log one warning and count in process
+  memory for `THROTTLE_CACHE_BACKOFF_SECONDS` (default 30), so limits still apply per process
+  without waiting on Redis, and sessions use the database engine instead of `cached_db`
+  (H-1, V-3). Existing sessions stay valid.
+
+### Changed
+
+- Owned repositories' topics are stored by the repositories step; the topics step only marks
+  progress, and job metadata no longer copies the topics (V-9).
+- A migration adds `Repository.refresh_failed_at` (nullable). New settings
+  `REPO_REFRESH_RETRY_MINUTES` and `THROTTLE_CACHE_BACKOFF_SECONDS` are checked by `core.E020`.
+  The API and OpenAPI schema are unchanged.
+
 ## [0.12.4] - 2026-10-19
 
 Job lifecycle and claim fencing (OpenSpec change `job-claim-fencing`, backlog batch 4).

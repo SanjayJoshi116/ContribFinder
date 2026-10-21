@@ -105,6 +105,19 @@ def fail(repo: Repository, code: str) -> None:
         lifecycle_changed_at=timezone.now(),
         claim_token=None,
         claimed_at=None,
+        refresh_failed_at=None,  # the FAILED retry delay takes over
+    )
+
+
+def record_refresh_failure(repo_id: int, code: str, *, since: datetime) -> None:
+    """A background refresh that started at ``since`` ended without a retry and without
+    FAILED (stale is not gone): record why and when, keeping the state, eligibility and data.
+    Called after the analysis released its claim, so a repository another analysis holds, one
+    that changed state since (completed by another run), or a FAILED one is left alone."""
+    Repository.objects.filter(pk=repo_id).exclude(
+        lifecycle__in=(*IN_PROGRESS, Lifecycle.FAILED)
+    ).exclude(lifecycle_changed_at__gte=since).update(
+        lifecycle_error=code, refresh_failed_at=timezone.now()
     )
 
 
@@ -122,6 +135,7 @@ def complete(repo: Repository, *, now: datetime | None = None) -> None:
     repo.previous_lifecycle = ""
     repo.stale_parts = []
     repo.claim_token, repo.claimed_at = None, None
+    repo.refresh_failed_at = None
     repo.save(
         update_fields=[
             "lifecycle",
@@ -133,5 +147,6 @@ def complete(repo: Repository, *, now: datetime | None = None) -> None:
             "stale_parts",
             "claim_token",
             "claimed_at",
+            "refresh_failed_at",
         ]
     )

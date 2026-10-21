@@ -74,6 +74,9 @@ class Repository(models.Model):
     # analysis last renewed it. A claim not renewed for SYNC_STALE_AFTER_SECONDS is reclaimable.
     claim_token = models.UUIDField(null=True, blank=True, editable=False)
     claimed_at = models.DateTimeField(null=True, blank=True)
+    # A background refresh that ended without a retry (and without FAILED): the backlog waits
+    # REPO_REFRESH_RETRY_MINUTES before queueing it again. ``lifecycle_error`` holds the code.
+    refresh_failed_at = models.DateTimeField(null=True, blank=True)
 
     # Community files and labels (null = not fetched yet).
     has_contributing = models.BooleanField(null=True, blank=True)

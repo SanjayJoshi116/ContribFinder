@@ -490,3 +490,26 @@ def test_failed_revocation_still_signs_in(
         _sign_in_twice(client, respx.mock, django_capture_on_commit_callbacks)
     assert "Revoking the replaced GitHub token failed" in caplog.text
     assert TOKEN not in caplog.text and NEW_TOKEN not in caplog.text
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx.Response(200, text="<html>maintenance</html>"),
+        httpx.Response(200, json={"login": "octocat"}),
+        httpx.Response(200, json={"id": 424242, "login": ""}),
+        httpx.Response(200, json={"id": 424242, "login": None}),
+        httpx.Response(200, json=["not", "an", "object"]),
+    ],
+)
+def test_malformed_identity_fails_sign_in(client: Client, answer: httpx.Response) -> None:
+    respx.mock.post(TOKEN_URL).respond(200, json={"access_token": TOKEN, "scope": ""})
+    respx.mock.get(USER_URL).mock(return_value=answer)
+    response = callback(client, code=CODE, state=start(client))
+    _assert_auth_error_redirect(response, "failed")
+    assert not User.objects.exists() and not GitHubAccount.objects.exists()
+    assert "_auth_user_id" not in client.session
+    event = AuditEvent.objects.get(action="sign_in_failed")
+    assert event.metadata["reason"] == "identity_failed"
+    assert_no_secrets(str(event.metadata))

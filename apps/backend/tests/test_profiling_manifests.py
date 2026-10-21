@@ -140,3 +140,20 @@ def test_malformed_manifest_returns_nothing(filename: str, text: str) -> None:
 def test_unsupported_file() -> None:
     assert not is_manifest("setup.py")
     assert parse_manifest("setup.py", "install_requires=['django']") == []
+
+
+DEEP = 100_000
+DEEP_PACKAGE_JSON = '{"dependencies": ' + "[" * DEEP + "]" * DEEP + "}"
+
+
+@pytest.mark.parametrize(
+    ("filename", "text"),
+    [
+        ("package.json", DEEP_PACKAGE_JSON),
+        ("pyproject.toml", "x = " + "[" * DEEP + "]" * DEEP + "\n"),
+        ("Cargo.toml", "x = " + "[" * DEEP + "]" * DEEP + "\n"),
+    ],
+    ids=["package.json", "pyproject.toml", "Cargo.toml"],  # the texts are too long for ids
+)
+def test_deeply_nested_manifest_yields_nothing(filename: str, text: str) -> None:
+    assert parse_manifest(filename, text) == []

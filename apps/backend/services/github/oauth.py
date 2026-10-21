@@ -104,13 +104,20 @@ def fetch_identity(access_token: str) -> GitHubIdentity:
         ) from None
     if response.status_code != 200:
         raise OAuthError("identity_failed", f"GET /user returned {response.status_code}")
-    data = response.json()
-    return GitHubIdentity(
-        github_id=int(data["id"]),
-        login=str(data["login"]),
-        name=str(data.get("name") or ""),
-        avatar_url=str(data.get("avatar_url") or ""),
-    )
+    try:
+        data = response.json()
+        login = data["login"]
+        identity = GitHubIdentity(
+            github_id=int(data["id"]),
+            login=login if isinstance(login, str) else "",  # null or a number is no login
+            name=str(data.get("name") or ""),
+            avatar_url=str(data.get("avatar_url") or ""),
+        )
+    except (ValueError, TypeError, KeyError, AttributeError):
+        identity = None  # not JSON, not an object, or a field missing or malformed
+    if identity is None or not identity.login:
+        raise OAuthError("identity_failed", "GET /user returned an unexpected body")
+    return identity
 
 
 def revoke_grant(access_token: str) -> None:

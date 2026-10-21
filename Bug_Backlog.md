@@ -44,6 +44,24 @@ severe first.
 | R-13 | `apps/backend/services/evaluation/build.py:34` | `build` assumes each input is a JSON object; a top-level list raises uncaught `AttributeError`. Differing `format` merged unchecked until final `parse`. | `build_benchmark --input report.json` (array) → raw traceback instead of `CommandError`. | fixed (evaluation-tooling-integrity) |
 | R-14 | `apps/backend/recommendations/management/commands/build_benchmark.py:174` | Real developers keep the export description "Add judgments ... by hand before using this developer"; `import_sheet` does not update it. | Committed benchmark-v2 shows judged developers labeled as unjudged. | fixed (evaluation-tooling-integrity) |
 
+## Batch 5 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `github-error-resilience` diff (v0.12.5), plus the
+`/simplify` altitude pass (V-1 overlap). Verified against the code 2026-10-21 (V-5, V-6 partial: narrow windows; V-8 matches the metadata convention) and fixed in 0.12.5 before commit. Paths under
+`apps/backend/`. Ranked most severe first. Type: bug · gap · design · cleanup.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| V-1 | design | `services/repositories/analysis.py:69` | `ERROR_CODES` maps bare `KeyError`/`ValueError`/`TypeError`/`IndexError` → FAILED `invalid_response`. Also catches transient bad bodies (truncated/HTML 200 → `JSONDecodeError`), corrupt ETag cache entries and programming bugs → every analyzed repository FAILED and ineligible for `REPO_FAILED_RETRY_HOURS`, logged at INFO. Deeper fix: raise typed `GitHubInvalidResponse(GitHubClientError)` at the `.json()`/`from_api` boundary in `services/github`; sync's `SKIPPABLE` and `oauth.fetch_identity` then get it for free. Module docstring also outdated. | fixed (github-error-resilience) |
+| V-2 | bug | `services/github/client.py:545` | Redirect guard in `_send` compares host only, not scheme/port. `Location: http://api.github.com/...` passes → bearer token sent in cleartext. Compare origin (scheme, host, port) with `GITHUB_API_BASE_URL`. | fixed (github-error-resilience) |
+| V-3 | design | `core/throttling.py:55` | Fail-open applies to every throttle, incl. anon throttle on `/auth/github` and scoped `/profile/sync`. Redis down (or induced cache errors) → no rate limiting per process for `THROTTLE_CACHE_BACKOFF_SECONDS`, renewed each error → OAuth-state churn, sync flooding into GitHub. Sensitive scopes: fail closed or in-process fallback counter. Revisits design D9. | fixed (github-error-resilience) |
+| V-4 | gap | `repositories/tasks.py:98` | `_refresh`'s app-credentials `GitHubAuthError` branch stays log-only (task 5.3), so `refresh_failed_at` stays null → rejected/rotated `GITHUB_CLIENT_SECRET` requeues the same `REPO_REFRESH_BATCH` every beat, the loop C-9 fixed for other errors. | fixed (github-error-resilience) |
+| V-5 | bug | `services/repositories/lifecycle.py:116` | `record_refresh_failure` runs as a separate UPDATE after `release()`. Another analysis can claim + complete in between → stale `lifecycle_error` and `refresh_failed_at` land on fresh RECOMMENDABLE data, next refresh delayed up to 60 min. Record inside `release()` under the held claim token. | fixed (github-error-resilience) |
+| V-6 | bug | `repositories/tasks.py:81` | `.exclude(refresh_failed_at__gte=...)` applies to the whole backlog query → also hides abandoned claims (dead worker, stuck FETCHING/REFRESHING) and DISCOVERED rows for up to `REPO_REFRESH_RETRY_MINUTES`. Scope it to the STALE branch. | fixed (github-error-resilience) |
+| V-7 | bug | `services/github/oauth.py:113` | `str(data["login"])` turns JSON `null` into `"None"`, passing the non-empty check → account upserted with username `"None"`. Check `isinstance(login, str)` and non-empty before converting. | fixed (github-error-resilience) |
+| V-8 | cleanup | `services/github/sync.py:187` | `languages_skipped` written to job metadata, never read (no code, API or UI). Spec-required (task 2.1), so: surface it (step detail or warning) or drop it from the spec. | wontfix (internal diagnostics, like `repos_capped`; spec-required) |
+| V-9 | cleanup | `services/github/sync.py:190` | `/simplify` altitude: `_step_topics` re-checks existing pks to work around topics being written a step later from `job.metadata["repo_topics"]`. Writing topics in `_step_repositories`' `job_write` removes the race (and rename re-points) and the metadata copy; `_step_topics` stays as a no-op step. Design accepted A-11 as partial. | fixed (github-error-resilience) |
+
 ## Full-file reviews (2026-10-19)
 
 `code-review` at high effort over whole files, all findings reported. All rows verified against
@@ -56,19 +74,19 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
 | A-1 | bug | `services/data_deletion.py:54` | Deletion only flips job status; a sync mid-step keeps the decrypted token and writes GitHubProfile, repositories or DeveloperProfile after the deletion commits → deleted data returns, and GitHub calls run after disconnect. | fixed (privacy-deletion-finality) |
-| A-2 | bug | `services/github/client.py:584` | A secondary-rate-limit 403 without Retry-After and with remaining > 0 → `GitHubForbidden`, not `GitHubRateLimited`. `count_contributors` returns None, SKIPPABLE steps drop data, and other paths fail as `github_error`. Rate limit is treated as empty data. | confirmed |
-| A-3 | bug | `services/github/sync.py:165` | `_step_languages` catches only 404; one owned repository returning 403 or 451 (DMCA) fails every sync permanently → no analysis, discovery or recommendations. | confirmed |
-| A-4 | bug | `services/github/client.py:524` | Redirects not followed; the 301 for a renamed repository → `GitHubClientError`. Contribution evidence dropped; the languages step fails the whole sync; discovery fails too (see C-1). | partial |
-| A-5 | bug | `services/github/sync.py:117` | `_step_readme` treats only 404 as "no README"; a 403 or 451 on `{login}/{login}` fails the sync. Violates the rule that a README failure degrades gracefully. | confirmed |
-| A-6 | bug | `services/crypto.py:45` | `TokenDecryptionError` is not a `GitHubError`; after a key rotation drops an old key, syncs fail as `internal_error`, not `github_auth_invalid` → user is never prompted to sign in again. | confirmed |
+| A-2 | bug | `services/github/client.py:584` | A secondary-rate-limit 403 without Retry-After and with remaining > 0 → `GitHubForbidden`, not `GitHubRateLimited`. `count_contributors` returns None, SKIPPABLE steps drop data, and other paths fail as `github_error`. Rate limit is treated as empty data. | fixed (github-error-resilience) |
+| A-3 | bug | `services/github/sync.py:165` | `_step_languages` catches only 404; one owned repository returning 403 or 451 (DMCA) fails every sync permanently → no analysis, discovery or recommendations. | fixed (github-error-resilience) |
+| A-4 | bug | `services/github/client.py:524` | Redirects not followed; the 301 for a renamed repository → `GitHubClientError`. Contribution evidence dropped; the languages step fails the whole sync; discovery fails too (see C-1). | fixed (github-error-resilience) |
+| A-5 | bug | `services/github/sync.py:117` | `_step_readme` treats only 404 as "no README"; a 403 or 451 on `{login}/{login}` fails the sync. Violates the rule that a README failure degrades gracefully. | fixed (github-error-resilience) |
+| A-6 | bug | `services/crypto.py:45` | `TokenDecryptionError` is not a `GitHubError`; after a key rotation drops an old key, syncs fail as `internal_error`, not `github_auth_invalid` → user is never prompted to sign in again. | fixed (github-error-resilience) |
 | A-7 | gap | `accounts/views.py:130` | SIGN_IN audit metadata keeps `github_id` and `github_username`; account deletion only nulls the user FK → GitHub identity survives "delete account" (FR-DATA-003). | fixed (privacy-deletion-finality) |
 | A-8 | gap | `services/github/accounts.py:31` | `User.display_name` (real name from GitHub) is not cleared by disconnect or delete-data; still served by `/auth/me`. | fixed (privacy-deletion-finality) |
 | A-9 | gap | `services/github/accounts.py:35` | Re-sign-in stores the new token without revoking the old one → orphaned valid tokens until disconnect. | fixed (privacy-deletion-finality) |
 | A-10 | bug | `services/github/storage.py:26` | `upsert_repository` (`update_or_create` on github_id) races on concurrent create → IntegrityError → `internal_error`, not retried; the user's job fails. | false-positive |
-| A-11 | bug | `services/github/sync.py:178` | `_step_topics` inserts for repository pks saved earlier in metadata; if the row was deleted in between (full_name conflict, orphan cleanup) → FK IntegrityError → sync fails permanently. | partial |
+| A-11 | bug | `services/github/sync.py:178` | `_step_topics` inserts for repository pks saved earlier in metadata; if the row was deleted in between (full_name conflict, orphan cleanup) → FK IntegrityError → sync fails permanently. | fixed (github-error-resilience) |
 | A-12 | bug | `accounts/views.py:214` | Disconnect logs out only the current session; other sessions stay valid up to 14 days with no GitHub account. | fixed (privacy-deletion-finality) |
-| A-13 | bug | `services/github/sync.py:96` | Sync refreshes `GitHubProfile.login/avatar_url` but not `GitHubAccount.username/avatar_url` (what `/auth/me` serves) → stale login after a GitHub rename until the next sign-in. | confirmed |
-| A-14 | bug | `services/github/oauth.py:107` | `fetch_identity` does not guard `response.json()` or `data['id'/'login']` → malformed 200 gives a JSON 500 instead of an `auth_error=failed` redirect plus audit entry. | confirmed |
+| A-13 | bug | `services/github/sync.py:96` | Sync refreshes `GitHubProfile.login/avatar_url` but not `GitHubAccount.username/avatar_url` (what `/auth/me` serves) → stale login after a GitHub rename until the next sign-in. | fixed (github-error-resilience) |
+| A-14 | bug | `services/github/oauth.py:107` | `fetch_identity` does not guard `response.json()` or `data['id'/'login']` → malformed 200 gives a JSON 500 instead of an `auth_error=failed` redirect plus audit entry. | fixed (github-error-resilience) |
 | A-15 | bug | `accounts/views.py:75` | One OAuth state per session; signing in from a second tab overwrites it → first tab's callback fails `invalid_state`. | fixed (security-hardening) |
 | A-16 | perf | `services/github/client.py:530` | `github:ratelimit:{scope}` written on every response but never read; keyed per scope, not per credential (user `PUBLIC_SCOPE` overwrites the app's). | confirmed |
 | A-17 | perf | `services/github/client.py:511` | A 304 does not refresh the ETag cache TTL → valid entries expire at `GITHUB_ETAG_TTL`, forcing a counted 200 refetch. Use `cache.touch`. | confirmed |
@@ -92,7 +110,7 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | B-10 | bug | `services/jobs.py:50` | `claim_job` ignores `attempts` → broker redelivery can exceed `SYNC_MAX_ATTEMPTS` (crash loop continues). | fixed (job-claim-fencing) |
 | B-11 | bug | `services/jobs.py:183` | Recovery, expiry and cancel don't update `steps` → a FAILED or CANCELLED job still shows a step `running` (UI spinner on a dead job). | fixed (job-claim-fencing) |
 | B-12 | bug | `services/jobs.py:174` | `recover_stale_jobs` re-sends `.delay` every beat without changing status → duplicate messages in a busy queue, repeated misleading log. | fixed (job-claim-fencing) |
-| B-13 | bug | `services/profiling/manifests.py:161` | `parse_manifest` doesn't catch RecursionError or MemoryError → a deeply nested package.json fails the dependencies step. | confirmed |
+| B-13 | bug | `services/profiling/manifests.py:161` | `parse_manifest` doesn't catch RecursionError or MemoryError → a deeply nested package.json fails the dependencies step. | fixed (github-error-resilience) |
 | B-14 | bug | `services/profiling/readme.py:32` | `_URLS` keeps `&amp;` → `parse_qs` keys like `amp;logo`; second and later badge params lost (e.g. Go not detected). | confirmed |
 | B-15 | bug | `services/profiling/readme.py:93` | shields.io parser reads only the first dash segment; `/badge/-Python-...` or `/badge/language-Rust-...` without `logo=` → no evidence. | confirmed |
 | B-16 | bug | `services/profiling/interests.py:33` | Contribution interest evidence uses `repo.pushed_at`, not `last_contributed_at` → "last observed" overstates recency. | confirmed |
@@ -105,15 +123,15 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| C-1 | bug | `services/repositories/analysis.py:142` | A non-permanent, non-transient client error (301 rename) re-raises → the whole discovery job fails, no lifecycle error recorded; every user whose pool holds the repository fails; backlog requeues forever. The "follows renames" comment (l.161) is wrong. | confirmed |
+| C-1 | bug | `services/repositories/analysis.py:142` | A non-permanent, non-transient client error (301 rename) re-raises → the whole discovery job fails, no lifecycle error recorded; every user whose pool holds the repository fails; backlog requeues forever. The "follows renames" comment (l.161) is wrong. | fixed (github-error-resilience) |
 | C-2 | bug | `services/discovery/service.py:364` | `upsert_repository` deletes any other row with the same full_name → a live renamed repository is wiped, cascading to every user's candidates, recommendations, saves and dismissals. | confirmed |
 | C-3 | bug | `services/repositories/lifecycle.py:363` | `release/fail/complete` don't check claim ownership → a reclaimed-stale worker overwrites lifecycle while another analyzes; final state = last writer. | fixed (job-claim-fencing) |
 | C-4 | bug | `services/repositories/analysis.py:136` | Repository claim never renewed during `_fetch` → analyses longer than 10 min are reclaimed while running (duplicate work, plus C-3). | fixed (job-claim-fencing) |
 | C-5 | bug | `services/repositories/analysis.py:129` | Explicit `parts` skip the FAILED→recheck-all rule, and `complete()` sets INDEXED before `eligibility()` → a deleted (404) repository returns as RECOMMENDABLE, eligible. | partial |
-| C-6 | bug | `services/repositories/analysis.py:56` | `GitHubForbidden` treated as permanent; a secondary-limit 403 (see A-2) marks shared repositories FAILED and ineligible for all users for 24 h. | confirmed |
+| C-6 | bug | `services/repositories/analysis.py:56` | `GitHubForbidden` treated as permanent; a secondary-limit 403 (see A-2) marks shared repositories FAILED and ineligible for all users for 24 h. | fixed (github-error-resilience) |
 | C-7 | bug | `services/discovery/service.py:137` | Each query's results are upserted in one transaction; concurrent jobs lock the same rows in different orders → deadlock → `internal_error`, job fails. | confirmed |
 | C-8 | bug | `services/discovery/service.py:364` | Search upserts set `synced_at=now` → `metadata` never stale for frequently found repositories → languages never refreshed. | confirmed |
-| C-9 | bug | `repositories/tasks.py:384` | Non-retryable refresh failure only logged; repository restored with no `lifecycle_error` → breaks "failures are state"; backlog retries forever. | confirmed |
+| C-9 | bug | `repositories/tasks.py:384` | Non-retryable refresh failure only logged; repository restored with no `lifecycle_error` → breaks "failures are state"; backlog retries forever. | fixed (github-error-resilience) |
 | C-10 | bug | `services/repositories/lifecycle.py:371` | `release()` sets `lifecycle_changed_at=now` → a transient error restarts the FAILED 24 h clock and the DISCOVERED grace period. | fixed (job-claim-fencing) |
 | C-11 | bug | `services/discovery/service.py:61` | Analysis step runs before the pool step → budget spent on candidates the pool deletes; ordering also differs (pool adds `last_seen_at`). | confirmed |
 | C-12 | bug | `services/discovery/service.py:180` | On resume `pending` excludes already analyzed repositories, so `pending[:cap]` takes new ones → more than `DISCOVERY_MAX_ANALYSES_PER_RUN` per run; `analysis_total` overwritten. | confirmed |
@@ -210,7 +228,7 @@ H-2 and H-4 confirmed by the reviewer (DRF `get_ident` source; `redact()` probes
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| H-1 | bug | `config/settings/base.py:157` | DRF throttles count in the Redis cache → Redis down = every API request (health included) 500s after the 5 s socket timeout, twice per request. Breaks "reads come from PostgreSQL" and degrade-gracefully. Tests use LocMemCache, so it's never exercised. | confirmed |
+| H-1 | bug | `config/settings/base.py:157` | DRF throttles count in the Redis cache → Redis down = every API request (health included) 500s after the 5 s socket timeout, twice per request. Breaks "reads come from PostgreSQL" and degrade-gracefully. Tests use LocMemCache, so it's never exercised. | fixed (github-error-resilience) |
 | H-2 | bug | `config/settings/base.py:148` | `NUM_PROXIES` unset → DRF keys throttles on raw `X-Forwarded-For` → a random XFF per request bypasses anon (60/min) and auth (10/min) limits. | fixed (security-hardening) |
 | H-3 | bug | `core/logging.py:41` | `RedactSecretsFilter` calls `record.getMessage()` outside logging's error guard → a bad log call (missing arg) raises into the caller, crashing a task step or turning a handled error into a 500. | fixed (security-hardening) |
 | H-4 | gap | `core/logging.py:15` | Redaction misses `key='value'` reprs, `'state'` in dict/JSON, and `Authorization: token <non-gh>` → client secret or OAuth state can reach logs. Tests cover only unquoted and `gh*_` cases. | fixed (security-hardening) |
@@ -268,7 +286,8 @@ scenario or severity is narrower; `false-positive` = not a defect.
 | F frontend | 9 | 8 | 1 | 0 |
 | G scripts/infra | 10 | 6 | 4 | 0 |
 | H platform/settings/tests | 20 | 16 | 4 | 0 |
-| **Total** | **154** | **115** | **31** | **1** |
+| V batch 5 review | 9 | 6 | 2 | 1 |
+| **Total** | **163** | **121** | **33** | **2** |
 
 ## Verification notes
 
@@ -317,7 +336,7 @@ scenario or severity is narrower; `false-positive` = not a defect.
 
 **Found during verification, not yet rows**
 - G-6 extra: Postgres published on `5433` with password `contribfinder` in compose.
-- H-1 extra: `cached_db` sessions also hit Redis.
+- H-1 extra: `cached_db` sessions also hit Redis. Fixed with H-1 (sessions now use the database backend).
 - G-10 extra: `uv sync` in setup is not `--frozen` either.
 
 ## Fix batches
@@ -338,5 +357,6 @@ can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
 | 9 | **Frontend correctness** | F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18 | Query invalidation churn, no 4xx retry, pagination gaps, 401 handling; add Playwright for the main flows. |
 | 10 | **Dev scripts, checks and migrations** | G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20 | `npm run stop` kills only this repo; config checks for unchecked settings; safe seed migrations; tests for those paths. |
 | 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2 | No behavior change; do alongside nearby batches or as one sweep. |
+| 12 | **Batch 5 follow-ups** | V-1, V-2, V-3, V-4, V-5, V-6, V-7, V-8, V-9 | Review of `github-error-resilience`. Fixed in the same release (0.12.5); V-1 and V-3 replace design decisions D7 (client raises `GitHubInvalidResponse`) and D9 (in-memory throttle fallback instead of fail-open). |
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.

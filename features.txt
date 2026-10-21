@@ -1,8 +1,8 @@
 ContribFinder - Feature list
-Version: 0.6.0 (2026-10-01)
+Version: 0.12.5 (2026-10-21)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
-Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md.
+Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
 
 ============================================================================
 SHIPPED - v0.1.0 - Phase 1: Foundation
@@ -346,6 +346,31 @@ Repositories
   [x] Claim and release keep the FAILED retry clock and DISCOVERED grace period
 
 ============================================================================
+SHIPPED - v0.12.5 - GitHub error resilience (backlog batch 5)
+============================================================================
+
+GitHub client
+  [x] Secondary rate limits without Retry-After are rate limits (60 s wait), not forbidden
+  [x] Redirects (renamed repositories) followed to the API origin only (no http), up to 3 hops
+  [x] Unreadable GitHub bodies are GitHubInvalidResponse, never bare KeyError/ValueError
+  [x] An undecryptable stored token fails as github_auth_invalid
+
+Sync and sign-in
+  [x] Languages and profile README degrade per repository (languages_skipped, step skipped)
+  [x] Topics skip repositories deleted mid-sync
+  [x] Sync refreshes the account's username and avatar
+  [x] Malformed GitHub identity at sign-in redirects with auth_error=failed
+
+Repositories
+  [x] Deeply nested manifests yield no dependencies
+  [x] Repository-specific 4xx and unreadable responses are FAILED, discovery continues
+  [x] Refresh failures (incl. rejected app credentials) recorded and retried after
+      REPO_REFRESH_RETRY_MINUTES; FAILED retries and dead-worker recovery not delayed
+
+Redis outage
+  [x] Throttles count in process memory during an outage; sessions use the database engine
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
@@ -357,3 +382,6 @@ PLANNED - MVP+ / FUTURE
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation
   [ ]          Personalized ranking, notifications, contribution tracking
+  [ ] ideas.md  Unplanned gap analysis (2026-10-20): IDF weighting, time decay, diversity,
+                preferences, contribution-success signals, evaluation rigor, online report,
+                dismiss reasons, CSP, dependency scanning

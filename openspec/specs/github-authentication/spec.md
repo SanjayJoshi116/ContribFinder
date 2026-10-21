@@ -30,7 +30,7 @@ The system SHALL let an unauthenticated user start GitHub authorization. It SHAL
 - **THEN** only the most recent states up to the limit remain valid
 
 ### Requirement: Handle the authorization callback
-The system SHALL complete sign-in only when the callback's `state` matches the one issued to the same browser session and GitHub successfully exchanges the authorization code. On success it SHALL create the local user and linked GitHub account, or update them if they already exist, keyed by the GitHub user ID. It SHALL then establish an authenticated session and redirect to the frontend. When a returning sign-in replaces a stored token with a different one, the system SHALL ask GitHub to revoke the replaced token; a failed revocation SHALL NOT block the sign-in and SHALL be recorded without the token.
+The system SHALL complete sign-in only when the callback's `state` matches the one issued to the same browser session and GitHub successfully exchanges the authorization code. On success it SHALL create the local user and linked GitHub account, or update them if they already exist, keyed by the GitHub user ID. It SHALL then establish an authenticated session and redirect to the frontend. If GitHub's identity response cannot be read (not JSON, missing the user ID, or a login that is missing, empty or not a string), sign-in SHALL fail like any other GitHub error during the callback. When a returning sign-in replaces a stored token with a different one, the system SHALL ask GitHub to revoke the replaced token; a failed revocation SHALL NOT block the sign-in and SHALL be recorded without the token.
 
 #### Scenario: First-time sign-in
 - **WHEN** GitHub redirects to `GET /api/v1/auth/github/callback` with a valid code and matching state for a GitHub user ID not seen before
@@ -59,6 +59,10 @@ The system SHALL complete sign-in only when the callback's `state` matches the o
 #### Scenario: GitHub token exchange fails
 - **WHEN** the code exchange with GitHub fails or times out
 - **THEN** the system does not create a session, records the failure without logging the code or any token, and redirects to the frontend with a retryable error code
+
+#### Scenario: Malformed identity response
+- **WHEN** the code exchange succeeds but GitHub's `GET /user` answers 200 with a body that is not JSON, or JSON without the user ID or login
+- **THEN** the system does not create a session or store the token, records the failure in the audit trail without any token, and redirects to the frontend with the `failed` authentication error code instead of answering with a server error
 
 ### Requirement: GitHub credential protection
 The system SHALL store the GitHub access token encrypted at rest. It SHALL NOT include the token, the authorization code or the client secret in any API response, URL, log entry or error report. As a backstop, log output SHALL mask credential values (access and refresh tokens, client secret, authorization code, OAuth `state`, and any `Authorization` header value) whether they appear as query parameters, quoted or unquoted `key=value` pairs, JSON or dictionary entries, or GitHub token strings. Masking SHALL never cause the logging call itself to fail.

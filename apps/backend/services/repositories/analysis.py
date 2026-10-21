@@ -4,10 +4,12 @@ Fetches the requested data types of one repository, then writes them in one tran
 walks the lifecycle. Repository data is shared: callers pick only the stale parts, so a fresh
 repository is never fetched again for another developer.
 
-Errors: a permanent GitHub error for the repository itself (404, 403, 451) marks it FAILED
-and is not raised, so a discovery run continues with the next repository. Anything else (rate
-limit, transient failure, revoked credentials, cancellation) restores the previous state and
-is re-raised for the caller's retry policy. A missing README, community file or label is data.
+Errors: an error that belongs to the repository itself marks it FAILED and is not raised, so
+a discovery run continues with the next repository: a permanent GitHub error (404, 403, 451),
+any other non-retryable 4xx (``client_error``) or a response the client cannot interpret
+(``invalid_response``). Anything else (rate limit, transient failure, revoked credentials,
+cancellation, a lost claim, a database or programming error) restores the previous state
+and is re-raised for the caller's retry policy. A missing README, community file or label is data.
 """
 
 from __future__ import annotations
@@ -34,7 +36,9 @@ from services.github.client import (
     PullSample,
 )
 from services.github.errors import (
+    GitHubClientError,
     GitHubForbidden,
+    GitHubInvalidResponse,
     GitHubNotFound,
     GitHubUnavailableForLegalReasons,
 )
@@ -53,12 +57,17 @@ from .staleness import PARTS, stale_parts
 
 logger = logging.getLogger(__name__)
 
-PERMANENT_ERRORS = (GitHubNotFound, GitHubUnavailableForLegalReasons, GitHubForbidden)
-ERROR_CODES: dict[type[Exception], str] = {
-    GitHubNotFound: "not_found",
-    GitHubUnavailableForLegalReasons: "unavailable",
-    GitHubForbidden: "forbidden",
-}
+# Errors that belong to the repository, most specific first: the first match gives the code.
+# GitHubClientError comes after its subclasses (451 keeps ``unavailable``). Rate limits,
+# transient and auth errors are not here: they are about the job, not the repository.
+ERROR_CODES: tuple[tuple[type[Exception], str], ...] = (
+    (GitHubNotFound, "not_found"),
+    (GitHubUnavailableForLegalReasons, "unavailable"),
+    (GitHubForbidden, "forbidden"),
+    (GitHubInvalidResponse, "invalid_response"),  # a GitHub answer the client can't read
+    (GitHubClientError, "client_error"),
+)
+REPOSITORY_ERRORS = tuple(cls for cls, _ in ERROR_CODES)
 # Issue columns written by each fetch (everything but the identity).
 ISSUE_FIELDS = (
     "repository",
@@ -135,9 +144,11 @@ class RepositoryAnalysisService:
         try:
             try:
                 fetched = self._fetch(repo, wanted, now)
-            except PERMANENT_ERRORS as exc:
-                code = ERROR_CODES[type(exc)]
-                logger.info("Repository %s unavailable: %s", repo.full_name, code)
+            except REPOSITORY_ERRORS as exc:
+                code = next(code for cls, code in ERROR_CODES if isinstance(exc, cls))
+                logger.info(
+                    "Repository %s failed: %s (%s)", repo.full_name, code, type(exc).__name__
+                )
                 lifecycle.fail(repo, code)
                 return Outcome.FAILED
             with transaction.atomic():
@@ -162,7 +173,7 @@ class RepositoryAnalysisService:
         if "metadata" in parts:
             self._between_parts(repo)
             out.metadata = c.get_repository(name)
-            name = out.metadata.full_name  # follows renames
+            name = out.metadata.full_name  # the current name after a rename (redirect followed)
             out.languages = c.get_languages(name)
         if "readme" in parts:
             self._between_parts(repo)

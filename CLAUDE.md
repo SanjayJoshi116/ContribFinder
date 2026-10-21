@@ -88,7 +88,7 @@ ContribFinder/
 │  │  ├─ config/            settings/{base,development,test,production}.py, urls.py, celery.py,
 │  │  │                     exceptions.py (error envelope)
 │  │  ├─ core/              health, auth class, CSRF/400/403/404 JSON views, log redaction, checks,
-│  │  │                     startup (production check gate)
+│  │  │                     startup (production check gate), throttling (cache-outage fallback)
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
 │  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API, recover_stale_jobs task
@@ -139,7 +139,8 @@ ContribFinder/
 │                           manage, check-version
 ├─ package.json             root runner: npm run setup / npm start / stop / manage / check:version
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
-├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches)
+├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
+│  ideas.md (unplanned gap analysis; each idea needs an OpenSpec change first)
 └─ .github/workflows/ci.yml
 ```
 
@@ -708,10 +709,47 @@ Archived: `openspec/changes/archive/2026-10-19-job-claim-fencing/`. Specs: delta
 - `ProfileAnalysisService(user, job=...)` drops a result older than the stored `analyzed_at`.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**GitHub error resilience** (MVP+, fix release)  ✅ shipped in v0.12.5 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-21-github-error-resilience/`. Specs: deltas to
+`github-data-sync`, `repository-analysis`, `github-authentication`, `api-platform`. Batch 5 of
+`Bug_Backlog.md`.
+- `GitHubClient`: a 403/429 whose message says secondary rate limit (or abuse detection), with no
+  `Retry-After`, is `GitHubRateLimited(SECONDARY_LIMIT_DEFAULT_WAIT = 60)`. Redirects are followed
+  up to `MAX_REDIRECTS = 3`, API origin only (scheme, host, port; else `GitHubClientError`); the
+  ETag key stays the original URL. `for_user` turns `TokenDecryptionError` into `GitHubAuthError`.
+  Public client methods (`@_parses_response`) raise `GitHubInvalidResponse` (a
+  `GitHubClientError`) for a body that is not the expected JSON; callers never catch bare
+  `KeyError`/`ValueError` for GitHub data.
+- Sync: languages skip a repository on `SKIPPABLE` errors (metadata `languages_skipped`), the
+  profile README step returns `skipped`, topics are stored by the repositories step (the topics
+  step only marks progress), and the profile step also updates
+  `GitHubAccount.username`/`avatar_url`. `fetch_identity` validates the payload
+  (`identity_failed`, login must be a non-empty string). `parse_manifest` catches
+  `RecursionError`.
+- Repository analysis: ordered `ERROR_CODES` (`GitHubInvalidResponse` → `invalid_response`,
+  `GitHubClientError` → `client_error` after its subclasses). Everything else still releases
+  and re-raises.
+- Refresh failures (also rejected app credentials): `lifecycle.record_refresh_failure(repo_id,
+  code, since=started)` sets `lifecycle_error` and `Repository.refresh_failed_at` without
+  changing state, skipping rows whose `lifecycle_changed_at >= since`; the backlog delays only
+  STALE/DISCOVERED rows for `REPO_REFRESH_RETRY_MINUTES` (60); `complete`/`fail` clear it.
+- Redis off the request path: `core/throttling.py` throttles count in a per-process
+  `LocMemCache` after a cache error (`THROTTLE_CACHE_BACKOFF_SECONDS`, 30) and `SESSION_ENGINE`
+  `db`. Worker-side ETag cache behavior without Redis is batch 11 (A-16).
+- Review follow-ups V-1…V-7 and V-9 of `Bug_Backlog.md` are fixed in the same release (V-8 wontfix).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).
+
+**Ideas** (`ideas.md`, gap analysis 2026-10-20, unplanned): IDF weighting, time decay on skill
+evidence, top-k diversity, stated preferences, contribution-success signals (maintainer
+responsiveness, linked PRs), evaluation rigor (bootstrap CIs, inter-rater agreement, discovery
+recall), online report per config from feedback, dismiss reasons, CSP, dependency scanning.
+Ranking-visible ideas wait for K-1; bootstrap CIs should land before or with it.
 
 ## 8. Release housekeeping
 

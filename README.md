@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.4** (job lifecycle and claim fencing: a reclaimed worker can no longer write, lost or crashed jobs recover once and stop at the attempt limit, finished jobs show no running step; MVP+). After signing in with
+**Version 0.12.5** (GitHub error resilience: one bad repository, manifest or GitHub response no longer fails a whole sync or discovery run, renamed repositories are followed, and the API keeps working while Redis is down; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -17,6 +17,7 @@ are measured offline on a hand-judged benchmark before they count as improvement
 
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
+  Unplanned ideas (gap analysis): [`ideas.md`](ideas.md).
 - Requirements: `Software Requirements Specification - 2.txt` (authoritative) and `- 1.txt`.
 - Engineering guide and roadmap: [`CLAUDE.md`](CLAUDE.md). Specs: `openspec/specs/`; archived
   changes: `openspec/changes/archive/`.
@@ -78,7 +79,13 @@ token). Beat also recovers jobs: a job whose worker died (no heartbeat for
 `SYNC_STALE_AFTER_SECONDS`) or whose queued task was lost is requeued once, and a job that used
 every `SYNC_MAX_ATTEMPTS` ends as `worker_lost`. Without `REDIS_URL` there is no worker or
 beat, so those jobs do not run; syncs then run inline in the request and a GitHub error that
-would be retried (rate limit, 5xx) fails the job instead.
+would be retried (rate limit, 5xx) fails the job instead. A background refresh that fails
+without a retry records the error on the repository and waits `REPO_REFRESH_RETRY_MINUTES`
+(60) before the next attempt.
+
+If Redis goes down while the app runs, API reads keep working: sessions live in PostgreSQL, and
+request throttling counts in each process's memory for `THROTTLE_CACHE_BACKOFF_SECONDS` (30)
+after a Redis error, then tries Redis again.
 
 Open http://localhost:5173. API health: http://localhost:5173/api/v1/health/.
 
@@ -232,10 +239,11 @@ All commands are in `CLAUDE.md` §6.
 ## Known issues
 
 `Bug_Backlog.md` lists the findings of a full codebase review (2026-10-19), each verified against
-the code (confirmed, partial or false positive), grouped into 11 fix batches in priority order.
+the code (confirmed, partial or false positive), grouped into fix batches in priority order.
 Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion finality) in
 0.12.2, batch 3 (evaluation tooling integrity) in 0.12.3, batch 4 (job lifecycle and claim
-fencing) in 0.12.4.
+fencing) in 0.12.4, batch 5 (GitHub error resilience) in 0.12.5, together with the follow-ups
+from its own review (rows V-1…V-9, batch 12).
 
 ## Versioning
 

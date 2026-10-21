@@ -121,7 +121,8 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # --- Sessions / CSRF / CORS ------------------------------------------------
-SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+# Database sessions: a signed-in request never depends on the cache (Redis) being up.
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
@@ -153,6 +154,10 @@ NUM_PROXIES = env.int("NUM_PROXIES", default=0)
 # Production sets this: the web server and workers run system checks and refuse to start on errors.
 RUN_STARTUP_CHECKS = False
 
+# Seconds a process stops using the cache for throttling after a cache error (it lets
+# requests through meanwhile instead of waiting for the Redis timeout on each one).
+THROTTLE_CACHE_BACKOFF_SECONDS = env.int("THROTTLE_CACHE_BACKOFF_SECONDS", default=30)
+
 # --- DRF / OpenAPI ---------------------------------------------------------
 REST_FRAMEWORK = {
     "NUM_PROXIES": NUM_PROXIES,
@@ -165,9 +170,10 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
-        "rest_framework.throttling.ScopedRateThrottle",
+        # Fail open when the cache is down (core/throttling.py).
+        "core.throttling.AnonRateThrottle",
+        "core.throttling.UserRateThrottle",
+        "core.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": env("THROTTLE_ANON", default="60/min"),
@@ -333,6 +339,9 @@ REPO_STALE_AFTER: dict[str, int] = {
 REPO_REFRESH_BATCH = env.int("REPO_REFRESH_BATCH", default=50)
 REPO_DISCOVERED_GRACE_MINUTES = env.int("REPO_DISCOVERED_GRACE_MINUTES", default=10)
 REPO_FAILED_RETRY_HOURS = env.int("REPO_FAILED_RETRY_HOURS", default=24)
+# Wait after a background refresh failed without a retry (rate-limit wait too long, GitHub
+# down for every attempt) before the backlog queues that repository again.
+REPO_REFRESH_RETRY_MINUTES = env.int("REPO_REFRESH_RETRY_MINUTES", default=60)
 
 # Activity label thresholds (FR-REPO-004). Observable signals, never a health verdict.
 ACTIVITY_THRESHOLDS: dict[str, int] = {

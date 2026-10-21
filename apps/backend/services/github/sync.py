@@ -19,7 +19,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from accounts.models import User
-from github.models import GitHubProfile
+from github.models import GitHubAccount, GitHubProfile
 from jobs.models import SyncJob
 from repositories.models import (
     Repository,
@@ -111,10 +111,18 @@ class GitHubSyncService:
                 "synced_at": timezone.now(),
             },
         )
+        # /auth/me serves the account's login and avatar: keep them in step with GitHub. A
+        # filter-update, so an account deleted meanwhile (disconnect) is not recreated.
+        GitHubAccount.objects.filter(user=self.user).update(
+            username=gh.login, avatar_url=gh.avatar_url
+        )
 
     def _step_readme(self, client: GitHubClient) -> str:
         profile = self._profile()
-        content = client.get_profile_readme(profile.login)
+        try:
+            content = client.get_profile_readme(profile.login)
+        except SKIPPABLE:
+            return Step.SKIPPED  # blocked or unreadable now: keep the README we stored before
         profile.has_profile_readme = content is not None
         profile.profile_readme = content or ""
         with job_write(self.job):
@@ -132,6 +140,10 @@ class GitHubSyncService:
         now = timezone.now()
         with job_write(self.job):
             stored = [upsert_repository(r, now) for r in selected]
+            # Topics come with the listing: stored with their rows, so no later step can find
+            # a row deleted or re-pointed meanwhile.
+            for repo, r in zip(stored, selected, strict=True):
+                replace_topics(repo.pk, list(r.topics))
             keep = {repo.pk for repo in stored}
             links = UserRepository.objects.filter(
                 user=self.user, relation=UserRepository.Relation.OWNER
@@ -147,36 +159,37 @@ class GitHubSyncService:
             repos_capped=len(owned) > cap,
             repos_truncated=truncated,
             repo_ids=[repo.pk for repo in stored],
-            repo_topics={
-                str(repo.pk): list(r.topics) for repo, r in zip(stored, selected, strict=True)
-            },
             languages_done=[],
+            languages_skipped=[],
         )
         return Step.DONE
 
     def _step_languages(self, client: GitHubClient) -> str:
         done: list[int] = list(self.job.metadata.get("languages_done", []))
+        skipped: list[int] = list(self.job.metadata.get("languages_skipped", []))
         repos = Repository.objects.filter(pk__in=self.job.metadata.get("repo_ids", []))
         for repo in repos.order_by("-pushed_at"):
             if repo.pk in done:
                 continue
             self._check_cancelled()
+            languages: dict[str, int] | None
             try:
                 languages = client.get_languages(repo.full_name)
             except GitHubNotFound:
                 languages = {}  # deleted between listing and now: nothing to record
+            except SKIPPABLE:
+                languages = None  # blocked (403, 451) or unreadable: keep what we knew
             with job_write(self.job):
-                replace_languages(repo, languages)
+                if languages is None:
+                    skipped.append(repo.pk)
+                else:
+                    replace_languages(repo, languages)
                 done.append(repo.pk)
-                self._update_metadata(languages_done=done)
+                self._update_metadata(languages_done=done, languages_skipped=skipped)
         return Step.DONE
 
     def _step_topics(self, client: GitHubClient) -> str:
-        topics_by_repo: dict[str, list[str]] = self.job.metadata.get("repo_topics", {})
-        with job_write(self.job):
-            for repo_pk, topics in topics_by_repo.items():
-                replace_topics(int(repo_pk), topics)
-        return Step.DONE
+        return Step.DONE  # stored by the repositories step; kept as a step for the progress UI
 
     def _step_dependencies(self, client: GitHubClient) -> str:
         done: list[int] = list(self.job.metadata.get("dependencies_done", []))

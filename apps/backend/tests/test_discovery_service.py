@@ -508,3 +508,16 @@ def test_pool_step_removes_lists_found_before_the_rule(user, developer, respx_mo
         "indexed",
     )
     assert job.metadata["pool_not_code"] == 1 and job.metadata["pool_size"] == 1
+
+
+def test_client_error_on_one_repository_does_not_fail_discovery(
+    user, developer, respx_mock, apis
+) -> None:
+    mock_search(respx_mock, {"language:Python": [HTTPX, RICH, TOOL]})
+    apis["Textualize/rich"]["metadata"].mock(return_value=httpx.Response(400))
+    job = run(user)
+
+    assert job.steps["analysis"] == "done"
+    assert job.metadata["analysis_outcomes"] == {"analyzed": 2, "failed": 1}
+    rich = Repository.objects.get(full_name="Textualize/rich")
+    assert (rich.lifecycle, rich.lifecycle_error) == ("failed", "client_error")

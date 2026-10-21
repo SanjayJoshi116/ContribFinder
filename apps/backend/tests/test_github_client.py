@@ -11,6 +11,7 @@ from services.github.errors import (
     GitHubAuthError,
     GitHubClientError,
     GitHubForbidden,
+    GitHubInvalidResponse,
     GitHubNotFound,
     GitHubRateLimited,
     GitHubTransientError,
@@ -250,4 +251,123 @@ def test_for_user_requires_connected_account(user) -> None:
 
     GitHubAccount.objects.filter(user=user).delete()
     with pytest.raises(GitHubAuthError):
+        GitHubClient.for_user(user)
+
+
+# --- github-error-resilience: secondary limits, redirects, undecryptable tokens --------------
+
+SECONDARY_MESSAGES = [
+    "You have exceeded a secondary rate limit. Please wait a few minutes before you try again.",
+    "You have triggered an abuse detection mechanism. Please wait a few minutes.",
+]
+
+
+@respx.mock
+@pytest.mark.parametrize("message", SECONDARY_MESSAGES)
+def test_secondary_limit_403_with_requests_remaining(client, message: str) -> None:
+    respx.get(f"{API}/user").respond(
+        403, json={"message": message}, headers={"X-RateLimit-Remaining": "4000"}
+    )
+    with pytest.raises(GitHubRateLimited) as exc:
+        client.get_authenticated_user()
+    assert exc.value.retry_after >= 60
+    assert "secondary" not in str(exc.value) and "abuse" not in str(exc.value)
+
+
+@respx.mock
+def test_blocked_403_stays_forbidden(client) -> None:
+    respx.get(f"{API}/repos/o/r").respond(
+        403, json={"message": "Repository access blocked"}, headers={"X-RateLimit-Remaining": "9"}
+    )
+    with pytest.raises(GitHubForbidden):
+        client.get_repository("o/r")
+
+
+@respx.mock
+def test_count_contributors_raises_on_secondary_limit(client) -> None:
+    respx.get(f"{API}/repos/o/r/contributors").respond(
+        403, json={"message": SECONDARY_MESSAGES[0]}, headers={"X-RateLimit-Remaining": "10"}
+    )
+    with pytest.raises(GitHubRateLimited):
+        client.count_contributors("o/r")
+
+
+@respx.mock
+def test_rename_redirect_is_followed_with_token(client) -> None:
+    respx.get(f"{API}/repos/old-org/tool").respond(
+        301, headers={"Location": f"{API}/repositories/42"}
+    )
+    respx.get(f"{API}/repositories/42").respond(
+        200, json={**repo_json(42), "full_name": "new-org/tool", "owner": {"login": "new-org"}}
+    )
+    repo = client.get_repository("old-org/tool")
+    assert (repo.github_id, repo.full_name) == (42, "new-org/tool")
+    assert respx.calls.last.request.headers["Authorization"] == f"Bearer {TOKEN}"
+
+
+@respx.mock
+def test_redirect_to_other_host_is_not_followed(client) -> None:
+    respx.get(f"{API}/repos/o/r").respond(307, headers={"Location": "https://evil.test/steal"})
+    foreign = respx.get("https://evil.test/steal").respond(200, json={})
+    with pytest.raises(GitHubClientError):
+        client.get_repository("o/r")
+    assert not foreign.called
+
+
+@respx.mock
+def test_redirect_to_plain_http_is_not_followed(client) -> None:
+    insecure = API.replace("https://", "http://")
+    respx.get(f"{API}/repos/o/r").respond(301, headers={"Location": f"{insecure}/repositories/1"})
+    downgraded = respx.get(f"{insecure}/repositories/1").respond(200, json={})
+    with pytest.raises(GitHubClientError):
+        client.get_repository("o/r")
+    assert not downgraded.called
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx.Response(200, text="<html>truncated"),
+        httpx.Response(200, json=["not", "an", "object"]),
+        httpx.Response(200, json={"Go": "many"}),
+    ],
+)
+@respx.mock
+def test_unreadable_body_is_invalid_response(client, answer: httpx.Response) -> None:
+    respx.get(f"{API}/repos/o/r/languages").mock(return_value=answer)
+    with pytest.raises(GitHubInvalidResponse):
+        client.get_languages("o/r")
+
+
+@respx.mock
+def test_redirect_loop_is_bounded(client) -> None:
+    respx.get(f"{API}/repos/o/r").respond(301, headers={"Location": f"{API}/repos/o/r"})
+    with pytest.raises(GitHubClientError):
+        client.get_repository("o/r")
+    assert len(respx.calls) == 4  # the request plus MAX_REDIRECTS hops
+
+
+@respx.mock
+def test_not_modified_after_redirect_serves_cached_body(client) -> None:
+    respx.get(f"{API}/repos/old/r/languages").respond(
+        301, headers={"Location": f"{API}/repositories/9/languages"}
+    )
+    target = respx.get(f"{API}/repositories/9/languages")
+    target.side_effect = [
+        httpx.Response(200, json={"Go": 5}, headers={"ETag": '"e"'}),
+        httpx.Response(304),
+    ]
+    assert client.get_languages("old/r") == {"Go": 5}
+    assert client.get_languages("old/r") == {"Go": 5}
+    assert target.calls[1].request.headers["If-None-Match"] == '"e"'
+
+
+@pytest.mark.django_db
+def test_for_user_with_undecryptable_token_is_auth_error(user) -> None:
+    from cryptography.fernet import Fernet
+
+    with (
+        override_settings(TOKEN_ENCRYPTION_KEYS=[Fernet.generate_key().decode()]),
+        pytest.raises(GitHubAuthError),
+    ):
         GitHubClient.for_user(user)

@@ -7,7 +7,7 @@ Fetches a signed-in user's public GitHub data (profile, profile README, owned re
 ## Requirements
 
 ### Requirement: GitHub profile ingestion
-A sync SHALL fetch the authenticated user's GitHub profile and store it: GitHub ID, username, display name, bio, company, location, blog/website, follower count, following count, public repository count and account creation date. Each sync SHALL overwrite values that changed on GitHub.
+A sync SHALL fetch the authenticated user's GitHub profile and store it: GitHub ID, username, display name, bio, company, location, blog/website, follower count, following count, public repository count and account creation date. Each sync SHALL overwrite values that changed on GitHub. The username and avatar URL shown for the signed-in user SHALL be updated from the same response, so a rename on GitHub is visible after the next sync without signing in again.
 
 #### Scenario: Profile stored after sync
 - **WHEN** a sync completes for a user whose GitHub profile has name "The Octocat", bio "Builds tools" and 12 public repositories
@@ -16,6 +16,10 @@ A sync SHALL fetch the authenticated user's GitHub profile and store it: GitHub 
 #### Scenario: Profile values change on GitHub
 - **WHEN** the user's bio changed on GitHub since the previous sync and a new sync completes
 - **THEN** the stored bio equals the new value and no duplicate profile record exists
+
+#### Scenario: Username renamed on GitHub
+- **WHEN** the user renamed their GitHub account from `octocat` to `octo-cat` and changed their avatar, and a new sync completes
+- **THEN** `GET /api/v1/auth/me` returns the username `octo-cat` and the new avatar URL
 
 ### Requirement: Public repository ingestion
 A sync SHALL fetch the user's public repositories that they own. For each it SHALL store: GitHub ID, owner, name, full name, description, URL, default branch, stars, forks, open issue count, primary language, license, fork flag, archived flag, creation date, last update date and last push date. Each repository SHALL be stored once and linked to the user as owner. Repositories that GitHub no longer returns for the user SHALL be unlinked from the user on the next successful sync.
@@ -33,7 +37,7 @@ A sync SHALL fetch the user's public repositories that they own. For each it SHA
 - **THEN** only the most recently pushed repositories up to the cap are synced, and the job metadata records that the cap was applied
 
 ### Requirement: Repository languages
-For each synced repository the system SHALL store its language breakdown (language name and byte count), replacing the previous breakdown on each sync.
+For each synced repository the system SHALL store its language breakdown (language name and byte count), replacing the previous breakdown on each sync. A repository that no longer exists (404) SHALL get an empty breakdown. A repository whose languages GitHub refuses to return for reasons other than a rate limit (a 403 that is not a rate limit, 451 unavailable for legal reasons, or another non-retryable client error) SHALL keep its previous breakdown, SHALL be recorded in the job metadata as skipped, and SHALL NOT fail the sync. Rate limits and transient failures SHALL be handled as for other sync requests.
 
 #### Scenario: Languages stored
 - **WHEN** GitHub reports a repository's languages as Python 7000 bytes and TypeScript 3000 bytes
@@ -43,15 +47,27 @@ For each synced repository the system SHALL store its language breakdown (langua
 - **WHEN** GitHub reports no languages for a repository
 - **THEN** the repository has no language entries and the sync still completes
 
+#### Scenario: One repository blocked
+- **WHEN** one of the user's owned repositories answers its languages request with 451, and its stored languages were Go 5000 bytes
+- **THEN** that repository keeps Go 5000 bytes, the job metadata lists it as skipped, the other repositories' languages are stored, and the sync completes
+
+#### Scenario: Rate limit while reading languages
+- **WHEN** a languages request is answered with a rate limit
+- **THEN** the job is retried as for other rate limits, and the repository is not recorded as skipped
+
 ### Requirement: Repository topics
-For each synced repository the system SHALL store the topics GitHub reports, replacing the previous topics on each sync.
+For each synced repository the system SHALL store the topics GitHub reports, replacing the previous topics on each sync. A repository that was removed from storage after the repositories step SHALL be skipped without failing the sync.
 
 #### Scenario: Topics stored
 - **WHEN** GitHub reports topics `django` and `rest-api` for a repository
 - **THEN** the repository has exactly those two topics
 
+#### Scenario: Repository removed during the sync
+- **WHEN** a repository stored by the repositories step is deleted from storage before the topics step runs
+- **THEN** the topics of the remaining repositories are stored and the sync completes
+
 ### Requirement: Profile README ingestion
-A sync SHALL look for the profile README in the repository named after the user's username, owned by the user. If it exists, the system SHALL store its raw content unchanged and separately from any derived data. A missing profile README SHALL be recorded as absent and SHALL NOT fail the sync.
+A sync SHALL look for the profile README in the repository named after the user's username, owned by the user. If it exists, the system SHALL store its raw content unchanged and separately from any derived data. A missing profile README SHALL be recorded as absent and SHALL NOT fail the sync. A profile README that GitHub refuses to return for reasons other than a rate limit (a 403 that is not a rate limit, 451, or another non-retryable client error) SHALL record the README step as skipped, SHALL keep the previously stored README and its presence flag, and SHALL NOT fail the sync.
 
 #### Scenario: Profile README present
 - **WHEN** the repository `octocat/octocat` has a README containing "## Skills\nPython"
@@ -60,6 +76,10 @@ A sync SHALL look for the profile README in the repository named after the user'
 #### Scenario: No profile README
 - **WHEN** the user has no `{username}/{username}` repository, or it has no README
 - **THEN** the profile is marked as having no README, the sync completes successfully, and the README step reports "not found" rather than an error
+
+#### Scenario: Profile README blocked
+- **WHEN** the README request for `octocat/octocat` is answered with 451, and a README was stored by an earlier sync
+- **THEN** the README step reports "skipped", the earlier README and its presence flag are kept, and the sync completes
 
 ### Requirement: Complete paginated results
 The system SHALL retrieve every page of paginated GitHub list responses, up to a configured page limit per request sequence. It SHALL NOT silently truncate results below that limit.
@@ -73,11 +93,15 @@ The system SHALL retrieve every page of paginated GitHub list responses, up to a
 - **THEN** the system stops at the limit and records in the job metadata that results were truncated
 
 ### Requirement: Rate-limit handling
-The system SHALL respect GitHub's primary and secondary rate limits. When GitHub signals that a limit was hit, the system SHALL stop requesting, wait until the time GitHub gives (`Retry-After`, or the rate-limit reset time), capped at a configured maximum, and then resume the sync without repeating completed steps. It SHALL NOT retry immediately in a loop.
+The system SHALL respect GitHub's primary and secondary rate limits. A 403 or 429 SHALL count as a rate limit when it has a `Retry-After` header, when `X-RateLimit-Remaining` is 0, when it is a 429, or when GitHub's error message says that a secondary rate limit (or abuse detection) was triggered. Only a 403 that matches none of these SHALL count as forbidden. When GitHub signals that a limit was hit, the system SHALL stop requesting, wait until the time GitHub gives (`Retry-After`, or the rate-limit reset time, or GitHub's documented minimum wait of one minute when neither is given), capped at a configured maximum, and then resume the sync without repeating completed steps. It SHALL NOT retry immediately in a loop, and it SHALL NOT treat a rate-limited request as missing or forbidden data.
 
 #### Scenario: Secondary rate limit with Retry-After
 - **WHEN** GitHub answers a sync request with 403 or 429 and `Retry-After: 60`
 - **THEN** the job moves to RETRYING, makes no further GitHub requests for at least 60 seconds, then resumes and completes the remaining steps
+
+#### Scenario: Secondary rate limit without Retry-After
+- **WHEN** GitHub answers with 403, `X-RateLimit-Remaining: 4000`, no `Retry-After`, and a message saying a secondary rate limit was exceeded
+- **THEN** the request is treated as rate limited: the job moves to RETRYING with a wait of at least 60 seconds, and no data is dropped or recorded as skipped for it
 
 #### Scenario: Primary rate limit exhausted
 - **WHEN** GitHub answers with 403, `X-RateLimit-Remaining: 0` and a reset time 10 minutes ahead
@@ -86,6 +110,10 @@ The system SHALL respect GitHub's primary and secondary rate limits. When GitHub
 #### Scenario: Wait exceeds maximum
 - **WHEN** the required wait exceeds the configured maximum retry delay
 - **THEN** the job moves to FAILED with error code `github_rate_limited`
+
+#### Scenario: Forbidden without rate-limit signals
+- **WHEN** GitHub answers with 403, requests remaining, no `Retry-After`, and a message that does not mention a rate limit
+- **THEN** the request counts as forbidden
 
 ### Requirement: Transient failure handling
 The system SHALL retry timeouts, connection errors and GitHub 5xx responses with exponential backoff, up to a configured number of attempts. After the attempts are used up, the job SHALL fail with a safe error code. Completed steps SHALL NOT be re-fetched on retry.
@@ -106,7 +134,7 @@ The system SHALL send conditional requests (ETag) for resources it has fetched b
 - **THEN** the previously fetched repository list is reused and the sync completes successfully
 
 ### Requirement: Credential use during sync
-Sync SHALL authenticate to GitHub with the user's stored token. The token SHALL NOT appear in job records, job arguments, error messages or logs. If GitHub rejects the token, or the user has no connected GitHub account, the sync SHALL stop without retrying and report that the user must sign in again.
+Sync SHALL authenticate to GitHub with the user's stored token. The token SHALL NOT appear in job records, job arguments, error messages or logs. If GitHub rejects the token, the user has no connected GitHub account, or the stored token cannot be decrypted with any configured key, the sync SHALL stop without retrying and report that the user must sign in again. Redirects SHALL be followed with the token only to the GitHub API's own origin (same scheme, host and port); a redirect anywhere else, including plain HTTP on the same host, SHALL NOT be followed and SHALL NOT receive the token.
 
 #### Scenario: Token revoked on GitHub
 - **WHEN** GitHub answers a sync request with 401
@@ -116,8 +144,20 @@ Sync SHALL authenticate to GitHub with the user's stored token. The token SHALL 
 - **WHEN** any sync job runs, succeeds or fails
 - **THEN** its stored fields, queued task arguments and log output contain no access token
 
+#### Scenario: Encryption key removed
+- **WHEN** the key that encrypted the user's stored token is no longer among the configured keys and a sync runs
+- **THEN** the job moves to FAILED with error code `github_auth_invalid`, is not retried, and makes no GitHub request
+
+#### Scenario: Redirect to another host
+- **WHEN** GitHub answers a request with a redirect whose location is not on the GitHub API host
+- **THEN** the redirect is not followed, no request carrying the token is sent to that host, and the request fails as a client error
+
+#### Scenario: Redirect to plain HTTP
+- **WHEN** GitHub answers a request with a redirect to `http://` on the GitHub API host
+- **THEN** the redirect is not followed, no request carrying the token is sent over plain HTTP, and the request fails as a client error
+
 ### Requirement: Dependency manifest ingestion
-A sync SHALL read root-level dependency manifests for the user's most recently pushed owned non-fork repositories, up to a configured number of repositories (default 30). The supported manifests are requirements.txt, pyproject.toml, package.json, go.mod, Cargo.toml, pom.xml, build.gradle and build.gradle.kts. For each repository the system SHALL store the dependency names found per ecosystem and manifest, replacing the previous set on each sync. Raw manifest contents SHALL NOT be stored. Manifests larger than a configured size SHALL be skipped. An empty repository, a repository without supported manifests, or a manifest that cannot be fetched (not found or forbidden) SHALL be skipped without failing the sync. Rate limits and transient failures SHALL be handled as for other sync requests, and a retried sync SHALL NOT re-read repositories it already finished.
+A sync SHALL read root-level dependency manifests for the user's most recently pushed owned non-fork repositories, up to a configured number of repositories (default 30). The supported manifests are requirements.txt, pyproject.toml, package.json, go.mod, Cargo.toml, pom.xml, build.gradle and build.gradle.kts. For each repository the system SHALL store the dependency names found per ecosystem and manifest, replacing the previous set on each sync. Raw manifest contents SHALL NOT be stored. Manifests larger than a configured size SHALL be skipped. An empty repository, a repository without supported manifests, or a manifest that cannot be fetched (not found or forbidden) SHALL be skipped without failing the sync. A manifest that cannot be parsed, including one nested too deeply to parse, SHALL contribute no dependencies and SHALL NOT fail the sync or any other job that reads it. Rate limits and transient failures SHALL be handled as for other sync requests, and a retried sync SHALL NOT re-read repositories it already finished.
 
 #### Scenario: Manifests stored
 - **WHEN** an owned repository has package.json with dependencies `react` and `vite` at its root
@@ -135,12 +175,16 @@ A sync SHALL read root-level dependency manifests for the user's most recently p
 - **WHEN** an owned repository is a fork
 - **THEN** its manifests are not read
 
+#### Scenario: Deeply nested manifest
+- **WHEN** an owned repository's package.json nests arrays 100000 levels deep and its requirements.txt lists `django`
+- **THEN** the repository's stored dependencies are `django` from requirements.txt only, and the sync completes
+
 ### Requirement: External contribution ingestion
 A sync SHALL collect the user's public contributions to repositories they do not own:
 - merged pull requests authored by the user, up to a configured number;
 - public push activity in the recent public events GitHub provides.
 
-For the contributed repositories with the most contributions, up to a configured number (default 20), the system SHALL store repository metadata, languages and topics as for owned repositories. It SHALL link them to the user as contributor with the number of merged pull requests and pushes observed, and the time of the latest one. Contributor links that are no longer observed SHALL be removed on the next successful sync. Private activity SHALL NOT be requested. If GitHub rejects the contribution search for the user as invalid, the step SHALL be recorded as skipped and the sync SHALL complete.
+For the contributed repositories with the most contributions, up to a configured number (default 20), the system SHALL store repository metadata, languages and topics as for owned repositories. It SHALL link them to the user as contributor with the number of merged pull requests and pushes observed, and the time of the latest one. Contributor links that are no longer observed SHALL be removed on the next successful sync. Private activity SHALL NOT be requested. If GitHub rejects the contribution search for the user as invalid, the step SHALL be recorded as skipped and the sync SHALL complete. A contributed repository that was renamed or transferred on GitHub SHALL be followed to its current name and stored under it; a repository that cannot be read (not found, forbidden or another non-retryable client error) SHALL be skipped without failing the sync.
 
 #### Scenario: Merged pull requests recorded
 - **WHEN** the user has 3 merged pull requests to `pallets/flask` and 1 to `psf/requests`
@@ -157,3 +201,7 @@ For the contributed repositories with the most contributions, up to a configured
 #### Scenario: Contribution repository cap
 - **WHEN** the user contributed to 35 repositories and the cap is 20
 - **THEN** only the 20 repositories with the most contributions are stored and linked, and the job metadata records that the cap was applied
+
+#### Scenario: Renamed contributed repository
+- **WHEN** the user's merged pull requests point to `old-org/tool`, and GitHub answers requests for it with a 301 redirect to the repository's current API location, `new-org/tool`
+- **THEN** the repository is stored as `new-org/tool` with its languages and topics and linked to the user as contributor

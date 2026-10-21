@@ -8,10 +8,12 @@ error mapping, and returns normalized dataclasses instead of raw GitHub JSON.
 from __future__ import annotations
 
 import base64
+import functools
 import hashlib
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -23,7 +25,7 @@ from django.core.cache import cache
 
 from accounts.models import User
 from github.models import GitHubAccount
-from services.crypto import decrypt_token
+from services.crypto import TokenDecryptionError, decrypt_token
 
 from .errors import (
     GitHubAuthError,
@@ -31,6 +33,7 @@ from .errors import (
     GitHubConflict,
     GitHubForbidden,
     GitHubGone,
+    GitHubInvalidResponse,
     GitHubNotFound,
     GitHubRateLimited,
     GitHubTransientError,
@@ -49,6 +52,11 @@ EVENTS_MAX_PAGES = 3
 LABELS_MAX_PAGES = 3
 # GitHub asks clients to wait at least a minute on a secondary limit without Retry-After.
 SECONDARY_LIMIT_DEFAULT_WAIT = 60
+# How GitHub words a secondary limit in the error message (current and older wording).
+SECONDARY_LIMIT_MARKERS = ("secondary rate limit", "abuse detection")
+REDIRECTS = (301, 302, 307, 308)
+# Renames and transfers redirect once; more hops than this is a loop.
+MAX_REDIRECTS = 3
 # ETag cache scope for public repository data, shared by every client (Phase 4).
 PUBLIC_SCOPE = "public"
 
@@ -248,6 +256,23 @@ class _Response:
         return json.loads(self.text)
 
 
+def _parses_response[**P, R](method: Callable[P, R]) -> Callable[P, R]:
+    """Public API methods: a body that is not the JSON the method reads raises
+    ``GitHubInvalidResponse``, so callers never see a bare ``KeyError`` or ``ValueError``
+    from GitHub data and can tell a bad response from a bug in their own code."""
+
+    @functools.wraps(method)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        try:
+            return method(*args, **kwargs)
+        except (KeyError, ValueError, TypeError, IndexError, AttributeError) as exc:
+            raise GitHubInvalidResponse(
+                f"{method.__name__}: unexpected response ({type(exc).__name__})"
+            ) from None
+
+    return wrapper
+
+
 class GitHubClient:
     def __init__(
         self, token: str | None = None, *, cache_scope: str, auth_header: str | None = None
@@ -272,9 +297,12 @@ class GitHubClient:
         account = GitHubAccount.objects.filter(user=user).first()
         if account is None:
             raise GitHubAuthError("No connected GitHub account")
-        return cls(
-            decrypt_token(account.access_token_encrypted), cache_scope=cache_scope or str(user.pk)
-        )
+        try:
+            token = decrypt_token(account.access_token_encrypted)
+        except TokenDecryptionError:
+            # A key rotation dropped the key: the user must sign in again (github_auth_invalid).
+            raise GitHubAuthError("Stored GitHub token cannot be decrypted") from None
+        return cls(token, cache_scope=cache_scope or str(user.pk))
 
     @classmethod
     def for_app(cls) -> GitHubClient:
@@ -301,26 +329,32 @@ class GitHubClient:
 
     # --- public API -----------------------------------------------------------
 
+    @_parses_response
     def get_authenticated_user(self) -> GitHubUser:
         return GitHubUser.from_api(self._get("/user").json())
 
+    @_parses_response
     def list_owned_repositories(self, login: str) -> tuple[list[GitHubRepo], bool]:
         page = self._paginate(f"/users/{login}/repos", {"type": "owner", "sort": "pushed"})
         return [GitHubRepo.from_api(item) for item in page.items], page.truncated
 
+    @_parses_response
     def get_languages(self, full_name: str) -> dict[str, int]:
         data = self._get(f"/repos/{full_name}/languages").json()
         return {str(lang): int(count) for lang, count in data.items()}
 
+    @_parses_response
     def get_profile_readme(self, login: str) -> str | None:
         try:
             return self._get(f"/repos/{login}/{login}/readme", accept=RAW).text
         except GitHubNotFound:
             return None
 
+    @_parses_response
     def get_repository(self, full_name: str) -> GitHubRepo:
         return GitHubRepo.from_api(self._get(f"/repos/{full_name}").json())
 
+    @_parses_response
     def list_root_contents(self, full_name: str) -> list[ContentEntry]:
         """Top-level entries of the default branch; ``[]`` for an empty repository."""
         try:
@@ -334,9 +368,11 @@ class GitHubClient:
             for e in data
         ]
 
+    @_parses_response
     def get_file(self, full_name: str, path: str) -> str:
         return self._get(f"/repos/{full_name}/contents/{quote(path)}", accept=RAW).text
 
+    @_parses_response
     def search_merged_pull_requests(self, login: str) -> tuple[list[PullRequestRef], bool]:
         """Public merged PRs authored by ``login`` in repositories it does not own, most
         recently updated first. Raises GitHubValidationError (422) when GitHub refuses to
@@ -358,6 +394,7 @@ class GitHubClient:
         ]
         return refs, page.truncated or len(page.items) > limit
 
+    @_parses_response
     def list_public_pushes(self, login: str) -> list[PushRef]:
         """Recent public pushes by ``login`` to repositories it does not own."""
         page = self._paginate(f"/users/{login}/events/public", {}, max_pages=EVENTS_MAX_PAGES)
@@ -371,6 +408,7 @@ class GitHubClient:
 
     # --- candidate repositories (Phase 4) -------------------------------------------
 
+    @_parses_response
     def search_repositories(self, query: str, limit: int) -> list[GitHubRepo]:
         """First page (best match) of a repository search, at most ``limit`` (≤ 100) results.
         Raises GitHubValidationError (422) for a query GitHub rejects."""
@@ -378,12 +416,14 @@ class GitHubClient:
         data = self._get(f"/search/repositories?{params}").json()
         return [GitHubRepo.from_api(item) for item in data.get("items", [])[:limit]]
 
+    @_parses_response
     def get_readme(self, full_name: str) -> str | None:
         try:
             return self._get(f"/repos/{full_name}/readme", accept=RAW).text
         except GitHubNotFound:
             return None
 
+    @_parses_response
     def get_community_profile(self, full_name: str) -> CommunityProfile:
         try:
             files = self._get(f"/repos/{full_name}/community/profile").json().get("files") or {}
@@ -398,10 +438,12 @@ class GitHubClient:
             has_pull_request_template=bool(files.get("pull_request_template")),
         )
 
+    @_parses_response
     def list_label_names(self, full_name: str) -> list[str]:
         page = self._paginate(f"/repos/{full_name}/labels", {}, max_pages=LABELS_MAX_PAGES)
         return [str(label.get("name", "")) for label in page.items]
 
+    @_parses_response
     def list_open_issues(self, full_name: str) -> IssuePage:
         """Open issues, most recently updated first, up to ``ISSUES_MAX_PAGES`` pages. Pull
         requests (which the issues listing includes) are dropped. A repository with issues
@@ -417,6 +459,7 @@ class GitHubClient:
         issues = [IssueData.from_api(item) for item in page.items if "pull_request" not in item]
         return IssuePage(issues=issues, truncated=page.truncated)
 
+    @_parses_response
     def count_commits_since(self, full_name: str, since: datetime) -> int:
         """Default-branch commits since ``since`` (truncated to the UTC day, so the URL and
         its ETag are stable within a day). An empty repository (409) has 0."""
@@ -429,6 +472,7 @@ class GitHubClient:
             return 0
         return _count_from_single_item_page(response)
 
+    @_parses_response
     def count_contributors(self, full_name: str) -> int | None:
         """Contributors (anonymous included), or None when GitHub will not list them (403 for
         very large repositories)."""
@@ -442,6 +486,7 @@ class GitHubClient:
             return 0
         return _count_from_single_item_page(response)
 
+    @_parses_response
     def recent_pull_requests(self, full_name: str, since: datetime) -> PullSample:
         params = urlencode(
             {"state": "all", "sort": "updated", "direction": "desc", "per_page": PER_PAGE}
@@ -456,6 +501,7 @@ class GitHubClient:
         capped = len(items) >= PER_PAGE and oldest is not None and oldest >= since
         return PullSample(opened=opened, merged=merged, capped=capped)
 
+    @_parses_response
     def get_latest_release_date(self, full_name: str) -> datetime | None:
         try:
             data = self._get(f"/repos/{full_name}/releases/latest").json()
@@ -501,12 +547,7 @@ class GitHubClient:
             headers["If-None-Match"] = cached["etag"]
 
         path = httpx.URL(url).path
-        try:
-            response = self._http.get(url, headers=headers)
-        except httpx.TransportError as exc:
-            raise GitHubTransientError(f"GET {path}: {type(exc).__name__}") from None
-
-        self._record_rate_limit(response)
+        response = self._send(url, headers, path)
 
         if response.status_code == 304 and cached:
             return _Response(status=200, text=cached["body"], link=cached.get("link", ""))
@@ -522,6 +563,29 @@ class GitHubClient:
                 )
             return result
         raise _error_for(response, path)
+
+    def _send(self, url: str, headers: dict[str, str], path: str) -> httpx.Response:
+        """GET ``url``, following redirects (renamed or transferred repositories) up to
+        ``MAX_REDIRECTS`` hops, and only to the API's own origin: the Authorization header
+        goes with them."""
+        target: httpx.URL | str = url
+        for _ in range(MAX_REDIRECTS + 1):
+            try:
+                response = self._http.get(target, headers=headers)
+            except httpx.TransportError as exc:
+                raise GitHubTransientError(f"GET {path}: {type(exc).__name__}") from None
+            self._record_rate_limit(response)
+            if response.status_code not in REDIRECTS:
+                return response
+            location = response.headers.get("Location")
+            if not location:
+                raise GitHubClientError(f"GET {path} redirected without a location")
+            target = response.request.url.join(location)
+            base = httpx.URL(settings.GITHUB_API_BASE_URL)
+            # Same scheme, host and port: never send the token elsewhere or over plain HTTP.
+            if (target.scheme, target.host, target.port) != (base.scheme, base.host, base.port):
+                raise GitHubClientError(f"GET {path}: redirect points outside the GitHub API")
+        raise GitHubClientError(f"GET {path}: too many redirects")
 
     def _record_rate_limit(self, response: httpx.Response) -> None:
         remaining = response.headers.get("X-RateLimit-Remaining")
@@ -579,7 +643,7 @@ def _error_for(response: httpx.Response, path: str) -> Exception:
                 int(reset) - int(time.time()) if reset.isdigit() else SECONDARY_LIMIT_DEFAULT_WAIT
             )
             return GitHubRateLimited(where, max(wait, 1))
-        if status == 429:
+        if status == 429 or _is_secondary_limit(response):
             return GitHubRateLimited(where, SECONDARY_LIMIT_DEFAULT_WAIT)
         return GitHubForbidden(where)
     if status == 404:
@@ -595,3 +659,14 @@ def _error_for(response: httpx.Response, path: str) -> Exception:
     if status >= 500:
         return GitHubTransientError(where)
     return GitHubClientError(where)
+
+
+def _is_secondary_limit(response: httpx.Response) -> bool:
+    """A 403 whose message says a secondary limit was hit (no Retry-After, requests
+    remaining). The message is only inspected, never copied into the error."""
+    try:
+        data = response.json()
+    except ValueError:
+        data = None
+    message = str(data.get("message", "")) if isinstance(data, dict) else response.text[:1024]
+    return any(marker in message.lower() for marker in SECONDARY_LIMIT_MARKERS)

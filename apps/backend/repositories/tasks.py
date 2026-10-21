@@ -22,7 +22,7 @@ from services.github.errors import GitHubAuthError
 from services.github.retry import Retry, decide_retry
 from services.jobs import run_tracked_job, start_recommendations_after
 from services.repositories.analysis import RepositoryAnalysisService
-from services.repositories.lifecycle import abandoned_claims
+from services.repositories.lifecycle import abandoned_claims, record_refresh_failure
 from services.repositories.staleness import stale_parts
 
 logger = logging.getLogger(__name__)
@@ -67,10 +67,14 @@ def process_repository_backlog() -> int:
     now = timezone.now()
     grace = now - timedelta(minutes=settings.REPO_DISCOVERED_GRACE_MINUTES)
     retry = now - timedelta(hours=settings.REPO_FAILED_RETRY_HOURS)
+    refresh_retry = now - timedelta(minutes=settings.REPO_REFRESH_RETRY_MINUTES)
+    refresh = Q(lifecycle=Lifecycle.STALE) | Q(lifecycle=Lifecycle.DISCOVERED) & (
+        Q(lifecycle_changed_at__lt=grace) | Q(lifecycle_changed_at__isnull=True)
+    )
+    # A failed refresh waits its delay; FAILED retries and dead-worker claims don't.
+    refresh &= ~Q(refresh_failed_at__gte=refresh_retry)
     due = (
-        Q(lifecycle=Lifecycle.STALE)
-        | Q(lifecycle=Lifecycle.DISCOVERED)
-        & (Q(lifecycle_changed_at__lt=grace) | Q(lifecycle_changed_at__isnull=True))
+        refresh
         | Q(lifecycle=Lifecycle.FAILED, lifecycle_changed_at__lt=retry)
         | abandoned_claims(now)
     )
@@ -92,11 +96,13 @@ def process_repository_backlog() -> int:
 
 
 def _refresh(task: Any, repo_id: int, parts: list[str] | None) -> None:
+    started = timezone.now()
     try:
         with GitHubClient.for_app() as client:
             outcome = RepositoryAnalysisService(client).run(repo_id, parts)
     except GitHubAuthError:
         logger.warning("Repository %s not refreshed: app credentials rejected", repo_id)
+        record_refresh_failure(repo_id, "github_auth_invalid", since=started)
         return
     except Exception as exc:
         decision = decide_retry(
@@ -108,6 +114,7 @@ def _refresh(task: Any, repo_id: int, parts: list[str] | None) -> None:
         if isinstance(decision, Retry):
             raise task.retry(countdown=decision.countdown) from None
         logger.warning("Repository %s refresh failed: %s", repo_id, decision.code)
+        record_refresh_failure(repo_id, decision.code, since=started)
         return
     logger.info("Repository %s refresh: %s", repo_id, outcome)
 

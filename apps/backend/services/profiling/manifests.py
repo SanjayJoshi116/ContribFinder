@@ -158,7 +158,8 @@ def parse_manifest(filename: str, text: str) -> list[Dependency]:
     ecosystem, parser = MANIFESTS[filename]
     try:
         names = parser(text)
-    except (ValueError, TypeError, AttributeError, tomllib.TOMLDecodeError):
+    # RecursionError: nesting too deep for the JSON/TOML parsers (untrusted input).
+    except (ValueError, TypeError, AttributeError, RecursionError, tomllib.TOMLDecodeError):
         logger.debug("Could not parse manifest %s", filename)
         return []
     deps = {Dependency(ecosystem, normalize_dependency(ecosystem, n)) for n in names if n}

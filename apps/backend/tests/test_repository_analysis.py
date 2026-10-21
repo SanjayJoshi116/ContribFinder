@@ -16,8 +16,9 @@ from services.github.errors import GitHubRateLimited
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import PARTS, stale_parts
 
-from .repo_fixtures import API, add_candidate, make_candidate_repo, mock_repo_api
-from .test_github_client import TOKEN
+from .repo_fixtures import API, add_candidate, make_candidate_repo, mock_repo_api, repo_payload
+from .test_github_client import SECONDARY_MESSAGES, TOKEN
+from .test_profiling_manifests import DEEP_PACKAGE_JSON
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 
@@ -359,3 +360,205 @@ def test_refresh_retries_on_rate_limit_and_releases(respx_mock, monkeypatch) -> 
         tasks.sync_repository(repo.pk)
     assert retries and retries[0] >= 30
     assert Repository.objects.get(pk=repo.pk).lifecycle == "stale"
+
+
+# --- github-error-resilience: repository-specific errors stay with the repository ------------
+
+
+def test_unexpected_client_error_marks_failed(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "odd/repo")
+    respx_mock.get(f"{API}/repos/odd/repo").respond(400, json={"message": "Bad"})
+    assert analyze(client, repo) == Outcome.FAILED
+    repo.refresh_from_db()
+    assert (repo.lifecycle, repo.lifecycle_error) == ("failed", "client_error")
+    assert (repo.is_eligible, repo.ineligible_reason) == (False, "repository_unavailable")
+
+
+def test_uninterpretable_response_marks_failed(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "encode/httpx")
+    routes = mock_repo_api(respx_mock, "encode/httpx", 7)
+    payload = repo_payload("encode/httpx", 7)
+    del payload["id"]
+    routes["metadata"].respond(200, json=payload)
+    assert analyze(client, repo) == Outcome.FAILED
+    repo.refresh_from_db()
+    assert (repo.lifecycle, repo.lifecycle_error) == ("failed", "invalid_response")
+
+
+def test_legal_block_keeps_unavailable_code(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "dmca/repo")
+    respx_mock.get(f"{API}/repos/dmca/repo").respond(451)
+    assert analyze(client, repo) == Outcome.FAILED
+    assert Repository.objects.get(pk=repo.pk).lifecycle_error == "unavailable"
+
+
+def test_secondary_limit_releases_instead_of_failing(client, respx_mock) -> None:
+    repo = make_candidate_repo(
+        7, "encode/httpx", lifecycle="stale", is_eligible=True, previous_lifecycle="recommendable"
+    )
+    routes = mock_repo_api(respx_mock, "encode/httpx", 7)
+    routes["contributors"].respond(
+        403, json={"message": SECONDARY_MESSAGES[0]}, headers={"X-RateLimit-Remaining": "4000"}
+    )
+    with pytest.raises(GitHubRateLimited):
+        analyze(client, repo, ["activity"])
+    repo.refresh_from_db()
+    assert (repo.lifecycle, repo.is_eligible, repo.lifecycle_error) == ("stale", True, "")
+    assert not repo.snapshots.exists()
+
+
+def test_renamed_repository_is_followed(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "old-org/tool")
+    respx_mock.get(f"{API}/repos/old-org/tool").respond(
+        301, headers={"Location": f"{API}/repositories/7"}
+    )
+    mock_repo_api(respx_mock, "new-org/tool", 7)
+    respx_mock.get(f"{API}/repositories/7").respond(200, json=repo_payload("new-org/tool", 7))
+    assert analyze(client, repo) == Outcome.ANALYZED
+    repo.refresh_from_db()
+    assert (repo.github_id, repo.full_name, repo.lifecycle) == (7, "new-org/tool", "recommendable")
+
+
+def test_programming_error_still_propagates(client, respx_mock, monkeypatch) -> None:
+    repo = make_candidate_repo(7, "encode/httpx")
+    mock_repo_api(respx_mock, "encode/httpx", 7)
+
+    def broken(full_name: str) -> dict[str, int]:
+        raise AttributeError("bug")
+
+    monkeypatch.setattr(client, "get_languages", broken)
+    with pytest.raises(AttributeError):
+        analyze(client, repo)
+    assert Repository.objects.get(pk=repo.pk).lifecycle == Lifecycle.DISCOVERED
+
+
+def test_deeply_nested_candidate_manifest_is_not_a_failure(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "encode/httpx")
+    mock_repo_api(respx_mock, "encode/httpx", 7, manifests={"package.json": DEEP_PACKAGE_JSON})
+    assert analyze(client, repo) == Outcome.ANALYZED
+    repo.refresh_from_db()
+    assert set(repo.dependencies.values_list("name", flat=True)) == {"httpx", "django"}
+
+
+@override_settings(SYNC_MAX_ATTEMPTS=1, REPO_REFRESH_RETRY_MINUTES=60)
+def test_refresh_failure_is_recorded_and_delays_the_backlog(
+    respx_mock, profile, monkeypatch
+) -> None:
+    now = timezone.now()
+    repo = make_candidate_repo(
+        7,
+        "encode/httpx",
+        lifecycle="stale",
+        is_eligible=True,
+        stale_parts=["metadata"],
+        synced_at=now - timedelta(hours=13),
+        lifecycle_changed_at=now - timedelta(hours=1),
+    )
+    add_candidate(profile, repo)
+    respx_mock.get(f"{API}/repos/encode/httpx").respond(503)
+
+    tasks.sync_repository.delay(repo.pk)
+
+    repo.refresh_from_db()
+    assert (repo.lifecycle, repo.is_eligible) == ("stale", True)
+    assert repo.lifecycle_error == "github_unavailable"
+    assert repo.refresh_failed_at is not None
+    assert repo.lifecycle_changed_at == now - timedelta(hours=1)
+
+    queued: list[int] = []
+    monkeypatch.setattr(tasks.sync_repository, "delay", queued.append)
+    assert tasks.process_repository_backlog() == 0
+
+    Repository.objects.filter(pk=repo.pk).update(refresh_failed_at=now - timedelta(minutes=61))
+    assert tasks.process_repository_backlog() == 1
+    assert queued == [repo.pk]
+
+    respx_mock.reset()
+    mock_repo_api(respx_mock, "encode/httpx", 7)
+    monkeypatch.undo()
+    tasks.sync_repository.delay(repo.pk)
+    repo = Repository.objects.get(pk=repo.pk)
+    assert (repo.lifecycle, repo.lifecycle_error) == ("recommendable", "")
+    assert repo.refresh_failed_at is None
+
+
+def test_refresh_failure_leaves_claimed_and_failed_repositories_alone() -> None:
+    from services.repositories.lifecycle import record_refresh_failure
+
+    claimed = make_candidate_repo(1, lifecycle="refreshing", claimed_at=timezone.now())
+    failed = make_candidate_repo(2, lifecycle="failed", lifecycle_error="not_found")
+    since = timezone.now()
+    record_refresh_failure(claimed.pk, "github_unavailable", since=since)
+    record_refresh_failure(failed.pk, "github_unavailable", since=since)
+    claimed.refresh_from_db()
+    failed.refresh_from_db()
+    assert (claimed.lifecycle_error, claimed.refresh_failed_at) == ("", None)
+    assert (failed.lifecycle_error, failed.refresh_failed_at) == ("not_found", None)
+
+
+def test_refresh_delay_applies_only_to_refreshes(profile, monkeypatch) -> None:
+    now = timezone.now()
+    due = make_candidate_repo(1, lifecycle="failed", lifecycle_changed_at=now - timedelta(days=2))
+    recent = make_candidate_repo(
+        2, lifecycle="failed", lifecycle_changed_at=now - timedelta(hours=1)
+    )
+    # A refresh failed, then another run claimed it and its worker died: recover it now.
+    abandoned = make_candidate_repo(
+        3, lifecycle="refreshing", claimed_at=now - timedelta(hours=1), refresh_failed_at=now
+    )
+    waiting = make_candidate_repo(4, lifecycle="stale", refresh_failed_at=now)
+    for repo in (due, recent, abandoned, waiting):
+        add_candidate(profile, repo)
+    queued: list[int] = []
+    monkeypatch.setattr(tasks.sync_repository, "delay", queued.append)
+    assert tasks.process_repository_backlog() == 2
+    assert set(queued) == {due.pk, abandoned.pk}
+
+
+def test_refresh_failure_skips_repository_changed_since() -> None:
+    from services.repositories.lifecycle import record_refresh_failure
+
+    now = timezone.now()
+    # Another run completed it after this refresh started: its fresh state stays clean.
+    redone = make_candidate_repo(1, lifecycle="recommendable", lifecycle_changed_at=now)
+    stale = make_candidate_repo(2, lifecycle="stale", lifecycle_changed_at=now - timedelta(hours=1))
+    since = now - timedelta(minutes=1)
+    record_refresh_failure(redone.pk, "github_unavailable", since=since)
+    record_refresh_failure(stale.pk, "github_unavailable", since=since)
+    redone.refresh_from_db()
+    stale.refresh_from_db()
+    assert (redone.lifecycle_error, redone.refresh_failed_at) == ("", None)
+    assert stale.lifecycle_error == "github_unavailable" and stale.refresh_failed_at is not None
+
+
+def test_rejected_app_credentials_record_the_refresh_failure(respx_mock) -> None:
+    repo = make_candidate_repo(
+        7,
+        "encode/httpx",
+        lifecycle="stale",
+        is_eligible=True,
+        previous_lifecycle="recommendable",
+        stale_parts=["metadata"],
+        lifecycle_changed_at=timezone.now() - timedelta(hours=1),
+    )
+    respx_mock.get(f"{API}/repos/encode/httpx").respond(401)
+    tasks.sync_repository.delay(repo.pk)
+    repo.refresh_from_db()
+    assert (repo.lifecycle, repo.is_eligible) == ("stale", True)
+    assert repo.lifecycle_error == "github_auth_invalid"
+    assert repo.refresh_failed_at is not None
+
+
+def test_error_outside_the_client_propagates(client, respx_mock, monkeypatch) -> None:
+    """Only GitHub answers the client can't read are ``invalid_response``: a TypeError in
+    ContribFinder's own code is a bug, not a repository failure."""
+    repo = make_candidate_repo(7, "encode/httpx")
+    mock_repo_api(respx_mock, "encode/httpx", 7)
+
+    def broken(*args, **kwargs):
+        raise TypeError("bug")
+
+    monkeypatch.setattr("services.repositories.analysis.read_manifests", broken)
+    with pytest.raises(TypeError):
+        analyze(client, repo)
+    assert Repository.objects.get(pk=repo.pk).lifecycle == Lifecycle.DISCOVERED
