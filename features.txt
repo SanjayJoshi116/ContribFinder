@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.6 (2026-10-21)
+Version: 0.12.7 (2026-10-21)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -392,13 +392,32 @@ Evaluation
   [x] Export holds stale and dismissed candidates
 
 ============================================================================
+SHIPPED - v0.12.7 - Discovery and repository data (backlog batch 7)
+============================================================================
+
+Repositories
+  [x] A taken name is given up (resolved by GitHub ID), never a deleted row
+  [x] Search results are not metadata fetches; eligibility from the current row
+  [x] FAILED retries fetch every part; queued tasks fetch only parts still stale
+  [x] Backlog does not queue a refresh twice; selection in services/repositories/backlog.py
+
+Discovery
+  [x] Pool step before analysis; analysis list chosen once per job
+  [x] Eligibility re-checked on stored data with every rule (lifecycle only)
+  [x] Suspected lists decided by manifest dependencies (a tagged library with deps is code)
+  [x] Provenance without star bands, pruned each run; one pool order everywhere
+  [x] Results stored in GitHub ID order (no deadlocks); pool_bands by band range
+  [x] Default bands follow DISCOVERY_MIN_STARS; core.W003 for an uneven budget
+  [x] Review follow-ups X-1..X-6: released names not recommended, provenance kept on
+      skipped searches, pool writes fenced, no-op refreshes stamp nothing
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
-  [ ] Bug_Backlog.md batches 5-11  GitHub errors, recommendations, discovery, signals,
-                               frontend, scripts, cleanup
+  [ ] Bug_Backlog.md batches 8-11  signals, frontend, scripts, cleanup
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation

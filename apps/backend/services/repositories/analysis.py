@@ -54,7 +54,7 @@ from services.issues.analysis import IssueInput, analyze
 from services.matching.activity import WINDOW_DAYS, ActivityData, compute_activity
 
 from . import lifecycle
-from .staleness import PARTS, stale_parts
+from .staleness import PARTS, is_released_name, stale_parts
 
 logger = logging.getLogger(__name__)
 
@@ -131,17 +131,26 @@ class RepositoryAnalysisService:
         self._now = now
 
     def run(self, repo_id: int, parts: Iterable[str] | None = None) -> Outcome:
-        """Claim the repository and analyze ``parts`` (default: its stale parts)."""
+        """Claim the repository and analyze its stale parts; ``parts`` narrows them to those
+        (a queued task for one data type). A FAILED retry checks every part, and a repository
+        that gave up its name fetches metadata first, by GitHub ID."""
         now = self._now or timezone.now()
         repo = lifecycle.claim(repo_id)
         if repo is None:
             return Outcome.SKIPPED
-        if parts is not None:
-            wanted = list(parts)
-        elif repo.previous_lifecycle == Lifecycle.FAILED:
+        if repo.previous_lifecycle == Lifecycle.FAILED:
             wanted = list(PARTS)  # a retry must re-check that the repository exists
         else:
-            wanted = stale_parts(repo, now)
+            asked = None if parts is None else set(parts)
+            wanted = [p for p in stale_parts(repo, now) if asked is None or p in asked]
+            if is_released_name(repo.full_name) and "metadata" not in wanted:
+                wanted.insert(0, "metadata")
+            if not wanted and repo.previous_lifecycle != Lifecycle.STALE:
+                # Refreshed by another analysis since it was queued: nothing to fetch, and
+                # completing would stamp a transition that makes freshness regenerate.
+                lifecycle.release(repo)
+                return Outcome.SKIPPED
+        fetched_name = None if "metadata" in wanted else repo.full_name
         try:
             try:
                 fetched = self._fetch(repo, wanted, now)
@@ -153,11 +162,14 @@ class RepositoryAnalysisService:
                 lifecycle.fail(repo, code)
                 return Outcome.FAILED
             with transaction.atomic():
-                lifecycle.hold(repo)
+                lifecycle.hold(repo, fetched_name=fetched_name)
                 self._store(repo, fetched, now)
                 lifecycle.complete(repo, now=now)
         except lifecycle.ClaimLost:
-            return Outcome.SKIPPED  # reclaimed by another analysis, which owns the state now
+            # Reclaimed by another analysis, which owns the state now; or renamed meanwhile,
+            # so the fetched data is discarded and the restored row stays due.
+            lifecycle.release(repo)
+            return Outcome.SKIPPED
         except BaseException:
             lifecycle.release(repo)
             raise
@@ -173,7 +185,7 @@ class RepositoryAnalysisService:
         c, name, out = self.client, repo.full_name, _Fetched()
         if "metadata" in parts:
             self._between_parts(repo)
-            out.metadata = c.get_repository(name)
+            out.metadata = self._metadata(repo)
             name = out.metadata.full_name  # the current name after a rename (redirect followed)
             out.languages = c.get_languages(name)
         if "readme" in parts:
@@ -211,13 +223,26 @@ class RepositoryAnalysisService:
             out.issues = c.list_open_issues(name)
         return out
 
+    def _metadata(self, repo: Repository) -> GitHubRepo:
+        """By name, or by GitHub ID when the name was given up, is gone, or now belongs to
+        another repository. A 404 by ID means the repository no longer exists."""
+        if not is_released_name(repo.full_name):
+            try:
+                found = self.client.get_repository(repo.full_name)
+            except GitHubNotFound:
+                pass
+            else:
+                if found.github_id == repo.github_id:
+                    return found
+        return self.client.get_repository_by_id(repo.github_id)
+
     # --- storing (one transaction) ---------------------------------------------------------
 
     def _store(self, repo: Repository, f: _Fetched, now: datetime) -> None:
         fields: list[str] = []
         if f.metadata is not None:
             stored = upsert_repository(f.metadata, now)
-            if stored.pk != repo.pk:  # pragma: no cover - github_id is stable per repository
+            if stored.pk != repo.pk:  # pragma: no cover - fetched by GitHub ID (_metadata)
                 raise RuntimeError("Repository identity changed during analysis")
             repo.refresh_from_db()
             replace_languages(repo, f.languages or {})

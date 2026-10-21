@@ -6,7 +6,6 @@ from django.db.models import (
     Case,
     Count,
     Exists,
-    F,
     IntegerField,
     OuterRef,
     Q,
@@ -26,6 +25,7 @@ from rest_framework.views import APIView
 from core.authentication import current_user
 from core.serializers import error_responses
 from jobs.models import SyncJob
+from services.discovery.ordering import pool_order
 from services.jobs import DISCOVERY, last_completed
 
 from .models import (
@@ -94,8 +94,8 @@ class CandidateFilter(filters.FilterSet):  # type: ignore[misc]
 
 class CandidateListView(ListAPIView[RepositoryCandidate]):
     """The developer's candidate pool: analysed-eligible first, then awaiting analysis, then
-    ineligible; within each, the discovery job's analysis order (previously interacted, best
-    search rank, name). Not a ranking."""
+    ineligible; within each, the order in which discovery keeps and analyzes them (previously
+    interacted, best search rank, most recently found, name). Not a ranking."""
 
     serializer_class = RepositoryCandidateSerializer
     pagination_class = CandidatePagination
@@ -109,37 +109,19 @@ class CandidateListView(ListAPIView[RepositoryCandidate]):
             .order_by("-captured_at", "-pk")
             .values("activity_label")[:1]
         )
-        best_rank = (
-            CandidateDiscovery.objects.filter(candidate=OuterRef("pk"), search_rank__isnull=False)
-            .order_by("search_rank")
-            .values("search_rank")[:1]
-        )
-        interacted = CandidateDiscovery.objects.filter(
-            candidate=OuterRef("pk"), source=DiscoverySource.PREVIOUSLY_INTERACTED
-        )
         state = Case(
             When(repository__is_eligible=True, then=Value(0)),
             When(repository__is_eligible__isnull=True, then=Value(1)),
             default=Value(2),
             output_field=IntegerField(),
         )
-        return (
+        candidates = (
             RepositoryCandidate.objects.filter(developer__user=current_user(self.request))
             .select_related("repository")
             .prefetch_related("discoveries", "repository__topics")
-            .annotate(
-                activity_label=Subquery(latest_label),
-                state=state,
-                interacted=Exists(interacted),
-                best_rank=Subquery(best_rank),
-            )
-            .order_by(
-                "state",
-                F("interacted").desc(),
-                F("best_rank").asc(nulls_last=True),
-                "repository__full_name",
-            )
+            .annotate(activity_label=Subquery(latest_label), state=state)
         )
+        return pool_order(candidates, "state")
 
     @extend_schema(
         operation_id="discovery_candidates",

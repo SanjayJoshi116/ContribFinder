@@ -125,8 +125,8 @@ export interface paths {
     }
     /**
      * @description The developer's candidate pool: analysed-eligible first, then awaiting analysis, then
-     *     ineligible; within each, the discovery job's analysis order (previously interacted, best
-     *     search rank, name). Not a ranking.
+     *     ineligible; within each, the order in which discovery keeps and analyzes them (previously
+     *     interacted, best search rank, most recently found, name). Not a ranking.
      */
     get: operations['discovery_candidates']
     put?: never

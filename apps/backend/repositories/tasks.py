@@ -6,31 +6,23 @@ Tasks take repository IDs only.
 """
 
 import logging
-from datetime import timedelta
 from typing import Any
 
 from celery import shared_task
 from django.conf import settings
-from django.db.models import F, Q
 from django.utils import timezone
 
 from jobs.models import SyncJob
-from repositories.models import Lifecycle, Repository
 from services.discovery.service import DiscoveryService
 from services.github.client import GitHubClient
 from services.github.errors import GitHubAuthError
 from services.github.retry import Retry, decide_retry
 from services.jobs import run_tracked_job, start_recommendations_after
+from services.repositories import backlog
 from services.repositories.analysis import RepositoryAnalysisService
-from services.repositories.lifecycle import abandoned_claims, record_refresh_failure
-from services.repositories.staleness import stale_parts
+from services.repositories.lifecycle import record_refresh_failure
 
 logger = logging.getLogger(__name__)
-
-
-def _pooled() -> Any:
-    """Repositories in at least one developer's candidate pool."""
-    return Repository.objects.filter(candidates__isnull=False).distinct()
 
 
 def _has_app_credentials() -> bool:
@@ -40,57 +32,20 @@ def _has_app_credentials() -> bool:
 @shared_task(name="repositories.mark_stale_repositories")
 def mark_stale_repositories() -> int:
     """Move pooled RECOMMENDABLE/INDEXED repositories with stale data types to STALE."""
-    now = timezone.now()
-    marked = 0
-    candidates = _pooled().filter(lifecycle__in=[Lifecycle.RECOMMENDABLE, Lifecycle.INDEXED])
-    for repo in candidates.order_by("pk").iterator(chunk_size=500):
-        parts = stale_parts(repo, now)
-        if not parts:
-            continue
-        marked += Repository.objects.filter(pk=repo.pk, lifecycle=repo.lifecycle).update(
-            lifecycle=Lifecycle.STALE,
-            previous_lifecycle=repo.lifecycle,
-            stale_parts=parts,
-            lifecycle_changed_at=now,
-        )
+    marked = backlog.mark_stale(timezone.now())
     logger.info("Marked %s repositories stale", marked)
     return marked
 
 
 @shared_task(name="repositories.process_repository_backlog")
 def process_repository_backlog() -> int:
-    """Queue refreshes for pooled repositories that are stale, still unanalyzed after the
-    grace period, failed and due for a retry, or left mid-analysis by a dead worker."""
+    """Queue the refreshes ``services.repositories.backlog`` finds due."""
     if not _has_app_credentials():
         logger.warning("GitHub client credentials are not configured; backlog not processed")
         return 0
-    now = timezone.now()
-    grace = now - timedelta(minutes=settings.REPO_DISCOVERED_GRACE_MINUTES)
-    retry = now - timedelta(hours=settings.REPO_FAILED_RETRY_HOURS)
-    refresh_retry = now - timedelta(minutes=settings.REPO_REFRESH_RETRY_MINUTES)
-    refresh = Q(lifecycle=Lifecycle.STALE) | Q(lifecycle=Lifecycle.DISCOVERED) & (
-        Q(lifecycle_changed_at__lt=grace) | Q(lifecycle_changed_at__isnull=True)
-    )
-    # A failed refresh waits its delay; FAILED retries and dead-worker claims don't.
-    refresh &= ~Q(refresh_failed_at__gte=refresh_retry)
-    due = (
-        refresh
-        | Q(lifecycle=Lifecycle.FAILED, lifecycle_changed_at__lt=retry)
-        | abandoned_claims(now)
-    )
-    batch = list(
-        _pooled()
-        .filter(due)
-        .order_by(F("lifecycle_changed_at").asc(nulls_first=True), "pk")
-        .values_list("pk", "stale_parts")[: settings.REPO_REFRESH_BATCH]
-    )
-    for repo_id, parts in batch:
-        if parts == ["readme"]:
-            sync_repository_readme.delay(repo_id)
-        elif parts == ["issues"]:
-            sync_repository_issues.delay(repo_id)
-        else:
-            sync_repository.delay(repo_id)
+    batch = backlog.queue_batch(timezone.now())
+    for repo_id, kind in batch:
+        REFRESH_TASKS[kind].delay(repo_id)
     logger.info("Queued %s repository refreshes", len(batch))
     return len(batch)
 
@@ -140,11 +95,17 @@ def sync_repository_issues(self: Any, repo_id: int) -> None:
     _refresh(self, repo_id, ["issues"])
 
 
+REFRESH_TASKS = {
+    "all": sync_repository,
+    "readme": sync_repository_readme,
+    "issues": sync_repository_issues,
+}
+
+
 __all__ = [
     "generate_candidates",
     "mark_stale_repositories",
     "process_repository_backlog",
-    "stale_parts",
     "sync_repository",
     "sync_repository_issues",
     "sync_repository_readme",

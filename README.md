@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.6** (recommendation consistency: stale repositories stay recommended with stable ids, dismissals are never missed or undone by a running generation, save/dismiss/generation no longer deadlock, and every reason matches stored issues; MVP+). After signing in with
+**Version 0.12.7** (discovery and repository data: a renamed repository is never deleted, eligibility follows current data and settings, real tools named like lists are no longer rejected, and the pool that is kept is the one analyzed; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -99,11 +99,12 @@ npm run manage -- reanalyze_profiles   # rebuild profiles from stored data (no G
 Profile scoring is configurable in `.env` (`EVIDENCE_WEIGHTS` and friends, see `.env.example`).
 Run `reanalyze_profiles` after changing it. Repository discovery budgets, filters, staleness and
 activity thresholds (`DISCOVERY_*`, `REPO_*`, `ACTIVITY_THRESHOLDS`) are configured the same way.
-Every search query runs once per star band (`DISCOVERY_STAR_BANDS`, default 20–999 and 1000+), so
-the pool holds smaller projects as well as the most popular ones; `DISCOVERY_MAX_QUERIES` counts
-these requests (default 20). Curated lists and documentation repositories (named `awesome-*`,
-tagged with a `DISCOVERY_EXCLUDED_TOPICS` topic, or without a detected language) are rejected as
-`not_code`.
+Every search query runs once per star band (`DISCOVERY_STAR_BANDS`, default `DISCOVERY_MIN_STARS`–999
+and 1000+), so the pool holds smaller projects as well as the most popular ones;
+`DISCOVERY_MAX_QUERIES` counts these requests (default 20). Repositories without a detected language
+are rejected as `not_code`; suspected lists (named `awesome-*` or tagged with a
+`DISCOVERY_EXCLUDED_TOPICS` topic) are analyzed once and are `not_code` unless they declare
+manifest dependencies.
 A completed sync or re-analysis starts a discovery run automatically, and a completed discovery
 starts a recommendation generation. Ranking limits and sizes (`RECOMMENDATION_*`,
 `RECOMMENDATIONS_TOP_N`, `REPO_SIZE_THRESHOLDS`) and the view de-duplication window
@@ -243,7 +244,8 @@ the code (confirmed, partial or false positive), grouped into fix batches in pri
 Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion finality) in
 0.12.2, batch 3 (evaluation tooling integrity) in 0.12.3, batch 4 (job lifecycle and claim
 fencing) in 0.12.4, batch 5 (GitHub error resilience) in 0.12.5, together with the follow-ups
-from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consistency) in 0.12.6.
+from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consistency) in 0.12.6,
+batch 7 (discovery and repository data) in 0.12.7.
 
 ## Versioning
 

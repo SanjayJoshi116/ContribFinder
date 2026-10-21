@@ -7,6 +7,60 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.7] - 2026-10-21
+
+Discovery and repository data (OpenSpec change `discovery-repository-data`, backlog batch 7,
+with its review follow-ups X-1…X-6). No ranking change: scores, order and the benchmark
+baselines are unchanged. Migration `repositories.0007` backfills `lifecycle_changed_at` and
+adds `refresh_queued_at`. Discovery job steps now run queries → search → interactions → pool
+→ analysis.
+
+### Fixed
+
+- A repository whose name another GitHub ID takes is no longer deleted (which cascaded to every
+  user's candidates, recommendations, saves and dismissals). It gives the name up
+  (`org/tool~<id>`) and its next analysis finds it by GitHub ID (new
+  `GitHubClient.get_repository_by_id`); a lookup by name that answers 404 or another
+  repository falls back to the ID too (C-2).
+- Search results update a repository's fields but no longer count as a metadata fetch, so
+  frequently found repositories get their languages and metadata refreshed (C-8).
+- Analysis decides eligibility from the locked current row, including search updates stored
+  while it fetched (C-14). Data fetched under a name that changed meanwhile is discarded.
+- A FAILED repository's retry fetches every data type, whatever the queued task asked for, so
+  a deleted repository is never made eligible again (C-5). A task for particular data types
+  fetches only those still stale (C-15).
+- Each query's results are stored in GitHub ID order, so concurrent discovery runs no longer
+  deadlock (C-7).
+- The pool step re-checks every eligibility rule on stored data through the lifecycle (new
+  `recheck_eligibility`): settings changes apply without waiting for a refresh (R-12), and a
+  FAILED or in-progress repository is no longer overwritten as `not_code` (R-4).
+- `not_code` no longer rejects real code. A repository without a language is still rejected
+  at search. An `awesome-*` name or a list topic only marks a suspected list, which is
+  `not_code` after analysis unless it has manifest dependencies (`awesome-lint` is code). A
+  list already decided is rejected at search without a new analysis (R-5).
+- Discovery steps are queries → search → interactions → pool → analysis: the analysis
+  budget is spent only on kept candidates (C-11). The analysis list is chosen once per job, so
+  a resumed step keeps its cap and total (C-12).
+- Discovery records a run did not see again are pruned (C-13). Stored query text no longer
+  includes the star band (R-6).
+- One pool order (previously interacted, best rank, most recently found, name) for the pool
+  cap, the analysis and the candidate list (C-17).
+- `pool_bands` counts a repository in the band that holds its stars, or under `other` (R-9).
+- The backlog does not queue a repository again while its queued refresh can still run
+  (`Repository.refresh_queued_at`), and its selection lives in
+  `services/repositories/backlog.py` (C-15, C-16).
+- `Repository.lifecycle_changed_at` is always set (default, backfilled) (C-18).
+- The default star bands follow `DISCOVERY_MIN_STARS`, so setting only the minimum no longer
+  stops Django (R-3). `DISCOVERY_STAR_BANDS` now defaults to unset and the bands are derived
+  when used, so an overridden minimum always moves them. New warning `core.W003` for a query budget that is not a multiple of the
+  band count (R-10). Topic reads use prefetching (R-11).
+- Review follow-ups (X-1…X-6): a repository that gave up its name is ineligible
+  (`name_released`) until resolved, never recommended under a wrong name and link; pruning
+  keeps records when a run searched nothing or GitHub rejected the query; the pool step's
+  writes are fenced by `job_write`; a queued refresh with nothing stale left changes nothing;
+  the better rank wins when one query finds a repository in both bands; overlapping backlog
+  runs never queue the same repository twice.
+
 ## [0.12.6] - 2026-10-21
 
 Recommendation consistency (OpenSpec change `recommendation-consistency`, backlog batch 6).

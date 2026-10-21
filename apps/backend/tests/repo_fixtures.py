@@ -10,6 +10,9 @@ from django.utils import timezone
 
 from developers.models import DeveloperProfile
 from repositories.models import CandidateDiscovery, Repository, RepositoryCandidate
+from services.github.client import GitHubClient
+from services.repositories.analysis import Outcome, RepositoryAnalysisService
+from services.repositories.staleness import PART_FIELDS, stale_parts
 
 API = "https://api.github.com"
 
@@ -145,7 +148,11 @@ def add_candidate(
     query: str = "language:Python",
     rank: int | None = 1,
     seen: datetime | None = None,
+    discovery_seen: datetime | None = None,
 ) -> RepositoryCandidate:
+    """``discovery_seen`` (default ``seen``): when the discovery record was last seen. A run
+    prunes records it did not see again, so a record standing for "found by this run" needs a
+    time after the run starts."""
     seen = seen or timezone.now()
     cand, _ = RepositoryCandidate.objects.get_or_create(
         developer=profile,
@@ -158,7 +165,7 @@ def add_candidate(
         query=query,
         search_rank=rank,
         first_seen_at=seen,
-        last_seen_at=seen,
+        last_seen_at=discovery_seen or seen,
     )
     return cand
 
@@ -199,3 +206,32 @@ def make_issue(repo: Repository, number: int, **fields: Any) -> Any:
         "analyzed_at": now,
     }
     return Issue.objects.create(**{**defaults, **fields})
+
+
+def expire_parts(repo: Repository, parts: list[str]) -> None:
+    """Make ``parts`` stale (those not stale already): an analysis asked for particular parts
+    fetches only the ones that are stale."""
+    current = Repository.objects.get(pk=repo.pk)
+    stale = stale_parts(current, timezone.now())
+    old = timezone.now() - timedelta(days=365)
+    fields = {PART_FIELDS[part]: old for part in parts if part not in stale}
+    if fields:
+        Repository.objects.filter(pk=repo.pk).update(**fields)
+
+
+def fresh_repo(github_id: int = 7, full_name: str = "encode/httpx", **fields: Any) -> Repository:
+    """An analyzed, recommendable repository whose data is all fresh."""
+    now = timezone.now()
+    defaults = {
+        "lifecycle": "recommendable",
+        "is_eligible": True,
+        **{field: now for field in PART_FIELDS.values()},
+    }
+    return make_candidate_repo(github_id, full_name, **{**defaults, **fields})
+
+
+def analyze(client: GitHubClient, repo: Repository, parts: list[str] | None = None) -> Outcome:
+    """Analyze ``repo``; explicit ``parts`` are made stale first (only stale ones are fetched)."""
+    if parts:
+        expire_parts(repo, parts)
+    return RepositoryAnalysisService(client).run(repo.pk, parts)

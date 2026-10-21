@@ -2,7 +2,9 @@
 
 ``prefilter`` runs on search payloads before anything becomes a candidate; ``eligibility``
 re-checks the repository-level rules on analyzed data. Both return a reason code, or None
-when the repository passes. Pure functions.
+when the repository passes. No writes: stored repositories are read for their topics and
+whether they have dependencies (annotate ``has_dependencies`` and prefetch ``topics`` when
+checking many).
 """
 
 from __future__ import annotations
@@ -13,8 +15,9 @@ from datetime import datetime, timedelta
 from typing import Protocol
 
 from django.conf import settings
+from django.db.models import Exists, OuterRef
 
-from repositories.models import Lifecycle, Repository
+from repositories.models import Lifecycle, Repository, RepositoryDependency
 
 ARCHIVED = "archived"
 FORK = "fork"
@@ -24,6 +27,7 @@ FEW_STARS = "few_stars"
 OWN_REPOSITORY = "own_repository"
 NOT_CODE = "not_code"
 REPOSITORY_UNAVAILABLE = "repository_unavailable"
+NAME_RELEASED = "name_released"  # gave its name to another repository; resolved by GitHub ID
 
 
 class RepoLike(Protocol):
@@ -85,7 +89,12 @@ def prefilter(
     )
     if reason is None and check_stars and repo.stars < cfg.min_stars:
         return FEW_STARS
-    if reason is None and not_code(repo.full_name, _topics(repo), repo.primary_language, cfg):
+    # A stored repository (previously interacted) brings its dependencies; a search result has
+    # none, so a suspected list passes here and the stored row is checked after storing.
+    stored = stored_has_dependencies(repo) if isinstance(repo, Repository) else None
+    if reason is None and not_code(
+        repo.full_name, _topics(repo), repo.primary_language, cfg, has_dependencies=stored
+    ):
         return NOT_CODE
     return reason
 
@@ -101,29 +110,67 @@ def eligibility(repo: Repository, *, now: datetime, cfg: FilterConfig) -> str | 
         now=now,
         cfg=cfg,
     )
-    if reason is None and not_code(repo.full_name, _topics(repo), repo.primary_language, cfg):
+    if reason is None and stored_not_code(repo, cfg):
         return NOT_CODE
     return reason
 
 
 def not_code(
-    full_name: str, topics: Collection[str], primary_language: str, cfg: FilterConfig
+    full_name: str,
+    topics: Collection[str],
+    primary_language: str,
+    cfg: FilterConfig,
+    *,
+    has_dependencies: bool | None,
 ) -> bool:
-    """Curated lists and documentation repositories are not contribution targets (design D4):
-    named ``awesome`` / ``awesome-*``, tagged with an excluded topic, or without any detected
-    programming language."""
+    """Curated lists and documentation repositories are not contribution targets: no
+    detected programming language, or a suspected list (named ``awesome`` / ``awesome-*``, or
+    tagged with an excluded topic) without manifest dependencies. ``has_dependencies`` None
+    (not analyzed yet) lets a suspected list through: its analysis decides."""
+    if not primary_language:
+        return True
+    return suspected_list(full_name, topics, cfg) and has_dependencies is False
+
+
+def suspected_list(full_name: str, topics: Collection[str], cfg: FilterConfig) -> bool:
     name = full_name.rsplit("/", 1)[-1].lower()
     if name == "awesome" or name.startswith("awesome-"):
         return True
-    if any(t.lower() in cfg.excluded_topics for t in topics):
-        return True
-    return not primary_language
+    return any(t.lower() in cfg.excluded_topics for t in topics)
+
+
+def stored_not_code(repo: Repository, cfg: FilterConfig) -> bool:
+    """``not_code`` on a stored repository, with its dependencies once they were fetched."""
+    return not_code(
+        repo.full_name,
+        _topics(repo),
+        repo.primary_language,
+        cfg,
+        has_dependencies=stored_has_dependencies(repo),
+    )
+
+
+def has_dependencies_annotation() -> Exists:
+    """``has_dependencies`` for querysets that check many repositories."""
+    return Exists(RepositoryDependency.objects.filter(repository=OuterRef("pk")))
+
+
+def stored_has_dependencies(repo: Repository) -> bool | None:
+    """Whether a stored repository declares manifest dependencies; None before they were
+    fetched. Reads the ``has_dependencies`` annotation when present."""
+    if repo.dependencies_synced_at is None:
+        return None
+    annotated: bool | None = getattr(repo, "has_dependencies", None)
+    if annotated is not None:
+        return annotated
+    return repo.dependencies.exists()
 
 
 def _topics(repo: RepoLike) -> Collection[str]:
-    """A search result carries its topics; a stored repository has them as rows."""
+    """A search result carries its topics; a stored repository has them as rows (read
+    through ``all()``, so a ``prefetch_related("topics")`` is used)."""
     if isinstance(repo, Repository):
-        return list(repo.topics.values_list("topic", flat=True)) if repo.pk else []
+        return [t.topic for t in repo.topics.all()] if repo.pk else []
     topics: Collection[str] = getattr(repo, "topics", ())
     return topics
 

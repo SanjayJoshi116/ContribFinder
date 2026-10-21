@@ -1,6 +1,6 @@
 # Ideas
 
-Gap analysis from 2026-10-20 (v0.12.4). These are not yet planned: each needs an OpenSpec
+Gap analysis from 2026-10-20 (v0.12.4); round 3 added 2026-10-21 (v0.12.7). These are not yet planned: each needs an OpenSpec
 change before work starts. Ranking-visible items must win on the benchmark, which needs K-1
 (`Bug_Backlog.md`) first.
 
@@ -133,3 +133,43 @@ need the discovery-recall metric (§3) first, or gains stay invisible.
 |---|---|---|
 | **High value** | labeled-issue fetch (§7); opportunity qualifiers (§6); setup readiness (§8) | upstream dependencies (§6); similar_repo from saves (§6) |
 | **Lower value** | — | starred repos (§6, privacy disclosure); periodic resync (§9, budget) |
+
+# Round 3 (2026-10-21): what batch 7 showed
+
+From the `discovery-repository-data` change (v0.12.7) and its first real discovery run.
+
+## 11. Code-or-list detection
+
+- **`not_code` by content, not only markers.** Today a suspected list (`awesome-*`, list
+  topic) is code when it declares manifest dependencies, and docs repositories without a list
+  marker always pass (K-4). Lists often carry lint or site tooling (`awesome-lint`, mkdocs), so
+  dependencies are weak evidence. Stored data already allows a better signal: share of
+  non-markup bytes in `RepositoryLanguage`, README link density, or source files at the root
+  (`list_root_contents` is already fetched for manifests). Needs a judged sample of lists and
+  tools first, since it decides what users can be shown at all.
+- **Post-analysis pool cleanup.** The pool step runs before analysis (D7), so a suspected list
+  found `not_code` by this run's analysis keeps its pool slot until the next run (X-9). A
+  second, cheap `not_code` pass after the analysis step would free it now.
+
+## 12. Search budget
+
+- **`no_license` is the biggest rejection.** The first real run rejected 30 results as
+  `no_license` against 3 `not_code`, out of 20 requests. GitHub search has no "has any license"
+  qualifier, so each rejected result costs a slot of a 30-result page. Measure per strategy;
+  if one query type dominates, a narrower query (or a second page for it) recovers budget.
+- **Uneven band yield.** Bands are counted (`pool_bands`) but not compared to what each band's
+  requests returned. Recording results per band in the job metadata would show whether the
+  20..999 band is worth the same budget as 1000+.
+
+## 13. Repository identity
+
+- **Released names are resolved lazily.** A repository that gave up its name stays
+  `name_released` (not recommended) until the hourly sweep and backlog resolve it by GitHub ID.
+  Queuing that refresh directly when the name is released would close the gap to minutes.
+
+## Suggested order (round 3)
+
+| | Cheap | Expensive |
+|---|---|---|
+| **High value** | post-analysis cleanup (§11); `no_license` measurement (§12) | content-based `not_code` (§11, needs a judged sample) |
+| **Lower value** | queue released-name refresh (§13); per-band yield (§12) | — |

@@ -16,7 +16,14 @@ from services.github.errors import GitHubRateLimited
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import PARTS, stale_parts
 
-from .repo_fixtures import API, add_candidate, make_candidate_repo, mock_repo_api, repo_payload
+from .repo_fixtures import (
+    API,
+    add_candidate,
+    analyze,
+    make_candidate_repo,
+    mock_repo_api,
+    repo_payload,
+)
 from .test_github_client import SECONDARY_MESSAGES, TOKEN
 from .test_profiling_manifests import DEEP_PACKAGE_JSON
 
@@ -32,10 +39,6 @@ def profile(user) -> DeveloperProfile:
 def client():
     with GitHubClient(TOKEN, cache_scope="public") as c:
         yield c
-
-
-def analyze(client, repo: Repository, parts=None) -> Outcome:
-    return RepositoryAnalysisService(client).run(repo.pk, parts)
 
 
 def test_first_analysis_stores_every_part(client, respx_mock) -> None:
@@ -114,7 +117,9 @@ def test_not_found_marks_failed_and_ineligible(client, respx_mock, profile) -> N
     repo = make_candidate_repo(7, "gone/repo")
     add_candidate(profile, repo)
     respx_mock.get(f"{API}/repos/gone/repo").respond(404, json={"message": "Not Found"})
+    by_id = respx_mock.get(f"{API}/repositories/7").respond(404, json={"message": "Not Found"})
     assert analyze(client, repo) == Outcome.FAILED
+    assert by_id.called  # not under that name: by GitHub ID, which is gone too
     repo.refresh_from_db()
     assert (repo.lifecycle, repo.lifecycle_error) == ("failed", "not_found")
     assert (repo.is_eligible, repo.ineligible_reason) == (False, "repository_unavailable")
@@ -261,11 +266,9 @@ def test_backlog_selects_due_pooled_repositories(profile, monkeypatch) -> None:
     queued.clear()
     with override_settings(REPO_REFRESH_BATCH=50):
         tasks.process_repository_backlog()
+    # The first batch is queued already and not queued twice.
     assert {pk for _, pk in queued} == {
-        stale.pk,
-        readme_only.pk,
         waiting.pk,
-        failed_due.pk,
         abandoned.pk,  # a dead worker's claim; the live one (9) is left alone
     }
 

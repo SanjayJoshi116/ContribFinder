@@ -25,8 +25,8 @@ from services.profiling.analysis import ProfileAnalysisService
 from services.repositories import lifecycle
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 
-from .repo_fixtures import API, add_candidate, make_candidate_repo, mock_repo_api
-from .test_repository_analysis import analyze, client, profile  # noqa: F401  (fixtures)
+from .repo_fixtures import API, add_candidate, analyze, make_candidate_repo, mock_repo_api
+from .test_repository_analysis import client, profile  # noqa: F401  (fixtures)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 

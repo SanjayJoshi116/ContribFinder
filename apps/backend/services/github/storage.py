@@ -1,5 +1,6 @@
-"""Storing normalized GitHub repository data (shared by the profile sync and Phase 4
-repository analysis). Callers own the transaction."""
+"""Storing normalized GitHub repository data (shared by the profile sync, discovery and
+repository analysis). Callers own the transaction. Rows are never deleted here: a repository
+whose name another GitHub ID now has gives the name up (``lifecycle.release_name``)."""
 
 from __future__ import annotations
 
@@ -15,36 +16,42 @@ from repositories.models import (
     RepositoryTopic,
 )
 from services.profiling.manifests import is_manifest, parse_manifest
+from services.repositories.lifecycle import release_name
 
 from .client import GitHubClient, GitHubRepo
 from .errors import GitHubNotFound
 
 
-def upsert_repository(gh: GitHubRepo, now: Any) -> Repository:
-    # A different repo that used to have this name (deleted and recreated, or renamed away) is
-    # stale; drop it so the unique full_name can move to the current repo.
-    Repository.objects.filter(full_name=gh.full_name).exclude(github_id=gh.github_id).delete()
+def upsert_repository(gh: GitHubRepo, now: Any, *, metadata_fetched: bool = True) -> Repository:
+    """Store ``gh`` by GitHub ID. ``metadata_fetched=False`` (a search result, which carries
+    no languages) updates the fields but not ``synced_at`` of an existing row, so its metadata
+    still goes stale on schedule."""
+    # Another repository that had this name (renamed away, or deleted and recreated) keeps its
+    # row and links; its next analysis finds it by GitHub ID.
+    release_name(gh.full_name, gh.github_id)
+    fields: dict[str, Any] = {
+        "owner_login": gh.owner_login,
+        "name": gh.name,
+        "full_name": gh.full_name,
+        "description": gh.description,
+        "html_url": gh.html_url,
+        "default_branch": gh.default_branch,
+        "stars": gh.stars,
+        "forks": gh.forks,
+        "open_issues": gh.open_issues,
+        "primary_language": gh.primary_language,
+        "license_spdx": gh.license_spdx,
+        "is_fork": gh.is_fork,
+        "is_archived": gh.is_archived,
+        "github_created_at": gh.created_at,
+        "github_updated_at": gh.updated_at,
+        "pushed_at": gh.pushed_at,
+    }
+    fetched = {"synced_at": now}
     repo, _ = Repository.objects.update_or_create(
         github_id=gh.github_id,
-        defaults={
-            "owner_login": gh.owner_login,
-            "name": gh.name,
-            "full_name": gh.full_name,
-            "description": gh.description,
-            "html_url": gh.html_url,
-            "default_branch": gh.default_branch,
-            "stars": gh.stars,
-            "forks": gh.forks,
-            "open_issues": gh.open_issues,
-            "primary_language": gh.primary_language,
-            "license_spdx": gh.license_spdx,
-            "is_fork": gh.is_fork,
-            "is_archived": gh.is_archived,
-            "github_created_at": gh.created_at,
-            "github_updated_at": gh.updated_at,
-            "pushed_at": gh.pushed_at,
-            "synced_at": now,
-        },
+        defaults=fields | fetched if metadata_fetched else fields,
+        create_defaults=fields | fetched,
     )
     return repo
 

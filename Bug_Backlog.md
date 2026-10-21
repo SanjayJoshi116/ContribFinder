@@ -10,7 +10,7 @@ Status: `open` · `in-progress` · `fixed` · `wontfix`.
 | K-1 | Judge `real-a-v2`, build `benchmark-v2`, evaluate v1/v2 (all/persona/real), `--write-baseline`. Blocks any further ranking search. | features.txt:261, CLAUDE.md §7 | open |
 | K-2 | Docker Compose verification from a fresh `.env` (no Docker on dev machine). | features.txt:279 | open |
 | K-3 | Issue-level evaluation (benchmark covers repositories only). | features.txt:282 | open |
-| K-4 | Docs-style repositories with a code language and no list topic (`system-design-primer`, `developer-roadmap`) pass `not_code`. | CHANGELOG 0.12.0 | open (known limit) |
+| K-4 | Docs-style repositories with a code language and no list topic (`system-design-primer`, `developer-roadmap`) pass `not_code`. Since 0.12.7 a suspected list (`awesome-*`, list topic) that declares manifest dependencies (lint or site tooling) passes too. | CHANGELOG 0.12.0, 0.12.7 | open (known limit; `ideas.md` §11) |
 | K-5 | Active config v2 is not an improvement over v1 on `benchmark-v1` (NDCG@10 +0.0195, P@5 −0.0333). | CLAUDE.md Phase 8b | open (needs K-1) |
 
 ## Documentation drift
@@ -31,16 +31,16 @@ severe first.
 |---|---|---|---|---|
 | R-1 | `apps/backend/recommendations/management/commands/evaluate_ranking.py:77` | `--write-baseline` without `--dataset` evaluates the selection dataset (benchmark-v2 once present), so the documented baseline fix never rewrites the benchmark-v1 entry that CI checks. | With a local benchmark-v2, `evaluate_ranking --write-baseline` rewrites only `datasets.benchmark-v2`; CI skips v2 and `test_baseline_metrics_unchanged` fails on stale v1. Workaround: `--dataset evaluation/benchmark-v1.json`. | fixed (evaluation-tooling-integrity) |
 | R-2 | `apps/backend/services/evaluation/baseline.py:42` | Format 3 keeps other datasets' entries but stores one global `top_n` from the current run. | v1 written at top_n 50, then `--dataset holdout-v2 --write-baseline --top-n 20` sets `top_n: 20` globally; the test re-evaluates v1 at 20 against metrics from 50 and reports a false "Ranking changed". Store `top_n` per dataset. | fixed (evaluation-tooling-integrity) |
-| R-3 | `apps/backend/config/settings/base.py:279` | Default `DISCOVERY_STAR_BANDS` hardcodes 20 instead of deriving from `DISCOVERY_MIN_STARS`; system check requires a match. | Set only `DISCOVERY_MIN_STARS=50` → `core.E025` fails, Django refuses to start (runserver, migrate, worker). | confirmed |
-| R-4 | `apps/backend/services/discovery/service.py:305` | `_remove_not_code` writes lifecycle and eligibility directly, overwriting existing reasons and racing with an in-progress analysis claim. | (a) FAILED or archived repository loses its real `ineligible_reason`. (b) REFRESHING repository (previous RECOMMENDABLE) is marked ineligible, analysis fails transiently, `lifecycle.release()` restores RECOMMENDABLE → RECOMMENDABLE but ineligible. Move to `services/repositories/lifecycle.py`. | confirmed |
-| R-5 | `apps/backend/services/discovery/filters.py:116` | `not_code` treats any `awesome-*` name and generic topics (`list`, `lists`, `books`) as non-code; ineligibility is set on the shared Repository row. | `sindresorhus/awesome-lint` (a linter) is rejected; a linked-list library tagged `list` is rejected; it disappears for every user despite having a primary language. | confirmed |
-| R-6 | `apps/backend/services/discovery/queries.py:172` | Provenance `core` includes the star band; a repository crossing a band creates a new CandidateDiscovery row and the old one (with its old search_rank) is never updated or pruned. | Rank #1 at `stars:20..999`, grows to rank #28 at `>=1000`; `Min(search_rank)` stays 1, so the stale rank keeps analysis priority and survives the pool cap. Band qualifier also leaks into user-facing provenance. | confirmed |
+| R-3 | `apps/backend/config/settings/base.py:279` | Default `DISCOVERY_STAR_BANDS` hardcodes 20 instead of deriving from `DISCOVERY_MIN_STARS`; system check requires a match. | Set only `DISCOVERY_MIN_STARS=50` → `core.E025` fails, Django refuses to start (runserver, migrate, worker). | fixed (discovery-repository-data) |
+| R-4 | `apps/backend/services/discovery/service.py:305` | `_remove_not_code` writes lifecycle and eligibility directly, overwriting existing reasons and racing with an in-progress analysis claim. | (a) FAILED or archived repository loses its real `ineligible_reason`. (b) REFRESHING repository (previous RECOMMENDABLE) is marked ineligible, analysis fails transiently, `lifecycle.release()` restores RECOMMENDABLE → RECOMMENDABLE but ineligible. Move to `services/repositories/lifecycle.py`. | fixed (discovery-repository-data) |
+| R-5 | `apps/backend/services/discovery/filters.py:116` | `not_code` treats any `awesome-*` name and generic topics (`list`, `lists`, `books`) as non-code; ineligibility is set on the shared Repository row. | `sindresorhus/awesome-lint` (a linter) is rejected; a linked-list library tagged `list` is rejected; it disappears for every user despite having a primary language. | fixed (discovery-repository-data) |
+| R-6 | `apps/backend/services/discovery/queries.py:172` | Provenance `core` includes the star band; a repository crossing a band creates a new CandidateDiscovery row and the old one (with its old search_rank) is never updated or pruned. | Rank #1 at `stars:20..999`, grows to rank #28 at `>=1000`; `Min(search_rank)` stays 1, so the stale rank keeps analysis priority and survives the pool cap. Band qualifier also leaks into user-facing provenance. | fixed (discovery-repository-data) |
 | R-7 | `apps/backend/services/evaluation/sheet.py:94` | `read_sheet` drops every physical line starting with `#` before CSV parsing, including continuation lines inside quoted multi-line fields. | Description `"Fast parser\n# Features"` loses its closing line and grade; quoted field swallows the next row → lost or misattributed grade, or a confusing "not a candidate" error. | fixed (evaluation-tooling-integrity) |
 | R-8 | `apps/backend/services/evaluation/sheet.py:98` | Duplicate repository rows: last wins silently. Formatted empty rows (`,,,,,,,,,`) become repository `''` and fail the whole import. | Spreadsheet saves trailing blank rows → `Row : not a candidate of this export`, nothing imported. | fixed (evaluation-tooling-integrity) |
-| R-9 | `apps/backend/services/discovery/service.py:440` | `_band_counts` assigns stars to the highest band whose low is reached, ignoring that band's high. | Bands `[[20,99],[200,999]]` (allowed by the check): 150 stars → `20..99`; 5000 stars → `200..999`. `pool_bands` metadata wrong. | confirmed |
-| R-10 | `apps/backend/services/discovery/queries.py:164` | Request budget floor-divided by band count; remainder silently wasted; check accepts non-multiples. | `DISCOVERY_MAX_QUERIES=25`, 3 bands → 24 requests; 5 with 3 bands → one query. No warning. | partial |
-| R-11 | `apps/backend/services/discovery/filters.py:126` | `_topics` uses `values_list`, which bypasses prefetch → N+1 in `_step_interactions`; `_remove_not_code` duplicates the topic extraction. | One extra query per contributed repository (up to `GITHUB_CONTRIB_MAX_REPOS`). Fix: `repo.topics.all()` + `prefetch_related('topics')`. Docstring still says "Pure functions". | confirmed |
-| R-12 | `apps/backend/services/discovery/service.py:285` | Design: pool step re-checks only `not_code` on stored data; other eligibility rules go stale when settings change. | After changing `DISCOVERY_MAX_PUSH_AGE_DAYS` or license rules, RECOMMENDABLE repositories keep old eligibility until re-analysis. Re-run `eligibility()` via a lifecycle helper (would also fix R-4). | partial |
+| R-9 | `apps/backend/services/discovery/service.py:440` | `_band_counts` assigns stars to the highest band whose low is reached, ignoring that band's high. | Bands `[[20,99],[200,999]]` (allowed by the check): 150 stars → `20..99`; 5000 stars → `200..999`. `pool_bands` metadata wrong. | fixed (discovery-repository-data) |
+| R-10 | `apps/backend/services/discovery/queries.py:164` | Request budget floor-divided by band count; remainder silently wasted; check accepts non-multiples. | `DISCOVERY_MAX_QUERIES=25`, 3 bands → 24 requests; 5 with 3 bands → one query. No warning. | fixed (discovery-repository-data) |
+| R-11 | `apps/backend/services/discovery/filters.py:126` | `_topics` uses `values_list`, which bypasses prefetch → N+1 in `_step_interactions`; `_remove_not_code` duplicates the topic extraction. | One extra query per contributed repository (up to `GITHUB_CONTRIB_MAX_REPOS`). Fix: `repo.topics.all()` + `prefetch_related('topics')`. Docstring still says "Pure functions". | fixed (discovery-repository-data) |
+| R-12 | `apps/backend/services/discovery/service.py:285` | Design: pool step re-checks only `not_code` on stored data; other eligibility rules go stale when settings change. | After changing `DISCOVERY_MAX_PUSH_AGE_DAYS` or license rules, RECOMMENDABLE repositories keep old eligibility until re-analysis. Re-run `eligibility()` via a lifecycle helper (would also fix R-4). | fixed (discovery-repository-data) |
 | R-13 | `apps/backend/services/evaluation/build.py:34` | `build` assumes each input is a JSON object; a top-level list raises uncaught `AttributeError`. Differing `format` merged unchecked until final `parse`. | `build_benchmark --input report.json` (array) → raw traceback instead of `CommandError`. | fixed (evaluation-tooling-integrity) |
 | R-14 | `apps/backend/recommendations/management/commands/build_benchmark.py:174` | Real developers keep the export description "Add judgments ... by hand before using this developer"; `import_sheet` does not update it. | Committed benchmark-v2 shows judged developers labeled as unjudged. | fixed (evaluation-tooling-integrity) |
 
@@ -79,6 +79,26 @@ under `apps/backend/`. All fixed in 0.12.6 before commit.
 | W-8 | bug | `services/ranking/service.py` | An issue re-analyzed (not deleted) between ranking and storing passed the check → reasons from stale analysis. | fixed (recommendation-consistency) |
 | W-9 | gap | `services/feedback.py` (`save`) | Dismissal enforced only through the recommendation's deletion. | fixed (recommendation-consistency) |
 | W-10 | perf | `services/feedback.py` (`record`) | View de-duplication waited on the profile lock held by a whole persist. | fixed (recommendation-consistency) |
+
+## Batch 7 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `discovery-repository-data` diff (v0.12.7). Paths
+under `apps/backend/`. Verified against the code; fixed in 0.12.7 before commit unless noted.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| X-1 | bug | `services/repositories/lifecycle.py` (`release_name`) | A holder that gave up its name stayed eligible: recommended as `a/b~5` with a URL that now opens another repository. Now ineligible `name_released` (INDEXED) until resolved. | fixed (discovery-repository-data) |
+| X-2 | bug | `services/discovery/service.py` (`_prune_discoveries`) | A run with no search (empty plan) or a query rejected with 422 pruned valid records, leaving candidates with no provenance. | fixed (discovery-repository-data) |
+| X-3 | gap | `services/discovery/service.py` (`_step_pool`) | Pool writes (prune, not_code, re-check, eviction) ran outside `job_write`: a cancelled or reclaimed run kept writing. | fixed (discovery-repository-data) |
+| X-4 | perf | `services/repositories/analysis.py` (`run`) | A queued refresh with nothing stale left still completed and stamped a transition → needless regenerations for every developer. Now released, SKIPPED. | fixed (discovery-repository-data) |
+| X-5 | bug | `services/discovery/service.py` (`_record`) | One query matching a repository in both bands in one run kept the later band's rank. Now the better rank within a run. | fixed (discovery-repository-data) |
+| X-6 | bug | `services/repositories/backlog.py` (`queue_batch`) | Overlapping backlog runs could queue the same rows. Now selected `skip_locked` and stamped in one transaction. | fixed (discovery-repository-data) |
+| X-7 | design | `services/github/storage.py` (`upsert_repository`) | `release_name` locks a second row outside GitHub ID order; deadlock needs a rename race plus two concurrent runs (accepted in design D3; the old delete had the same shape). | wontfix (accepted) |
+| X-8 | cleanup | `services/discovery/service.py` (`_step_pool`) | `_remove_not_code` and `recheck_eligibility` both load the pool with topics and dependencies. Not one pass: they cover different lifecycles. | wontfix (batch 11 if it matters) |
+| X-9 | design | `services/discovery/service.py` (steps) | A suspected list found `not_code` by this run's analysis keeps its pool slot until the next run (pool runs before analysis, D7). | wontfix (by design) |
+| X-10 | — | `core/checks.py` | "W003 when the budget is below the band count": E025 already errors there and W003 is skipped. | false-positive |
+| X-11 | perf | `services/repositories/lifecycle.py` (`complete`) | Eligibility re-reads the topics and dependencies the analysis just wrote: 1–2 queries per analysis. Passing them in needs an annotation set by hand (skipped in the `/simplify` pass). | open (batch 11) |
+| X-12 | cleanup | `tests/` | `developer`, `single_band` and `client` fixtures are copied across `test_discovery_service.py`, `test_discovery_repository_data.py`, `test_repository_analysis.py` and `test_issue_ingestion.py`; move them to `conftest.py` (`fresh_repo` and `analyze` already moved to `repo_fixtures.py`). | open (batch 11) |
 
 ## Full-file reviews (2026-10-19)
 
@@ -142,23 +162,23 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
 | C-1 | bug | `services/repositories/analysis.py:142` | A non-permanent, non-transient client error (301 rename) re-raises → the whole discovery job fails, no lifecycle error recorded; every user whose pool holds the repository fails; backlog requeues forever. The "follows renames" comment (l.161) is wrong. | fixed (github-error-resilience) |
-| C-2 | bug | `services/discovery/service.py:364` | `upsert_repository` deletes any other row with the same full_name → a live renamed repository is wiped, cascading to every user's candidates, recommendations, saves and dismissals. | confirmed |
+| C-2 | bug | `services/discovery/service.py:364` | `upsert_repository` deletes any other row with the same full_name → a live renamed repository is wiped, cascading to every user's candidates, recommendations, saves and dismissals. | fixed (discovery-repository-data) |
 | C-3 | bug | `services/repositories/lifecycle.py:363` | `release/fail/complete` don't check claim ownership → a reclaimed-stale worker overwrites lifecycle while another analyzes; final state = last writer. | fixed (job-claim-fencing) |
 | C-4 | bug | `services/repositories/analysis.py:136` | Repository claim never renewed during `_fetch` → analyses longer than 10 min are reclaimed while running (duplicate work, plus C-3). | fixed (job-claim-fencing) |
-| C-5 | bug | `services/repositories/analysis.py:129` | Explicit `parts` skip the FAILED→recheck-all rule, and `complete()` sets INDEXED before `eligibility()` → a deleted (404) repository returns as RECOMMENDABLE, eligible. | partial |
+| C-5 | bug | `services/repositories/analysis.py:129` | Explicit `parts` skip the FAILED→recheck-all rule, and `complete()` sets INDEXED before `eligibility()` → a deleted (404) repository returns as RECOMMENDABLE, eligible. | fixed (discovery-repository-data) |
 | C-6 | bug | `services/repositories/analysis.py:56` | `GitHubForbidden` treated as permanent; a secondary-limit 403 (see A-2) marks shared repositories FAILED and ineligible for all users for 24 h. | fixed (github-error-resilience) |
-| C-7 | bug | `services/discovery/service.py:137` | Each query's results are upserted in one transaction; concurrent jobs lock the same rows in different orders → deadlock → `internal_error`, job fails. | confirmed |
-| C-8 | bug | `services/discovery/service.py:364` | Search upserts set `synced_at=now` → `metadata` never stale for frequently found repositories → languages never refreshed. | confirmed |
+| C-7 | bug | `services/discovery/service.py:137` | Each query's results are upserted in one transaction; concurrent jobs lock the same rows in different orders → deadlock → `internal_error`, job fails. | fixed (discovery-repository-data) |
+| C-8 | bug | `services/discovery/service.py:364` | Search upserts set `synced_at=now` → `metadata` never stale for frequently found repositories → languages never refreshed. | fixed (discovery-repository-data) |
 | C-9 | bug | `repositories/tasks.py:384` | Non-retryable refresh failure only logged; repository restored with no `lifecycle_error` → breaks "failures are state"; backlog retries forever. | fixed (github-error-resilience) |
 | C-10 | bug | `services/repositories/lifecycle.py:371` | `release()` sets `lifecycle_changed_at=now` → a transient error restarts the FAILED 24 h clock and the DISCOVERED grace period. | fixed (job-claim-fencing) |
-| C-11 | bug | `services/discovery/service.py:61` | Analysis step runs before the pool step → budget spent on candidates the pool deletes; ordering also differs (pool adds `last_seen_at`). | confirmed |
-| C-12 | bug | `services/discovery/service.py:180` | On resume `pending` excludes already analyzed repositories, so `pending[:cap]` takes new ones → more than `DISCOVERY_MAX_ANALYSES_PER_RUN` per run; `analysis_total` overwritten. | confirmed |
-| C-13 | bug | `services/discovery/service.py:262` | CandidateDiscovery rows from queries that no longer match are never pruned → stale best rank drives analysis order and eviction (generalizes R-6). | confirmed |
-| C-14 | bug | `services/repositories/lifecycle.py:396` | Without a metadata fetch, `complete()` computes eligibility from the in-memory row loaded at claim, ignoring concurrent upserts. | confirmed |
-| C-15 | perf | `repositories/tasks.py:357` | Backlog requeues STALE repositories every 15 min even when a task is queued or retrying; explicit-part tasks don't intersect with current stale parts → duplicate fetches. | confirmed |
-| C-16 | gap | `repositories/tasks.py:313` | Staleness and backlog selection logic lives in Celery tasks, not services (CLAUDE.md §5). | confirmed |
-| C-17 | cleanup | `repositories/api.py:112` | Candidate ordering written three times (API, `_pool_repositories`, `_step_pool`) and drifted. | confirmed |
-| C-18 | cleanup | `services/discovery/service.py:366` | Null `lifecycle_changed_at` patched in two places; give the field a default. | confirmed |
+| C-11 | bug | `services/discovery/service.py:61` | Analysis step runs before the pool step → budget spent on candidates the pool deletes; ordering also differs (pool adds `last_seen_at`). | fixed (discovery-repository-data) |
+| C-12 | bug | `services/discovery/service.py:180` | On resume `pending` excludes already analyzed repositories, so `pending[:cap]` takes new ones → more than `DISCOVERY_MAX_ANALYSES_PER_RUN` per run; `analysis_total` overwritten. | fixed (discovery-repository-data) |
+| C-13 | bug | `services/discovery/service.py:262` | CandidateDiscovery rows from queries that no longer match are never pruned → stale best rank drives analysis order and eviction (generalizes R-6). | fixed (discovery-repository-data) |
+| C-14 | bug | `services/repositories/lifecycle.py:396` | Without a metadata fetch, `complete()` computes eligibility from the in-memory row loaded at claim, ignoring concurrent upserts. | fixed (discovery-repository-data) |
+| C-15 | perf | `repositories/tasks.py:357` | Backlog requeues STALE repositories every 15 min even when a task is queued or retrying; explicit-part tasks don't intersect with current stale parts → duplicate fetches. | fixed (discovery-repository-data) |
+| C-16 | gap | `repositories/tasks.py:313` | Staleness and backlog selection logic lives in Celery tasks, not services (CLAUDE.md §5). | fixed (discovery-repository-data) |
+| C-17 | cleanup | `repositories/api.py:112` | Candidate ordering written three times (API, `_pool_repositories`, `_step_pool`) and drifted. | fixed (discovery-repository-data) |
+| C-18 | cleanup | `services/discovery/service.py:366` | Null `lifecycle_changed_at` patched in two places; give the field a default. | fixed (discovery-repository-data) |
 | C-19 | bug | `services/repositories/lifecycle.py:365` | `release()` is read-then-update (not atomic); can restore a stale `previous_lifecycle`. | fixed (job-claim-fencing) |
 | C-20 | perf | `services/discovery/service.py:184` | Full metadata JSON rewritten after each analysis → quadratic write volume. | confirmed |
 | C-21 | cleanup | `repositories/serializers.py:58` | `ineligible_reason` not `read_only=True` → OpenAPI marks it writable and required. | confirmed |
@@ -306,7 +326,8 @@ scenario or severity is narrower; `false-positive` = not a defect.
 | H platform/settings/tests | 20 | 16 | 4 | 0 |
 | V batch 5 review | 9 | 6 | 2 | 1 |
 | W batch 6 review | 10 | 10 | 0 | 0 |
-| **Total** | **173** | **131** | **33** | **2** |
+| X batch 7 review | 12 | 11 | 0 | 1 |
+| **Total** | **185** | **142** | **33** | **3** |
 
 ## Verification notes
 
@@ -375,7 +396,12 @@ can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
 | 8 | **Signal and explanation accuracy** | B-6, B-14, B-15, B-16, D-7, D-8, D-9, D-11, D-12, D-13, D-15, D-16, D-17, D-18 | Wrong experience level, missed README badges, misclassified issues, reasons not backed by scoring. Ranking-visible: evaluate on the benchmark. |
 | 9 | **Frontend correctness** | F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18 | Query invalidation churn, no 4xx retry, pagination gaps, 401 handling; add Playwright for the main flows. |
 | 10 | **Dev scripts, checks and migrations** | G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20 | `npm run stop` kills only this repo; config checks for unchecked settings; safe seed migrations; tests for those paths. |
-| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2 | No behavior change; do alongside nearby batches or as one sweep. |
+| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
 | 12 | **Batch 5 follow-ups** | V-1, V-2, V-3, V-4, V-5, V-6, V-7, V-8, V-9 | Review of `github-error-resilience`. Fixed in the same release (0.12.5); V-1 and V-3 replace design decisions D7 (client raises `GitHubInvalidResponse`) and D9 (in-memory throttle fallback instead of fail-open). |
+| 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7…X-9 accepted, X-10 false positive. X-11 and X-12 went to batch 11. |
+
+Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
+W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7. Next: batch 8 (signal and explanation accuracy,
+ranking-visible: needs K-1 to judge), else batch 9 or 10.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.

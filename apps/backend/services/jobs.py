@@ -24,7 +24,7 @@ from services.errors import JobCancelled, PermanentJobError
 from services.github.errors import GitHubError
 from services.github.retry import Retry, decide_retry
 from services.github.sync import STEPS
-from services.job_guard import held, stale_before
+from services.job_guard import held, lost_before, stale_before
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ DISCOVERY = SyncJob.JobType.REPOSITORY_DISCOVERY
 RECOMMENDATIONS = SyncJob.JobType.RECOMMENDATION_GENERATION
 Status = SyncJob.Status
 
-DISCOVERY_STEPS = ("queries", "search", "interactions", "analysis", "pool")
+DISCOVERY_STEPS = ("queries", "search", "interactions", "pool", "analysis")
 RECOMMENDATION_STEPS = ("recommendations",)
 STEPS_BY_JOB_TYPE: dict[str, tuple[str, ...]] = {
     SYNC: STEPS,
@@ -219,7 +219,6 @@ def recover_stale_jobs() -> dict[str, int]:
       its message was lost. It is requeued, and ``updated_at`` is bumped so the next run waits
       a full period again. ``claim_job`` lets only one delivery run a duplicate."""
     now = timezone.now()
-    lost_before = stale_before(now) - timedelta(seconds=settings.GITHUB_MAX_RETRY_DELAY)
     stale = SyncJob.objects.filter(_stale_running(now))
     failed = _end_jobs(
         stale.filter(attempts__gte=settings.SYNC_MAX_ATTEMPTS),
@@ -227,7 +226,7 @@ def recover_stale_jobs() -> dict[str, int]:
         error_code="worker_lost",
     )
     waiting = SyncJob.objects.filter(
-        status__in=[Status.PENDING, Status.RETRYING], updated_at__lt=lost_before
+        status__in=[Status.PENDING, Status.RETRYING], updated_at__lt=lost_before(now)
     )
     # Stale jobs first: once RETRYING with updated_at = now, they are no longer "waiting".
     requeued = _requeue(

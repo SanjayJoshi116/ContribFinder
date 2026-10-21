@@ -76,13 +76,13 @@ def mock_search(respx_mock, results: dict[str, list[dict[str, Any]]]) -> Any:
     return respx_mock.get(f"{API}/search/repositories").mock(side_effect=respond)
 
 
-def new_job(user) -> SyncJob:
-    return SyncJob.objects.create(
-        user=user,
-        job_type="repository_discovery",
-        status="RUNNING",
-        steps=dict.fromkeys(jobs.DISCOVERY_STEPS, "pending"),
-    )
+def new_job(user, **overrides: Any) -> SyncJob:
+    fields = {
+        "status": "RUNNING",
+        "steps": dict.fromkeys(jobs.DISCOVERY_STEPS, "pending"),
+        **overrides,
+    }
+    return SyncJob.objects.create(user=user, job_type="repository_discovery", **fields)
 
 
 def run(user, **kw) -> SyncJob:
@@ -278,7 +278,9 @@ def test_expired_candidates_removed(user, developer, respx_mock) -> None:
     with override_settings(DISCOVERY_MAX_ANALYSES_PER_RUN=0):
         job = run(user)
     assert list(RepositoryCandidate.objects.values_list("repository_id", flat=True)) == [recent.pk]
-    assert job.metadata["pool_expired"] == 2  # the candidate and its discovery row
+    # Neither record was found again by this run (no queries), so both are pruned first.
+    assert job.metadata["pool_pruned_discoveries"] == 2
+    assert job.metadata["pool_expired"] == 1
     assert Repository.objects.filter(pk=old.pk).exists()
 
 
@@ -286,6 +288,7 @@ def test_expired_candidates_removed(user, developer, respx_mock) -> None:
 def test_pool_cap_keeps_best_ranked_interacted_first(user, developer, respx_mock) -> None:
     mock_search(respx_mock, {})
     now = timezone.now()
+    this_run = now + timedelta(hours=1)  # records the run "found again": not pruned
     interacted = make_candidate_repo(1)
     worst = make_candidate_repo(2)
     best = make_candidate_repo(3)
@@ -296,9 +299,10 @@ def test_pool_cap_keeps_best_ranked_interacted_first(user, developer, respx_mock
         query="",
         rank=None,
         seen=now - timedelta(days=20),
+        discovery_seen=this_run,
     )
-    add_candidate(developer, worst, rank=25, seen=now)
-    add_candidate(developer, best, rank=2, seen=now - timedelta(days=5))
+    add_candidate(developer, worst, rank=25, seen=now, discovery_seen=this_run)
+    add_candidate(developer, best, rank=2, seen=now - timedelta(days=5), discovery_seen=this_run)
     job = run(user)
     assert set(RepositoryCandidate.objects.values_list("repository_id", flat=True)) == {
         interacted.pk,
@@ -472,8 +476,9 @@ def test_banded_run_keeps_both_sizes(user, developer, respx_mock, settings) -> N
     kept = set(RepositoryCandidate.objects.values_list("repository__full_name", flat=True))
     assert kept == {"small/p0", "small/p1", "large/p0", "large/p1"}  # ranks 1-2 of each band
     assert job.metadata["pool_bands"] == {"below": 0, "20..999": 2, "1000+": 2}
+    # One query in both bands: provenance has no star qualifier.
     queries = set(CandidateDiscovery.objects.values_list("query", flat=True))
-    assert queries == {"language:Python stars:20..999", "language:Python stars:>=1000"}
+    assert queries == {"language:Python"}
 
 
 def test_contributed_list_rejected_as_not_code(user, developer, respx_mock) -> None:
@@ -492,6 +497,7 @@ def test_pool_step_removes_lists_found_before_the_rule(user, developer, respx_mo
         lifecycle="recommendable",
         is_eligible=True,
         activity_synced_at=timezone.now(),
+        dependencies_synced_at=timezone.now(),  # analyzed: no manifest dependencies
     )
     RepositoryTopic.objects.create(repository=lists, topic="lists")
     code = make_candidate_repo(303, "encode/httpx", lifecycle="recommendable", is_eligible=True)

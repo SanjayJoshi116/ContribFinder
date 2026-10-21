@@ -27,6 +27,13 @@ def stale_before(now: datetime) -> datetime:
     return now - timedelta(seconds=settings.SYNC_STALE_AFTER_SECONDS)
 
 
+def lost_before(now: datetime) -> datetime:
+    """Queued work (a job's message, a repository refresh task) untouched since before this
+    has had its chance to be claimed and retried: its message was lost, so it may be queued
+    again."""
+    return stale_before(now) - timedelta(seconds=settings.GITHUB_MAX_RETRY_DELAY)
+
+
 def held(job: SyncJob) -> QuerySet[SyncJob]:
     """The job's row, if it is still RUNNING under this worker's claim."""
     return SyncJob.objects.filter(

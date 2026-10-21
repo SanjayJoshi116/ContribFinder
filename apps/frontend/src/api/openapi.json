@@ -233,7 +233,7 @@
     "/api/v1/discovery/candidates": {
       "get": {
         "operationId": "discovery_candidates",
-        "description": "The developer's candidate pool: analysed-eligible first, then awaiting analysis, then\nineligible; within each, the discovery job's analysis order (previously interacted, best\nsearch rank, name). Not a ranking.",
+        "description": "The developer's candidate pool: analysed-eligible first, then awaiting analysis, then\nineligible; within each, the order in which discovery keeps and analyzes them (previously\ninteracted, best search rank, most recently found, name). Not a ranking.",
         "parameters": [
           {
             "in": "query",

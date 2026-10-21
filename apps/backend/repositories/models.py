@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Lifecycle(models.TextChoices):
@@ -64,7 +65,7 @@ class Repository(models.Model):
     )
     # Time of the last lifecycle transition. Claiming for analysis is not a transition: a
     # released claim keeps the earlier state's time.
-    lifecycle_changed_at = models.DateTimeField(null=True, blank=True)
+    lifecycle_changed_at = models.DateTimeField(default=timezone.now)
     lifecycle_error = models.CharField(max_length=50, blank=True)
     previous_lifecycle = models.CharField(max_length=20, choices=Lifecycle.choices, blank=True)
     stale_parts = models.JSONField(default=list, blank=True)
@@ -77,6 +78,9 @@ class Repository(models.Model):
     # A background refresh that ended without a retry (and without FAILED): the backlog waits
     # REPO_REFRESH_RETRY_MINUTES before queueing it again. ``lifecycle_error`` holds the code.
     refresh_failed_at = models.DateTimeField(null=True, blank=True)
+    # When the backlog last queued a refresh task. It is not queued again while that task can
+    # still run (services/repositories/backlog.py); a completed or failed analysis clears it.
+    refresh_queued_at = models.DateTimeField(null=True, blank=True)
 
     # Community files and labels (null = not fetched yet).
     has_contributing = models.BooleanField(null=True, blank=True)

@@ -293,12 +293,14 @@ DISCOVERY_QUERY_SHARES: dict[str, int] = {
 }
 DISCOVERY_RESULTS_PER_QUERY = env.int("DISCOVERY_RESULTS_PER_QUERY", default=30)
 DISCOVERY_MIN_STARS = env.int("DISCOVERY_MIN_STARS", default=20)
+
 # Every query runs once per star band ([low, high], high null = open-ended), so smaller projects
 # are found as well as the most popular ones. The first band starts at DISCOVERY_MIN_STARS.
-DISCOVERY_STAR_BANDS: list[list[int | None]] = env.json(
-    "DISCOVERY_STAR_BANDS", default=[[20, 999], [1000, None]]
-)
-# Curated lists and documentation repositories are not contribution targets (`not_code`).
+# Unset (None), the bands follow it: MIN..999 and 1000+, or one open band from MIN when
+# MIN >= 1000 (services.discovery.queries.configured_star_bands).
+DISCOVERY_STAR_BANDS: list[list[int | None]] | None = env.json("DISCOVERY_STAR_BANDS", default=None)
+# Topics that mark a suspected curated list or documentation repository: `not_code` when it has
+# no manifest dependencies, so a library tagged `list` that declares dependencies stays code.
 DISCOVERY_EXCLUDED_TOPICS: list[str] = env.json(
     "DISCOVERY_EXCLUDED_TOPICS",
     default=[

@@ -19,6 +19,13 @@ PART_FIELDS = {
     "issues": "issues_synced_at",
 }
 PARTS = tuple(PART_FIELDS)
+# A repository that gave up its name to another GitHub ID is stored as ``{name}~{github_id}``
+# (lifecycle.release_name). GitHub names never contain ``~``, so this cannot collide.
+RELEASED_MARK = "~"
+
+
+def is_released_name(full_name: str) -> bool:
+    return RELEASED_MARK in full_name
 
 
 def part_timestamps(repo: Repository) -> dict[str, datetime | None]:
@@ -31,13 +38,17 @@ def stale_parts(
     """Data types that are missing or older than their configured age (hours), in ``PARTS``
     order. A repository that was never analyzed needs every part: its metadata may come from
     a search result, which carries no languages. An analyzed repository whose issues were
-    never fetched (analyzed before issues existed) has them stale."""
+    never fetched (analyzed before issues existed) has them stale. A repository that gave up
+    its name has stale metadata: only a lookup by GitHub ID finds its current name."""
     if repo.activity_synced_at is None:
         return list(PARTS)
     ages = ages if ages is not None else settings.REPO_STALE_AFTER
     stamps = part_timestamps(repo)
+    released = is_released_name(repo.full_name)
     return [
         part
         for part in PARTS
-        if (stamp := stamps[part]) is None or stamp < now - timedelta(hours=ages[part])
+        if (part == "metadata" and released)
+        or (stamp := stamps[part]) is None
+        or stamp < now - timedelta(hours=ages[part])
     ]

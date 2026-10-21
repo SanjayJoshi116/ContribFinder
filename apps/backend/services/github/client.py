@@ -355,6 +355,11 @@ class GitHubClient:
         return GitHubRepo.from_api(self._get(f"/repos/{full_name}").json())
 
     @_parses_response
+    def get_repository_by_id(self, github_id: int) -> GitHubRepo:
+        """The repository with this GitHub ID under its current name (renames, transfers)."""
+        return GitHubRepo.from_api(self._get(f"/repositories/{int(github_id)}").json())
+
+    @_parses_response
     def list_root_contents(self, full_name: str) -> list[ContentEntry]:
         """Top-level entries of the default branch; ``[]`` for an empty repository."""
         try:

@@ -172,10 +172,11 @@ BANDED = replace(CFG, max_queries=20, bands=((20, 999), (1000, None)))
 def test_every_query_in_every_band() -> None:
     plan = plan_queries(data([skill("python", 0.9), skill("django", 0.7)]), BANDED)
     assert [(q.core, q.key) for q in plan] == [
-        ("language:Python stars:20..999", "language:python@0"),
-        ("language:Python stars:>=1000", "language:python@1"),
-        ("topic:django language:Python stars:20..999", "skill:django@0"),
-        ("topic:django language:Python stars:>=1000", "skill:django@1"),
+        # Provenance is the query without qualifiers: one query in both bands.
+        ("language:Python", "language:python@0"),
+        ("language:Python", "language:python@1"),
+        ("topic:django language:Python", "skill:django@0"),
+        ("topic:django language:Python", "skill:django@1"),
     ]
     assert plan[0].q == (
         "language:Python archived:false fork:false is:public pushed:>=2026-04-02 "

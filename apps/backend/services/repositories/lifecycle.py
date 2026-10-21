@@ -10,21 +10,33 @@ or complete the repository, so a reclaimed analysis changes nothing. ``claimed_a
 claim's age; ``lifecycle_changed_at`` is the time of the last real transition, which a claim
 and its release leave alone (the FAILED retry delay and the DISCOVERED grace period count
 from it).
+
+This module is the only writer of eligibility and of the RECOMMENDABLE / INDEXED state.
+Repository rows locked in bulk are locked in GitHub ID order.
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 
 from django.db import transaction
-from django.db.models import F, Q, QuerySet, Value
-from django.db.models.functions import Coalesce, NullIf
+from django.db.models import CharField, F, Q, QuerySet, Value
+from django.db.models.functions import Coalesce, Concat, NullIf
 from django.utils import timezone
 
 from repositories.models import Lifecycle, Repository
-from services.discovery.filters import REPOSITORY_UNAVAILABLE, FilterConfig, eligibility
+from services.discovery.filters import (
+    NAME_RELEASED,
+    REPOSITORY_UNAVAILABLE,
+    FilterConfig,
+    eligibility,
+    has_dependencies_annotation,
+)
 from services.job_guard import stale_before
+
+from .staleness import RELEASED_MARK
 
 IN_PROGRESS = (Lifecycle.FETCHING, Lifecycle.REFRESHING)
 # States whose stored data can be scored, together with ``is_eligible``: stale is not gone.
@@ -79,11 +91,47 @@ def renew(repo: Repository) -> None:
         raise ClaimLost()
 
 
-def hold(repo: Repository) -> None:
-    """Lock the repository inside the store transaction; raises ClaimLost (rolling back the
-    transaction) when this analysis no longer holds the claim."""
-    if not _held(repo).select_for_update().values_list("pk", flat=True).first():
+def hold(repo: Repository, *, fetched_name: str | None = None) -> None:
+    """Lock the repository inside the store transaction and refresh ``repo`` from the locked
+    row, so eligibility sees what searches stored meanwhile. Raises ClaimLost (rolling back
+    the transaction) when this analysis no longer holds the claim, or when the data was
+    fetched under ``fetched_name`` (no metadata fetched) and the name changed since: the
+    fetched data may belong to another repository."""
+    try:
+        repo.refresh_from_db(from_queryset=_held(repo).select_for_update())
+    except Repository.DoesNotExist:
+        raise ClaimLost() from None
+    if fetched_name is not None and repo.full_name != fetched_name:
         raise ClaimLost()
+
+
+def release_name(full_name: str, github_id: int) -> None:
+    """Free ``full_name`` for ``github_id``: another row holding it (renamed away on GitHub,
+    or deleted and recreated) becomes ``{full_name}~{its github_id}`` and keeps its data and
+    links. Its stale metadata (staleness.is_released_name) makes the next analysis look it up
+    by GitHub ID. Until then its name and URL are wrong, so an eligible holder becomes
+    ineligible (``name_released``) and INDEXED; that analysis decides eligibility again."""
+    holders = list(
+        Repository.objects.filter(full_name=full_name)
+        .exclude(github_id=github_id)
+        .values_list("pk", flat=True)
+    )
+    if not holders:
+        return
+    rows = Repository.objects.filter(pk__in=holders)
+    rows.update(
+        full_name=Concat(
+            F("full_name"), Value(RELEASED_MARK), F("github_id"), output_field=CharField()
+        )
+    )
+    rows.filter(is_eligible=True).update(is_eligible=False, ineligible_reason=NAME_RELEASED)
+    rows.filter(lifecycle=Lifecycle.RECOMMENDABLE).update(
+        lifecycle=Lifecycle.INDEXED, lifecycle_changed_at=timezone.now()
+    )
+    # A claimed holder restores INDEXED, not RECOMMENDABLE, if its analysis is released.
+    rows.filter(previous_lifecycle=Lifecycle.RECOMMENDABLE).update(
+        previous_lifecycle=Lifecycle.INDEXED
+    )
 
 
 def release(repo: Repository) -> None:
@@ -110,6 +158,7 @@ def fail(repo: Repository, code: str) -> None:
         claim_token=None,
         claimed_at=None,
         refresh_failed_at=None,  # the FAILED retry delay takes over
+        refresh_queued_at=None,
     )
 
 
@@ -140,6 +189,7 @@ def complete(repo: Repository, *, now: datetime | None = None) -> None:
     repo.stale_parts = []
     repo.claim_token, repo.claimed_at = None, None
     repo.refresh_failed_at = None
+    repo.refresh_queued_at = None
     repo.save(
         update_fields=[
             "lifecycle",
@@ -152,5 +202,43 @@ def complete(repo: Repository, *, now: datetime | None = None) -> None:
             "claim_token",
             "claimed_at",
             "refresh_failed_at",
+            "refresh_queued_at",
         ]
     )
+
+
+# Settled states whose eligibility a re-check may change: in-progress rows are decided by
+# their analysis, FAILED rows keep their failure, DISCOVERED rows have no eligibility yet.
+RECHECKABLE = (Lifecycle.RECOMMENDABLE, Lifecycle.INDEXED, Lifecycle.STALE)
+
+
+def recheck_eligibility(repo_ids: Iterable[int], *, now: datetime) -> int:
+    """Re-run every eligibility rule on stored data with the current settings and time (the
+    discovery pool step). A RECOMMENDABLE or INDEXED row whose eligibility flips swaps state
+    (a transition: freshness sees it); a STALE row keeps STALE, its refresh decides the state.
+    Rows another transaction has locked are skipped, never waited for. Returns the changes."""
+    cfg = FilterConfig.from_settings()
+    # One UPDATE per distinct outcome (a handful), not one per changed row: a settings change
+    # can flip a whole pool.
+    changes: dict[tuple[tuple[str, object], ...], list[int]] = {}
+    with transaction.atomic():
+        rows = (
+            Repository.objects.filter(pk__in=list(repo_ids), lifecycle__in=RECHECKABLE)
+            .select_for_update(skip_locked=True, of=("self",))
+            .annotate(has_dependencies=has_dependencies_annotation())
+            .prefetch_related("topics")
+            .order_by("github_id")
+        )
+        for repo in rows:
+            reason = eligibility(repo, now=now, cfg=cfg) or ""
+            if reason == repo.ineligible_reason and repo.is_eligible == (not reason):
+                continue
+            update: dict[str, object] = {"is_eligible": not reason, "ineligible_reason": reason}
+            if repo.lifecycle != Lifecycle.STALE:
+                update["lifecycle"] = Lifecycle.INDEXED if reason else Lifecycle.RECOMMENDABLE
+                if update["lifecycle"] != repo.lifecycle:
+                    update["lifecycle_changed_at"] = now
+            changes.setdefault(tuple(sorted(update.items())), []).append(repo.pk)
+        for update_items, pks in changes.items():
+            Repository.objects.filter(pk__in=pks).update(**dict(update_items))
+    return sum(len(pks) for pks in changes.values())

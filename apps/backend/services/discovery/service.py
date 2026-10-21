@@ -2,8 +2,9 @@
 
 Steps, persisted on the SyncJob and resumable like the profile sync:
 ``queries`` (plan from the profile) → ``search`` (run queries, pre-filter, record provenance)
-→ ``interactions`` (contributed repositories) → ``analysis`` (shared repository analysis,
-capped per run) → ``pool`` (retention and size cap). Searches use the developer's token;
+→ ``interactions`` (contributed repositories) → ``pool`` (provenance pruning, not_code,
+eligibility re-check, retention and size cap) → ``analysis`` (shared repository analysis of
+the kept pool, planned once and capped per run). Searches use the developer's token;
 repository endpoints use the same token with the shared ``public`` ETag scope.
 """
 
@@ -18,8 +19,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from django.conf import settings
-from django.db import connections, transaction
-from django.db.models import Exists, F, Min, OuterRef
+from django.db import connections
 from django.utils import timezone
 
 from accounts.models import User
@@ -40,10 +40,20 @@ from services.github.errors import GitHubValidationError
 from services.github.storage import replace_topics, upsert_repository
 from services.job_guard import heartbeat, job_write, save_progress
 from services.repositories.analysis import RepositoryAnalysisService
-from services.repositories.lifecycle import IN_PROGRESS
+from services.repositories.lifecycle import IN_PROGRESS, recheck_eligibility
 from services.repositories.staleness import stale_parts
 
-from .filters import NOT_CODE, FilterConfig, not_code, prefilter
+from .filters import (
+    NOT_CODE,
+    FilterConfig,
+    has_dependencies_annotation,
+    not_code,
+    prefilter,
+    stored_has_dependencies,
+    stored_not_code,
+    suspected_list,
+)
+from .ordering import pool_order
 from .queries import (
     DiscoveryInput,
     InterestSignal,
@@ -51,6 +61,7 @@ from .queries import (
     QueryConfig,
     SkillSignal,
     band_label,
+    band_of,
     plan_queries,
     star_bands,
 )
@@ -58,7 +69,7 @@ from .queries import (
 logger = logging.getLogger(__name__)
 
 Step = SyncJob.StepState
-STEPS = ("queries", "search", "interactions", "analysis", "pool")
+STEPS = ("queries", "search", "interactions", "pool", "analysis")
 FINISHED = {Step.DONE, Step.NOT_FOUND, Step.SKIPPED}
 INTERACTED = DiscoverySource.PREVIOUSLY_INTERACTED
 
@@ -112,6 +123,10 @@ class DiscoveryService:
         return Step.DONE
 
     def _step_search(self) -> str:
+        if "search_started_at" not in self.job.metadata:
+            # Every record this run writes is seen at or after this; the pool step prunes the
+            # developer's older ones (queries that no longer find the repository).
+            self._update_metadata(search_started_at=self.now.isoformat())
         plan = [PlannedQuery(**q) for q in self.job.metadata.get("plan", [])]
         if not plan:
             return Step.SKIPPED
@@ -133,13 +148,28 @@ class DiscoveryService:
                 skipped.append(query.key)
                 self._update_metadata(queries_skipped=skipped)
                 continue
+            kept: list[tuple[int, GitHubRepo]] = []
+            for rank, gh in enumerate(results, start=1):
+                reason = prefilter(gh, login=login, owned=owned, now=self.now, cfg=cfg)
+                if reason:
+                    rejections[reason] += 1
+                else:
+                    kept.append((rank, gh))
             with job_write(self.job):
-                for rank, gh in enumerate(results, start=1):
-                    reason = prefilter(gh, login=login, owned=owned, now=self.now, cfg=cfg)
-                    if reason:
-                        rejections[reason] += 1
-                        continue
+                # GitHub ID order: concurrent runs storing overlapping results lock the shared
+                # rows in the same order and never deadlock.
+                for rank, gh in sorted(kept, key=lambda item: item[1].github_id):
                     repo = self._store_search_result(gh)
+                    # Topics are the search result's (just stored); dependencies are stored.
+                    if suspected_list(gh.full_name, gh.topics, cfg) and not_code(
+                        gh.full_name,
+                        gh.topics,
+                        gh.primary_language,
+                        cfg,
+                        has_dependencies=stored_has_dependencies(repo),
+                    ):
+                        rejections[NOT_CODE] += 1  # an analysis already found it is a list
+                        continue
                     self._record(repo, query.source, query.core, rank)
                 found += len(results)
                 done.append(query.key)
@@ -152,9 +182,15 @@ class DiscoveryService:
         owned, login, cfg = self._owned(), self._login(), FilterConfig.from_settings()
         rejections: Counter[str] = Counter(self.job.metadata.get("rejections", {}))
         added = 0
-        contributed = Repository.objects.filter(
-            user_links__user=self.user, user_links__relation=UserRepository.Relation.CONTRIBUTOR
-        ).distinct()
+        contributed = (
+            Repository.objects.filter(
+                user_links__user=self.user,
+                user_links__relation=UserRepository.Relation.CONTRIBUTOR,
+            )
+            .distinct()
+            .annotate(has_dependencies=has_dependencies_annotation())
+            .prefetch_related("topics")
+        )
         with job_write(self.job):
             for repo in contributed:
                 reason = prefilter(
@@ -163,20 +199,24 @@ class DiscoveryService:
                 if reason:
                     rejections[reason] += 1
                     continue
-                if repo.lifecycle_changed_at is None:
-                    Repository.objects.filter(pk=repo.pk).update(lifecycle_changed_at=self.now)
                 self._record(repo, INTERACTED, "", None)
                 added += 1
         self._update_metadata(rejections=dict(rejections), interactions_added=added)
         return Step.DONE
 
     def _step_analysis(self) -> str:
+        if "analysis_plan" not in self.job.metadata:
+            # Chosen once: a resumed step finishes this choice, never takes the next ones.
+            pending = [r for r in self._pool_repositories() if self._needs_analysis(r)]
+            cap = settings.DISCOVERY_MAX_ANALYSES_PER_RUN
+            self._update_metadata(
+                analysis_plan=[r.pk for r in pending[:cap]],
+                analysis_total=len(pending),
+                analysis_capped=len(pending) > cap,
+            )
         done: list[int] = list(self.job.metadata.get("analyzed", []))
         outcomes: Counter[str] = Counter(self.job.metadata.get("analysis_outcomes", {}))
-        pending = [r for r in self._pool_repositories() if self._needs_analysis(r)]
-        cap = settings.DISCOVERY_MAX_ANALYSES_PER_RUN
-        self._update_metadata(analysis_total=len(pending), analysis_capped=len(pending) > cap)
-        todo = [r.pk for r in pending[:cap] if r.pk not in done]
+        todo = [pk for pk in self.job.metadata["analysis_plan"] if pk not in done]
         for repo_id, outcome in self._analyze(todo):
             outcomes[outcome] += 1
             done.append(repo_id)
@@ -250,68 +290,72 @@ class DiscoveryService:
     def _step_pool(self) -> str:
         pool = RepositoryCandidate.objects.filter(developer=self.profile)
         cutoff = self.now - timedelta(days=settings.DISCOVERY_CANDIDATE_RETENTION_DAYS)
-        expired, _ = pool.filter(last_seen_at__lt=cutoff).delete()
-        not_code_removed = self._remove_not_code(pool)
-        evicted = 0
-        if pool.count() > settings.DISCOVERY_MAX_POOL:
-            # Keep the best candidates in analysis order (previously interacted, best search
-            # rank, most recently seen), so the kept pool is the one that gets analyzed.
-            keep = list(
-                pool.annotate(
-                    interacted=Exists(_interacted_discoveries()),
-                    best_rank=Min("discoveries__search_rank"),
+        # Fenced like every job write of user data: a cancelled or reclaimed run stops here.
+        with job_write(self.job):
+            pruned = self._prune_discoveries()
+            expired, _ = pool.filter(last_seen_at__lt=cutoff).delete()
+            # Re-checked including the lists removed next: their shared row becomes ineligible.
+            pooled_ids = list(pool.values_list("repository_id", flat=True))
+            not_code_removed = self._remove_not_code(pool, pooled_ids)
+            eligibility_changed = recheck_eligibility(pooled_ids, now=self.now)
+            evicted = 0
+            if len(pooled_ids) - not_code_removed > settings.DISCOVERY_MAX_POOL:
+                # Keep the candidates first in the pool order, which the analysis step
+                # follows, so the kept pool is the one that gets analyzed.
+                keep = list(
+                    pool_order(pool).values_list("pk", flat=True)[: settings.DISCOVERY_MAX_POOL]
                 )
-                .order_by(
-                    F("interacted").desc(),
-                    F("best_rank").asc(nulls_last=True),
-                    F("last_seen_at").desc(),
-                    "repository__full_name",
-                )
-                .values_list("pk", flat=True)[: settings.DISCOVERY_MAX_POOL]
-            )
-            evicted, _ = pool.exclude(pk__in=keep).delete()
+                evicted, _ = pool.exclude(pk__in=keep).delete()
+        stars = list(pool.values_list("repository__stars", flat=True))
         self._update_metadata(
+            pool_pruned_discoveries=pruned,
             pool_expired=expired,
             pool_not_code=not_code_removed,
+            pool_eligibility_changed=eligibility_changed,
             pool_evicted=evicted,
-            pool_size=pool.count(),
-            pool_bands=_band_counts(pool.values_list("repository__stars", flat=True)),
+            pool_size=len(stars),
+            pool_bands=_band_counts(stars),
         )
         return Step.DONE
 
     # --- helpers ------------------------------------------------------------------------
 
-    def _remove_not_code(self, pool: Any) -> int:
-        """Re-check ``not_code`` on stored data for the whole pool (spec: "Candidate pool
-        maintenance"): a list found before the rule, or analyzed recently, would otherwise stay
-        eligible until its next analysis. Its candidate leaves the pool and the shared
-        repository becomes ineligible, as eligibility would make it. Returns the removals."""
-        cfg = FilterConfig.from_settings()
-        rows = pool.select_related("repository").prefetch_related("repository__topics")
-        flagged = [
-            c
-            for c in rows
-            if not_code(
-                c.repository.full_name,
-                [t.topic for t in c.repository.topics.all()],
-                c.repository.primary_language,
-                cfg,
+    def _prune_discoveries(self) -> int:
+        """Delete the developer's discovery records this run did not see again: a rank from a
+        query that no longer finds the repository must not order the pool. Candidates stay
+        (retention removes them). A run that searched nothing (no plan) proves nothing about
+        the old records, and a query GitHub rejected this run keeps its records."""
+        started = self.job.metadata.get("search_started_at")
+        if not started or self.job.steps.get("search") == Step.SKIPPED:
+            return 0
+        skipped = set(self.job.metadata.get("queries_skipped", []))
+        kept_queries = {q["core"] for q in self.job.metadata.get("plan", []) if q["key"] in skipped}
+        deleted, _ = (
+            CandidateDiscovery.objects.filter(
+                candidate__developer=self.profile,
+                last_seen_at__lt=datetime.fromisoformat(started),
             )
-        ]
+            .exclude(query__in=kept_queries)
+            .delete()
+        )
+        return deleted
+
+    def _remove_not_code(self, pool: Any, repo_ids: list[int]) -> int:
+        """Re-check ``not_code`` on stored data for the whole pool (spec: "Candidate pool
+        maintenance"): a list found before the rule, or analyzed recently, leaves the pool now.
+        Only candidates are removed here; the shared repository's eligibility changes through
+        the lifecycle re-check. Returns the removals."""
+        cfg = FilterConfig.from_settings()
+        repos = (
+            Repository.objects.filter(pk__in=repo_ids)
+            .annotate(has_dependencies=has_dependencies_annotation())
+            .prefetch_related("topics")
+        )
+        flagged = [repo.pk for repo in repos if stored_not_code(repo, cfg)]
         if not flagged:
             return 0
-        repo_ids = [c.repository_id for c in flagged]
-        with transaction.atomic():
-            Repository.objects.filter(pk__in=repo_ids, lifecycle=Lifecycle.RECOMMENDABLE).update(
-                lifecycle=Lifecycle.INDEXED, lifecycle_changed_at=self.now
-            )
-            Repository.objects.filter(pk__in=repo_ids).update(
-                is_eligible=False, ineligible_reason=NOT_CODE
-            )
-            RepositoryCandidate.objects.filter(pk__in=[c.pk for c in flagged]).delete()
-        logger.info(
-            "Discovery for user %s removed %d not_code candidates", self.user.pk, len(flagged)
-        )
+        removed, _ = pool.filter(repository_id__in=flagged).delete()
+        logger.info("Discovery for user %s removed %d not_code candidates", self.user.pk, removed)
         return len(flagged)
 
     def _input(self) -> DiscoveryInput:
@@ -360,11 +404,9 @@ class DiscoveryService:
         }
 
     def _store_search_result(self, gh: GitHubRepo) -> Repository:
-        repo = upsert_repository(gh, self.now)
+        # A search result carries no languages: it is not a metadata fetch.
+        repo = upsert_repository(gh, self.now, metadata_fetched=False)
         replace_topics(repo.pk, gh.topics)
-        if repo.lifecycle_changed_at is None:
-            repo.lifecycle_changed_at = self.now
-            repo.save(update_fields=["lifecycle_changed_at"])
         return repo
 
     def _record(self, repo: Repository, source: str, query: str, rank: int | None) -> None:
@@ -382,25 +424,19 @@ class DiscoveryService:
             defaults={"search_rank": rank, "first_seen_at": self.now, "last_seen_at": self.now},
         )
         if not created:
+            previous = discovery.search_rank
+            if discovery.last_seen_at == self.now and rank is not None and previous is not None:
+                # The same query in another band this run (stars changed between requests):
+                # keep the better rank, never the order the bands ran in.
+                rank = min(rank, previous)
             CandidateDiscovery.objects.filter(pk=discovery.pk).update(
                 search_rank=rank, last_seen_at=self.now
             )
 
     def _pool_repositories(self) -> list[Repository]:
-        """The developer's candidate repositories in analysis order: previously interacted
-        first, then by best search rank, then name."""
-        candidates = (
-            RepositoryCandidate.objects.filter(developer=self.profile)
-            .annotate(
-                interacted=Exists(_interacted_discoveries()),
-                best_rank=Min("discoveries__search_rank"),
-            )
-            .select_related("repository")
-            .order_by(
-                F("interacted").desc(),
-                F("best_rank").asc(nulls_last=True),
-                "repository__full_name",
-            )
+        """The developer's candidate repositories in the pool order (ordering.py)."""
+        candidates = pool_order(
+            RepositoryCandidate.objects.filter(developer=self.profile).select_related("repository")
         )
         return [c.repository for c in candidates]
 
@@ -411,9 +447,7 @@ class DiscoveryService:
             return True
         if repo.lifecycle == Lifecycle.FAILED:
             retry_after = timedelta(hours=settings.REPO_FAILED_RETRY_HOURS)
-            return repo.lifecycle_changed_at is None or (
-                repo.lifecycle_changed_at < self.now - retry_after
-            )
+            return repo.lifecycle_changed_at < self.now - retry_after
         return bool(stale_parts(repo, self.now))
 
     def _check_cancelled(self) -> None:
@@ -430,18 +464,19 @@ class DiscoveryService:
 
 
 def _band_counts(stars: Iterable[int]) -> dict[str, int]:
-    """Pool candidates per star band (design D3), by current stars; ``below`` holds those
-    under the lowest band (previously interacted repositories)."""
+    """Pool candidates per star band (design D3), by current stars: in the band whose range
+    holds them; ``below`` under the lowest band (previously interacted repositories);
+    ``other`` in no band (a gap between bands, or above a closed last band), present only
+    when non-zero."""
     bands = star_bands()
     counts = dict.fromkeys(["below", *(band_label(b) for b in bands)], 0)
     for value in stars:
-        label = next(
-            (band_label(b) for b in reversed(bands) if value >= b[0]),
-            "below",
-        )
-        counts[label] += 1
+        band = band_of(value, bands)
+        if band is not None:
+            label = band_label(band)
+        elif value < bands[0][0]:
+            label = "below"
+        else:
+            label = "other"
+        counts[label] = counts.get(label, 0) + 1
     return counts
-
-
-def _interacted_discoveries() -> Any:
-    return CandidateDiscovery.objects.filter(candidate=OuterRef("pk"), source=INTERACTED)

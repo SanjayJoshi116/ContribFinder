@@ -80,7 +80,7 @@ def test_status_with_job_and_counts(user, pool, signed_in_client: APIClient) -> 
     )
     body = signed_in_client.get("/api/v1/discovery/status").json()
     assert body["job"]["status"] == "COMPLETED"
-    assert list(body["job"]["steps"]) == ["queries", "search", "interactions", "analysis", "pool"]
+    assert list(body["job"]["steps"]) == ["queries", "search", "interactions", "pool", "analysis"]
     assert body["last_completed_at"] is not None
     assert body["pool"] == {
         "total": 3,
@@ -151,6 +151,15 @@ def test_order_within_state(profile, signed_in_client: APIClient) -> None:
     body = signed_in_client.get("/api/v1/discovery/candidates").json()
     names = [c["repository"]["full_name"] for c in body["results"]]
     assert names == ["d/mine", "b/rank2", "a/rank9", "c/unranked"]
+
+
+def test_equal_rank_most_recently_found_first(profile, signed_in_client: APIClient) -> None:
+    """The pool order: the cap keeps the more recently found candidate first, so does the list."""
+    now = timezone.now()
+    add_candidate(profile, make_candidate_repo(1, "a/older"), rank=3, seen=now - timedelta(days=2))
+    add_candidate(profile, make_candidate_repo(2, "b/newer"), rank=3, seen=now)
+    body = signed_in_client.get("/api/v1/discovery/candidates").json()
+    assert [c["repository"]["full_name"] for c in body["results"]] == ["b/newer", "a/older"]
 
 
 def test_other_users_candidates_invisible(pool, api_client: APIClient) -> None:

@@ -114,17 +114,18 @@ ContribFinder/
 │  │  │                     baselines.json (format 4, keyed by dataset, top N each)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError, JobCancelled), job_guard.py
-│  │     │                  (stale_before, job_write, save_progress, heartbeat), locks.py
-│  │     │                  (lock_developer: one lock order for recommendations and feedback),
-│  │     │                  feedback.py
-│  │     │                  (record, save, dismiss, restore), data_deletion.py (GitHub data /
-│  │     │                  account deletion)
+│  │     │                  (stale_before, lost_before, job_write, save_progress, heartbeat),
+│  │     │                  locks.py (lock_developer: one lock order for recommendations and
+│  │     │                  feedback), feedback.py (record, save, dismiss, restore),
+│  │     │                  data_deletion.py (GitHub data / account deletion)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
 │  │     │                  storage.py (shared repository upserts)
 │  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
 │  │     │                  experience, summary, analysis (Phase 3)
-│  │     ├─ discovery/      queries, filters (prefilter/eligibility), DiscoveryService (Phase 4)
-│  │     ├─ repositories/   analysis, lifecycle, staleness (shared repository data, Phase 4)
+│  │     ├─ discovery/      queries, filters (prefilter/eligibility), ordering (pool order),
+│  │     │                  DiscoveryService (Phase 4)
+│  │     ├─ repositories/   analysis, lifecycle, staleness, backlog (shared repository data,
+│  │     │                  Phase 4)
 │  │     ├─ issues/         labels (normalization), classify (type, difficulty),
 │  │     │                  technologies, analysis (Phase 7)
 │  │     ├─ matching/       activity, technologies, features (loading), signals,
@@ -774,6 +775,48 @@ Archived: `openspec/changes/archive/2026-10-21-recommendation-consistency/`. Spe
   directly (the archived deltas predate them).
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Discovery and repository data** (MVP+, fix release)  ✅ shipped in v0.12.7 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-21-discovery-repository-data/`. Specs: deltas to
+`repository-discovery`, `repository-analysis`. Batch 7 of `Bug_Backlog.md`.
+- Rows are never deleted for a name: `lifecycle.release_name` renames the holder to
+  `{full_name}~{github_id}` (`staleness.is_released_name`; its metadata counts as stale) and
+  makes it ineligible `name_released` (INDEXED) until its analysis resolves it.
+  Analysis fetches metadata by name and falls back to `get_repository_by_id` for a released
+  name, a 404 or another ID. `hold(repo, fetched_name=...)` re-reads the locked row
+  (`refresh_from_db(from_queryset=...)`, eligibility from current data) and raises `ClaimLost`
+  when the name changed under a fetch without metadata.
+- `upsert_repository(..., metadata_fetched=False)` for search results: `synced_at` only on
+  create. Search stores each query's survivors in GitHub ID order (bulk repository locks are
+  taken in GitHub ID order).
+- `run(repo_id, parts)`: a FAILED retry fetches every part; otherwise stale parts ∩ `parts`,
+  with metadata first for a released name. Nothing stale on a non-STALE row → release,
+  SKIPPED (no transition stamp). Tests that force a part use
+  `repo_fixtures.expire_parts`.
+- Eligibility and RECOMMENDABLE/INDEXED change only in `services/repositories/lifecycle.py`.
+  `recheck_eligibility(ids, now=)` (pool step) skips in-progress, FAILED, DISCOVERED and
+  locked rows (`skip_locked`); STALE rows stay STALE.
+- `not_code(..., has_dependencies=)`: no language → not code; a suspected list (`awesome-*`,
+  excluded topic) is not code only once analyzed without manifest dependencies. Bulk callers
+  annotate `has_dependencies_annotation()` and prefetch topics.
+- Discovery steps: queries → search → interactions → pool → analysis. New metadata:
+  `search_started_at` (older records are pruned at the pool step), `analysis_plan` (chosen
+  once), `pool_eligibility_changed`, `pool_pruned_discoveries`. `pool_bands` may hold `other`.
+  `PlannedQuery.core` has no star band. `ordering.pool_order(qs, *leading)` is the one
+  candidate order (cap, analysis, API). The pool step writes inside `job_write`; pruning skips
+  a run with no search and keeps records of `queries_skipped`.
+- Backlog: `services/repositories/backlog.py` (`mark_stale`, `queue_batch`); its queued window
+  is `job_guard.lost_before(now)`, shared with job recovery.
+  `Repository.refresh_queued_at` holds a queued refresh back (abandoned claims excepted);
+  `complete` and `fail` clear it. `lifecycle_changed_at` is non-null with a default.
+- `DISCOVERY_STAR_BANDS` defaults to None: `queries.configured_star_bands()` derives the bands
+  from `DISCOVERY_MIN_STARS` at call time (checks use it too); `core.W003` warns when the budget is
+  not a multiple of the band count. Default `DISCOVERY_EXCLUDED_TOPICS` keeps generic topics
+  (`list`, `books`): dependency evidence, not the topic list, keeps real code eligible.
+- Review follow-ups X-1…X-6 of `Bug_Backlog.md` fixed in the same release; main specs updated
+  directly (the archived deltas carry the same text).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
@@ -783,6 +826,8 @@ contribution plans, similar repositories, observability dashboards (Sentry, Prom
 evidence, top-k diversity, stated preferences, contribution-success signals (maintainer
 responsiveness, linked PRs), evaluation rigor (bootstrap CIs, inter-rater agreement, discovery
 recall), online report per config from feedback, dismiss reasons, CSP, dependency scanning.
+Round 3 (2026-10-21): content-based `not_code`, post-analysis pool cleanup, search budget
+(`no_license` rejections, per-band yield), queuing released-name refreshes.
 Ranking-visible ideas wait for K-1; bootstrap CIs should land before or with it.
 
 ## 8. Release housekeeping

@@ -183,7 +183,22 @@ def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
     errors += _keys_errors(
         "DISCOVERY_QUERY_SHARES", settings.DISCOVERY_QUERY_SHARES, QUERY_STRATEGIES, "core.E022"
     )
-    errors += _star_band_errors(settings.DISCOVERY_STAR_BANDS)
+    from services.discovery.queries import configured_star_bands  # needs the app registry
+
+    bands = configured_star_bands()
+    band_errors = _star_band_errors(bands)
+    errors += band_errors
+    if not band_errors and _is_int(settings.DISCOVERY_MAX_QUERIES):
+        unused = settings.DISCOVERY_MAX_QUERIES % len(bands)
+        if unused:
+            errors.append(
+                Warning(
+                    f"DISCOVERY_MAX_QUERIES leaves {unused} search request(s) unused: every "
+                    f"query runs in all {len(bands)} star bands.",
+                    hint="Use a multiple of the number of DISCOVERY_STAR_BANDS.",
+                    id="core.W003",
+                )
+            )
     topics = settings.DISCOVERY_EXCLUDED_TOPICS
     if not isinstance(topics, list) or not all(isinstance(t, str) and t for t in topics):
         errors.append(

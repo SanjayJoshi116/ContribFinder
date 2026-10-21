@@ -82,16 +82,36 @@ class QueryConfig:
         )
 
 
+def default_star_bands(min_stars: int) -> list[list[int | None]]:
+    return [[min_stars, 999], [1000, None]] if min_stars < 1000 else [[min_stars, None]]
+
+
+def configured_star_bands() -> list[list[int | None]]:
+    """``DISCOVERY_STAR_BANDS`` as configured, or derived from ``DISCOVERY_MIN_STARS`` when
+    unset (read at call time, so overriding the minimum moves the default bands too)."""
+    bands: list[list[int | None]] | None = settings.DISCOVERY_STAR_BANDS
+    return bands if bands is not None else default_star_bands(settings.DISCOVERY_MIN_STARS)
+
+
 def star_bands() -> tuple[Band, ...]:
     return tuple(
         (int(low or 0), None if high is None else int(high))
-        for low, high in settings.DISCOVERY_STAR_BANDS
+        for low, high in configured_star_bands()
     )
 
 
 def band_label(band: Band) -> str:
     low, high = band
     return f"{low}..{high}" if high is not None else f"{low}+"
+
+
+def band_of(stars: int, bands: Sequence[Band]) -> Band | None:
+    """The band whose range holds ``stars`` (an open high has no limit), or None."""
+    for band in bands:
+        low, high = band
+        if low <= stars and (high is None or stars <= high):
+            return band
+    return None
 
 
 def _stars(band: Band) -> str:
@@ -103,8 +123,8 @@ def _stars(band: Band) -> str:
 class PlannedQuery:
     source: str
     q: str  # full query text sent to GitHub, qualifiers included
-    key: str  # stable id of the query within a plan, for resuming
-    core: str  # the query without the qualifiers: stable across days, stored as provenance
+    key: str  # stable id of the request within a plan (query and band), for resuming
+    core: str  # the query without the qualifiers (band included): stored as provenance
 
     def as_json(self) -> dict[str, str]:
         return {"source": self.source, "q": self.q, "key": self.key, "core": self.core}
@@ -169,7 +189,7 @@ def plan_queries(data: DiscoveryInput, cfg: QueryConfig) -> list[PlannedQuery]:
             SOURCE_BY_STRATEGY[strategy],
             f"{core} {_qualifiers(data, cfg, band)}",
             f"{key}@{index}" if banded else key,
-            f"{core} {_stars(band)}" if banded else core,
+            core,
         )
         for strategy in STRATEGIES
         for key, core in cores.get(strategy, [])[: quotas[strategy]]

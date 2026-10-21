@@ -16,11 +16,20 @@ from repositories import tasks
 from repositories.models import Repository
 from services.github.client import GitHubClient
 from services.github.errors import GitHubTransientError
-from services.repositories.analysis import Outcome, RepositoryAnalysisService
+from services.repositories.analysis import Outcome
 from services.repositories.staleness import stale_parts
 
 from .factories import UserFactory
-from .repo_fixtures import API, add_candidate, issue_payload, make_candidate_repo, mock_repo_api
+from .repo_fixtures import (
+    API,
+    add_candidate,
+    analyze,
+    expire_parts,
+    fresh_repo,
+    issue_payload,
+    make_candidate_repo,
+    mock_repo_api,
+)
 from .test_github_client import TOKEN
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
@@ -37,26 +46,6 @@ def profile(user) -> DeveloperProfile:
 def client():
     with GitHubClient(TOKEN, cache_scope="public") as c:
         yield c
-
-
-def analyze(client, repo: Repository, parts=None) -> Outcome:
-    return RepositoryAnalysisService(client).run(repo.pk, parts)
-
-
-def fresh_repo(**fields) -> Repository:
-    """An analyzed, recommendable repository whose data is all fresh."""
-    now = timezone.now()
-    defaults = {
-        "lifecycle": "recommendable",
-        "is_eligible": True,
-        "synced_at": now,
-        "readme_synced_at": now,
-        "community_synced_at": now,
-        "dependencies_synced_at": now,
-        "activity_synced_at": now,
-        "issues_synced_at": now,
-    }
-    return make_candidate_repo(7, "encode/httpx", **{**defaults, **fields})
 
 
 def pull_request(number: int) -> dict[str, Any]:
@@ -174,6 +163,7 @@ def test_forbidden_fetch_recorded_as_failure(client, respx_mock) -> None:
 
 def test_issues_task_fetches_issues_only(respx_mock) -> None:
     repo = fresh_repo(lifecycle="stale", stale_parts=["issues"])
+    expire_parts(repo, ["issues"])
     routes = mock_repo_api(respx_mock, "encode/httpx", 7, issues=[issue_payload(1)])
 
     tasks.sync_repository_issues.delay(repo.pk)
