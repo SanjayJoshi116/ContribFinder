@@ -2,31 +2,28 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type { GitHubProfile, RepositoryPage, SyncJob, SyncStatus } from '@/api/types'
+import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 
 export const syncStatusKey = ['sync', 'status'] as const
 export const githubProfileKey = ['profile', 'github'] as const
 export const repositoriesKey = ['profile', 'repositories'] as const
 
-const ACTIVE: ReadonlySet<SyncJob['status']> = new Set(['PENDING', 'RUNNING', 'RETRYING'])
 export const POLL_INTERVAL_MS = 2000
 
-export function isActive(job: SyncJob | null | undefined): boolean {
-  return !!job && ACTIVE.has(job.status)
-}
-
-/** Latest sync job and last successful sync. Polls while a job is in progress. */
+/** Latest sync job and last successful sync. Polls while a job is in progress; a newly
+ * finished sync refetches everything derived from GitHub data (all of ['profile']). */
 export function useSyncStatus() {
   const queryClient = useQueryClient()
   return useQuery<SyncStatus, ApiError>({
     queryKey: syncStatusKey,
-    queryFn: async () => {
-      const status = await apiFetch<SyncStatus>('/sync/status')
-      if (status.job?.status === 'COMPLETED') {
-        // Fresh data landed: refetch anything derived from it.
-        await queryClient.invalidateQueries({ queryKey: ['profile'] })
-      }
-      return status
-    },
+    queryFn: () =>
+      fetchStatusAndRefresh(
+        queryClient,
+        syncStatusKey,
+        () => apiFetch<SyncStatus>('/sync/status'),
+        () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
+      ),
+    staleTime: 0,
     refetchInterval: (query) => (isActive(query.state.data?.job) ? POLL_INTERVAL_MS : false),
   })
 }

@@ -100,6 +100,25 @@ under `apps/backend/`. Verified against the code; fixed in 0.12.7 before commit 
 | X-11 | perf | `services/repositories/lifecycle.py` (`complete`) | Eligibility re-reads the topics and dependencies the analysis just wrote: 1–2 queries per analysis. Passing them in needs an annotation set by hand (skipped in the `/simplify` pass). | open (batch 11) |
 | X-12 | cleanup | `tests/` | `developer`, `single_band` and `client` fixtures are copied across `test_discovery_service.py`, `test_discovery_repository_data.py`, `test_repository_analysis.py` and `test_issue_ingestion.py`; move them to `conftest.py` (`fresh_repo` and `analyze` already moved to `repo_fixtures.py`). | open (batch 11) |
 
+## Batch 9 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `frontend-correctness` diff (v0.12.8). Paths under
+`apps/frontend/src/` unless noted. Y-1…Y-5 and Y-8 fixed in 0.12.8 before commit, each with a
+test that fails without the fix (Y-8 checked by `npm run e2e`).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| Y-1 | bug | `app/queryClient.ts` (401 handler) | Log out, disconnect or delete account while a poll is in flight: its 401 called `endSession` → "Your session ended" after a deliberate sign-out. Sign-out mutations now carry `meta.endsSession` (`features/auth/api.ts`), which suspends the handler until it fails or `/auth/me` succeeds again. | fixed (frontend-correctness) |
+| Y-2 | bug | `app/jobTransitions.ts` (`fetchStatusAndRefresh`) | The status `queryFn` awaited the whole refresh cascade (which includes other status queries); one slow or hung derived request froze the status and its polling. Refresh is now started, not awaited. | fixed (frontend-correctness) |
+| Y-3 | bug | `lib/useScrollToHash.ts` | `decodeURIComponent` threw on a malformed hash (`#%E0`) inside an effect → blank page. Falls back to the raw hash. | fixed (frontend-correctness) |
+| Y-4 | bug | `features/recommendations/RecommendationList.tsx` (page recovery) | Dismissing the last card on page N moved to page N−1 from the optimistic cache; a failed dismissal restored the card on a page no longer shown. Recovery now waits for pending dismissals (`dismissMutationKey`). | fixed (frontend-correctness) |
+| Y-5 | bug | `lib/utils.ts` (`positiveId`) | `Number()` accepted `0x1f`, `1e2`, ` 7` → `/app/recommendations/0x1f` fetched id 31. Now decimal digits only. | fixed (frontend-correctness) |
+| Y-6 | design | `app/queryClient.ts` (`DERIVED_STALE_TIME_MS`) | Data changed by jobs no status query watches (a standalone `profile_analysis` from `reanalyze_profiles`, a backend repository refresh) stays cached up to 5 min where it used to refetch on mount. Intended trade-off of F-1; fix if it shows in use (watch the analysis job too, or a shorter stale time for profile and detail; `ideas.md` §14). | open |
+| Y-7 | bug | `features/feedback/api.ts` (`usePagedList`) | Saved and hidden lists page by number: a save or unsave in another tab between "Show more" clicks shifts the pages → a duplicated entry (duplicate React key) or a skipped one. Needs cursor or `saved_at`-keyset pagination in the API, or de-duplication by `repository_id` (`ideas.md` §14). | open |
+| Y-8 | bug | `apps/backend/config/settings/e2e.py` | Claimed self-contained but `base.py` read the whole local `.env` (`NUM_PROXIES`, `ALLOWED_HOSTS`, `DISCOVERY_MAX_POOL`, ranking settings used by the seed): local e2e differed from CI. The runner (`scripts/e2e-backend.mjs`) passes only `DATABASE_URL` from `.env` and sets `DJANGO_READ_DOTENV=0`, which `base.py` honors. | fixed (frontend-correctness) |
+| Y-9 | cleanup | `apps/backend/e2e/management/commands/e2e_seed.py` | An installed app's command imports `tests.repo_fixtures`; a test-helper refactor breaks `npm run e2e` while pytest stays green. Move the shared seeding helpers to a module both use. | open (batch 11) |
+| Y-10 | cleanup | `app/app.test.tsx` (`count`) | Reimplements `callsTo` from `features/feedback/feedback.test.tsx`; move one helper to `test/render.tsx`. | open (batch 11) |
+
 ## Full-file reviews (2026-10-19)
 
 `code-review` at high effort over whole files, all findings reported. All rows verified against
@@ -234,15 +253,15 @@ Excludes what R-1, R-2, R-7, R-8, R-13 and R-14 already cover.
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| F-1 | bug | `features/sync/api.ts:24` | `useSyncStatus` invalidates every `['profile']` query on each status fetch whose latest job is COMPLETED, which is the steady state. Window focus or remounting `/app` (back from a detail page) refetches skills, interests, repositories, recommendations, discovery and saved lists every time, and can refetch the list mid-dismiss so the card flickers back. Invalidate only when the job id or status changes, as `useRecommendationStatus` does. | confirmed |
-| F-2 | bug | `features/feedback/api.ts:259` | Saved and hidden lists fetch one page of `page_size=100` with no pagination → a user with more than 100 saved or hidden projects silently cannot see or restore the rest. | confirmed |
-| F-3 | bug | `features/recommendations/RecommendationList.tsx:134` | `?page=N` past the last page (after dismissals or a regeneration shrinks the list, or a shared link) gets a DRF 404 → "Could not load recommendations. Please refresh the page."; refreshing keeps the page in the URL, so it never recovers. Dismissing the only card on the last page shows the empty-state text although earlier pages exist. | confirmed |
+| F-1 | bug | `features/sync/api.ts:24` | `useSyncStatus` invalidates every `['profile']` query on each status fetch whose latest job is COMPLETED, which is the steady state. Window focus or remounting `/app` (back from a detail page) refetches skills, interests, repositories, recommendations, discovery and saved lists every time, and can refetch the list mid-dismiss so the card flickers back. Invalidate only when the job id or status changes, as `useRecommendationStatus` does. | fixed (frontend-correctness) |
+| F-2 | bug | `features/feedback/api.ts:259` | Saved and hidden lists fetch one page of `page_size=100` with no pagination → a user with more than 100 saved or hidden projects silently cannot see or restore the rest. | fixed (frontend-correctness) |
+| F-3 | bug | `features/recommendations/RecommendationList.tsx:134` | `?page=N` past the last page (after dismissals or a regeneration shrinks the list, or a shared link) gets a DRF 404 → "Could not load recommendations. Please refresh the page."; refreshing keeps the page in the URL, so it never recovers. Dismissing the only card on the last page shows the empty-state text although earlier pages exist. | fixed (frontend-correctness) |
 | F-4 | bug | `features/feedback/RecommendationActions.tsx:287` | Save button is not disabled while pending; a fast double click sends POST and DELETE concurrently with no ordering guarantee, and the first mutation's rollback restores a snapshot taken before the second → UI shows Saved while the server has it unsaved (or the reverse). | fixed (recommendation-consistency) |
-| F-5 | bug | `features/recommendations/RecommendationCard.tsx:332` | "N relevant issues" links to `#relevant-issues`, but client-side navigation does not scroll to hashes and the target renders only after the detail query loads → user lands at the top of the page. | confirmed |
-| F-6 | bug | `features/recommendations/RecommendationDetailPage.tsx:98` | Non-numeric or zero `:id` (also `IssueDetailPage.tsx:33`) disables the query, so `isPending` stays true → "Loading…" forever instead of a not-found message. | confirmed |
-| F-7 | bug | `features/auth/RequireAuth.tsx:245` | Only `/auth/me` 401s redirect; with `staleTime` 60 s an expired session shows "Could not load ... Please refresh the page" on every panel instead of returning to sign-in. Handle 401 globally (QueryCache `onError`). | partial |
-| F-8 | bug | `features/recommendations/RecommendationList.tsx:61` | `closeUndo` depends on `location`, so any filter change (new location) re-runs the `DismissUndo` effect and restarts the 10 s Undo timer. | confirmed |
-| F-9 | perf | `features/recommendations/api.ts:235` | The invalidation effect runs in every observer of `useRecommendationStatus`, including the passive one in `usePipelineStage` → two invalidations per finished generation; the second cancels the first list fetch and restarts it. | confirmed |
+| F-5 | bug | `features/recommendations/RecommendationCard.tsx:332` | "N relevant issues" links to `#relevant-issues`, but client-side navigation does not scroll to hashes and the target renders only after the detail query loads → user lands at the top of the page. | fixed (frontend-correctness) |
+| F-6 | bug | `features/recommendations/RecommendationDetailPage.tsx:98` | Non-numeric or zero `:id` (also `IssueDetailPage.tsx:33`) disables the query, so `isPending` stays true → "Loading…" forever instead of a not-found message. | fixed (frontend-correctness) |
+| F-7 | bug | `features/auth/RequireAuth.tsx:245` | Only `/auth/me` 401s redirect; with `staleTime` 60 s an expired session shows "Could not load ... Please refresh the page" on every panel instead of returning to sign-in. Handle 401 globally (QueryCache `onError`). | fixed (frontend-correctness) |
+| F-8 | bug | `features/recommendations/RecommendationList.tsx:61` | `closeUndo` depends on `location`, so any filter change (new location) re-runs the `DismissUndo` effect and restarts the 10 s Undo timer. | fixed (frontend-correctness) |
+| F-9 | perf | `features/recommendations/api.ts:235` | The invalidation effect runs in every observer of `useRecommendationStatus`, including the passive one in `usePipelineStage` → two invalidations per finished generation; the second cancels the first list fetch and restarts it. | fixed (frontend-correctness) |
 
 ### G: Scripts, compose, CI, Dockerfiles, `.env.example`
 
@@ -270,7 +289,7 @@ H-2 and H-4 confirmed by the reviewer (DRF `get_ident` source; `redact()` probes
 | H-2 | bug | `config/settings/base.py:148` | `NUM_PROXIES` unset → DRF keys throttles on raw `X-Forwarded-For` → a random XFF per request bypasses anon (60/min) and auth (10/min) limits. | fixed (security-hardening) |
 | H-3 | bug | `core/logging.py:41` | `RedactSecretsFilter` calls `record.getMessage()` outside logging's error guard → a bad log call (missing arg) raises into the caller, crashing a task step or turning a handled error into a 500. | fixed (security-hardening) |
 | H-4 | gap | `core/logging.py:15` | Redaction misses `key='value'` reprs, `'state'` in dict/JSON, and `Authorization: token <non-gh>` → client secret or OAuth state can reach logs. Tests cover only unquoted and `gh*_` cases. | fixed (security-hardening) |
-| H-5 | bug | `apps/frontend/src/main.tsx:9` | Production QueryClient keeps default `retry: 3` for 4xx → normal `404 not_analyzed` shows "Loading…" about 7 s over 4 requests; 401s and 429s retried too. Tests set `retry: false`, which hides it. | confirmed |
+| H-5 | bug | `apps/frontend/src/main.tsx:9` | Production QueryClient keeps default `retry: 3` for 4xx → normal `404 not_analyzed` shows "Loading…" about 7 s over 4 requests; 401s and 429s retried too. Tests set `retry: false`, which hides it. | fixed (frontend-correctness) |
 | H-6 | gap | `config/settings/production.py:7` | System checks (token keys, weights) never run under gunicorn or the Celery worker → misconfigured deploy starts and fails per request (empty `TOKEN_ENCRYPTION_KEYS` → 500 on sign-in). | fixed (security-hardening) |
 | H-7 | gap | `core/checks.py:52` | No checks for `EXPERIENCE_THRESHOLDS`, `SYNC_MAX_ATTEMPTS`, `SYNC_STALE_AFTER_SECONDS`, `JOB_RECOVERY_INTERVAL_SECONDS`, GitHub caps, etc. → e.g. interval 0 = `recover_stale_jobs` hot loop; scalar threshold = every analysis fails. | confirmed |
 | H-8 | gap | `apps/frontend/src/routes/PrivacyPage.tsx:15` | Says the GitHub identifier is kept until disconnect, but `User.username = gh_<github_id>` survives disconnect. | fixed (privacy-deletion-finality) |
@@ -282,8 +301,8 @@ H-2 and H-4 confirmed by the reviewer (DRF `get_ident` source; `redact()` probes
 | H-14 | bug | `core/api.py:11` | `HealthView` is throttled (60/min per IP) → load balancer probes get 429 and mark a healthy instance down. | fixed (security-hardening) |
 | H-15 | bug | `config/settings/production.py:13` | `SECURE_SSL_REDIRECT` without health exemption → plain-HTTP probes get 301. `SECURE_PROXY_SSL_HEADER` trusted unconditionally. | fixed (security-hardening) |
 | H-16 | gap | `config/settings/production.py:15` | HSTS `includeSubDomains` + `preload` hard-coded, 1-year max-age → irreversible on a shared parent domain. Make opt-in. | fixed (security-hardening) |
-| H-17 | bug | `apps/frontend/src/features/profile/languages.ts:13` | "Other" summed from shares pre-rounded to 2 decimals → many small languages become 0, "Other" disappears, rows show "0%". | confirmed |
-| H-18 | gap | `apps/frontend/package.json:1` | No Playwright config, specs or CI job despite CLAUDE.md §4; OAuth → onboarding → dashboard, dismiss/undo, delete flows covered only by mocked unit tests. | confirmed |
+| H-17 | bug | `apps/frontend/src/features/profile/languages.ts:13` | "Other" summed from shares pre-rounded to 2 decimals → many small languages become 0, "Other" disappears, rows show "0%". | fixed (frontend-correctness) |
+| H-18 | gap | `apps/frontend/package.json:1` | No Playwright config, specs or CI job despite CLAUDE.md §4; OAuth → onboarding → dashboard, dismiss/undo, delete flows covered only by mocked unit tests. | fixed (frontend-correctness) |
 | H-19 | gap | `tests/test_api_platform.py:82` | No tests for: failing cache backend, migration unseed, malformed log call or quoted redaction, Django-level 400, privacy page vs `data_deletion`. | confirmed |
 | H-20 | perf | `config/settings/base.py:182` | `CELERY_RESULT_BACKEND` stores every task result in Redis, never read. Set `CELERY_TASK_IGNORE_RESULT`. | confirmed |
 
@@ -327,7 +346,8 @@ scenario or severity is narrower; `false-positive` = not a defect.
 | V batch 5 review | 9 | 6 | 2 | 1 |
 | W batch 6 review | 10 | 10 | 0 | 0 |
 | X batch 7 review | 12 | 11 | 0 | 1 |
-| **Total** | **185** | **142** | **33** | **3** |
+| Y batch 9 review | 10 | 9 | 1 | 0 |
+| **Total** | **195** | **151** | **34** | **3** |
 
 ## Verification notes
 
@@ -396,12 +416,13 @@ can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
 | 8 | **Signal and explanation accuracy** | B-6, B-14, B-15, B-16, D-7, D-8, D-9, D-11, D-12, D-13, D-15, D-16, D-17, D-18 | Wrong experience level, missed README badges, misclassified issues, reasons not backed by scoring. Ranking-visible: evaluate on the benchmark. |
 | 9 | **Frontend correctness** | F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18 | Query invalidation churn, no 4xx retry, pagination gaps, 401 handling; add Playwright for the main flows. |
 | 10 | **Dev scripts, checks and migrations** | G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20 | `npm run stop` kills only this repo; config checks for unchecked settings; safe seed migrations; tests for those paths. |
-| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
+| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12, Y-9, Y-10 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
 | 12 | **Batch 5 follow-ups** | V-1, V-2, V-3, V-4, V-5, V-6, V-7, V-8, V-9 | Review of `github-error-resilience`. Fixed in the same release (0.12.5); V-1 and V-3 replace design decisions D7 (client raises `GitHubInvalidResponse`) and D9 (in-memory throttle fallback instead of fail-open). |
 | 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7…X-9 accepted, X-10 false positive. X-11 and X-12 went to batch 11. |
+| 14 | **Batch 9 follow-ups** | Y-1…Y-10 | Review of `frontend-correctness`. Y-1…Y-5 and Y-8 fixed in the same release (0.12.8); Y-6 and Y-7 open (next frontend change); Y-9 and Y-10 went to batch 11. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
-W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7. Next: batch 8 (signal and explanation accuracy,
-ranking-visible: needs K-1 to judge), else batch 9 or 10.
+W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8. Next: batch 10 (dev scripts, checks and
+migrations); batch 8 (signal and explanation accuracy) is ranking-visible and waits for K-1.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.

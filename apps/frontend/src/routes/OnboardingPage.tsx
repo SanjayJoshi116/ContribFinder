@@ -3,7 +3,8 @@ import { Navigate, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL } from '@/features/auth/api'
-import { isActive, useStartSync, useSyncStatus } from '@/features/sync/api'
+import { isActive } from '@/app/jobTransitions'
+import { useStartSync, useSyncStatus } from '@/features/sync/api'
 import { failureMessage } from '@/features/sync/messages'
 import { SyncSteps } from '@/features/sync/SyncSteps'
 

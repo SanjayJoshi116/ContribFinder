@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { Navigate } from 'react-router'
 
+import { isActive } from '@/app/jobTransitions'
 import { Button } from '@/components/ui/button'
 import { useMe } from '@/features/auth/api'
 import { DataSection } from '@/features/auth/DataSection'
@@ -10,13 +11,7 @@ import { useDeveloperProfile, useInterests, useSkills } from '@/features/profile
 import { InterestList } from '@/features/profile/InterestList'
 import { SkillGroups } from '@/features/profile/SkillGroups'
 import { RecommendationList } from '@/features/recommendations/RecommendationList'
-import {
-  isActive,
-  useGitHubProfile,
-  useRepositories,
-  useStartSync,
-  useSyncStatus,
-} from '@/features/sync/api'
+import { useGitHubProfile, useRepositories, useStartSync, useSyncStatus } from '@/features/sync/api'
 import { failureMessage, formatWait } from '@/features/sync/messages'
 import { STAGE_TEXT, usePipelineStage } from '@/features/sync/pipeline'
 import { RepositoryList } from '@/features/sync/RepositoryList'

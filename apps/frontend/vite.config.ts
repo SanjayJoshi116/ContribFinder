@@ -24,6 +24,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Browser tests run under Playwright (`npm run e2e`), not Vitest.
+    exclude: ['**/node_modules/**', 'e2e/**'],
     // Room for several findBy* waits (5 s each, see src/test/setup.ts) in one test.
     testTimeout: 15_000,
     css: false,

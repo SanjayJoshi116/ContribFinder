@@ -106,6 +106,8 @@ ContribFinder/
 │  │  │                     benchmark_sheet, import_judgments, build_benchmark commands
 │  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
 │  │  │                     saved and dismissed API (Phase 8a)
+│  │  ├─ e2e/               e2e_seed command (browser-test users and sessions); installed only by
+│  │  │                     config/settings/e2e.py, never in production
 │  │  ├─ embeddings/        (Phase 6, future)
 │  │  ├─ evaluation/        data only: benchmark-v1.json (seed benchmark), holdout-v1.json and
 │  │  │                     holdout-v2.json (acceptance only, never for choosing; both used, so
@@ -136,10 +138,12 @@ ContribFinder/
 │  │     │                  (evaluate, compare, persona/real subsets), baseline, export, sheet
 │  │     │                  (blind judging sheets), build (merge datasets) (Phase 8b+)
 │  │     └─ ai/             provider interfaces only (future)
-│  └─ frontend/src/{app,components,features,hooks,lib,api,types,routes}
+│  └─ frontend/           src/{app,components,features,hooks,lib,api,types,routes}; app/ holds
+│                         the query client (retry, stale time, 401) and job-transition refresh;
+│                         e2e/ Playwright specs, playwright.config.ts
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
 │                           redis (WSL), child (process-tree runner), env, wait-port, uv,
-│                           manage, check-version
+│                           manage, check-version, e2e-backend (seed + Django for Playwright)
 ├─ package.json             root runner: npm run setup / npm start / stop / manage / check:version
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
@@ -225,6 +229,11 @@ Frontend (`apps/frontend`, npm):
 - `npm run dev`, `npm test`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build`
 - `npm run api:sync`: re-export the OpenAPI schema from Django and regenerate
   `src/api/schema.d.ts`. Run it after any API change and commit both files; CI fails on drift.
+- `npm run e2e`: Playwright (Chromium) against the real backend on :8001 and Vite on :5174
+  (database `contribfinder_e2e`, re-seeded every run; one-time `npx playwright install
+  chromium`). Mutating specs each own a seeded user. New queries go through the shared client
+  (`src/app/queryClient.ts`): 4xx are never retried, any 401 ends the session, and data derived
+  from a job is refreshed by its status query (`fetchStatusAndRefresh`), not on mount.
 
 ### Known issues
 
@@ -817,6 +826,32 @@ Archived: `openspec/changes/archive/2026-10-21-discovery-repository-data/`. Spec
   directly (the archived deltas carry the same text).
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Frontend correctness** (MVP+, fix release)  ✅ shipped in v0.12.8 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-21-frontend-correctness/`. Specs: new `web-client`;
+deltas to `recommendations-view`, `recommendation-feedback`, `issue-matching`,
+`developer-profile`. Batch 9 of `Bug_Backlog.md`.
+- `createQueryClient({ navigate })` (`src/app/queryClient.ts`) is the one client for the app
+  and tests: retries only network errors and 5xx (twice), default `staleTime` 5 min (status
+  queries 0), and any 401 except `/auth/me` ends the session → `/?auth_error=session_ended`
+  through `navigate`; `isActive` lives in `src/app/jobTransitions.ts`; the landing
+  page clears the remaining cache on mount (clearing before the navigation commits lets the
+  dashboard refetch it).
+- `fetchStatusAndRefresh` (`src/app/jobTransitions.ts`) runs inside each status `queryFn` and
+  refreshes derived data once per newly finished job (sync → `['profile']`; generation → list,
+  details, issues, saved; discovery → generation status). No per-observer effects.
+- `positiveId` and `DeadEnd` for detail routes; `useScrollToHash(ready)` for hash links to
+  content that loads later; saved/hidden lists are infinite queries (50 per page).
+- Browser tests: `scripts/e2e-backend.mjs` runs `e2e_seed` (creates, migrates, seeds
+  `contribfinder_e2e`) then Django; Playwright starts web servers before `globalSetup`, so the
+  seed lives there. CI job `e2e`.
+- Sign-out mutations carry `meta: { endsSession: true }` (`ENDS_SESSION_META_KEY`), which
+  suspends the 401 handler; new sign-out flows must set it. `DJANGO_READ_DOTENV=0` stops
+  `base.py` reading `.env`; `scripts/e2e-backend.mjs` sets it and passes only `DATABASE_URL`.
+- Review follow-ups Y-1…Y-5 and Y-8 of `Bug_Backlog.md` fixed in the same release; Y-6, Y-7
+  open; Y-9, Y-10 in batch 11.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
@@ -827,7 +862,8 @@ evidence, top-k diversity, stated preferences, contribution-success signals (mai
 responsiveness, linked PRs), evaluation rigor (bootstrap CIs, inter-rater agreement, discovery
 recall), online report per config from feedback, dismiss reasons, CSP, dependency scanning.
 Round 3 (2026-10-21): content-based `not_code`, post-analysis pool cleanup, search budget
-(`no_license` rejections, per-band yield), queuing released-name refreshes.
+(`no_license` rejections, per-band yield), queuing released-name refreshes. Round 4: data
+versions for client freshness, keyset saved lists, server page clamping, route-level ids.
 Ranking-visible ideas wait for K-1; bootstrap CIs should land before or with it.
 
 ## 8. Release housekeeping

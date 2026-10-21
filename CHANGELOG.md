@@ -7,6 +7,58 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.8] - 2026-10-21
+
+Frontend correctness (OpenSpec change `frontend-correctness`, backlog batch 9). No ranking or
+API change. New browser tests and a CI job `e2e`.
+
+### Fixed
+
+- The dashboard no longer refetches skills, interests, repositories, recommendations and saved
+  projects on every window focus or return from a detail page. Data derived from a job is
+  refreshed when that job newly finishes, once per status fetch, however many components show
+  the status (F-1, F-9). Derived data stays fresh for 5 minutes otherwise; status queries still
+  refetch on focus.
+- Errors that a retry cannot fix show at once: only network failures and 5xx responses are
+  retried, twice. A `404 not_analyzed` no longer shows "Loading…" for about 7 seconds (H-5).
+  Unit tests use the same client as the app.
+- An expired session returns to the sign-in page with "Your session ended. Sign in again to pick
+  up where you left off." from any request, including Save, and drops the cached data (F-7).
+- `?page=N` past the last page shows page 1 instead of a dead error; dismissing the last card on
+  a page shows the previous page instead of the empty state (F-3).
+- "N relevant issues" opens the recommendation scrolled to its relevant issues, with keyboard
+  focus there; the scroll is instant under reduced motion (F-5).
+- A recommendation or issue link whose id is not a positive integer says it doesn't point to
+  anything, instead of "Loading…" forever (F-6).
+- Saved and hidden projects load 50 at a time with "Show more", so more than 100 can be seen and
+  restored (F-2).
+- Changing a filter no longer restarts the 10-second Undo window after a dismissal (F-8).
+- The languages chart computes every share, "Other" included, from bytes. Many small languages
+  no longer vanish, and a language under 1% shows "<1%", not "0%" (H-17).
+- Review follow-ups (Y-1…Y-5, Y-8): logging out, disconnecting or deleting the account while a
+  status poll is in flight no longer shows "Your session ended"; a finished job's refresh no
+  longer holds up its status (a slow derived request could freeze polling); a malformed link
+  hash no longer blanks the page; a failed dismissal of a page's last card keeps that page;
+  ids such as `0x1f` or `1e2` are rejected; the browser tests take only `DATABASE_URL` from a
+  local `.env` (the runner sets `DJANGO_READ_DOTENV=0`, which `base.py` honors), so they see
+  CI's settings.
+
+### Added
+
+- Playwright browser tests (`npm run e2e` in `apps/frontend`) against the real Django backend
+  and PostgreSQL (database `contribfinder_e2e`). They cover sign-in start, onboarding, the
+  dashboard, save, dismiss and undo, the relevant-issues link, session end and data deletion
+  (H-18). Seeded users sign in through sessions created by `e2e_seed`, a command in the `e2e`
+  app that only `config.settings.e2e` installs; GitHub is unreachable there.
+
+### Changed
+
+- CI caches the Playwright browser download between runs (keyed on the frontend lockfile).
+- Internal cleanup with no behavior change: `createQueryClient` takes `navigate` and handles a
+  401 itself (no copied wiring in the app and tests), status hooks share
+  `fetchStatusAndRefresh` without a job selector, `isActive` has one import path, and the
+  e2e seed signs users in with `force_login`.
+
 ## [0.12.7] - 2026-10-21
 
 Discovery and repository data (OpenSpec change `discovery-repository-data`, backlog batch 7,

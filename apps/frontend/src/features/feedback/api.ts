@@ -1,4 +1,10 @@
-import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  type InfiniteData,
+  type QueryClient,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type {
@@ -77,11 +83,15 @@ function useSaveToggle(saved: boolean) {
 export const useSave = () => useSaveToggle(true)
 export const useUnsave = () => useSaveToggle(false)
 
+/** Pending dismissals: until they settle, an emptied list page is only optimistic. */
+export const dismissMutationKey = ['feedback', 'dismiss'] as const
+
 /** Removes the recommendation from the cached lists at once; the server excludes its
  * repository from later generations. */
 export function useDismiss() {
   const queryClient = useQueryClient()
   return useMutation<unknown, ApiError, number, Snapshot>({
+    mutationKey: dismissMutationKey,
     mutationFn: (id) => apiFetch(`/recommendations/${id}/dismiss`, { method: 'POST' }),
     onMutate: async (id) => {
       const previous = await snapshot(queryClient, id)
@@ -128,16 +138,24 @@ export function useUnsaveRepository() {
   })
 }
 
-export function useSaved() {
-  return useQuery<SavedPage, ApiError>({
-    queryKey: savedKey,
-    queryFn: () => apiFetch<SavedPage>('/saved?page_size=100'),
+/** Entries per request; "Show more" loads the next page. */
+export const LIST_PAGE_SIZE = 50
+
+/** `/saved` or `/dismissed`, one page at a time, so every entry can be reached. An
+ * invalidation refetches all loaded pages, so entries already shown stay listed. */
+function usePagedList<P extends { next?: string | null }>(key: readonly unknown[], path: string) {
+  return useInfiniteQuery<P, ApiError, InfiniteData<P>, readonly unknown[], number>({
+    queryKey: key,
+    queryFn: ({ pageParam }) =>
+      apiFetch<P>(
+        pageParam > 1
+          ? `${path}?page=${pageParam}&page_size=${LIST_PAGE_SIZE}`
+          : `${path}?page_size=${LIST_PAGE_SIZE}`,
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (last, _pages, lastPage) => (last.next ? lastPage + 1 : undefined),
   })
 }
 
-export function useDismissed() {
-  return useQuery<DismissedPage, ApiError>({
-    queryKey: dismissedKey,
-    queryFn: () => apiFetch<DismissedPage>('/dismissed?page_size=100'),
-  })
-}
+export const useSaved = () => usePagedList<SavedPage>(savedKey, '/saved')
+export const useDismissed = () => usePagedList<DismissedPage>(dismissedKey, '/dismissed')

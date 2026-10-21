@@ -2,9 +2,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recha
 
 import type { ProfileLanguage } from '@/api/types'
 
-import { languageRows } from './languages'
-
-const percent = (share: number) => `${Math.round(share * 100)}%`
+import { languageRows, percent } from './languages'
 
 export function LanguageChart({ languages }: { languages: readonly ProfileLanguage[] }) {
   const rows = languageRows(languages)

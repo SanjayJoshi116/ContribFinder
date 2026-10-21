@@ -7,11 +7,15 @@ export const meQueryKey = ['auth', 'me'] as const
 
 export const GITHUB_SIGN_IN_URL = '/api/v1/auth/github'
 
+/** Mutation `meta` key marking the user's own sign-out: the query client then ignores the
+ * 401s of requests still in flight instead of reporting an ended session. */
+export const ENDS_SESSION_META_KEY = 'endsSession'
+const endsSessionMeta = { [ENDS_SESSION_META_KEY]: true }
+
 export function useMe() {
   return useQuery<Me, ApiError>({
     queryKey: meQueryKey,
     queryFn: () => apiFetch<Me>('/auth/me'),
-    retry: (failureCount, error) => error.status !== 401 && failureCount < 2,
     staleTime: 60_000,
   })
 }
@@ -20,6 +24,7 @@ function useSignOutMutation<T>(path: string) {
   const queryClient = useQueryClient()
   return useMutation<T, ApiError>({
     mutationFn: () => apiFetch<T>(path, { method: 'POST' }),
+    meta: endsSessionMeta,
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: meQueryKey })
     },
@@ -55,6 +60,7 @@ export function useDeleteAccount() {
   const queryClient = useQueryClient()
   return useMutation<void, ApiError>({
     mutationFn: () => apiFetch<void>('/auth/account', { method: 'DELETE' }),
+    meta: endsSessionMeta,
     onSuccess: () => queryClient.clear(),
   })
 }

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -289,6 +289,22 @@ describe('recommendation cards', () => {
     expect(await screen.findByRole('article', { name: 'httpx' })).toBeInTheDocument()
   })
 
+  it('moves a page past the end to the first page', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/recommendations/status': () => json(GENERATED),
+      'GET /api/v1/recommendations?page=5': () =>
+        json({ error: { code: 'not_found', message: 'Invalid page.' } }, 404),
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION]),
+    })
+    const { router } = renderRoute('/app?page=5')
+
+    expect(await screen.findByRole('article', { name: 'httpx' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('explains an empty list before the first generation', async () => {
     mockFetch({ ...ME_ROUTE, ...SYNCED_USER })
     renderRoute('/app')
@@ -375,6 +391,58 @@ describe('recommendation detail page', () => {
     expect(items[0]).toHaveTextContent('Mentions Django, which you use')
     expect(items[0]).not.toHaveTextContent('good first issue') // only the top reason
     expect(items[1]).toHaveTextContent('Type: Bug fix · Difficulty: Not enough evidence')
+  })
+
+  it.each([
+    [false, 'smooth'],
+    [true, 'auto'],
+  ])(
+    'scrolls to and focuses the relevant issues from the card link (reduced motion: %s)',
+    async (reduced, behavior) => {
+      // jsdom implements neither.
+      const scrollIntoView = vi.fn()
+      Element.prototype.scrollIntoView = scrollIntoView
+      vi.stubGlobal(
+        'matchMedia',
+        (query: string) => ({ matches: reduced && query.includes('reduce') }) as MediaQueryList,
+      )
+      try {
+        mockFetch({ ...ME_ROUTE, 'GET /api/v1/recommendations/7': () => json(DETAIL) })
+        renderRoute('/app/recommendations/7#relevant-issues')
+
+        const heading = await screen.findByRole('heading', { name: 'Relevant issues' })
+        await waitFor(() => expect(heading).toHaveFocus())
+        expect(scrollIntoView).toHaveBeenCalledTimes(1)
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior })
+      } finally {
+        delete (Element.prototype as Partial<Element>).scrollIntoView
+      }
+    },
+  )
+
+  it('shows the page for a malformed hash', async () => {
+    mockFetch({ ...ME_ROUTE, 'GET /api/v1/recommendations/7': () => json(DETAIL) })
+    renderRoute('/app/recommendations/7#%E0')
+
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('encode/httpx')
+  })
+
+  it.each([
+    ['/app/recommendations/abc', "This link doesn't point to a recommendation."],
+    ['/app/recommendations/0', "This link doesn't point to a recommendation."],
+    ['/app/recommendations/0x1f', "This link doesn't point to a recommendation."],
+    ['/app/issues/x', "This link doesn't point to an issue."],
+    ['/app/issues/1e2', "This link doesn't point to an issue."],
+  ])('says %s points to nothing, without a request', async (path, message) => {
+    const fetchMock = mockFetch(ME_ROUTE)
+    renderRoute(path)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.getByRole('link', { name: 'Back to your dashboard' })).toHaveAttribute(
+      'href',
+      '/app',
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1) // /auth/me only
   })
 
   it('says when no relevant issues were found', async () => {

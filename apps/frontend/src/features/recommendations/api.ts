@@ -1,9 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type { RecommendationDetail, RecommendationPage, RecommendationStatus } from '@/api/types'
-import { isActive } from '@/features/sync/api'
+import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 
 // Under ['profile'], so a completed sync (useSyncStatus) invalidates them too.
 const ROOT = ['profile', 'recommendations'] as const
@@ -37,29 +36,30 @@ export function recommendationsPath(filters: RecommendationFilters): string {
 }
 
 /** Latest generation job and counts. Polls while a generation runs, and refreshes the list
- * once it finishes. A short generation can start and finish between two polls, so any newly
- * seen finished job refreshes the list, not only one that was seen running. */
+ * once per newly seen finished job, also one that started and finished between two polls. */
 export function useRecommendationStatus(enabled = true) {
   const queryClient = useQueryClient()
-  const status = useQuery<RecommendationStatus, ApiError>({
+  return useQuery<RecommendationStatus, ApiError>({
     queryKey: recommendationStatusKey,
-    queryFn: () => apiFetch<RecommendationStatus>('/recommendations/status'),
+    queryFn: () =>
+      fetchStatusAndRefresh(
+        queryClient,
+        recommendationStatusKey,
+        () => apiFetch<RecommendationStatus>('/recommendations/status'),
+        () =>
+          Promise.all([
+            queryClient.invalidateQueries({ queryKey: recommendationListKey }),
+            queryClient.invalidateQueries({ queryKey: [...ROOT, 'detail'] }),
+            queryClient.invalidateQueries({ queryKey: ['profile', 'issues'] }),
+            // Saved entries show the current recommendation (features/feedback savedKey).
+            queryClient.invalidateQueries({ queryKey: ['profile', 'saved'] }),
+          ]),
+      ),
+    staleTime: 0,
     enabled,
     refetchInterval: (query) =>
       isActive(query.state.data?.job) ? RECOMMENDATION_POLL_INTERVAL_MS : false,
   })
-  const job = status.data?.job
-  const jobKey = status.data ? `${job?.id ?? ''}:${job?.status ?? ''}` : null
-  const active = isActive(job)
-  const previousKey = useRef<string | null>(null)
-  useEffect(() => {
-    if (jobKey === null) return
-    if (previousKey.current !== null && previousKey.current !== jobKey && !active) {
-      void queryClient.invalidateQueries({ queryKey: recommendationListKey })
-    }
-    previousKey.current = jobKey
-  }, [jobKey, active, queryClient])
-  return status
 }
 
 export function useRecommendations(filters: RecommendationFilters, enabled = true) {

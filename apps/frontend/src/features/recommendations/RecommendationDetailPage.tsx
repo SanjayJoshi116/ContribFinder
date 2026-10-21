@@ -2,7 +2,10 @@ import { useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import type { RecommendationDetail } from '@/api/types'
+import { DeadEnd } from '@/components/DeadEnd'
 import { recordFeedback } from '@/features/feedback/api'
+import { useScrollToHash } from '@/lib/useScrollToHash'
+import { positiveId } from '@/lib/utils'
 import { DismissButton, SaveButton } from '@/features/feedback/RecommendationActions'
 
 import { useRecommendation } from './api'
@@ -93,11 +96,14 @@ function LanguageBar({ languages }: { languages: RecommendationDetail['languages
 
 /** One recommendation: GitHub's facts kept visibly apart from ContribFinder's analysis. */
 export function RecommendationDetailPage() {
-  const { id } = useParams()
+  const { id: param } = useParams()
+  const id = positiveId(param)
   const navigate = useNavigate()
-  const recommendation = useRecommendation(Number(id))
+  // Disabled for an invalid id (0): nothing is requested.
+  const recommendation = useRecommendation(id ?? 0)
   const loadedId = recommendation.data?.id
   const viewed = useRef<number | null>(null)
+  useScrollToHash(recommendation.isSuccess)
 
   // One view per page visit (the backend also de-duplicates within a window).
   useEffect(() => {
@@ -107,19 +113,17 @@ export function RecommendationDetailPage() {
     }
   }, [loadedId])
 
+  if (id === null) return <DeadEnd message="This link doesn't point to a recommendation." />
   if (recommendation.isPending) return <p className="text-muted-foreground">Loading…</p>
   if (recommendation.isError) {
     return (
-      <div className="space-y-2">
-        <p role="alert">
-          {recommendation.error.status === 404
+      <DeadEnd
+        message={
+          recommendation.error.status === 404
             ? 'This recommendation no longer exists. Recommendations change as your profile and projects are refreshed.'
-            : 'Could not load this recommendation. Please refresh the page.'}
-        </p>
-        <Link to="/app" className="text-sm underline">
-          Back to your dashboard
-        </Link>
-      </div>
+            : 'Could not load this recommendation. Please refresh the page.'
+        }
+      />
     )
   }
 

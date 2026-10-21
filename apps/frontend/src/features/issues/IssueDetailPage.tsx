@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router'
 
+import { DeadEnd } from '@/components/DeadEnd'
 import { recordFeedback } from '@/features/feedback/api'
 import {
   CONTRIBUTION_TYPE_TEXT,
@@ -7,7 +8,7 @@ import {
   difficultyText,
 } from '@/features/recommendations/messages'
 import { MatchBadge } from '@/features/recommendations/RecommendationCard'
-import { cn } from '@/lib/utils'
+import { cn, positiveId } from '@/lib/utils'
 
 import { useIssue } from './api'
 import { contributionBasis, difficultyBasis } from './evidence'
@@ -29,22 +30,22 @@ function Fact({ term, value, note }: { term: string; value: string; note?: strin
 /** One relevant issue: GitHub's data kept visibly apart from ContribFinder's analysis. The
  * description is shown as plain text (React escapes it), never rendered as HTML. */
 export function IssueDetailPage() {
-  const { id } = useParams()
-  const issue = useIssue(Number(id))
+  const { id: param } = useParams()
+  const id = positiveId(param)
+  // Disabled for an invalid id (0): nothing is requested.
+  const issue = useIssue(id ?? 0)
 
+  if (id === null) return <DeadEnd message="This link doesn't point to an issue." />
   if (issue.isPending) return <p className="text-muted-foreground">Loading…</p>
   if (issue.isError) {
     return (
-      <div className="space-y-2">
-        <p role="alert">
-          {issue.error.status === 404
+      <DeadEnd
+        message={
+          issue.error.status === 404
             ? 'This issue is no longer among your relevant issues. Issues change as projects are refreshed.'
-            : 'Could not load this issue. Please refresh the page.'}
-        </p>
-        <Link to="/app" className="text-sm underline">
-          Back to your dashboard
-        </Link>
-      </div>
+            : 'Could not load this issue. Please refresh the page.'
+        }
+      />
     )
   }
 

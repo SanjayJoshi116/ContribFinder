@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useIsMutating } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { dismissMutationKey } from '@/features/feedback/api'
 import { type DismissedProject, DismissUndo } from '@/features/feedback/RecommendationActions'
 
 import {
@@ -58,10 +60,10 @@ export function RecommendationList() {
   const [dismissed, setDismissed] = useState<DismissedProject | null>(
     () => (location.state as { dismissed?: DismissedProject } | null)?.dismissed ?? null,
   )
-  const closeUndo = useCallback(() => {
+  const closeUndo = () => {
     setDismissed(null)
     if (location.state) void navigate(location, { replace: true, state: null })
-  }, [location, navigate])
+  }
   const filters = readFilters(params)
   const filtered = FILTER_KEYS.some((key) => filters[key])
   const status = useRecommendationStatus()
@@ -81,6 +83,36 @@ export function RecommendationList() {
 
   const page = filters.page ?? 1
   const results = list.data?.results ?? []
+  // A dismissal empties its page at once; only once it is confirmed is the page really empty.
+  const dismissing = useIsMutating({ mutationKey: dismissMutationKey }) > 0
+
+  // A page that no longer exists (dismissals or a regeneration shrank the list, an old link)
+  // moves to one that does: past the end → page 1 (the 404 does not say which page is last);
+  // emptied by confirmed dismissals with earlier pages → the previous page.
+  let recoverTo: number | null = null
+  if (page > 1) {
+    if (list.isError && list.error.status === 404) recoverTo = 1
+    else if (
+      list.isSuccess &&
+      !list.isPlaceholderData &&
+      !dismissing &&
+      results.length === 0 &&
+      list.data.previous
+    )
+      recoverTo = page - 1
+  }
+  useEffect(() => {
+    if (recoverTo === null) return
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        if (recoverTo > 1) next.set('page', String(recoverTo))
+        else next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
+  }, [recoverTo, setParams])
 
   return (
     <section className="space-y-4" aria-labelledby="recommendations-heading">
@@ -129,7 +161,7 @@ export function RecommendationList() {
         </p>
       )}
 
-      {list.isPending ? (
+      {list.isPending || recoverTo !== null ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : list.isError ? (
         <p role="alert" className="text-sm">

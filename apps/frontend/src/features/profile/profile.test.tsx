@@ -6,7 +6,7 @@ import type { DeveloperSkill, EvidenceSummary } from '@/api/types'
 import { COMPLETED_JOB, ME, SKILLS, SYNCED_USER, json, mockFetch, renderRoute } from '@/test/render'
 
 import { evidenceLabel, groupByCategory } from './evidence'
-import { languageRows } from './languages'
+import { languageRows, percent } from './languages'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
 
@@ -48,17 +48,42 @@ describe('groupByCategory', () => {
   })
 })
 
+/** Languages with these byte counts; `share` is rounded as the API does. */
+function languages(bytes: number[]) {
+  const total = bytes.reduce((sum, b) => sum + b, 0)
+  return bytes.map((b, i) => ({
+    name: `L${i}`,
+    bytes: b,
+    share: Math.round((b / total) * 100) / 100,
+    repo_count: 1,
+  }))
+}
+
 describe('languageRows', () => {
   it('keeps the top 8 and folds the rest into Other', () => {
-    const languages = Array.from({ length: 10 }, (_, i) => ({
-      name: `L${i}`,
-      bytes: 100 - i,
-      share: 0.1,
-      repo_count: 1,
-    }))
-    const rows = languageRows(languages)
+    const rows = languageRows(languages([10, 10, 10, 10, 10, 10, 10, 10, 10, 10]))
     expect(rows).toHaveLength(9)
     expect(rows.at(-1)).toEqual({ name: 'Other', share: 0.2 })
+  })
+
+  it('counts many small languages in Other from bytes', () => {
+    // 8 large languages, then 12 at 0.3% each: the API rounds each of those shares to 0.
+    const rows = languageRows(languages([...Array(8).fill(1203), ...Array(12).fill(30)]))
+    const other = rows.at(-1)!
+    expect(other.name).toBe('Other')
+    expect(percent(other.share)).toBe('4%')
+    expect(rows.reduce((sum, row) => sum + row.share, 0)).toBeCloseTo(1)
+  })
+})
+
+describe('percent', () => {
+  it.each([
+    [0.002, '<1%'],
+    [0.005, '1%'],
+    [0.73, '73%'],
+    [0, '0%'],
+  ])('%f → %s', (share, expected) => {
+    expect(percent(share)).toBe(expected)
   })
 })
 

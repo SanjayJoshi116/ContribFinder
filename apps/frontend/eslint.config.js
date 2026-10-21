@@ -18,6 +18,12 @@ export default defineConfig([
     languageOptions: { ecmaVersion: 2023, globals: globals.browser },
   },
   {
+    // Playwright: Node globals, and its fixtures' `use` is not React's.
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    languageOptions: { globals: globals.node },
+    rules: { 'react-hooks/rules-of-hooks': 'off' },
+  },
+  {
     files: ['src/components/ui/**/*.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },

@@ -8,7 +8,8 @@ import { CONTRIBUTION_TYPE_TEXT, difficultyText } from './messages'
 export function RelevantIssues({ issues }: { issues: RelevantIssue[] }) {
   return (
     <div className="space-y-2">
-      <h3 id="relevant-issues" className="text-sm font-medium">
+      {/* Focusable for the card's "N relevant issues" link (useScrollToHash). */}
+      <h3 id="relevant-issues" tabIndex={-1} className="scroll-mt-4 text-sm font-medium">
         Relevant issues
       </h3>
       {issues.length === 0 ? (

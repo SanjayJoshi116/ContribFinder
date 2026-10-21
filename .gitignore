@@ -26,9 +26,10 @@ coverage/
 *.tsbuildinfo
 npm-debug.log*
 
-# Playwright (Phase 7+)
+# Playwright (apps/frontend, npm run e2e)
 test-results/
 playwright-report/
+apps/frontend/e2e/.sessions.json
 
 # Logs
 *.log

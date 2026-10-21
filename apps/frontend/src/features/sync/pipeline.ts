@@ -1,10 +1,8 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
-
+import { isActive } from '@/app/jobTransitions'
 import { useDiscoveryStatus } from '@/features/discovery/api'
-import { recommendationStatusKey, useRecommendationStatus } from '@/features/recommendations/api'
+import { useRecommendationStatus } from '@/features/recommendations/api'
 
-import { isActive, useSyncStatus } from './api'
+import { useSyncStatus } from './api'
 
 export type PipelineStage = 'syncing' | 'analyzing' | 'finding' | 'preparing'
 
@@ -21,24 +19,13 @@ export const STAGE_TEXT: Record<PipelineStage, string> = {
  * recommendation list fetch and poll them, and a second active observer would refetch on
  * mount. */
 export function usePipelineStage(): PipelineStage | null {
-  const queryClient = useQueryClient()
   const sync = useSyncStatus()
   const discovery = useDiscoveryStatus(false)
   const recommendations = useRecommendationStatus(false)
 
-  // A finished discovery starts a generation: look for it right away.
-  const discovering = isActive(discovery.data?.job)
-  const wasDiscovering = useRef(false)
-  useEffect(() => {
-    if (wasDiscovering.current && !discovering) {
-      void queryClient.invalidateQueries({ queryKey: recommendationStatusKey })
-    }
-    wasDiscovering.current = discovering
-  }, [discovering, queryClient])
-
   const syncJob = sync.data?.job
   if (isActive(syncJob)) return syncJob?.steps.analysis === 'running' ? 'analyzing' : 'syncing'
-  if (discovering) return 'finding'
+  if (isActive(discovery.data?.job)) return 'finding'
   if (isActive(recommendations.data?.job)) return 'preparing'
   return null
 }

@@ -1,5 +1,5 @@
 import type { ContributionType, Difficulty, MatchLabel, RecommendationStatus } from '@/api/types'
-import { isActive } from '@/features/sync/api'
+import { isActive } from '@/app/jobTransitions'
 
 /** What users see instead of a score: a label backed by reasons. Never a percentage. */
 export const MATCH_TEXT: Record<MatchLabel, string> = {

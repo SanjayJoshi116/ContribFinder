@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.7 (2026-10-21)
+Version: 0.12.8 (2026-10-21)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -412,12 +412,40 @@ Discovery
       skipped searches, pool writes fenced, no-op refreshes stamp nothing
 
 ============================================================================
+SHIPPED - v0.12.8 - Frontend correctness (backlog batch 9)
+============================================================================
+
+Server state
+  [x] Derived data refetched only when a sync, discovery or generation newly finishes
+  [x] One refresh per status fetch, however many components show it
+  [x] Only network errors and 5xx are retried (twice); 4xx shows at once
+  [x] Any 401 returns to sign-in with "Your session ended"
+
+Navigation
+  [x] A page past the end moves to page 1; an emptied page moves back one
+  [x] "N relevant issues" scrolls to and focuses the issues (reduced motion respected)
+  [x] An invalid recommendation or issue id says the link points to nothing
+
+Lists and profile
+  [x] Saved and hidden lists load 50 at a time with "Show more"
+  [x] Undo stays open 10 s from the dismissal, whatever filters change
+  [x] Language shares and "Other" computed from bytes; "<1%" for tiny shares
+
+Browser tests
+  [x] Playwright (Chromium) against the real backend and PostgreSQL, CI job e2e
+  [x] Seeded sign-in only under config.settings.e2e (no login path elsewhere)
+  [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
+      never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
+      its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
-  [ ] Bug_Backlog.md batches 8-11  signals, frontend, scripts, cleanup
+  [ ] Bug_Backlog.md batches 8, 10, 11  signals, scripts, cleanup
+  [ ] Bug_Backlog.md Y-6, Y-7  5-minute stale profile data, saved-list paging drift
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation

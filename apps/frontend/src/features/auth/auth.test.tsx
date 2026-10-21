@@ -60,22 +60,25 @@ describe('route guard', () => {
     expect(await screen.findByRole('link', { name: /continue with github/i })).toBeInTheDocument()
   })
 
-  it(
-    'shows an error instead of redirecting on non-auth failures',
-    { timeout: 10_000 },
-    async () => {
-      mockFetch({
-        'GET /api/v1/auth/me': () => json({ error: { code: 'server_error', message: 'x' } }, 500),
-      })
-      const { router } = renderRoute('/app')
+  it('shows an error instead of redirecting on non-auth failures', async () => {
+    const fetchMock = mockFetch({
+      'GET /api/v1/auth/me': () => json({ error: { code: 'server_error', message: 'x' } }, 500),
+    })
+    const { router } = renderRoute('/app')
 
-      // useMe retries non-401 failures twice with backoff before surfacing the error.
-      expect(await screen.findByRole('alert', {}, { timeout: 6000 })).toHaveTextContent(
-        /something went wrong/i,
-      )
-      expect(router.state.location.pathname).toBe('/app')
-    },
-  )
+    // A server error is retried twice before it is shown.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/something went wrong/i)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(router.state.location.pathname).toBe('/app')
+  })
+
+  it('shows no session notice to a signed-out visitor', async () => {
+    mockFetch({ 'GET /api/v1/auth/me': unauthenticated })
+    renderRoute('/app')
+
+    expect(await screen.findByRole('link', { name: /continue with github/i })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
 })
 
 describe('signed-in shell', () => {

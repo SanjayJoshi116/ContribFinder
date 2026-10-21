@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.7** (discovery and repository data: a renamed repository is never deleted, eligibility follows current data and settings, real tools named like lists are no longer rejected, and the pool that is kept is the one analyzed; MVP+). After signing in with
+**Version 0.12.8** (frontend correctness: the dashboard refetches only after a job finishes, errors show at once, an ended session returns to sign-in, every link and page lands somewhere, and browser tests cover the main flows; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -237,6 +237,20 @@ Never commit `.env`.
 `uv run pytest` in `apps/backend` (uses local PostgreSQL) and `npm test` in `apps/frontend`.
 All commands are in `CLAUDE.md` §6.
 
+### End-to-end tests
+
+Playwright runs the main flows (sign-in start, onboarding, dashboard, save, dismiss and undo,
+relevant issues, session end, data deletion) in Chromium against the real backend and
+PostgreSQL. Nothing calls GitHub: sign-in uses sessions created by a seed command that only
+`config.settings.e2e` installs.
+
+- One-time: `npx playwright install chromium` in `apps/frontend`. The `contribfinder` role
+  needs `CREATEDB`, as for `pytest`: the seed creates the `contribfinder_e2e` database.
+- `npm run e2e` in `apps/frontend`. It re-seeds the database on every run and starts Django on
+  `127.0.0.1:8001` and Vite on `5174`, so it runs alongside `npm start`.
+- Of your `.env` only `DATABASE_URL` is used (`DJANGO_READ_DOTENV=0` for Django), so local runs
+  see the same settings as CI.
+
 ## Known issues
 
 `Bug_Backlog.md` lists the findings of a full codebase review (2026-10-19), each verified against
@@ -245,7 +259,8 @@ Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion fi
 0.12.2, batch 3 (evaluation tooling integrity) in 0.12.3, batch 4 (job lifecycle and claim
 fencing) in 0.12.4, batch 5 (GitHub error resilience) in 0.12.5, together with the follow-ups
 from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consistency) in 0.12.6,
-batch 7 (discovery and repository data) in 0.12.7.
+batch 7 (discovery and repository data) in 0.12.7, batch 9 (frontend correctness) in 0.12.8,
+together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 and Y-7 still open).
 
 ## Versioning
 

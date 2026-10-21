@@ -1,14 +1,25 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { LogIn } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 
+import { clearSignedInData } from '@/app/queryClient'
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL, useMe } from '@/features/auth/api'
 import { authErrorMessage } from '@/features/auth/authErrors'
 
 export function LandingPage() {
   const [params] = useSearchParams()
+  const queryClient = useQueryClient()
   const me = useMe()
-  const error = authErrorMessage(params.get('auth_error'))
+  const code = params.get('auth_error')
+  const error = authErrorMessage(code)
+
+  // An ended session leaves the previous user's data cached; the signed-in pages are
+  // unmounted by now, so nothing refetches it.
+  useEffect(() => {
+    if (code === 'session_ended') clearSignedInData(queryClient)
+  }, [code, queryClient])
 
   if (me.isSuccess) return <Navigate to="/app" replace />
 

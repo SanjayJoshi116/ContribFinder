@@ -1,6 +1,6 @@
 {
   "name": "contribfinder-frontend",
-  "version": "0.12.7",
+  "version": "0.12.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
     "gen:api": "npx --yes openapi-typescript@7.13.0 src/api/openapi.json -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts src/api/openapi.json",
     "api:export": "cd ../backend && uv run python manage.py spectacular --settings config.settings.test --format openapi-json --validate --fail-on-warn --file ../frontend/src/api/openapi.json",
     "api:sync": "npm run api:export && npm run gen:api"
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

@@ -130,6 +130,22 @@ describe('save and dismiss', () => {
     )
   })
 
+  it('returns to sign-in when Save finds the session ended', async () => {
+    let meCalls = 0
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/auth/me': () => (meCalls++ === 0 ? json(ME) : unauthenticated()),
+      'POST /api/v1/recommendations/7/save': unauthenticated,
+    })
+    const { router } = renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/your session ended/i)
+    expect(router.state.location.pathname).toBe('/')
+  })
+
   it('rolls Save back when the request fails', async () => {
     mockFetch({
       ...WITH_RECOMMENDATION,
@@ -197,6 +213,100 @@ describe('save and dismiss', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/app'))
     expect(await screen.findByText(/hidden encode\/httpx/i)).toBeInTheDocument()
   })
+
+  it('moves back a page when the last card on it is dismissed', async () => {
+    const other = {
+      ...RECOMMENDATION,
+      id: 8,
+      repository_id: 80,
+      repository: { ...REPOSITORY, name: 'starlette', full_name: 'encode/starlette' },
+    }
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () =>
+        json({
+          count: 21,
+          next: '/api/v1/recommendations?page=2',
+          previous: null,
+          results: [other],
+        }),
+      'GET /api/v1/recommendations?page=2': () =>
+        json({
+          count: 21,
+          next: null,
+          previous: '/api/v1/recommendations',
+          results: [RECOMMENDATION],
+        }),
+      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+    })
+    const { router } = renderRoute('/app?page=2')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+
+    expect(await screen.findByRole('article', { name: 'starlette' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('')
+    expect(screen.getByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no recommendations/i)).not.toBeInTheDocument()
+  })
+
+  it('stays on the page when dismissing its last card fails', async () => {
+    let failDismiss: () => void = () => {}
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations?page=2': () =>
+        json({
+          count: 21,
+          next: null,
+          previous: '/api/v1/recommendations',
+          results: [RECOMMENDATION],
+        }),
+      'POST /api/v1/recommendations/7/dismiss': () =>
+        new Promise<Response>((resolve) => {
+          failDismiss = () =>
+            resolve(json({ error: { code: 'server_error', message: 'Down.' } }, 500))
+        }),
+    })
+    const { router } = renderRoute('/app?page=2')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('article', { name: 'httpx' })).toBeNull())
+    // The emptied page is only optimistic until the server answers.
+    expect(router.state.location.search).toBe('?page=2')
+
+    failDismiss()
+
+    expect(await screen.findByRole('article', { name: 'httpx' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?page=2')
+  })
+
+  it('times Undo from the dismissal, not from a later filter change', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations?language=python': () => page([RECOMMENDATION]),
+      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+    })
+    renderRoute('/app?language=python')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await user.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    expect(await screen.findByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(6000)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), '')
+    expect(screen.getByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+
+    // Still open just before 10 s from the dismissal, gone right after (not 6 s later).
+    await vi.advanceTimersByTimeAsync(3500)
+    expect(screen.getByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(600)
+    await waitFor(
+      () => expect(screen.queryByText(/hidden encode\/httpx/i)).not.toBeInTheDocument(),
+      { timeout: 1000 },
+    )
+  })
 })
 
 describe('interaction events', () => {
@@ -247,7 +357,7 @@ describe('saved projects page', () => {
     let hidden = true
     const fetchMock = mockFetch({
       ...ME_ROUTE,
-      'GET /api/v1/saved?page_size=100': () =>
+      'GET /api/v1/saved?page_size=50': () =>
         page([
           {
             repository_id: 70,
@@ -264,7 +374,7 @@ describe('saved projects page', () => {
             recommendation: null,
           },
         ]),
-      'GET /api/v1/dismissed?page_size=100': () =>
+      'GET /api/v1/dismissed?page_size=50': () =>
         page(
           hidden
             ? [
@@ -297,6 +407,79 @@ describe('saved projects page', () => {
     await userEvent.click(within(hiddenList).getByRole('button', { name: 'Restore' }))
     expect(await screen.findByText('No hidden projects.')).toBeInTheDocument()
     expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/dismissed/72')).toHaveLength(1)
+  })
+
+  it('shows more saved projects page by page', async () => {
+    const saved = (n: number) => ({
+      repository_id: 100 + n,
+      repository: { ...REPOSITORY, full_name: `org/repo-${n}`, name: `repo-${n}` },
+      saved_at: '2026-09-29T10:00:00Z',
+      activity_label: '',
+      recommendation: null,
+    })
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/saved?page_size=50': () =>
+        json({
+          count: 2,
+          next: '/api/v1/saved?page=2&page_size=50',
+          previous: null,
+          results: [saved(1)],
+        }),
+      'GET /api/v1/saved?page=2&page_size=50': () =>
+        json({ count: 2, next: null, previous: '/api/v1/saved?page_size=50', results: [saved(2)] }),
+      'GET /api/v1/dismissed?page_size=50': () => page([]),
+    })
+    renderRoute('/app/saved')
+
+    expect(await screen.findByRole('article', { name: 'org/repo-1' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }))
+
+    expect(await screen.findByRole('article', { name: 'org/repo-2' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'org/repo-1' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
+  })
+
+  it('keeps loaded hidden projects listed after a restore', async () => {
+    const hidden = (n: number) => ({
+      repository_id: 200 + n,
+      repository: { ...REPOSITORY, full_name: `org/hidden-${n}`, name: `hidden-${n}` },
+      dismissed_at: '2026-09-29T11:00:00Z',
+    })
+    let restored = false
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/saved?page_size=50': () => page([]),
+      'GET /api/v1/dismissed?page_size=50': () =>
+        json({
+          count: 3,
+          next: '/api/v1/dismissed?page=2&page_size=50',
+          previous: null,
+          results: [hidden(1), hidden(2)],
+        }),
+      'GET /api/v1/dismissed?page=2&page_size=50': () =>
+        json({
+          count: restored ? 2 : 3,
+          next: null,
+          previous: '/api/v1/dismissed?page_size=50',
+          results: restored ? [] : [hidden(3)],
+        }),
+      'DELETE /api/v1/dismissed/203': () => {
+        restored = true
+        return noContent()
+      },
+    })
+    renderRoute('/app/saved')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Show more' }))
+    const list = screen.getByRole('list', { name: 'Hidden projects' })
+    await within(list).findByText('org/hidden-3')
+    const last = within(list).getByText('org/hidden-3').closest('li')!
+    await userEvent.click(within(last).getByRole('button', { name: 'Restore' }))
+
+    await waitFor(() => expect(within(list).queryByText('org/hidden-3')).not.toBeInTheDocument())
+    expect(within(list).getByText('org/hidden-1')).toBeInTheDocument()
+    expect(within(list).getByText('org/hidden-2')).toBeInTheDocument()
   })
 
   it('is linked from the dashboard', async () => {

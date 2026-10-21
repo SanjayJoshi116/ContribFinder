@@ -1,5 +1,5 @@
 import type { DiscoveryStatus, SyncJob } from '@/api/types'
-import { isActive } from '@/features/sync/api'
+import { isActive } from '@/app/jobTransitions'
 
 const FAILURES: Record<string, string> = {
   github_auth_invalid:

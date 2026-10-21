@@ -83,10 +83,31 @@ function HiddenEntry({ entry }: { entry: DismissedRepository }) {
   )
 }
 
+/** Loads the next page of a list; shown only while there is one. */
+function ShowMore({
+  list,
+}: {
+  list: ReturnType<typeof useSaved> | ReturnType<typeof useDismissed>
+}) {
+  if (!list.hasNextPage) return null
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={list.isFetchingNextPage}
+      onClick={() => void list.fetchNextPage()}
+    >
+      Show more
+    </Button>
+  )
+}
+
 /** Saved projects (kept even when no longer recommended) and hidden projects. */
 export function SavedPage() {
   const saved = useSaved()
   const dismissed = useDismissed()
+  const savedEntries = saved.data?.pages.flatMap((page) => page.results) ?? []
+  const hiddenEntries = dismissed.data?.pages.flatMap((page) => page.results) ?? []
 
   return (
     <>
@@ -102,16 +123,19 @@ export function SavedPage() {
           <p className="text-muted-foreground text-sm">Loading…</p>
         ) : saved.isError ? (
           <p role="alert">Could not load your saved projects. Please refresh the page.</p>
-        ) : saved.data.results.length === 0 ? (
+        ) : savedEntries.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             Nothing saved yet. Use Save on a recommendation to keep it here.
           </p>
         ) : (
-          <div className="space-y-3">
-            {saved.data.results.map((entry) => (
-              <SavedEntry key={entry.repository_id} entry={entry} />
-            ))}
-          </div>
+          <>
+            <div className="space-y-3">
+              {savedEntries.map((entry) => (
+                <SavedEntry key={entry.repository_id} entry={entry} />
+              ))}
+            </div>
+            <ShowMore list={saved} />
+          </>
         )}
       </section>
 
@@ -126,14 +150,17 @@ export function SavedPage() {
           <p className="text-muted-foreground text-sm">Loading…</p>
         ) : dismissed.isError ? (
           <p role="alert">Could not load your hidden projects. Please refresh the page.</p>
-        ) : dismissed.data.results.length === 0 ? (
+        ) : hiddenEntries.length === 0 ? (
           <p className="text-muted-foreground text-sm">No hidden projects.</p>
         ) : (
-          <ul aria-label="Hidden projects">
-            {dismissed.data.results.map((entry) => (
-              <HiddenEntry key={entry.repository_id} entry={entry} />
-            ))}
-          </ul>
+          <>
+            <ul aria-label="Hidden projects">
+              {hiddenEntries.map((entry) => (
+                <HiddenEntry key={entry.repository_id} entry={entry} />
+              ))}
+            </ul>
+            <ShowMore list={dismissed} />
+          </>
         )}
       </section>
     </>

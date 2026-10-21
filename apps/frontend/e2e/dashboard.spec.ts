@@ -1,0 +1,49 @@
+import { expect, test } from './fixtures.ts'
+
+test.beforeEach(async ({ page, signInAs }) => {
+  await signInAs('e2e-dashboard')
+  await page.goto('/app')
+})
+
+test('shows the profile and labeled recommendations, never a percentage', async ({ page }) => {
+  await expect(page.getByRole('heading', { name: 'Skills' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Skills' })).toContainText('Python')
+  const cards = page.getByRole('article')
+  await expect(cards).toHaveCount(20)
+  const first = page.getByRole('article', { name: 'project-01' })
+  await expect(first).toContainText(/(Strong|Good|Partial) match/)
+  await expect(page.getByRole('region', { name: 'Recommended projects' })).not.toContainText('%')
+  await expect(page.getByRole('navigation', { name: 'Recommendation pages' })).toBeVisible()
+})
+
+test('saves a project and lists it on the saved page', async ({ page }) => {
+  const card = page.getByRole('article', { name: 'project-03' })
+  await card.getByRole('button', { name: 'Save' }).click()
+  await expect(card.getByRole('button', { name: 'Saved' })).toBeEnabled()
+
+  await page.getByRole('link', { name: 'Saved and hidden projects' }).click()
+  await expect(page.getByRole('article', { name: 'seed-org/project-03' })).toBeVisible()
+})
+
+test('dismisses a project and brings it back with Undo', async ({ page }) => {
+  const card = page.getByRole('article', { name: 'project-07' })
+  await card.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(card).toBeHidden()
+  const notice = page.getByRole('status').filter({ hasText: 'Hidden seed-org/project-07' })
+
+  await notice.getByRole('button', { name: 'Undo' }).click()
+
+  // Restore regenerates (inline in these tests), which brings the project back.
+  await expect(page.getByRole('article', { name: 'project-07' })).toBeVisible()
+  await page.goto('/app/saved')
+  await expect(page.getByText('No hidden projects.')).toBeVisible()
+})
+
+test('the relevant-issues link lands on the issues', async ({ page }) => {
+  const card = page.getByRole('article', { name: 'project-01' })
+  await card.getByRole('link', { name: /relevant issues/ }).click()
+
+  const heading = page.getByRole('heading', { name: 'Relevant issues' })
+  await expect(heading).toBeFocused()
+  await expect(heading).toBeInViewport()
+})

@@ -173,3 +173,31 @@ From the `discovery-repository-data` change (v0.12.7) and its first real discove
 |---|---|---|
 | **High value** | post-analysis cleanup (§11); `no_license` measurement (§12) | content-based `not_code` (§11, needs a judged sample) |
 | **Lower value** | queue released-name refresh (§13); per-band yield (§12) | — |
+
+## 14. Client freshness and paging
+
+Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
+
+- **Data versions instead of job watching.** The SPA refreshes derived data when a sync,
+  discovery or generation job finishes. Data changed by anything else (`reanalyze_profiles`, a
+  backend repository refresh) stays cached up to 5 minutes (Y-6). One small endpoint returning
+  per-area update times (profile, recommendations, saved) would let the status poll refresh
+  exactly what changed, whatever changed it.
+- **Keyset pagination for saved and hidden lists.** Page numbers shift when entries are added
+  or removed between "Show more" clicks (Y-7). A `saved_at` cursor keeps pages stable.
+- **Clamp past-the-end pages on the server.** `/recommendations?page=N` past the end returns
+  404, and the client has two recovery paths (404 → page 1, emptied page → previous page).
+  Returning the last page (with its number) removes both; with the list refetched after a
+  dismissal, the optimistic-page guard goes too.
+- **Route-level id validation.** Each detail page parses `:id`, passes `0` as a disabled
+  sentinel and renders its own dead end. A route wrapper that validates once would hand pages
+  a plain number.
+- **Browser tests on a production build in CI.** The e2e suite drives the Vite dev server;
+  `vite build && vite preview` would test what ships and load faster per page.
+
+## Suggested order (round 4)
+
+| | Cheap | Expensive |
+|---|---|---|
+| **High value** | keyset saved lists (§14) | data versions (§14) |
+| **Lower value** | route-level ids, production build in CI (§14) | server page clamping (§14, API change) |

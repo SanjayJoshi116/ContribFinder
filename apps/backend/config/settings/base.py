@@ -11,8 +11,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 REPO_ROOT = BASE_DIR.parent.parent
 
 env = environ.Env()
-# Local (non-Docker) runs read the repo-root .env; in Docker, compose injects it.
-if (REPO_ROOT / ".env").exists():
+# Local (non-Docker) runs read the repo-root .env; in Docker, compose injects it. The browser-test
+# runner (scripts/e2e-backend.mjs) turns it off with DJANGO_READ_DOTENV=0.
+if env.bool("DJANGO_READ_DOTENV", default=True) and (REPO_ROOT / ".env").exists():
     env.read_env(REPO_ROOT / ".env")
 
 SECRET_KEY = env("DJANGO_SECRET_KEY")

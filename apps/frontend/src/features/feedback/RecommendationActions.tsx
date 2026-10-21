@@ -1,5 +1,5 @@
 import { Bookmark, BookmarkCheck, EyeOff } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 
 import type { Recommendation } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -77,10 +77,13 @@ export function DismissUndo({
   onClose: () => void
 }) {
   const restore = useRestore()
+  // The window runs from the dismissal: a new onClose (the list re-renders on every filter
+  // or page change) must not restart it.
+  const close = useEffectEvent(onClose)
   useEffect(() => {
-    const timer = setTimeout(onClose, UNDO_TIMEOUT_MS)
+    const timer = setTimeout(() => close(), UNDO_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [project, onClose])
+  }, [project])
 
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border p-3 text-sm">
