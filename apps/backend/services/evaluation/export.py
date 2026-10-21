@@ -53,7 +53,7 @@ def export_developer(
     if profile is None:
         raise NotAnalyzed(f"User {user_id} has no analyzed developer profile.")
     dev = load_developer(profile)
-    candidates = load_candidates(profile)
+    candidates = load_candidates(profile, include_dismissed=True)
     dropped = 0
     if not include_interacted:
         interacted = interacted_repository_ids(profile)

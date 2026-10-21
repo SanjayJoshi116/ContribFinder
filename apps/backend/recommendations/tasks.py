@@ -6,7 +6,7 @@ from typing import Any
 from celery import shared_task
 
 from jobs.models import SyncJob
-from services.jobs import run_tracked_job
+from services.jobs import rerun_recommendations_if_requested, run_tracked_job
 from services.ranking.freshness import start_due_generations
 from services.ranking.service import RecommendationService
 
@@ -22,7 +22,7 @@ def _generate(job: SyncJob) -> None:
 )
 def generate_recommendations(self: Any, job_id: int) -> None:
     """Run a recommendation generation job (job type ``recommendation_generation``)."""
-    run_tracked_job(self, job_id, _generate)
+    run_tracked_job(self, job_id, _generate, on_completed=rerun_recommendations_if_requested)
 
 
 @shared_task(name="recommendations.refresh_recommendations")

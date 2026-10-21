@@ -62,6 +62,24 @@ Source: `code-review` over the uncommitted `github-error-resilience` diff (v0.12
 | V-8 | cleanup | `services/github/sync.py:187` | `languages_skipped` written to job metadata, never read (no code, API or UI). Spec-required (task 2.1), so: surface it (step detail or warning) or drop it from the spec. | wontfix (internal diagnostics, like `repos_capped`; spec-required) |
 | V-9 | cleanup | `services/github/sync.py:190` | `/simplify` altitude: `_step_topics` re-checks existing pks to work around topics being written a step later from `job.metadata["repo_topics"]`. Writing topics in `_step_repositories`' `job_write` removes the race (and rename re-points) and the metadata copy; `_step_topics` stays as a no-op step. Design accepted A-11 as partial. | fixed (github-error-resilience) |
 
+## Batch 6 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `recommendation-consistency` diff (v0.12.6). Paths
+under `apps/backend/`. All fixed in 0.12.6 before commit.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| W-1 | bug | `services/feedback.py` (`dismiss`) | Events referenced a recommendation a concurrent generation deleted → deferred FK fails at commit → dismiss 500. | fixed (recommendation-consistency) |
+| W-2 | bug | `services/feedback.py` (`record`) | Same for `viewed` (and other events), with the profile lock widening the window. | fixed (recommendation-consistency) |
+| W-3 | bug | `services/repositories/analysis.py` (`_store_issues`) | Only deleted issues were locked by pk; the unordered `bulk_update` of open issues could deadlock with persist's pk-ordered lock. | fixed (recommendation-consistency) |
+| W-4 | perf | `services/ranking/freshness.py` | The sweep flagged running generations as due → `rerun_requested` → a redundant generation after every overlap. | fixed (recommendation-consistency) |
+| W-5 | gap | `services/jobs.py` | A retry reloads its inputs but kept the rerun flag (extra run). A flag lost on permanent failure stays an accepted risk (design). | fixed (recommendation-consistency) |
+| W-6 | gap | `services/ranking/freshness.py` | A staleness mark overwrote the completion time of an analysis newer than the last generation → missed regeneration. | fixed (recommendation-consistency) |
+| W-7 | gap | `services/ranking/freshness.py` | A generation that keeps failing was restarted every sweep (30 min) forever. | fixed (recommendation-consistency) |
+| W-8 | bug | `services/ranking/service.py` | An issue re-analyzed (not deleted) between ranking and storing passed the check → reasons from stale analysis. | fixed (recommendation-consistency) |
+| W-9 | gap | `services/feedback.py` (`save`) | Dismissal enforced only through the recommendation's deletion. | fixed (recommendation-consistency) |
+| W-10 | perf | `services/feedback.py` (`record`) | View de-duplication waited on the profile lock held by a whole persist. | fixed (recommendation-consistency) |
+
 ## Full-file reviews (2026-10-19)
 
 `code-review` at high effort over whole files, all findings reported. All rows verified against
@@ -153,20 +171,20 @@ Two runs, merged.
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| D-1 | bug | `services/matching/features.py:85` | `load_candidates` scores only RECOMMENDABLE; the 6 h stale sweep moves repositories to STALE and bumps `lifecycle_changed_at`, which triggers regeneration → `_persist` deletes their recommendations, which return later with new ids (or never, without app credentials). Breaks "ids survive regenerations"; saved items vanish. | partial |
-| D-2 | bug | `services/ranking/service.py:151` | `_persist` reads dismissals before locking Recommendation rows → a dismiss committing in between is missed → dismissed repository recreated. | confirmed |
-| D-3 | bug | `services/ranking/service.py:215` | Dismiss (cascade deletes children first) and persist (locks parent first) lock in opposite orders → deadlock; dismiss 500 or generation fails. | confirmed |
-| D-4 | bug | `services/ranking/service.py:159` | Persist locks Issue rows then deletes RecommendedIssue; issue refresh deletes RecommendedIssue then Issue → deadlock. | confirmed |
-| D-5 | bug | `services/ranking/freshness.py:45` | Restore reuses a running generation that already loaded candidates; freshness ignores dismissals and new pool members → restored or newly found repositories missing until an unrelated change. | confirmed |
-| D-6 | bug | `services/ranking/service.py:164` | Concurrently deleted issues are dropped from rows and snapshot, but score, signals, label and reason text ("3 open issues…") still count them → explanation not backed by stored data. | confirmed |
+| D-1 | bug | `services/matching/features.py:85` | `load_candidates` scores only RECOMMENDABLE; the 6 h stale sweep moves repositories to STALE and bumps `lifecycle_changed_at`, which triggers regeneration → `_persist` deletes their recommendations, which return later with new ids (or never, without app credentials). Breaks "ids survive regenerations"; saved items vanish. | fixed (recommendation-consistency) |
+| D-2 | bug | `services/ranking/service.py:151` | `_persist` reads dismissals before locking Recommendation rows → a dismiss committing in between is missed → dismissed repository recreated. | fixed (recommendation-consistency) |
+| D-3 | bug | `services/ranking/service.py:215` | Dismiss (cascade deletes children first) and persist (locks parent first) lock in opposite orders → deadlock; dismiss 500 or generation fails. | fixed (recommendation-consistency) |
+| D-4 | bug | `services/ranking/service.py:159` | Persist locks Issue rows then deletes RecommendedIssue; issue refresh deletes RecommendedIssue then Issue → deadlock. | fixed (recommendation-consistency) |
+| D-5 | bug | `services/ranking/freshness.py:45` | Restore reuses a running generation that already loaded candidates; freshness ignores dismissals and new pool members → restored or newly found repositories missing until an unrelated change. | fixed (recommendation-consistency) |
+| D-6 | bug | `services/ranking/service.py:164` | Concurrently deleted issues are dropped from rows and snapshot, but score, signals, label and reason text ("3 open issues…") still count them → explanation not backed by stored data. | fixed (recommendation-consistency) |
 | D-7 | gap | `services/ranking/explain.py:188` | Reasons emitted for signals > 0 even when weight 0 → explanations for signals scoring didn't use (FR-REC-003). Filter on contribution > 0. | partial |
 | D-8 | bug | `services/ranking/score.py:99` | Relevance gate checks raw signal values, not weights → a weight-0 relevance signal still admits a candidate. | partial |
 | D-9 | bug | `services/matching/issues.py:193` | Issue with only technologies the developer lacks still counts via approachability + difficulty (score 0.40 ≥ 0.3) → "matches your profile" for a Rust issue shown to a Python dev. | partial |
-| D-10 | bug | `services/ranking/service.py:156` | Dismissals during a run removed after the `top_n` cut → fewer than N stored although next candidates exist. | confirmed |
+| D-10 | bug | `services/ranking/service.py:156` | Dismissals during a run removed after the `top_n` cut → fewer than N stored although next candidates exist. | fixed (recommendation-consistency) |
 | D-11 | bug | `services/issues/classify.py:336` | Title keyword order puts docs, test and CI before bug → "[Bug]: docs build crashes" becomes documentation → beginner vote. Undoes the `[Bug]:` fix. | confirmed |
 | D-12 | bug | `services/issues/classify.py:412` | `body_length` vote uses raw markdown (template HTML comments included) → wrong or unknown difficulty. | confirmed |
 | D-13 | bug | `services/issues/labels.py:110` | `[Type] Bug`-style labels never normalized (`_EDGES` strips only `[`) → no category, filter misses, documentation vote lost. | confirmed |
-| D-14 | bug | `services/ranking/freshness.py:34` | `due_profiles` requires candidates → profile with an emptied pool keeps old recommendations forever. | partial |
+| D-14 | bug | `services/ranking/freshness.py:34` | `due_profiles` requires candidates → profile with an emptied pool keeps old recommendations forever. | fixed (recommendation-consistency) |
 | D-15 | gap | `recommendations/admin.py:25` | ScoringConfig editable once no Recommendation references it → past versions' numbers can change (feedback snapshots, baselines). Activate action doesn't validate (`stored=True`). | partial |
 | D-16 | bug | `services/matching/issues.py:136` | Difficulty-fit part of an unknown-difficulty issue's score has no reason → unexplained score. | confirmed |
 | D-17 | gap | `services/ranking/config.py:354` | Openness points not validated to sum ≤ 1; silently capped → saturated signal. | confirmed |
@@ -184,10 +202,10 @@ Excludes what R-1, R-2, R-7, R-8, R-13 and R-14 already cover.
 | E-1 | bug | `services/evaluation/baseline.py:333` | `write` replaces the whole dataset entry with only the configs evaluated in this run. `evaluate_ranking --write-baseline --config v2-deterministic` drops v1 from `benchmark-v1`; `test_baseline_metrics_unchanged` asserts both v1 and v2 are present → CI fails. Merge into the existing entry instead. | fixed (evaluation-tooling-integrity) |
 | E-2 | bug | `recommendations/management/commands/evaluate_ranking.py:170` | `--write-baseline --min-score X` records the override as every config's `min_score` (and metrics at X), but the test re-evaluates without override at `baseline.MIN_SCORE` → permanent "Ranking changed" mismatch. Reject `--min-score` with `--write-baseline` (as `--config-file` is). | fixed (evaluation-tooling-integrity) |
 | E-3 | gap | `services/evaluation/export.py:36` | Export claims anonymized output, but the pool includes `previously_interacted` candidates (repositories the user contributed to) by full name → a committed `benchmark-v2` lets anyone re-identify the developer from their contribution set. | fixed (privacy-deletion-finality) |
-| E-4 | bug | `services/evaluation/export.py:36` | Export reuses `load_candidates`, which drops dismissed and non-RECOMMENDABLE (STALE, FETCHING, see D-1) repositories → the judged pool depends on when the beat sweep last ran and omits the user's clearest "not relevant" examples. | confirmed |
-| E-5 | bug | `services/feedback.py:86` | `save` does not check for a dismissal; a save from a second tab with a stale recommendation racing `dismiss` leaves a SavedRepository for a hidden repository (shown in Saved while hidden; `dismiss` deleted the save first). Lock or re-check `DismissedRepository` inside the transaction. | partial |
-| E-6 | bug | `services/feedback.py:117` | `dismiss` deletes the SavedRepository without recording an `unsaved` event → the append-only event log shows the repository as still saved; save analytics overcount. | confirmed |
-| E-7 | bug | `services/feedback.py:73` | `viewed` de-duplication is check-then-insert without a lock → two concurrent views (StrictMode double effect, two tabs) both store an event. | confirmed |
+| E-4 | bug | `services/evaluation/export.py:36` | Export reuses `load_candidates`, which drops dismissed and non-RECOMMENDABLE (STALE, FETCHING, see D-1) repositories → the judged pool depends on when the beat sweep last ran and omits the user's clearest "not relevant" examples. | fixed (recommendation-consistency) |
+| E-5 | bug | `services/feedback.py:86` | `save` does not check for a dismissal; a save from a second tab with a stale recommendation racing `dismiss` leaves a SavedRepository for a hidden repository (shown in Saved while hidden; `dismiss` deleted the save first). Lock or re-check `DismissedRepository` inside the transaction. | fixed (recommendation-consistency) |
+| E-6 | bug | `services/feedback.py:117` | `dismiss` deletes the SavedRepository without recording an `unsaved` event → the append-only event log shows the repository as still saved; save analytics overcount. | fixed (recommendation-consistency) |
+| E-7 | bug | `services/feedback.py:73` | `viewed` de-duplication is check-then-insert without a lock → two concurrent views (StrictMode double effect, two tabs) both store an event. | fixed (recommendation-consistency) |
 | E-8 | bug | `recommendations/management/commands/evaluate_ranking.py:183` | `--json` writes without creating the parent folder or catching `OSError` → raw traceback for `--json ../../judging/new/report.json`; the other commands create output folders (CLAUDE.md §7). | fixed (evaluation-tooling-integrity) |
 | E-9 | bug | `services/evaluation/sheet.py:155` | `_languages` sums byte counts, but the dataset format allows `null` bytes (`_count`) → `TypeError` in `benchmark_sheet`, not caught (only OSError/ValueError/KeyError/SheetError) → traceback. | fixed (evaluation-tooling-integrity) |
 | E-10 | perf | `feedback/api.py:252` | Saved list prefetches every snapshot of each repository (up to `REPO_SNAPSHOT_HISTORY`) to read only the newest. | confirmed |
@@ -199,7 +217,7 @@ Excludes what R-1, R-2, R-7, R-8, R-13 and R-14 already cover.
 | F-1 | bug | `features/sync/api.ts:24` | `useSyncStatus` invalidates every `['profile']` query on each status fetch whose latest job is COMPLETED, which is the steady state. Window focus or remounting `/app` (back from a detail page) refetches skills, interests, repositories, recommendations, discovery and saved lists every time, and can refetch the list mid-dismiss so the card flickers back. Invalidate only when the job id or status changes, as `useRecommendationStatus` does. | confirmed |
 | F-2 | bug | `features/feedback/api.ts:259` | Saved and hidden lists fetch one page of `page_size=100` with no pagination → a user with more than 100 saved or hidden projects silently cannot see or restore the rest. | confirmed |
 | F-3 | bug | `features/recommendations/RecommendationList.tsx:134` | `?page=N` past the last page (after dismissals or a regeneration shrinks the list, or a shared link) gets a DRF 404 → "Could not load recommendations. Please refresh the page."; refreshing keeps the page in the URL, so it never recovers. Dismissing the only card on the last page shows the empty-state text although earlier pages exist. | confirmed |
-| F-4 | bug | `features/feedback/RecommendationActions.tsx:287` | Save button is not disabled while pending; a fast double click sends POST and DELETE concurrently with no ordering guarantee, and the first mutation's rollback restores a snapshot taken before the second → UI shows Saved while the server has it unsaved (or the reverse). | confirmed |
+| F-4 | bug | `features/feedback/RecommendationActions.tsx:287` | Save button is not disabled while pending; a fast double click sends POST and DELETE concurrently with no ordering guarantee, and the first mutation's rollback restores a snapshot taken before the second → UI shows Saved while the server has it unsaved (or the reverse). | fixed (recommendation-consistency) |
 | F-5 | bug | `features/recommendations/RecommendationCard.tsx:332` | "N relevant issues" links to `#relevant-issues`, but client-side navigation does not scroll to hashes and the target renders only after the detail query loads → user lands at the top of the page. | confirmed |
 | F-6 | bug | `features/recommendations/RecommendationDetailPage.tsx:98` | Non-numeric or zero `:id` (also `IssueDetailPage.tsx:33`) disables the query, so `isPending` stays true → "Loading…" forever instead of a not-found message. | confirmed |
 | F-7 | bug | `features/auth/RequireAuth.tsx:245` | Only `/auth/me` 401s redirect; with `staleTime` 60 s an expired session shows "Could not load ... Please refresh the page" on every panel instead of returning to sign-in. Handle 401 globally (QueryCache `onError`). | partial |
@@ -287,7 +305,8 @@ scenario or severity is narrower; `false-positive` = not a defect.
 | G scripts/infra | 10 | 6 | 4 | 0 |
 | H platform/settings/tests | 20 | 16 | 4 | 0 |
 | V batch 5 review | 9 | 6 | 2 | 1 |
-| **Total** | **163** | **121** | **33** | **2** |
+| W batch 6 review | 10 | 10 | 0 | 0 |
+| **Total** | **173** | **131** | **33** | **2** |
 
 ## Verification notes
 

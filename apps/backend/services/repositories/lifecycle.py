@@ -27,6 +27,10 @@ from services.discovery.filters import REPOSITORY_UNAVAILABLE, FilterConfig, eli
 from services.job_guard import stale_before
 
 IN_PROGRESS = (Lifecycle.FETCHING, Lifecycle.REFRESHING)
+# States whose stored data can be scored, together with ``is_eligible``: stale is not gone.
+# Marking stale and claiming keep ``is_eligible``, so an eligible STALE or REFRESHING row was
+# RECOMMENDABLE before; a FAILED retry (REFRESHING) stays ineligible.
+SCORABLE = (Lifecycle.RECOMMENDABLE, Lifecycle.STALE, Lifecycle.REFRESHING)
 
 
 class ClaimLost(Exception):

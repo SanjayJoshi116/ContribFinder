@@ -7,7 +7,7 @@ Lets developers act on their recommendations (save the ones they want to keep, d
 ## Requirements
 
 ### Requirement: Feedback events
-The system SHALL record a feedback event for a user's recommendation interactions: `viewed`, `saved`, `unsaved`, `dismissed`, `undismissed`, `opened_repository` and `opened_issue`. Each event SHALL store the user, the repository, the recommendation it came from (when it still exists), the action, the time, and a snapshot of the recommendation's match label, rank and scoring configuration version at that moment. An `opened_issue` event SHALL also store the issue (while it still exists) and a snapshot of its number. Events SHALL remain intact when the recommendation is regenerated or removed, or when the issue is closed or removed. `POST /api/v1/recommendations/{id}/feedback` SHALL accept `viewed`, `opened_repository` and `opened_issue` for the requesting user's own recommendations; `opened_issue` SHALL require the id of one of that recommendation's relevant issues and SHALL be rejected with a 400 error otherwise. Saved, dismissed and their reversals SHALL be recorded by the save and dismiss actions themselves. A `viewed` event for the same user and recommendation within the configured window (default 30 minutes) SHALL NOT create a second event. Feedback SHALL NOT change scores or ranking.
+The system SHALL record a feedback event for a user's recommendation interactions: `viewed`, `saved`, `unsaved`, `dismissed`, `undismissed`, `opened_repository` and `opened_issue`. Each event SHALL store the user, the repository, the recommendation it came from (when it still exists), the action, the time, and a snapshot of the recommendation's match label, rank and scoring configuration version at that moment. An `opened_issue` event SHALL also store the issue (while it still exists) and a snapshot of its number. Events SHALL remain intact when the recommendation is regenerated or removed, or when the issue is closed or removed. `POST /api/v1/recommendations/{id}/feedback` SHALL accept `viewed`, `opened_repository` and `opened_issue` for the requesting user's own recommendations; `opened_issue` SHALL require the id of one of that recommendation's relevant issues and SHALL be rejected with a 400 error otherwise. Saved, dismissed and their reversals SHALL be recorded by the save and dismiss actions themselves. A `viewed` event for the same user and recommendation within the configured window (default 30 minutes) SHALL NOT create a second event, also when the views arrive at the same time. An interaction posted for a recommendation that no longer exists when it is recorded (dropped by a regeneration meanwhile) SHALL store no event and SHALL NOT be an error. Recording an event SHALL NOT wait for a generation job storing its result. Feedback SHALL NOT change scores or ranking.
 
 #### Scenario: View recorded once
 - **WHEN** a user opens the same recommendation's detail page twice within 30 minutes
@@ -37,8 +37,12 @@ The system SHALL record a feedback event for a user's recommendation interaction
 - **WHEN** a user has viewed a recommendation many times
 - **THEN** its score and rank in the next generation are the same as without the views
 
+#### Scenario: Simultaneous views
+- **WHEN** two requests record a view of the same recommendation at the same time
+- **THEN** one `viewed` event exists
+
 ### Requirement: Save recommendations
-A user SHALL be able to save and unsave a recommendation's repository (`POST` and `DELETE /api/v1/recommendations/{id}/save`). Saving SHALL be idempotent and store the save time. Every recommendation in the list and detail responses SHALL say whether its repository is saved. A saved repository SHALL stay saved when it is no longer recommended.
+A user SHALL be able to save and unsave a recommendation's repository (`POST` and `DELETE /api/v1/recommendations/{id}/save`). Saving SHALL be idempotent and store the save time. Every recommendation in the list and detail responses SHALL say whether its repository is saved. A saved repository SHALL stay saved when it is no longer recommended. Saving a recommendation that no longer exists, or whose repository the user has dismissed, SHALL answer 404 and SHALL store no save and no event, also when the save races a dismiss of the same repository.
 
 #### Scenario: Save and unsave
 - **WHEN** a user saves a recommendation, then unsaves it
@@ -48,6 +52,10 @@ A user SHALL be able to save and unsave a recommendation's repository (`POST` an
 - **WHEN** a user saves an already saved recommendation
 - **THEN** the save time is unchanged and no duplicate save exists
 
+#### Scenario: Save racing a dismiss
+- **WHEN** a user dismisses a recommendation in one tab while another tab saves the same recommendation
+- **THEN** the repository ends dismissed and not saved, and the save either answers 404 or completes before the dismiss removes it
+
 ### Requirement: Saved projects
 The system SHALL provide `GET /api/v1/saved` (paginated, most recently saved first) listing the user's saved repositories, each with the save time, the repository summary, its current activity label, and its current recommendation (id, match label and reasons) or none when it is no longer recommended. `DELETE /api/v1/saved/{repository_id}` SHALL unsave a repository whether or not it is still recommended. The frontend SHALL offer a saved-projects page with these entries; an entry whose repository is no longer recommended SHALL say so rather than implying it is still a good fit.
 
@@ -56,7 +64,7 @@ The system SHALL provide `GET /api/v1/saved` (paginated, most recently saved fir
 - **THEN** it is still listed, with no current recommendation, and the page says it is no longer recommended
 
 ### Requirement: Dismiss recommendations
-A user SHALL be able to dismiss a recommendation (`POST /api/v1/recommendations/{id}/dismiss`). The recommendation SHALL disappear from the user's list immediately, and its repository SHALL NOT be recommended to that user by any later generation. `GET /api/v1/dismissed` SHALL list dismissed repositories, and `DELETE /api/v1/dismissed/{repository_id}` SHALL restore one, after which it MAY be recommended again by the next generation. Dismissing a saved repository SHALL unsave it.
+A user SHALL be able to dismiss a recommendation (`POST /api/v1/recommendations/{id}/dismiss`). The recommendation SHALL disappear from the user's list immediately, and its repository SHALL NOT be recommended to that user by any later generation. `GET /api/v1/dismissed` SHALL list dismissed repositories, and `DELETE /api/v1/dismissed/{repository_id}` SHALL restore one, after which it MAY be recommended again by the next generation. Dismissing a saved repository SHALL unsave it and record an `unsaved` event. A dismiss of a recommendation that a regeneration dropped meanwhile SHALL still dismiss the repository; its events then reference no recommendation. Save, unsave, dismiss and restore SHALL complete without a server error while a generation job for the same user is storing its result.
 
 #### Scenario: Dismissed stays hidden
 - **WHEN** a user dismisses a recommendation and recommendations are regenerated
@@ -70,8 +78,16 @@ A user SHALL be able to dismiss a recommendation (`POST /api/v1/recommendations/
 - **WHEN** a user restores a dismissed repository
 - **THEN** it is no longer listed as dismissed, an `undismissed` event is recorded, and a new generation is started
 
+#### Scenario: Dismiss a saved repository
+- **WHEN** a user dismisses a recommendation whose repository is saved
+- **THEN** the repository is no longer saved, and `dismissed` and `unsaved` events are recorded
+
+#### Scenario: Dismiss while a generation stores its result
+- **WHEN** a user dismisses a recommendation at the moment their generation job stores its result
+- **THEN** the dismiss succeeds, the generation completes, and the repository is not among the user's recommendations
+
 ### Requirement: Save and dismiss in the interface
-Recommendation cards and the detail page SHALL offer Save/Saved and Dismiss actions that update without a page reload. Dismissing SHALL offer an immediate undo. Opening a recommendation's detail page SHALL record a view, and following its GitHub link SHALL record an opened-repository event, without delaying navigation; a failure to record SHALL NOT be shown as an error.
+Recommendation cards and the detail page SHALL offer Save/Saved and Dismiss actions that update without a page reload. Dismissing SHALL offer an immediate undo. The Save/Saved action SHALL be disabled while a save or unsave request is in flight, so its label always ends matching the stored state. Opening a recommendation's detail page SHALL record a view, and following its GitHub link SHALL record an opened-repository event, without delaying navigation; a failure to record SHALL NOT be shown as an error.
 
 #### Scenario: Save from the card
 - **WHEN** the user clicks Save on a card
@@ -80,3 +96,7 @@ Recommendation cards and the detail page SHALL offer Save/Saved and Dismiss acti
 #### Scenario: Dismiss with undo
 - **WHEN** the user dismisses a card and then clicks Undo
 - **THEN** the card disappears, then the repository is restored and no longer listed as dismissed
+
+#### Scenario: Double click on Save
+- **WHEN** the user double-clicks Save on a card
+- **THEN** one save request is sent, and the button shows Saved once it completes

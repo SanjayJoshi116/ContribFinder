@@ -23,6 +23,7 @@ from enum import StrEnum
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from issues.models import Issue
@@ -290,8 +291,12 @@ class RepositoryAnalysisService:
         limit = settings.ISSUE_BODY_MAX_CHARS
         thresholds = settings.ISSUE_DIFFICULTY
         ids = {i.github_id for i in fetched}
-        Issue.objects.filter(repository=repo).exclude(github_id__in=ids).delete()
-        existing = {i.github_id: i for i in Issue.objects.filter(github_id__in=ids)}
+        # Lock every issue this replaces, deletes or updates, by pk, before touching any: the
+        # order a generation's persist uses (services/locks.py), so the two never deadlock.
+        touched = Issue.objects.filter(Q(repository=repo) | Q(github_id__in=ids))
+        locked = list(touched.select_for_update().order_by("pk"))
+        Issue.objects.filter(pk__in=[i.pk for i in locked if i.github_id not in ids]).delete()
+        existing = {i.github_id: i for i in locked if i.github_id in ids}
         to_create: list[Issue] = []
         to_update: list[Issue] = []
         for data in fetched:

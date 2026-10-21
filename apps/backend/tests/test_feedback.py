@@ -136,6 +136,42 @@ def test_dismiss_removes_recommendation_and_unsaves(user, recs) -> None:
         1,
         "encode/django-tool",
     )
+    unsaved = events(user, "unsaved").get()  # the dismiss removed the save: recorded too
+    assert (unsaved.repository_full_name, unsaved.rank) == ("encode/django-tool", 1)
+
+
+def test_dismiss_of_unsaved_repository_records_no_unsave(user, recs) -> None:
+    feedback.dismiss(user, recs["django"])
+    assert not events(user, "unsaved").exists()
+
+
+def test_save_after_a_dismiss_is_refused(user, recs) -> None:
+    stale = Recommendation.objects.get(pk=recs["django"].pk)  # a second tab's copy
+    feedback.dismiss(user, recs["django"])
+    with pytest.raises(Recommendation.DoesNotExist):
+        feedback.save(user, stale)
+    assert not SavedRepository.objects.filter(user=user).exists()
+    assert not events(user, "saved").exists()
+
+
+def test_save_of_a_dismissed_repository_is_refused(user, recs) -> None:
+    rec = recs["django"]
+    DismissedRepository.objects.create(user=user, repository=rec.repository)  # row still there
+    with pytest.raises(Recommendation.DoesNotExist):
+        feedback.save(user, rec)
+    assert not SavedRepository.objects.filter(user=user).exists()
+
+
+def test_save_endpoint_racing_a_dismiss_is_404(
+    signed_in_client: APIClient, user, recs, monkeypatch
+) -> None:
+    stale = Recommendation.objects.get(pk=recs["django"].pk)
+    feedback.dismiss(user, recs["django"])
+    monkeypatch.setattr("feedback.api._own_recommendation", lambda request, pk: stale)
+    response = signed_in_client.post(f"{RECS}/{stale.pk}/save")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    assert not SavedRepository.objects.filter(user=user).exists()
 
 
 def test_dismissed_repository_absent_after_regeneration(user, recs, pool) -> None:  # noqa: F811

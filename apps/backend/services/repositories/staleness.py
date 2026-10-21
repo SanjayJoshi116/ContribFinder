@@ -9,18 +9,20 @@ from django.conf import settings
 
 from repositories.models import Repository
 
-PARTS = ("metadata", "readme", "community", "dependencies", "activity", "issues")
+# Each data type and the Repository field set when it is fetched (repositories/analysis.py).
+PART_FIELDS = {
+    "metadata": "synced_at",
+    "readme": "readme_synced_at",
+    "community": "community_synced_at",
+    "dependencies": "dependencies_synced_at",
+    "activity": "activity_synced_at",
+    "issues": "issues_synced_at",
+}
+PARTS = tuple(PART_FIELDS)
 
 
 def part_timestamps(repo: Repository) -> dict[str, datetime | None]:
-    return {
-        "metadata": repo.synced_at,
-        "readme": repo.readme_synced_at,
-        "community": repo.community_synced_at,
-        "dependencies": repo.dependencies_synced_at,
-        "activity": repo.activity_synced_at,
-        "issues": repo.issues_synced_at,
-    }
+    return {part: getattr(repo, field) for part, field in PART_FIELDS.items()}
 
 
 def stale_parts(

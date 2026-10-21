@@ -37,6 +37,7 @@ class IssueFeature:
     difficulty: str
     technologies: tuple[str, ...]  # skill slugs
     updated_at: datetime | None
+    analyzed_at: datetime | None = None  # which analysis was ranked (generation re-checks it)
 
 
 @dataclass(frozen=True)
@@ -79,9 +80,10 @@ def load_issues(
         "difficulty",
         "technologies",
         "github_updated_at",
+        "analyzed_at",
     )
     result: dict[int, list[IssueFeature]] = {}
-    for pk, repo_id, number, labels, ctype, difficulty, techs, updated in rows:
+    for pk, repo_id, number, labels, ctype, difficulty, techs, updated, analyzed in rows:
         result.setdefault(repo_id, []).append(
             IssueFeature(
                 id=pk,
@@ -92,6 +94,7 @@ def load_issues(
                 difficulty=difficulty,
                 technologies=tuple(t["slug"] for t in techs),
                 updated_at=updated,
+                analyzed_at=analyzed,
             )
         )
     return result

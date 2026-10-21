@@ -117,7 +117,7 @@ The evaluation command's baseline option SHALL write the recorded values, at the
 - **THEN** the command fails and the file is unchanged
 
 ### Requirement: Export a developer snapshot
-A management command SHALL export one user's stored developer features and candidate pool (with eligible issues) into the dataset format, for a person to judge. It SHALL make no GitHub calls. The export SHALL contain no username, name, email, GitHub id, avatar or token; the developer identifier SHALL be given by the person exporting. By default it SHALL also leave out every candidate the user interacted with (a repository they contributed to or that entered the pool as previously interacted with), because the set of those repositories identifies the person; an explicit option SHALL include them for private use. Every candidate SHALL be left unjudged, and the export SHALL say that judgments must be added by hand. A user without an analyzed profile SHALL produce an error, not an empty export.
+A management command SHALL export one user's stored developer features and candidate pool (with eligible issues) into the dataset format, for a person to judge. The exported pool SHALL be the candidates a generation would score, including repositories whose stored data is stale, plus the candidates the user dismissed, so the export does not depend on when the staleness sweep last ran. It SHALL make no GitHub calls. The export SHALL contain no username, name, email, GitHub id, avatar or token; the developer identifier SHALL be given by the person exporting. By default it SHALL also leave out every candidate the user interacted with (a repository they contributed to or that entered the pool as previously interacted with), because the set of those repositories identifies the person; an explicit option SHALL include them for private use. Every candidate SHALL be left unjudged, and the export SHALL say that judgments must be added by hand. A user without an analyzed profile SHALL produce an error, not an empty export.
 
 #### Scenario: Anonymized export
 - **WHEN** a person exports a user's snapshot with identifier `dev-f`
@@ -134,6 +134,10 @@ A management command SHALL export one user's stored developer features and candi
 #### Scenario: Not analyzed
 - **WHEN** the user has no developer profile
 - **THEN** the command exits with an error and writes no file
+
+#### Scenario: Stale and dismissed candidates exported
+- **WHEN** the user's pool holds an eligible repository marked stale and a repository they dismissed
+- **THEN** both are in the file
 
 ### Requirement: Holdout benchmark
 The repository SHALL include a holdout dataset `holdout-v1`, in the benchmark format, with at least four benchmark developers whose profiles differ from those in `benchmark-v1` (including at least one beginner and one developer whose strongest match is a quiet, low-activity repository). Its judgments SHALL be written before any candidate configuration of the change that introduces it is evaluated. The holdout SHALL only be used to accept or reject a configuration already chosen on `benchmark-v1`, never to choose between candidates. A holdout whose results for a change's candidates were recorded SHALL NOT be the acceptance set of a later change; that change SHALL add a fresh holdout, judged before any of its candidates is evaluated. `holdout-v1` was used this way by `ranking-v3-deterministic` and `holdout-v2` by `ranking-min-score-config`; the next change that evaluates candidates SHALL add `holdout-v3`. It SHALL contain no real GitHub user data.

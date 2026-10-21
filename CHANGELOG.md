@@ -7,6 +7,58 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.6] - 2026-10-21
+
+Recommendation consistency (OpenSpec change `recommendation-consistency`, backlog batch 6).
+No ranking change: scores, order and the benchmark baselines are unchanged.
+
+### Fixed
+
+- Stale is not gone: repositories marked stale or being refreshed stay recommended from their
+  stored data, so the staleness sweep no longer removes recommendations or changes their ids
+  (D-1). A staleness mark alone no longer triggers a regeneration.
+- Generation, save, unsave, dismiss, restore, view recording and data deletion take one lock
+  order, starting with the developer profile row: a dismiss is never missed or undone by a
+  running generation, and dismiss/generation and issue refresh/generation no longer deadlock
+  (D-2, D-3, D-4). An issue refresh locks every issue it touches, by pk, before deleting or
+  updating any (W-3).
+- A save racing a dismiss, or of a dismissed repository, answers 404 and leaves no hidden save
+  (E-5); dismissing a saved repository records an `unsaved` event (E-6); simultaneous views are
+  recorded once (E-7). A dismiss or view of a recommendation a regeneration dropped meanwhile
+  no longer fails at commit; views lock only their recommendation, never waiting for a
+  generation (W-1, W-2, W-9, W-10).
+- Dismissals made during a generation are dropped before the top N is taken, so the list stays
+  full (D-10).
+- If a matched issue is deleted or re-analyzed before the result is stored, the generation
+  ranks again (up to 3 attempts, then fails `issues_changed` keeping the previous result):
+  stored counts, signals, labels and reasons always match the stored issues (D-6, W-8).
+- Starting a generation while one is running makes it run again once it completes, so a
+  restore or a discovery that finishes mid-run is always reflected (D-5). A retry clears the
+  request (it reloads its inputs), and the freshness sweep never asks a running generation to
+  run again (W-4, W-5).
+- A developer whose candidate pool became empty no longer keeps old recommendations (D-14).
+- Freshness also compares the repositories' data fetch times, so an analysis followed by a
+  staleness mark is not missed (W-6), and after a failed generation the sweep waits
+  `RECOMMENDATION_FAILED_RETRY_MINUTES` (default 360) instead of retrying every 30 minutes
+  (W-7).
+- The benchmark export holds the pool generation would score, stale repositories included,
+  plus dismissed repositories (E-4).
+- The Save button is disabled while a save or unsave is in flight, so a double click can no
+  longer leave it showing the opposite of the stored state (F-4).
+
+### Changed
+
+- New `services/locks.py` (`lock_developer`) documents the lock order. `rank` and `rank_pool`
+  accept `top_n=None`; generation cuts after dropping dismissals.
+- `start_recommendations(user, rerun_if_running=False)` returns a running generation without
+  asking it to rerun (used by the freshness sweep). Repository data parts and their timestamp
+  fields live in one map (`staleness.PART_FIELDS`), shared by staleness and freshness. A
+  generation retry re-ranks without reloading candidates; an issue refresh reads its issues
+  once.
+- A migration adds `SyncJob.rerun_requested` (internal, not serialized). New setting
+  `RECOMMENDATION_FAILED_RETRY_MINUTES` (checked by `core.E020`). The API and OpenAPI schema
+  are unchanged.
+
 ## [0.12.5] - 2026-10-21
 
 GitHub error resilience (OpenSpec change `github-error-resilience`, backlog batch 5).

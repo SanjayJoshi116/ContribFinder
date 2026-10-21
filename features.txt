@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.5 (2026-10-21)
+Version: 0.12.6 (2026-10-21)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -369,6 +369,27 @@ Repositories
 
 Redis outage
   [x] Throttles count in process memory during an outage; sessions use the database engine
+
+============================================================================
+SHIPPED - v0.12.6 - Recommendation consistency (backlog batch 6)
+============================================================================
+
+Generation
+  [x] Stale and refreshing eligible repositories stay recommended (ids survive the sweep)
+  [x] Dismissals applied before the top-N cut
+  [x] Issues deleted mid-run: rank again (3 attempts), never store unbacked reasons
+  [x] A generation requested mid-run runs again after it completes (restore, discovery)
+  [x] Freshness ignores staleness marks; emptied pools are regenerated
+  [x] Freshness sees data fetched before a staleness mark; failed generations back off
+
+Feedback
+  [x] One lock order (profile first) for generation, feedback and deletion: no deadlocks
+  [x] Save racing a dismiss is 404; dismiss records unsaved; concurrent views stored once
+  [x] Views lock only their recommendation; events never reference a dropped recommendation
+  [x] Save button disabled while a request is in flight
+
+Evaluation
+  [x] Export holds stale and dismissed candidates
 
 ============================================================================
 PLANNED - MVP+ / FUTURE

@@ -9,7 +9,8 @@ from django.db.models import Count, Exists, Min, OuterRef, Prefetch
 
 from developers.models import DeveloperInterest, DeveloperProfile, DeveloperSkill
 from feedback.models import DismissedRepository
-from repositories.models import Lifecycle, RepositoryCandidate, RepositorySnapshot
+from repositories.models import RepositoryCandidate, RepositorySnapshot
+from services.repositories.lifecycle import SCORABLE
 
 
 @dataclass(frozen=True)
@@ -73,20 +74,22 @@ def load_developer(profile: DeveloperProfile) -> DeveloperFeatures:
     )
 
 
-def load_candidates(profile: DeveloperProfile) -> list[RepoData]:
-    """The developer's scorable candidates: eligible repositories that finished analysis and
-    that the user has not dismissed. A fixed number of queries whatever the pool size."""
-    dismissed = DismissedRepository.objects.filter(
-        user_id=profile.user_id, repository=OuterRef("repository")
+def load_candidates(
+    profile: DeveloperProfile, *, include_dismissed: bool = False
+) -> list[RepoData]:
+    """The developer's scorable candidates: eligible repositories that finished analysis
+    (stale data included) and, unless ``include_dismissed``, that the user has not dismissed.
+    A fixed number of queries whatever the pool size."""
+    candidates = RepositoryCandidate.objects.filter(
+        developer=profile, repository__lifecycle__in=SCORABLE, repository__is_eligible=True
     )
-    candidates = (
-        RepositoryCandidate.objects.filter(
-            developer=profile,
-            repository__lifecycle=Lifecycle.RECOMMENDABLE,
-            repository__is_eligible=True,
+    if not include_dismissed:
+        dismissed = DismissedRepository.objects.filter(
+            user_id=profile.user_id, repository=OuterRef("repository")
         )
-        .exclude(Exists(dismissed))
-        .select_related("repository")
+        candidates = candidates.exclude(Exists(dismissed))
+    candidates = (
+        candidates.select_related("repository")
         .annotate(best_rank=Min("discoveries__search_rank"))
         .prefetch_related(
             "repository__languages",

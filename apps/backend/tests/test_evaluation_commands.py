@@ -8,8 +8,9 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
+from feedback.models import DismissedRepository
 from recommendations.models import Recommendation, ScoringConfig
-from repositories.models import UserRepository
+from repositories.models import Repository, UserRepository
 from services.evaluation import baseline
 from services.evaluation import dataset as datasets
 from services.evaluation.dataset import DatasetError, parse
@@ -329,3 +330,12 @@ def test_export_leaves_out_interacted_repositories(user, developer, pool) -> Non
     names, err = _export(user, "--include-interacted")
     assert names == sorted([*searched, "friend/contributed"])
     assert err == ""
+
+
+def test_export_holds_stale_and_dismissed_candidates(user, developer, pool) -> None:  # noqa: F811
+    Repository.objects.filter(pk=pool["plain"].pk).update(
+        lifecycle="stale", previous_lifecycle="recommendable"
+    )
+    DismissedRepository.objects.create(user=user, repository=pool["go"])
+    names, _ = _export(user)
+    assert names == sorted(r.full_name for r in pool.values())

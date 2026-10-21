@@ -364,6 +364,8 @@ REPO_SIZE_THRESHOLDS: dict[str, int] = {
     "medium": 100,
     **env.json("REPO_SIZE_THRESHOLDS", default={}),
 }
+# The freshness sweep waits this long after a failed generation before starting another.
+RECOMMENDATION_FAILED_RETRY_MINUTES = env.int("RECOMMENDATION_FAILED_RETRY_MINUTES", default=360)
 RECOMMENDATION_REFRESH_INTERVAL_SECONDS = env.int(
     "RECOMMENDATION_REFRESH_INTERVAL_SECONDS", default=30 * 60
 )

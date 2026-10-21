@@ -2,6 +2,7 @@
 wrappers around ``services.feedback``."""
 
 from django.db.models import Prefetch, QuerySet
+from django.http import Http404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView, get_object_or_404
@@ -70,7 +71,10 @@ class SaveView(APIView):
         responses={200: SaveResultSerializer, **error_responses(401, 403, 404)},
     )
     def post(self, request: Request, pk: int) -> Response:
-        feedback.save(current_user(request), _own_recommendation(request, pk))
+        try:
+            feedback.save(current_user(request), _own_recommendation(request, pk))
+        except Recommendation.DoesNotExist:
+            raise Http404 from None  # dismissed (or regenerated away) meanwhile
         return Response(SaveResultSerializer({"saved": True}).data)
 
     @extend_schema(

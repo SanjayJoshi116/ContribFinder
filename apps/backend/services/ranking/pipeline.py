@@ -28,7 +28,7 @@ def rank_pool(
     issues_for: IssuesFor,
     *,
     min_score: float,
-    top_n: int,
+    top_n: int | None,
 ) -> list[Scored]:
     """Rank a developer's candidates under one configuration. ``issues_for`` is called once,
     with the ids of the candidates that pass the relevance gate, and only when the

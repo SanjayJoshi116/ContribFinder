@@ -62,6 +62,7 @@ def claim_job(job_id: int) -> SyncJob | None:
     claimed = claimable.filter(attempts__lt=settings.SYNC_MAX_ATTEMPTS).update(
         status=Status.RUNNING,
         claim_token=token,
+        rerun_requested=False,  # this attempt loads its inputs: an earlier request is covered
         attempts=F("attempts") + 1,
         started_at=Coalesce("started_at", now),
         updated_at=now,
@@ -346,15 +347,31 @@ def start_discovery_after(job: SyncJob) -> None:
     start_discovery(job.user)
 
 
-def start_recommendations(user: User) -> tuple[SyncJob | None, bool]:
+def start_recommendations(
+    user: User, *, rerun_if_running: bool = True
+) -> tuple[SyncJob | None, bool]:
     """Queue a recommendation generation (Phase 5). No job without a developer profile; an
-    active generation is returned instead of a second one. Reads stored data only, so no
-    GitHub account is needed."""
+    active generation is returned instead of a second one, and a running one is asked to run
+    again unless ``rerun_if_running`` is false. Reads stored data only, so no GitHub account
+    is needed."""
     from developers.models import DeveloperProfile
 
     if not DeveloperProfile.objects.filter(user=user).exists():
         return None, False
+    job, created = _start_job(user, RECOMMENDATIONS)
+    if created or job.status != Status.RUNNING or not rerun_if_running:
+        return job, created  # a pending or retrying job loads its inputs when it runs
+    # A running job may have loaded its inputs already: have it run again once it completes.
+    # Serialized with its completion on the job row; if it finished first, start a new one.
+    if SyncJob.objects.filter(pk=job.pk, status=Status.RUNNING).update(rerun_requested=True):
+        return job, False
     return _start_job(user, RECOMMENDATIONS)
+
+
+def rerun_recommendations_if_requested(job: SyncJob) -> None:
+    """``on_completed`` hook of recommendation generation jobs (see ``start_recommendations``)."""
+    if SyncJob.objects.filter(pk=job.pk, rerun_requested=True).exists():
+        start_recommendations(job.user)
 
 
 def start_recommendations_after(job: SyncJob) -> None:

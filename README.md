@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.5** (GitHub error resilience: one bad repository, manifest or GitHub response no longer fails a whole sync or discovery run, renamed repositories are followed, and the API keeps working while Redis is down; MVP+). After signing in with
+**Version 0.12.6** (recommendation consistency: stale repositories stay recommended with stable ids, dismissals are never missed or undone by a running generation, save/dismiss/generation no longer deadlock, and every reason matches stored issues; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -243,7 +243,7 @@ the code (confirmed, partial or false positive), grouped into fix batches in pri
 Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion finality) in
 0.12.2, batch 3 (evaluation tooling integrity) in 0.12.3, batch 4 (job lifecycle and claim
 fencing) in 0.12.4, batch 5 (GitHub error resilience) in 0.12.5, together with the follow-ups
-from its own review (rows V-1…V-9, batch 12).
+from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consistency) in 0.12.6.
 
 ## Versioning
 

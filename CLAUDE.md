@@ -114,7 +114,9 @@ ContribFinder/
 │  │  │                     baselines.json (format 4, keyed by dataset, top N each)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError, JobCancelled), job_guard.py
-│  │     │                  (stale_before, job_write, save_progress, heartbeat), feedback.py
+│  │     │                  (stale_before, job_write, save_progress, heartbeat), locks.py
+│  │     │                  (lock_developer: one lock order for recommendations and feedback),
+│  │     │                  feedback.py
 │  │     │                  (record, save, dismiss, restore), data_deletion.py (GitHub data /
 │  │     │                  account deletion)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
@@ -738,6 +740,38 @@ Archived: `openspec/changes/archive/2026-10-21-github-error-resilience/`. Specs:
   `LocMemCache` after a cache error (`THROTTLE_CACHE_BACKOFF_SECONDS`, 30) and `SESSION_ENGINE`
   `db`. Worker-side ETag cache behavior without Redis is batch 11 (A-16).
 - Review follow-ups V-1…V-7 and V-9 of `Bug_Backlog.md` are fixed in the same release (V-8 wontfix).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Recommendation consistency** (MVP+, fix release)  ✅ shipped in v0.12.6 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-21-recommendation-consistency/`. Specs: deltas to
+`recommendation-engine`, `recommendation-feedback`, `recommendation-evaluation`. Batch 6 of
+`Bug_Backlog.md`.
+- Scorable = `is_eligible` and `lifecycle.SCORABLE` (RECOMMENDABLE, STALE, REFRESHING): marking
+  stale and claiming keep `is_eligible`. `load_candidates(profile, include_dismissed=False)`;
+  the export passes `True`.
+- Lock order (`services/locks.py`): job (`job_write`) → `lock_developer(user_id)` (profile row
+  `select_for_update`) → dismissals/saves → recommendations → issues by pk → children. Save,
+  unsave, dismiss, restore, `_persist` and `delete_github_data` lock the profile first;
+  `record` locks only its recommendation row (skips when it is gone); `_store_issues` locks all
+  issues it touches by pk first. New writers of recommendation or feedback rows must follow
+  it. Events never reference a recommendation that may be gone (deferred FK fails at commit).
+- Generation ranks uncut (`rank_pool(top_n=None)`); `_persist` drops dismissals, then cuts to
+  `RECOMMENDATIONS_TOP_N`. A matched issue missing or re-analyzed (`IssueFeature.analyzed_at`)
+  under the lock raises `IssuesChanged`; `run()` loads candidates once and re-ranks up to
+  `MAX_ATTEMPTS = 3`, then `issues_changed`.
+- `SyncJob.rerun_requested`: `start_recommendations` sets it on a RUNNING generation (a new
+  job if it finished meanwhile) unless `rerun_if_running=False`;
+  `rerun_recommendations_if_requested` is the task's `on_completed` hook; `claim_job` clears it.
+- Freshness: `pool_changed` ignores STALE/REFRESHING repositories, `data_changed` takes the
+  latest data time (`staleness.PART_FIELDS`, the one part → `*_synced_at` map); profiles with
+  recommendations and no candidates are due; a failure within
+  `RECOMMENDATION_FAILED_RETRY_MINUTES` (360) is not; the sweep starts with
+  `rerun_if_running=False`, so an active generation is left alone.
+- Feedback: save re-checks the recommendation and the dismissal under the lock
+  (`Recommendation.DoesNotExist` → 404); dismiss records `unsaved`.
+- Review follow-ups W-1…W-10 of `Bug_Backlog.md` fixed in the same release; main specs updated
+  directly (the archived deltas predate them).
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).

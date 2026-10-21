@@ -106,6 +106,30 @@ describe('save and dismiss', () => {
     expect(callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/save')).toHaveLength(1)
   })
 
+  it('sends one request for a double click on Save', async () => {
+    let answer: (response: Response) => void = () => {}
+    const fetchMock = mockFetch({
+      ...WITH_RECOMMENDATION,
+      'POST /api/v1/recommendations/7/save': () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve
+        }),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.dblClick(within(card).getByRole('button', { name: 'Save' }))
+    // Shown as Saved at once (optimistic), but locked until the request settles.
+    expect(within(card).getByRole('button', { name: 'Saved' })).toBeDisabled()
+    answer(json({ saved: true }))
+
+    await waitFor(() => expect(within(card).getByRole('button', { name: 'Saved' })).toBeEnabled())
+    expect(callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/save')).toHaveLength(1)
+    expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/recommendations/7/save')).toHaveLength(
+      0,
+    )
+  })
+
   it('rolls Save back when the request fails', async () => {
     mockFetch({
       ...WITH_RECOMMENDATION,

@@ -104,11 +104,12 @@ def is_relevant(scored: Scored) -> bool:
 
 
 def rank(
-    scored: Iterable[Scored], *, min_score: float, top_n: int, basis: str = BASIS_SCORE
+    scored: Iterable[Scored], *, min_score: float, top_n: int | None, basis: str = BASIS_SCORE
 ) -> list[Scored]:
     """Best first: score, then best search rank (unranked last), then name. Keeps the top N
-    that are relevant (a relevance signal above 0) and reach ``min_score``: with ``basis``
-    ``relevance``, only the relevance part of the score is compared."""
+    (all with ``top_n`` None) that are relevant (a relevance signal above 0) and reach
+    ``min_score``: with ``basis`` ``relevance``, only the relevance part of the score is
+    compared."""
     kept = [
         s
         for s in scored

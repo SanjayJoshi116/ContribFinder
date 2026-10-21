@@ -26,6 +26,7 @@ from recommendations.models import Recommendation
 from repositories.models import Repository, RepositoryCandidate, UserRepository
 
 from . import jobs
+from .locks import lock_developer
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,9 @@ def delete_github_data(user: User) -> dict[str, int]:
     content). The user's cached GitHub responses are purged after commit."""
     jobs.cancel_active_syncs(user)
     with transaction.atomic():
+        # Profile first, as every recommendation and feedback write does (services/locks.py);
+        # the cascade below would otherwise lock recommendations before the profile.
+        lock_developer(user.pk)
         repository_ids = _touched_repository_ids(user)
         # The developer profile cascades skills, interests, evidence, candidates, discoveries,
         # recommendations and reasons.

@@ -26,8 +26,9 @@ from recommendations.models import (
 )
 from services.errors import PermanentJobError
 from services.job_guard import heartbeat, job_write, save_progress
+from services.locks import lock_developer
 from services.matching.features import DeveloperFeatures, load_candidates, load_developer
-from services.matching.issues import MatchedIssue, load_issues
+from services.matching.issues import load_issues
 from services.matching.issues import snapshot as issue_snapshot
 from services.matching.technologies import Tech
 
@@ -46,6 +47,19 @@ class NotAnalyzed(PermanentJobError):
 
 class NoScoringConfig(PermanentJobError):
     code = "no_scoring_config"
+
+
+class IssuesKeepChanging(PermanentJobError):
+    code = "issues_changed"
+
+
+class IssuesChanged(Exception):
+    """A matched issue was deleted or re-analyzed between ranking and storing: rank again
+    (design D5)."""
+
+
+# Rankings tried before a generation gives up on issues that keep disappearing.
+MAX_ATTEMPTS = 3
 
 
 def repository_size(contributors: int | None, thresholds: dict[str, int]) -> str:
@@ -97,18 +111,27 @@ class RecommendationService:
         self._set_step(Step.RUNNING)
         try:
             dev = load_developer(profile)
+            # Only matched issues can make an attempt fail, so candidates are loaded once.
             candidates = load_candidates(profile)
-            self._check_cancelled()
-            kept = rank_pool(
-                dev,
-                candidates,
-                config.weights,
-                config.params,
-                lambda ids: load_issues(ids, now, settings.ISSUE_MAX_AGE_DAYS),
-                min_score=settings.RECOMMENDATION_MIN_SCORE,
-                top_n=settings.RECOMMENDATIONS_TOP_N,
-            )
-            kept = self._persist(profile, config, dev, kept, now)
+            for _ in range(MAX_ATTEMPTS):
+                self._check_cancelled()
+                # Uncut: dismissals made while ranking are dropped before the top N is taken.
+                ranked = rank_pool(
+                    dev,
+                    candidates,
+                    config.weights,
+                    config.params,
+                    lambda ids: load_issues(ids, now, settings.ISSUE_MAX_AGE_DAYS),
+                    min_score=settings.RECOMMENDATION_MIN_SCORE,
+                    top_n=None,
+                )
+                try:
+                    kept = self._persist(profile, config, dev, ranked, now)
+                    break
+                except IssuesChanged:
+                    continue
+            else:
+                raise IssuesKeepChanging(f"Matched issues changed during {MAX_ATTEMPTS} attempts")
         except Exception:
             self._set_step(Step.FAILED)
             raise
@@ -130,34 +153,43 @@ class RecommendationService:
         profile: DeveloperProfile,
         config: ScoringConfig,
         dev: DeveloperFeatures,
-        kept: list[Scored],
+        ranked: list[Scored],
         now: datetime,
     ) -> list[Scored]:
-        """Write the result and return what was kept after dropping repositories dismissed
-        while this run worked."""
+        """Write the top N of ``ranked`` that the user has not dismissed (also while this run
+        worked) and return them. Raises ``IssuesChanged``, writing nothing, when a matched
+        issue no longer exists or was re-analyzed: every stored number and reason comes from
+        the stored issues."""
         sizes = settings.REPO_SIZE_THRESHOLDS
         # A disconnect or deletion cancels the job; a cancelled run never replaces results.
         with job_write(self.job):
+            # One lock order with feedback (services/locks.py): profile, then dismissals,
+            # recommendations and issues. A dismiss committed before this point is seen.
+            lock_developer(profile.user_id)
             dismissed = set(
                 DismissedRepository.objects.filter(user_id=profile.user_id).values_list(
                     "repository_id", flat=True
                 )
             )
-            kept = [s for s in kept if s.repo.id not in dismissed]
-            # Lock the matched issues so a concurrent issue refresh cannot delete one before
-            # commit; one it already deleted is dropped.
-            alive = set(
-                Issue.objects.select_for_update()
-                .filter(pk__in=[m.issue.id for s in kept for m in s.issues.issues])
-                .values_list("pk", flat=True)
-            )
-            issues: dict[int, list[MatchedIssue]] = {
-                s.repo.id: [m for m in s.issues.issues if m.issue.id in alive] for s in kept
-            }
+            kept = [s for s in ranked if s.repo.id not in dismissed][
+                : settings.RECOMMENDATIONS_TOP_N
+            ]
             existing = {
                 r.repository_id: r
                 for r in Recommendation.objects.select_for_update().filter(developer=profile)
             }
+            # Lock the matched issues so a concurrent issue refresh cannot change one before
+            # commit; if one is already gone or re-analyzed, the scores and reasons came from
+            # what is no longer stored: rank again.
+            matched = {m.issue.id: m.issue.analyzed_at for s in kept for m in s.issues.issues}
+            stored = dict(
+                Issue.objects.select_for_update()
+                .filter(pk__in=matched)
+                .order_by("pk")
+                .values_list("pk", "analyzed_at")
+            )
+            if stored != matched:
+                raise IssuesChanged()
             to_create: list[Recommendation] = []
             to_update: list[Recommendation] = []
             for position, s in enumerate(kept, start=1):
@@ -171,7 +203,7 @@ class RecommendationService:
                     "technologies": technologies_json(dict(s.techs), dev),
                     "activity_label": snapshot.activity_label if snapshot else "",
                     "size": repository_size(snapshot.contributors if snapshot else None, sizes),
-                    **issue_snapshot(issues[s.repo.id]),
+                    **issue_snapshot(s.issues.issues),
                     "generated_at": now,
                 }
                 if (rec := existing.pop(s.repo.id, None)) is not None:
@@ -220,13 +252,13 @@ class RecommendationService:
             RecommendedIssue.objects.bulk_create(
                 RecommendedIssue(
                     recommendation=by_repo[s.repo.id],
-                    issue_id=matched.issue.id,
+                    issue_id=matched_issue.issue.id,
                     rank=position,
-                    score=matched.score,
-                    reasons=list(matched.reasons),
+                    score=matched_issue.score,
+                    reasons=list(matched_issue.reasons),
                 )
                 for s in kept
-                for position, matched in enumerate(issues[s.repo.id], start=1)
+                for position, matched_issue in enumerate(s.issues.issues, start=1)
             )
         return kept
 

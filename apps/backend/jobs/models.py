@@ -52,6 +52,10 @@ class SyncJob(models.Model):
     # Set by each claim; only the worker holding the current token may write (job-claim-fencing
     # D1). Internal: never serialized.
     claim_token = models.UUIDField(null=True, blank=True, editable=False)
+    # Generation jobs: a generation was requested while this one was RUNNING, so it runs again
+    # once it completes (recommendation-consistency D6). A column, not metadata: the job
+    # rewrites its metadata wholesale. Internal: never serialized.
+    rerun_requested = models.BooleanField(default=False, editable=False)
 
     class Meta:
         ordering = ["-created_at"]
