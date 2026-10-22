@@ -7,6 +7,12 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+### Fixed
+
+- CI's `e2e` job no longer hangs after the last browser test: the e2e backend runner keeps
+  Django in Playwright's process group, so Playwright's `SIGKILL` stops it and its output pipe
+  closes. Every CI job now has a `timeout-minutes` limit.
+
 ## [0.12.11] - 2026-10-22
 
 Tooling and data hygiene (OpenSpec change `tooling-data-hygiene`, backlog batch 16 and Q-10…Q-12).

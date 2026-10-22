@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   backend:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -60,6 +61,7 @@ jobs:
         run: uv run pytest
 
   frontend:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -85,6 +87,7 @@ jobs:
 
   api-contract:
     # Fails when the committed OpenAPI schema / generated TS types drift from the backend.
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +128,7 @@ jobs:
   e2e:
     # Browser tests (Playwright, Chromium) against the real Django backend and PostgreSQL.
     # The seed creates the contribfinder_e2e database; nothing calls GitHub.
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     services:
       postgres:

@@ -30,6 +30,9 @@ uv(['run', 'python', 'manage.py', 'e2e_seed', '--out', path.resolve(sessions), .
   cwd: backend,
 })
 
+// Not detached: Playwright stops a web server by SIGKILL to its process group, which this
+// runner cannot forward. A detached Django would survive in its own group, keep Playwright's
+// stdout pipe open, and Playwright would wait for it forever (CI hung after the last test).
 const [cmd, prefix] = uvCommand()
 runChild(
   cmd,
@@ -43,5 +46,5 @@ runChild(
     '--noreload',
     ...settings,
   ],
-  { cwd: backend },
+  { cwd: backend, detached: false },
 )
