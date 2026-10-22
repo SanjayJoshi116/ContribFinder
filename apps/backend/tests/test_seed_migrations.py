@@ -9,10 +9,10 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
+from e2e.builders import make_candidate_repo
 from recommendations.models import ScoringConfig
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 
-from .repo_fixtures import make_candidate_repo
 from .test_models_phase5 import make_recommendation
 
 seed_v1 = importlib.import_module("recommendations.migrations.0002_seed_v1_deterministic")

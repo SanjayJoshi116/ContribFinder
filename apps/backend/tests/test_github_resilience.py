@@ -9,6 +9,7 @@ from cryptography.fernet import Fernet
 from django.test import override_settings
 from django.utils import timezone
 
+from e2e.builders import make_candidate_repo
 from github.models import GitHubProfile
 from github.tasks import sync_github_profile
 from jobs.models import SyncJob
@@ -16,7 +17,6 @@ from repositories.models import Repository, RepositoryLanguage, UserRepository
 from services.github.storage import replace_languages
 from services.github.sync import GitHubSyncService, initial_steps
 
-from .repo_fixtures import make_candidate_repo
 from .test_github_client import SECONDARY_MESSAGES
 from .test_github_sync import API, PROFILE, SYNC, mock_github, repo_json, run
 

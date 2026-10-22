@@ -8,6 +8,7 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
+from e2e.builders import add_candidate
 from feedback.models import DismissedRepository
 from recommendations.models import Recommendation, ScoringConfig
 from repositories.models import Repository, UserRepository
@@ -16,7 +17,6 @@ from services.evaluation import dataset as datasets
 from services.evaluation.dataset import DatasetError, parse
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 
-from .repo_fixtures import add_candidate
 from .test_evaluation_build import real
 from .test_evaluation_dataset import minimal
 from .test_issue_matching import django_issues

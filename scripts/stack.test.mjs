@@ -36,14 +36,23 @@ test('a reused pid is not stopped and its record is stale', () => {
 test('the WSL keep-alive is stopped by its record only', () => {
   const keepAlive = { pid: 30, name: 'wsl', cmd: 'wsl.exe -d Ubuntu -- sleep infinity' }
   const other = { pid: 31, name: 'wsl', cmd: 'wsl.exe -d Ubuntu -- sleep infinity' }
-  const result = matchStack([keepAlive, other], [record(30, 'redis', 'wsl', 'sleep infinity')], REPO, SELF)
+  const result = matchStack(
+    [keepAlive, other],
+    [record(30, 'redis', 'wsl', 'sleep infinity')],
+    REPO,
+    SELF,
+  )
   assert.deepEqual(killed(result), [30])
 })
 
 test("this repository's Django, Celery and Vite match by path", () => {
   const processes = [
     { pid: 40, name: 'python', cmd: `python ${REPO}\\apps\\backend\\manage.py runserver 8000` },
-    { pid: 41, name: 'celery', cmd: `${REPO}\\apps\\backend\\.venv\\scripts\\celery -A config worker` },
+    {
+      pid: 41,
+      name: 'celery',
+      cmd: `${REPO}\\apps\\backend\\.venv\\scripts\\celery -A config worker`,
+    },
     node(42, `node ${REPO}\\apps\\frontend\\node_modules\\vite\\bin\\vite.js`),
     { pid: 43, name: 'python', cmd: 'python c:\\other\\manage.py runserver' },
     { pid: 44, name: 'code', cmd: `code ${REPO}\\apps\\backend\\manage.py runserver` },
@@ -52,7 +61,12 @@ test("this repository's Django, Celery and Vite match by path", () => {
 })
 
 test('never stops the stopping process', () => {
-  const result = matchStack([node(SELF, 'node scripts/start.mjs')], [record(SELF, 'start')], REPO, SELF)
+  const result = matchStack(
+    [node(SELF, 'node scripts/start.mjs')],
+    [record(SELF, 'start')],
+    REPO,
+    SELF,
+  )
   assert.deepEqual(killed(result), [])
 })
 

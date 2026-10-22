@@ -11,6 +11,7 @@ from django.utils import timezone
 from accounts.models import User
 from core.checks import discovery_config_check, issue_config_check
 from developers.models import DeveloperProfile
+from e2e.builders import add_candidate, fresh_repo, make_candidate_repo
 from issues.models import Issue
 from repositories import tasks
 from repositories.models import Repository
@@ -20,16 +21,7 @@ from services.repositories.staleness import stale_parts
 
 from .checks_helpers import ids
 from .factories import UserFactory
-from .repo_fixtures import (
-    API,
-    add_candidate,
-    analyze,
-    expire_parts,
-    fresh_repo,
-    issue_payload,
-    make_candidate_repo,
-    mock_repo_api,
-)
+from .repo_fixtures import API, analyze, expire_parts, issue_payload, mock_repo_api
 from .shared_fixtures import public_client  # noqa: F401
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]

@@ -234,7 +234,8 @@ class RepositorySnapshot(models.Model):
 
     class Meta:
         ordering = ["-captured_at"]
-        indexes = [models.Index(fields=["repository", "-captured_at"])]
+        # Matches repositories.queries.SNAPSHOT_NEWEST_FIRST (newest-snapshot reads).
+        indexes = [models.Index(fields=["repository", "-captured_at", "-id"])]
 
     def __str__(self) -> str:
         return f"{self.repository_id}@{self.captured_at:%Y-%m-%d} {self.activity_label}"

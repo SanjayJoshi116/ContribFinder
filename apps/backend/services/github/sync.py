@@ -154,13 +154,16 @@ class GitHubSyncService:
                 UserRepository(user=self.user, repository_id=pk) for pk in keep - existing
             )
 
-        self._update_metadata(
-            repos_total=len(owned),
-            repos_capped=len(owned) > cap,
-            repos_truncated=truncated,
-            repo_ids=[repo.pk for repo in stored],
-            languages_done=[],
-            languages_skipped=[],
+        merge_metadata(
+            self.job,
+            {
+                "repos_total": len(owned),
+                "repos_capped": len(owned) > cap,
+                "repos_truncated": truncated,
+                "repo_ids": [repo.pk for repo in stored],
+                "languages_done": [],
+                "languages_skipped": [],
+            },
         )
         return Step.DONE
 
@@ -185,7 +188,7 @@ class GitHubSyncService:
                 else:
                     replace_languages(repo, languages)
                 done.append(repo.pk)
-                self._update_metadata(languages_done=done, languages_skipped=skipped)
+                merge_metadata(self.job, {"languages_done": done, "languages_skipped": skipped})
         return Step.DONE
 
     def _step_topics(self, client: GitHubClient) -> str:
@@ -198,7 +201,7 @@ class GitHubSyncService:
         ).order_by(F("pushed_at").desc(nulls_last=True), "pk")
         cap = settings.GITHUB_MANIFEST_MAX_REPOS
         total = candidates.count()
-        self._update_metadata(dependencies_total=total, dependencies_capped=total > cap)
+        merge_metadata(self.job, {"dependencies_total": total, "dependencies_capped": total > cap})
         for repo in candidates[:cap]:
             if repo.pk in done:
                 continue
@@ -211,7 +214,7 @@ class GitHubSyncService:
                 with job_write(self.job):
                     replace_dependencies(repo, dependencies)
             done.append(repo.pk)
-            self._update_metadata(dependencies_done=done)
+            merge_metadata(self.job, {"dependencies_done": done})
         return Step.DONE
 
     def _step_contributions(self, client: GitHubClient) -> str:
@@ -224,12 +227,15 @@ class GitHubSyncService:
                 return Step.SKIPPED  # GitHub won't search this user; keep previous links
             pushes = client.list_public_pushes(login)
             plan, total = self._plan_contributions(login, prs, pushes)
-            self._update_metadata(
-                contrib_plan=plan,
-                contrib_done={},
-                contrib_repos_total=total,
-                contrib_capped=total > settings.GITHUB_CONTRIB_MAX_REPOS,
-                contrib_prs_truncated=prs_truncated,
+            merge_metadata(
+                self.job,
+                {
+                    "contrib_plan": plan,
+                    "contrib_done": {},
+                    "contrib_repos_total": total,
+                    "contrib_capped": total > settings.GITHUB_CONTRIB_MAX_REPOS,
+                    "contrib_prs_truncated": prs_truncated,
+                },
             )
 
         # full name → stored repository pk, or None when it could not (or must not) be stored
@@ -240,7 +246,7 @@ class GitHubSyncService:
                 continue
             self._check_cancelled()
             done[name] = self._store_contributed_repository(client, name, login)
-            self._update_metadata(contrib_done=done)
+            merge_metadata(self.job, {"contrib_done": done})
 
         by_pk: dict[int, dict[str, Any]] = {
             pk: item for item in plan if (pk := done.get(item["full_name"])) is not None
@@ -324,9 +330,6 @@ class GitHubSyncService:
     def _set_step(self, step: str, state: str) -> None:
         self.job.steps = {**self.job.steps, step: str(state)}
         save_progress(self.job, steps=self.job.steps)
-
-    def _update_metadata(self, **values: Any) -> None:
-        merge_metadata(self.job, values)
 
 
 def _parse_dt(value: str | None) -> datetime | None:

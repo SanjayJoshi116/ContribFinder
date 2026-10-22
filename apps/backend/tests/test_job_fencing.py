@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from developers.models import DeveloperProfile, Interest, Skill
 from developers.tasks import extract_developer_skills
+from e2e.builders import add_candidate, make_candidate_repo
 from github.tasks import sync_github_profile
 from jobs.models import SyncJob
 from repositories import tasks as repo_tasks
@@ -25,7 +26,7 @@ from services.profiling.analysis import ProfileAnalysisService
 from services.repositories import lifecycle
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 
-from .repo_fixtures import API, add_candidate, analyze, make_candidate_repo, mock_repo_api
+from .repo_fixtures import API, analyze, mock_repo_api
 from .shared_fixtures import public_client  # noqa: F401  (fixture "client")
 from .test_repository_analysis import profile  # noqa: F401  (fixture)
 

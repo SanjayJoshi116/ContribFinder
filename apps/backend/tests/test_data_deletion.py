@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from accounts.models import AuditEvent, User
 from developers.models import DeveloperProfile, DeveloperSkill, SkillEvidence
+from e2e.builders import add_candidate
 from feedback.models import DismissedRepository, RecommendationFeedback, SavedRepository
 from github.models import GitHubAccount, GitHubProfile
 from jobs.models import SyncJob
@@ -28,7 +29,6 @@ from repositories.models import (
 from services import data_deletion, feedback, jobs
 
 from .factories import GitHubAccountFactory
-from .repo_fixtures import add_candidate
 from .test_github_auth import callback, mock_github_ok, start
 from .test_recommendation_generation import (  # noqa: F401 - pytest fixtures
     developer,

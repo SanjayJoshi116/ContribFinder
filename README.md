@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.10** (performance and cleanup: fewer queries and writes, and a GitHub response-cache outage no longer fails a worker job; MVP+). After signing in with
+**Version 0.12.11** (tooling and data hygiene: the Redis runner restarts a lost WSL keep-alive, LF checkouts on every OS, runner scripts linted in CI; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -80,6 +80,16 @@ repository path), so another project or a second checkout keeps running; stale r
 discarded. Closing the console window stops the stack too, keep-alive included. Each checkout
 keeps its own Celery beat schedule file (named after a hash of the repository path). Stacks
 started before 0.12.9 have no records: stop them once with the old `npm run stop` before upgrading.
+If the keep-alive session ends while the stack runs, the Redis runner starts a new one and logs the
+exit code; after 3 restarts within 5 minutes it gives up and the stack stops.
+
+`.gitattributes` checks text files out with LF on every OS (since 0.12.11), so the format checks
+pass on Windows. A Windows checkout made earlier still has CRLF working files: refresh them once,
+on a tree with no uncommitted changes (Git Bash):
+
+```bash
+git ls-files -z | xargs -0 rm -f && git checkout -- .
+```
 
 Celery beat runs the periodic repository jobs: it marks candidate repositories stale and
 refreshes them in the background with the OAuth app's client credentials (never a user's
@@ -275,7 +285,8 @@ batch 7 (discovery and repository data) in 0.12.7, batch 9 (frontend correctness
 together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 and Y-7 still open),
 and batch 10 (dev scripts, checks and migrations) in 0.12.9, together with the follow-ups from its
 review (rows Z-1…Z-10, batch 15; Z-1 still open), and batch 11 (performance and cleanup) in
-0.12.10 (A-18 wontfix). Batch 8 (ranking-visible, waits for K-1) remains.
+0.12.10 (A-18 wontfix), and batch 16 (tooling and data hygiene) in 0.12.11. Batch 8
+(ranking-visible, waits for K-1) remains.
 
 ## Versioning
 

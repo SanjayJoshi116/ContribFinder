@@ -8,7 +8,9 @@ import { uv } from './uv.mjs'
 const backend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'backend')
 const args = process.argv.slice(2)
 if (args.length === 0) {
-  console.error('Usage: npm run manage -- <command> [args], e.g. npm run manage -- reanalyze_profiles')
+  console.error(
+    'Usage: npm run manage -- <command> [args], e.g. npm run manage -- reanalyze_profiles',
+  )
   process.exit(2)
 }
 uv(['run', 'python', 'manage.py', ...args], { cwd: backend })

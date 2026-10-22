@@ -1,0 +1,2 @@
+# LF in every checkout, on every OS: formatters and CI expect it (Bug_Backlog P-2).
+* text=auto eol=lf

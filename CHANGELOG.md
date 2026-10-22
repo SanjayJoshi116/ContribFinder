@@ -7,6 +7,36 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.11] - 2026-10-22
+
+Tooling and data hygiene (OpenSpec change `tooling-data-hygiene`, backlog batch 16 and Q-10…Q-12).
+No ranking, API or UI change.
+
+### Fixed
+
+- The Redis runner no longer takes the whole stack down when the WSL keep-alive ends: it starts
+  a new one (at most 3 times in 5 minutes) and logs the exit code in decimal and hex. An
+  intended stop never restarts it (P-1, in part: the cause is still unknown).
+- `.gitattributes` checks text files out with LF on every OS, so `npm run format:check` passes
+  on Windows. Earlier Windows checkouts refresh their working files once (README) (P-2).
+- `npm run api:sync` finds `uv` without PATH, like every other backend command (P-4).
+
+### Changed
+
+- Runner scripts are linted (ESLint) and format-checked (Prettier) in CI: `npm run
+  lint:scripts`, `npm run format:scripts`. The Prettier config moved to the repository root and
+  is shared with `apps/frontend` (P-5).
+- The snapshot index includes the `id` tie-break (migration `repositories.0008`), and one
+  ordering constant replaces three copies; single-repository newest-snapshot reads no longer
+  sort (Q-10 in part, Q-11).
+- The `_update_metadata` wrappers are gone, and tests import the seed builders from
+  `e2e.builders` (Q-12).
+
+### Not changed
+
+- P-3 (two frontend tests that failed once under load) did not reproduce in 8 runs; it stays
+  open in `Bug_Backlog.md`.
+
 ## [0.12.10] - 2026-10-22
 
 Performance and cleanup (OpenSpec change `performance-cleanup`, backlog batch 11). No ranking,

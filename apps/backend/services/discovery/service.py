@@ -119,14 +119,14 @@ class DiscoveryService:
 
     def _step_queries(self) -> str:
         plan = plan_queries(self._input(), QueryConfig.from_settings())
-        self._update_metadata(plan=[q.as_json() for q in plan])
+        merge_metadata(self.job, {"plan": [q.as_json() for q in plan]})
         return Step.DONE
 
     def _step_search(self) -> str:
         if "search_started_at" not in self.job.metadata:
             # Every record this run writes is seen at or after this; the pool step prunes the
             # developer's older ones (queries that no longer find the repository).
-            self._update_metadata(search_started_at=self.now.isoformat())
+            merge_metadata(self.job, {"search_started_at": self.now.isoformat()})
         plan = [PlannedQuery(**q) for q in self.job.metadata.get("plan", [])]
         if not plan:
             return Step.SKIPPED
@@ -146,7 +146,7 @@ class DiscoveryService:
                 )
             except GitHubValidationError:
                 skipped.append(query.key)
-                self._update_metadata(queries_skipped=skipped)
+                merge_metadata(self.job, {"queries_skipped": skipped})
                 continue
             kept: list[tuple[int, GitHubRepo]] = []
             for rank, gh in enumerate(results, start=1):
@@ -173,8 +173,9 @@ class DiscoveryService:
                     self._record(repo, query.source, query.core, rank)
                 found += len(results)
                 done.append(query.key)
-                self._update_metadata(
-                    queries_done=done, rejections=dict(rejections), results_found=found
+                merge_metadata(
+                    self.job,
+                    {"queries_done": done, "rejections": dict(rejections), "results_found": found},
                 )
         return Step.DONE
 
@@ -201,7 +202,7 @@ class DiscoveryService:
                     continue
                 self._record(repo, INTERACTED, "", None)
                 added += 1
-        self._update_metadata(rejections=dict(rejections), interactions_added=added)
+        merge_metadata(self.job, {"rejections": dict(rejections), "interactions_added": added})
         return Step.DONE
 
     def _step_analysis(self) -> str:
@@ -209,10 +210,13 @@ class DiscoveryService:
             # Chosen once: a resumed step finishes this choice, never takes the next ones.
             pending = [r for r in self._pool_repositories() if self._needs_analysis(r)]
             cap = settings.DISCOVERY_MAX_ANALYSES_PER_RUN
-            self._update_metadata(
-                analysis_plan=[r.pk for r in pending[:cap]],
-                analysis_total=len(pending),
-                analysis_capped=len(pending) > cap,
+            merge_metadata(
+                self.job,
+                {
+                    "analysis_plan": [r.pk for r in pending[:cap]],
+                    "analysis_total": len(pending),
+                    "analysis_capped": len(pending) > cap,
+                },
             )
         done: list[int] = list(self.job.metadata.get("analyzed", []))
         outcomes: Counter[str] = Counter(self.job.metadata.get("analysis_outcomes", {}))
@@ -220,7 +224,7 @@ class DiscoveryService:
         for repo_id, outcome in self._analyze(todo):
             outcomes[outcome] += 1
             done.append(repo_id)
-            self._update_metadata(analyzed=done, analysis_outcomes=dict(outcomes))
+            merge_metadata(self.job, {"analyzed": done, "analysis_outcomes": dict(outcomes)})
         return Step.DONE
 
     def _analyze(self, repo_ids: list[int]) -> Iterator[tuple[int, str]]:
@@ -307,14 +311,17 @@ class DiscoveryService:
                 )
                 evicted, _ = pool.exclude(pk__in=keep).delete()
         stars = list(pool.values_list("repository__stars", flat=True))
-        self._update_metadata(
-            pool_pruned_discoveries=pruned,
-            pool_expired=expired,
-            pool_not_code=not_code_removed,
-            pool_eligibility_changed=eligibility_changed,
-            pool_evicted=evicted,
-            pool_size=len(stars),
-            pool_bands=_band_counts(stars),
+        merge_metadata(
+            self.job,
+            {
+                "pool_pruned_discoveries": pruned,
+                "pool_expired": expired,
+                "pool_not_code": not_code_removed,
+                "pool_eligibility_changed": eligibility_changed,
+                "pool_evicted": evicted,
+                "pool_size": len(stars),
+                "pool_bands": _band_counts(stars),
+            },
         )
         return Step.DONE
 
@@ -457,9 +464,6 @@ class DiscoveryService:
     def _set_step(self, step: str, state: str) -> None:
         self.job.steps = {**self.job.steps, step: str(state)}
         save_progress(self.job, steps=self.job.steps)
-
-    def _update_metadata(self, **values: Any) -> None:
-        merge_metadata(self.job, values)
 
 
 def _band_counts(stars: Iterable[int]) -> dict[str, int]:

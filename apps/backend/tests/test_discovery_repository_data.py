@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from core.checks import discovery_config_check
 from developers.models import DeveloperInterest, DeveloperSkill
+from e2e.builders import add_candidate, fresh_repo, make_candidate_repo
 from feedback.models import DismissedRepository, SavedRepository
 from repositories.models import (
     CandidateDiscovery,
@@ -37,15 +38,7 @@ from services.repositories import backlog, lifecycle
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import stale_parts
 
-from .repo_fixtures import (
-    API,
-    add_candidate,
-    expire_parts,
-    fresh_repo,
-    make_candidate_repo,
-    mock_repo_api,
-    repo_payload,
-)
+from .repo_fixtures import API, expire_parts, mock_repo_api, repo_payload
 from .shared_fixtures import developer, public_client, single_band  # noqa: F401
 from .test_discovery_service import mock_search, new_job, run
 

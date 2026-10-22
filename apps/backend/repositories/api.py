@@ -35,6 +35,7 @@ from .models import (
     RepositoryCandidate,
     RepositorySnapshot,
 )
+from .queries import SNAPSHOT_NEWEST_FIRST
 from .serializers import DiscoveryStatusSerializer, RepositoryCandidateSerializer
 
 
@@ -106,7 +107,7 @@ class CandidateListView(ListAPIView[RepositoryCandidate]):
             return RepositoryCandidate.objects.none()
         latest_label = (
             RepositorySnapshot.objects.filter(repository=OuterRef("repository"))
-            .order_by("-captured_at", "-pk")
+            .order_by(*SNAPSHOT_NEWEST_FIRST)
             .values("activity_label")[:1]
         )
         state = Case(

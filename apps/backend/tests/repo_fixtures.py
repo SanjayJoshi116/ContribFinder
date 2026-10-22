@@ -8,13 +8,10 @@ from typing import Any
 import respx
 from django.utils import timezone
 
-from e2e.builders import add_candidate, fresh_repo, make_candidate_repo, make_issue
 from repositories.models import Repository
 from services.github.client import GitHubClient
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import PART_FIELDS, stale_parts
-
-__all__ = ["add_candidate", "fresh_repo", "make_candidate_repo", "make_issue"]
 
 API = "https://api.github.com"
 

@@ -10,12 +10,12 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from developers.models import DeveloperProfile
+from e2e.builders import add_candidate, make_candidate_repo
 from github.models import GitHubAccount
 from jobs.models import SyncJob
 from repositories.models import RepositorySnapshot
 
 from .factories import GitHubAccountFactory
-from .repo_fixtures import add_candidate, make_candidate_repo
 
 pytestmark = pytest.mark.django_db
 

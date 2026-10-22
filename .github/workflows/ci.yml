@@ -96,11 +96,18 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: apps/frontend/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            apps/frontend/package-lock.json
       - name: Version consistency
         run: node scripts/check-version.mjs
+      - run: npm ci
       - name: Script tests
-        run: node --test "scripts/*.test.mjs"
+        run: npm run test:scripts
+      - name: Script lint
+        run: npm run lint:scripts
+      - name: Script format
+        run: npm run format:scripts
       - run: uv sync --frozen
         working-directory: apps/backend
       - run: npm ci

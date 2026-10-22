@@ -207,7 +207,7 @@ Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 
 Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
-- **Lint and format `scripts/` in CI.** The runners are tested (`npm run test:scripts`) but no
+- ~~**Lint and format `scripts/` in CI.**~~ Shipped in v0.12.11 (P-5). The runners are tested (`npm run test:scripts`) but no
   ESLint or Prettier config covers them; the frontend's config does not reach the root.
 - **Helper modules fail loudly when run.** `node scripts/uv.mjs ...` exits 0 without doing
   anything (it is a library), which once passed for a green mypy run. A guard that prints usage
@@ -225,28 +225,29 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
 | | Cheap | Expensive |
 |---|---|---|
-| **High value** | loud helper modules, lint `scripts/` (§15) | activation command (§15, changes seeding) |
+| **High value** | loud helper modules, ~~lint `scripts/`~~ (§15) | activation command (§15, changes seeding) |
 | **Lower value** | ~~one `taskkill`~~ (shipped) | generic migration round trip (§15, slow test) |
 
 ## 16. Data access and repository hygiene
 
 Round 6 (2026-10-22), from the `performance-cleanup` review and `/simplify` pass.
 
-- **Newest snapshot without a window sort.** `latest_snapshot()` slices a prefetch, which
+- **Newest snapshot without a window sort.** *(v0.12.11: the index has `-id`; single-repository
+  reads no longer sort, the multi-repository prefetch still does.)* `latest_snapshot()` slices a prefetch, which
   Postgres runs as `ROW_NUMBER()` over every snapshot of the prefetched repositories. Add `-id`
   to the `(repository, -captured_at)` index, use `DISTINCT ON`, or keep the activity fields
   (or a pointer) on `Repository` (Q-10).
-- **One metadata write path.** `merge_metadata` and `save_progress` are separate calls;
+- ~~**One metadata write path.**~~ The wrappers are gone in v0.12.11 (Q-12). `merge_metadata` and `save_progress` are separate calls;
   `save_progress` could merge any `metadata` it gets, and the per-service `_update_metadata`
   wrappers could go (Q-12).
-- **Line endings fixed in the repository.** `.gitattributes` with `* text=auto eol=lf` makes
+- ~~**Line endings fixed in the repository.**~~ Shipped in v0.12.11 (P-2). `.gitattributes` with `* text=auto eol=lf` makes
   `npm run format:check` pass on Windows checkouts (P-2).
-- **Tests import builders where they live.** `tests/repo_fixtures.py` re-exports
+- ~~**Tests import builders where they live.**~~ Shipped in v0.12.11 (Q-12). `tests/repo_fixtures.py` re-exports
   `e2e.builders`; importing it directly removes the shim (Q-12).
 
 ## Suggested order (round 6)
 
 | | Cheap | Expensive |
 |---|---|---|
-| **High value** | `.gitattributes` (§16) | snapshot index or stored activity (§16, migration) |
-| **Lower value** | builders import, one metadata write path (§16) | |
+| **High value** | ~~`.gitattributes`~~ (shipped) | stored activity (§16, migration; index shipped) |
+| **Lower value** | ~~builders import, wrappers~~ (shipped) | |

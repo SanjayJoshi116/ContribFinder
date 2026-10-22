@@ -9,20 +9,14 @@ from django.test import override_settings
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
+from e2e.builders import add_candidate, make_candidate_repo
 from repositories import tasks
 from repositories.models import Lifecycle, Repository, RepositorySnapshot
 from services.github.errors import GitHubRateLimited
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import PARTS, stale_parts
 
-from .repo_fixtures import (
-    API,
-    add_candidate,
-    analyze,
-    make_candidate_repo,
-    mock_repo_api,
-    repo_payload,
-)
+from .repo_fixtures import API, analyze, mock_repo_api, repo_payload
 from .shared_fixtures import public_client  # noqa: F401
 from .test_github_client import SECONDARY_MESSAGES
 from .test_profiling_manifests import DEEP_PACKAGE_JSON
@@ -82,9 +76,8 @@ def test_completion_uses_the_data_it_just_stored(client, respx_mock, monkeypatch
 
 
 def test_completion_reads_parts_it_did_not_fetch(client, respx_mock) -> None:
+    from e2e.builders import fresh_repo
     from repositories.models import RepositoryTopic
-
-    from .repo_fixtures import fresh_repo
 
     # A list repository analyzed earlier without manifest dependencies: only its README is
     # refreshed now, so topics and dependencies come from the stored rows.

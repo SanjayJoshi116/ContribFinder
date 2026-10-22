@@ -5,11 +5,11 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
+from e2e.builders import add_candidate, make_candidate_repo, make_issue
 from feedback.models import RecommendationFeedback
 from issues.models import Issue, RecommendedIssue
 from services.data_deletion import delete_github_data
 
-from .repo_fixtures import add_candidate, make_candidate_repo, make_issue
 from .test_models_phase5 import make_recommendation
 
 pytestmark = pytest.mark.django_db

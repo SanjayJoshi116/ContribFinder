@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.10 (2026-10-22)
+Version: 0.12.11 (2026-10-22)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,6 +439,23 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.11 - Tooling and data hygiene (backlog batch 16, Q-10..Q-12)
+============================================================================
+
+Local stack and tooling
+  [x] Redis runner restarts a lost WSL keep-alive (3 in 5 minutes), exit code logged in hex
+  [~] Why the keep-alive once ended (P-1) is still unknown
+  [x] .gitattributes: LF checkouts on every OS; format:check passes on Windows
+  [x] npm run api:sync without uv on PATH
+  [x] Runner scripts linted and format-checked in CI (lint:scripts, format:scripts)
+  [~] Flaky frontend tests (P-3) not reproduced in 8 runs; still open
+
+Data access and cleanup
+  [x] Snapshot index with the id tie-break; one newest-snapshot ordering constant
+  [~] Multi-repository latest-snapshot prefetch still sorts (bounded by history)
+  [x] _update_metadata wrappers removed; tests import builders from e2e.builders
+
+============================================================================
 SHIPPED - v0.12.10 - Performance and cleanup (backlog batch 11)
 ============================================================================
 
@@ -500,8 +517,8 @@ PLANNED - MVP+ / FUTURE
   [ ] Bug_Backlog.md batch 8  signal and explanation accuracy (waits for K-1)
   [ ] Bug_Backlog.md Y-6, Y-7  5-minute stale profile data, saved-list paging drift
   [ ] Bug_Backlog.md Z-1  v2 re-seed after a rollback overrides an operator's v1 (spec change)
-  [ ] Bug_Backlog.md P-1..P-5, Q-10..Q-12  keep-alive exit, CRLF format check, flaky tests,
-                     api:sync uv, scripts lint; snapshot index, ordering constant, wrappers
+  [ ] Bug_Backlog.md P-1, P-3, Q-10  keep-alive exit cause, flaky frontend tests (not
+                     reproduced), multi-repository snapshot prefetch sort
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation

@@ -9,10 +9,9 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from developers.models import DeveloperProfile, DeveloperSkill, Skill, SkillEvidence
+from e2e.builders import add_candidate, make_candidate_repo
 from repositories.models import RepositoryLanguage, RepositorySnapshot, RepositoryTopic
 from services.matching.features import load_candidates, load_developer
-
-from .repo_fixtures import add_candidate, make_candidate_repo
 
 pytestmark = pytest.mark.django_db
 

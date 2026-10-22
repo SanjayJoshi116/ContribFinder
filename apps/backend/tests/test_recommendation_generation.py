@@ -15,6 +15,7 @@ from developers.models import (
     Skill,
     SkillEvidence,
 )
+from e2e.builders import add_candidate, make_candidate_repo
 from jobs.models import SyncJob
 from recommendations.models import Recommendation, RecommendationReason, ScoringConfig
 from repositories.models import (
@@ -31,7 +32,6 @@ from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 from services.ranking.service import RecommendationService
 
 from .factories import UserFactory
-from .repo_fixtures import add_candidate, make_candidate_repo
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 

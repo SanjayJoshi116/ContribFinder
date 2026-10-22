@@ -8,6 +8,7 @@ from django.apps import apps
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
+from e2e.builders import make_issue
 from issues.models import Issue, RecommendedIssue
 from recommendations.models import Recommendation, ScoringConfig
 from services import feedback
@@ -22,7 +23,6 @@ from services.matching.issues import (
 from services.ranking.config import V2_ISSUE_PARAMS
 from services.ranking.explain import reasons
 
-from .repo_fixtures import make_issue
 from .test_recommendation_generation import (  # noqa: F401 - pytest fixtures
     developer,
     generate,

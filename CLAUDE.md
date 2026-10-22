@@ -149,8 +149,11 @@ ContribFinder/
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
 │                           redis (WSL), child (process-tree runner, .run/ records), stack
 │                           (stop matching), env, wait-port, uv, manage, check-version,
-│                           e2e-backend (seed + Django for Playwright); *.test.mjs (node --test)
+│                           restarts (keep-alive restart budget), e2e-backend (seed + Django for
+│                           Playwright); *.test.mjs (node --test)
 ├─ package.json             root runner: npm run setup / npm start / stop / manage / check:version
+│                           / lint:scripts / format:scripts; eslint.config.mjs (scripts only),
+│                           .prettierrc.json (shared with apps/frontend), .gitattributes (LF)
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
 │  ideas.md (unplanned gap analysis; each idea needs an OpenSpec change first)
@@ -204,10 +207,14 @@ Local, no Docker (primary on this machine):
   `contribfinder-celerybeat-<sha1(root)[:8]>` (`scheduleFile` in `env.mjs`) in the OS temp dir, one per checkout.
   The SPA proxies `/api`.
 - `npm run test:scripts`: Node built-in tests for the runners (`scripts/*.test.mjs`, also in CI).
+  `npm run lint:scripts` / `format:scripts`: ESLint and Prettier for `scripts/` (also in CI).
+  `.gitattributes` keeps LF in every checkout; a Windows checkout from before 0.12.11 refreshes
+  its working files once (README).
   `npm run setup` uses `npm ci` (never rewrites a lockfile); `npm run check:version` also checks
   `packages[""].version` of both npm lockfiles.
 - Redis: on Windows, `npm start` starts the `redis-server` service in WSL Ubuntu and keeps the
-  distro awake (`scripts/redis.mjs`), then a Celery worker with `--pool=threads --concurrency=4`
+  distro awake (`scripts/redis.mjs`; a keep-alive that ends is restarted, at most 3 times in 5
+  minutes, and logged with its exit code in hex), then a Celery worker with `--pool=threads --concurrency=4`
   (`scripts/worker.mjs`). `REDIS_URL=redis://localhost:6379/1`: db 1, because db 0 holds unrelated
   data. With `REDIS_URL` empty, tasks run inline (syncs block) and health reports
   `redis: not_configured`. Production refuses to start without `REDIS_URL`.
@@ -921,12 +928,34 @@ the user's repository responses outlive "delete my data").
   `conftest.py`: a global `client` would replace pytest-django's. Ruff ignores F811 in `tests/`.
   `tests/checks_helpers.ids`; frontend `callsTo` in `src/test/render.tsx`.
 - `killTree(pidOrPids)` (one `taskkill` for many); `parsePs` (`scripts/stack.mjs`) names a
-  process by its first argument. On Windows `npm run format:check` fails on CRLF checkouts
-  (`core.autocrlf`); `prettier --check --end-of-line auto` checks content.
+  process by its first argument. (CRLF checkouts failing `format:check` on Windows: fixed by
+  `.gitattributes` in 0.12.11.)
 - `merge_metadata(job, values, **fields)` is used by every job service that writes metadata
   (sync, discovery, generation); `save_progress` stays for steps only.
 - Review follow-ups Q-1, Q-2, Q-4, Q-5, Q-7…Q-9 of `Bug_Backlog.md` fixed in the same release;
   Q-3, Q-6 accepted; Q-10…Q-12 (`/simplify` skips) and notes P-1…P-5 (batch 16) open.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Tooling and data hygiene** (MVP+, fix release)  ✅ shipped in v0.12.11 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-22-tooling-data-hygiene/`. Spec: delta to
+`developer-tooling`. Batch 16 of `Bug_Backlog.md` (P-1…P-5) plus Q-10…Q-12.
+- `scripts/redis.mjs` restarts a keep-alive that ends while the stack runs
+  (`restartBudget`, `scripts/restarts.mjs`: 3 in 5 minutes); an intended stop sets `stopping`
+  first. P-1's cause is still unknown; the log now shows the code in hex.
+- `.gitattributes` `* text=auto eol=lf` (the index was already LF). `git checkout-index --force`
+  does not rewrite clean-looking files; the README refresh deletes tracked files and checks
+  them out again.
+- Root `eslint.config.mjs` (scripts only) and `.prettierrc.json` (moved from `apps/frontend`;
+  Prettier finds it upwards). CI's `api-contract` job runs root `npm ci`, `test:scripts`,
+  `lint:scripts`, `format:scripts`.
+- `api:export` runs through `scripts/manage.mjs`, so `npm run api:sync` needs no uv on PATH.
+- `repositories.queries.SNAPSHOT_NEWEST_FIRST` is the one newest-snapshot order; the snapshot
+  index is `(repository, -captured_at, -id)` (migration 0008). EXPLAIN: single-repository
+  reads are index scan + limit; the `= ANY` prefetch still sorts (bitmap scan).
+- `_update_metadata` wrappers removed (`merge_metadata(self.job, {...})`); tests import
+  builders from `e2e.builders`.
+- P-3 (flaky frontend tests) not reproduced in 8 runs under load; stays open.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
@@ -941,9 +970,10 @@ recall), online report per config from feedback, dismiss reasons, CSP, dependenc
 Round 3 (2026-10-21): content-based `not_code`, post-analysis pool cleanup, search budget
 (`no_license` rejections, per-band yield), queuing released-name refreshes. Round 4: data
 versions for client freshness, keyset saved lists, server page clamping, route-level ids. Round 5:
-lint `scripts/`, loud helper modules, generic migration round trip, explicit config activation.
-Round 6 (2026-10-22): newest-snapshot index, one metadata write path, `.gitattributes` eol, direct
-builder imports. Ranking-visible ideas wait for K-1; bootstrap CIs should land before or with it.
+loud helper modules, generic migration round trip, explicit config activation (lint `scripts/`
+shipped in 0.12.11). Round 6 (2026-10-22): stored activity on `Repository` (the index tie-break,
+wrappers, `.gitattributes` and builder imports shipped in 0.12.11). Ranking-visible ideas wait
+for K-1; bootstrap CIs should land before or with it.
 
 ## 8. Release housekeeping
 

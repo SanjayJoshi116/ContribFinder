@@ -28,6 +28,7 @@ from django.utils import timezone
 
 from issues.models import Issue
 from repositories.models import Lifecycle, Repository, RepositoryReadme, RepositorySnapshot
+from repositories.queries import SNAPSHOT_NEWEST_FIRST
 from services.github.client import (
     CommunityProfile,
     GitHubClient,
@@ -314,7 +315,7 @@ class RepositoryAnalysisService:
         signals = compute_activity(data, now)
         RepositorySnapshot.objects.create(repository=repo, **vars(signals))
         keep = settings.REPO_SNAPSHOT_HISTORY
-        old = RepositorySnapshot.objects.filter(repository=repo).order_by("-captured_at", "-pk")
+        old = RepositorySnapshot.objects.filter(repository=repo).order_by(*SNAPSHOT_NEWEST_FIRST)
         stale_ids = list(old.values_list("pk", flat=True)[keep:])
         if stale_ids:
             RepositorySnapshot.objects.filter(pk__in=stale_ids).delete()

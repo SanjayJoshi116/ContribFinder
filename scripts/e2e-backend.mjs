@@ -33,6 +33,15 @@ uv(['run', 'python', 'manage.py', 'e2e_seed', '--out', path.resolve(sessions), .
 const [cmd, prefix] = uvCommand()
 runChild(
   cmd,
-  [...prefix, 'run', 'python', 'manage.py', 'runserver', '127.0.0.1:8001', '--noreload', ...settings],
+  [
+    ...prefix,
+    'run',
+    'python',
+    'manage.py',
+    'runserver',
+    '127.0.0.1:8001',
+    '--noreload',
+    ...settings,
+  ],
   { cwd: backend },
 )

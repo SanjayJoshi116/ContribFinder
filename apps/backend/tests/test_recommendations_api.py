@@ -9,13 +9,13 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from developers.models import DeveloperProfile
+from e2e.builders import add_candidate
 from github.models import GitHubAccount
 from jobs.models import SyncJob
 from recommendations.models import Recommendation
 from repositories.models import RepositoryReadme
 
 from .factories import GitHubAccountFactory
-from .repo_fixtures import add_candidate
 from .test_recommendation_generation import (  # noqa: F401 - pytest fixtures
     developer,
     generate,

@@ -142,7 +142,7 @@ Z-7 fixed in 0.12.9 before commit, each with a test where one can run locally (Z
 Source: `code-review` over the uncommitted `performance-cleanup` diff (v0.12.10). Q-1, Q-2, Q-4,
 Q-5, Q-7, Q-8 and Q-9 fixed in 0.12.10 before commit; Q-3 and Q-6 accepted. Q-10…Q-12 are the
 `/simplify` pass's skips (the pass's fixes, such as one `GREATEST` in the freshness filter and
-`Backoff.call`, shipped in 0.12.10).
+`Backoff.call`, shipped in 0.12.10); they shipped in 0.12.11 (Q-10 in part).
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
@@ -154,9 +154,9 @@ Q-5, Q-7, Q-8 and Q-9 fixed in 0.12.10 before commit; Q-3 and Q-6 accepted. Q-10
 | Q-6 | design | `services/github/client.py` (304 `touch`) | One more Redis call per 304, and an entry confirmed by 304s never ages out. Intended: spec `github-data-sync` (A-17); the call goes through the cache backoff. | wontfix (by design) |
 | Q-7 | privacy | `services/data_deletion.py` | The `github:ratelimit:{pk}` purge was dropped with the writer → keys from before the upgrade survived deletion for up to an hour. Purge kept for one release. | fixed (performance-cleanup) |
 | Q-8 | bug | `scripts/stack.mjs` (`parsePs`) | Name from the first word of `args` → a node or python path with a space (`/home/a b/...`) named `a`, so `npm run stop` found nothing. Linux reads `/proc/<pid>/exe`; macOS keeps the first word (limit). | fixed (performance-cleanup) |
-| Q-10 | perf | `repositories/queries.py` (`latest_snapshot`) | The sliced prefetch sends one row per repository but Postgres still window-sorts every snapshot of them (`ROW_NUMBER()`; the index lacks the `-pk` tie-break). Grows with `REPO_SNAPSHOT_HISTORY`. Skipped in the `/simplify` pass: needs a migration (`ideas.md` §16). | open |
-| Q-11 | cleanup | `services/repositories/analysis.py`, `repositories/api.py` | The "newest snapshot" order `("-captured_at", "-pk")` is still written by hand in a filter and a subquery outside `latest_snapshot`. A shared ordering constant keeps the three equal. Skipped in the `/simplify` pass (outside the diff). | open |
-| Q-12 | cleanup | `services/github/sync.py`, `services/discovery/service.py`, `tests/repo_fixtures.py` | One-line `_update_metadata` wrappers around `merge_metadata`, and a re-export shim of `e2e.builders` for 16 test imports. Skipped in the `/simplify` pass (churn, no behavior; `ideas.md` §16). | open |
+| Q-10 | perf | `repositories/queries.py` (`latest_snapshot`) | The sliced prefetch sends one row per repository but Postgres still window-sorts every snapshot of them (`ROW_NUMBER()`; the index lacks the `-pk` tie-break). Grows with `REPO_SNAPSHOT_HISTORY`. Skipped in the `/simplify` pass: needs a migration (`ideas.md` §16). | fixed in part (tooling-data-hygiene: index gains `-id`, so single-repository newest reads are an index scan + limit; the multi-repository prefetch still sorts its bounded rows, Postgres bitmap-scans `= ANY`) |
+| Q-11 | cleanup | `services/repositories/analysis.py`, `repositories/api.py` | The "newest snapshot" order `("-captured_at", "-pk")` is still written by hand in a filter and a subquery outside `latest_snapshot`. A shared ordering constant keeps the three equal. Skipped in the `/simplify` pass (outside the diff). | fixed (tooling-data-hygiene) |
+| Q-12 | cleanup | `services/github/sync.py`, `services/discovery/service.py`, `tests/repo_fixtures.py` | One-line `_update_metadata` wrappers around `merge_metadata`, and a re-export shim of `e2e.builders` for 16 test imports. Skipped in the `/simplify` pass (churn, no behavior; `ideas.md` §16). | fixed (tooling-data-hygiene) |
 | Q-9 | docs | `CLAUDE.md` | Said no `github:ratelimit:*` key remains at all; now says it is no longer written and still purged for one release. ("rate-limit state in Redis" was already removed.) | fixed (performance-cleanup) |
 
 ## Batch 11 notes (2026-10-22)
@@ -166,11 +166,11 @@ fixed there: outside the batch's rows.
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| P-1 | bug | `scripts/redis.mjs` (WSL keep-alive) | First `npm start` from Claude Code's Git Bash: keep-alive `wsl.exe` exited `3221225786` (`0xC000013A`, Ctrl+C exit) ~8 s after start → `concurrently` stopped the whole stack ("WSL keep-alive session ended … Redis may stop"). Second run stayed up 90 s; not reproduced. Maybe the shell's inherited Ctrl+C handling (CLAUDE.md §6 testing note), maybe a real stray console event. Check in an interactive console; decide whether a keep-alive exit must end the stack or be restarted. | open (unverified) |
-| P-2 | tooling | `apps/frontend` (`format:check`), `.gitattributes` | With `core.autocrlf=true` (Windows default) files check out CRLF; prettier wants LF → `npm run format:check` fails on untouched files (HEAD too). CI (Linux) unaffected. `prettier --check --end-of-line auto` passes. Fix: `.gitattributes` `* text=auto eol=lf`, or `endOfLine: "auto"`. | open |
-| P-3 | test | `src/app/app.test.tsx`, `src/features/feedback/feedback.test.tsx` | Under load (other suites running, 82 s duration) 2 of 35 tests failed; rerun alone passed in 12 s. Likely `waitFor` default timeout. Flaky locally; not seen in CI. Find the two tests, raise their timeout or wait on the right signal. | open (seen once) |
-| P-4 | tooling | `apps/frontend/package.json` (`api:export`) | Runs bare `uv`, not `scripts/uv.mjs` → `npm run api:sync` fails ("'uv' is not recognized") where uv is not on PATH, though `npm run manage` etc. find it. Route through `scripts/uv.mjs`. | open |
-| P-5 | cleanup | `scripts/*.mjs` | Not prettier-clean (and unlinted); runner edits cannot follow a checked style. Same as `ideas.md` round 5 "lint `scripts/`". | open |
+| P-1 | bug | `scripts/redis.mjs` (WSL keep-alive) | First `npm start` from Claude Code's Git Bash: keep-alive `wsl.exe` exited `3221225786` (`0xC000013A`, Ctrl+C exit) ~8 s after start → `concurrently` stopped the whole stack ("WSL keep-alive session ended … Redis may stop"). Second run stayed up 90 s; not reproduced. Maybe the shell's inherited Ctrl+C handling (CLAUDE.md §6 testing note), maybe a real stray console event. Check in an interactive console; decide whether a keep-alive exit must end the stack or be restarted. | fixed in part (tooling-data-hygiene: the runner restarts the keep-alive and logs the code in hex; the cause is still unknown) |
+| P-2 | tooling | `apps/frontend` (`format:check`), `.gitattributes` | With `core.autocrlf=true` (Windows default) files check out CRLF; prettier wants LF → `npm run format:check` fails on untouched files (HEAD too). CI (Linux) unaffected. `prettier --check --end-of-line auto` passes. Fix: `.gitattributes` `* text=auto eol=lf`, or `endOfLine: "auto"`. | fixed (tooling-data-hygiene) |
+| P-3 | test | `src/app/app.test.tsx`, `src/features/feedback/feedback.test.tsx` | Under load (other suites running, 82 s duration) 2 of 35 tests failed; rerun alone passed in 12 s. Likely `waitFor` default timeout. Flaky locally; not seen in CI. Find the two tests, raise their timeout or wait on the right signal. | open (not reproduced in 8 runs under backend-suite load on 2026-10-22: 5 of the two files, 3 cold full suites; tooling-data-hygiene) |
+| P-4 | tooling | `apps/frontend/package.json` (`api:export`) | Runs bare `uv`, not `scripts/uv.mjs` → `npm run api:sync` fails ("'uv' is not recognized") where uv is not on PATH, though `npm run manage` etc. find it. Route through `scripts/uv.mjs`. | fixed (tooling-data-hygiene) |
+| P-5 | cleanup | `scripts/*.mjs` | Not prettier-clean (and unlinted); runner edits cannot follow a checked style. Same as `ideas.md` round 5 "lint `scripts/`". | fixed (tooling-data-hygiene) |
 
 ## Full-file reviews (2026-10-19)
 
@@ -477,12 +477,13 @@ can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
 | 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7…X-9 accepted, X-10 false positive. X-11 and X-12 went to batch 11. |
 | 14 | **Batch 9 follow-ups** | Y-1…Y-10 | Review of `frontend-correctness`. Y-1…Y-5 and Y-8 fixed in the same release (0.12.8); Y-6 and Y-7 open (next frontend change); Y-9 and Y-10 went to batch 11. |
 | 15 | **Batch 10 follow-ups** | Z-1…Z-10 | Review and `/simplify` pass of `dev-scripts-checks`. Z-2, Z-3, Z-6, Z-7 fixed in the same release (0.12.9); Z-1 open (needs a spec change); Z-4, Z-5, Z-8, Z-9, Z-10 went to batch 11. |
-| 16 | **Batch 11 follow-ups** | P-1…P-5 | Found while implementing `performance-cleanup` (0.12.10). All open: P-1 needs a reproduction first; P-2, P-4, P-5 are local tooling; P-3 a flaky test. |
-| 17 | **Batch 11 review** | Q-1…Q-12 | Review and `/simplify` pass of `performance-cleanup`. Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 fixed in the same release (0.12.10); Q-3, Q-6 accepted; Q-10…Q-12 open. |
+| 16 | **Batch 11 follow-ups** | P-1…P-5 | Found while implementing `performance-cleanup` (0.12.10). Shipped with Q-10…Q-12 in 0.12.11 (`tooling-data-hygiene`): P-2, P-4, P-5 fixed, P-1 fixed in part (restart; cause unknown), P-3 open (not reproduced). |
+| 17 | **Batch 11 review** | Q-1…Q-12 | Review and `/simplify` pass of `performance-cleanup`. Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 fixed in the same release (0.12.10); Q-3, Q-6 accepted; Q-10…Q-12 went to batch 16 (0.12.11; Q-10 in part). |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
-0.12.10 (A-18 wontfix). Next: batch 8 (signal and explanation accuracy) is ranking-visible and waits for
-K-1; Y-6, Y-7 and Z-1 stay open outside a batch; batch 16 (P-1…P-5) is open.
+0.12.10 (A-18 wontfix), 16 with Q-10…Q-12 in 0.12.11 (P-1 and Q-10 in part, P-3 not reproduced).
+Next: batch 8 (signal and explanation accuracy) is ranking-visible and waits for K-1; Y-6, Y-7 and
+Z-1 stay open outside a batch.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.

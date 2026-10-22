@@ -7,10 +7,9 @@ from django.db.models import ProtectedError
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
+from e2e.builders import make_candidate_repo
 from recommendations.models import Recommendation, RecommendationReason, ScoringConfig
 from services.ranking.config import V1_PARAMS, V1_WEIGHTS, V2_PARAMS, V2_WEIGHTS
-
-from .repo_fixtures import make_candidate_repo
 
 pytestmark = pytest.mark.django_db
 

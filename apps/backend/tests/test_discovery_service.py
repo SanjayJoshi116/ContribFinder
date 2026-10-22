@@ -10,6 +10,7 @@ import pytest
 from django.test import override_settings
 from django.utils import timezone
 
+from e2e.builders import add_candidate, make_candidate_repo
 from github.models import GitHubAccount
 from jobs.models import SyncJob
 from repositories.models import (
@@ -24,7 +25,7 @@ from services.discovery.service import DiscoveryService
 from services.github.errors import GitHubRateLimited
 
 from .factories import GitHubAccountFactory
-from .repo_fixtures import API, add_candidate, make_candidate_repo, mock_repo_api, repo_payload
+from .repo_fixtures import API, mock_repo_api, repo_payload
 from .shared_fixtures import developer, make_developer, single_band  # noqa: F401
 from .test_github_client import TOKEN
 
