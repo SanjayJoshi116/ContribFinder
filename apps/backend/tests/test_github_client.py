@@ -17,6 +17,8 @@ from services.github.errors import (
     GitHubTransientError,
 )
 
+from .cache_helpers import DownCache
+
 API = "https://api.github.com"
 TOKEN = "gho_ClientTestToken000000000000000000000"
 
@@ -130,6 +132,59 @@ def test_conditional_request_reuses_cached_body(client) -> None:
 
 
 @respx.mock
+def test_cache_error_sends_unconditional_request(client, monkeypatch, caplog) -> None:
+    from services.github import client as client_module
+
+    down = DownCache()
+    monkeypatch.setattr(client_module, "cache", down)
+    route = respx.get(f"{API}/repos/octocat/r1/languages").respond(
+        200, json={"Python": 7000}, headers={"ETag": '"abc"'}
+    )
+    with caplog.at_level(logging.WARNING, logger="services.github.client"):
+        assert client.get_languages("octocat/r1") == {"Python": 7000}
+    assert "If-None-Match" not in route.calls[0].request.headers
+    assert down.calls == 1  # the read failed; the result was not written
+    assert any("ConnectionError" in r.getMessage() for r in caplog.records)
+
+
+@respx.mock
+def test_cache_skipped_during_backoff(client, monkeypatch) -> None:
+    from services.github import client as client_module
+
+    down = DownCache()
+    monkeypatch.setattr(client_module, "cache", down)
+    route = respx.get(f"{API}/repos/octocat/r1/languages").respond(200, json={"Python": 1})
+    client.get_languages("octocat/r1")
+    client.get_languages("octocat/r1")
+    assert route.call_count == 2
+    assert down.calls == 1  # the second request did not try the cache
+
+
+@respx.mock
+@override_settings(GITHUB_ETAG_TTL=3600)
+def test_not_modified_renews_cache_entry(client, monkeypatch) -> None:
+    from django.core.cache import cache
+
+    touched: list[tuple[str, int]] = []
+
+    def touch(key: str, ttl: int) -> bool:
+        touched.append((key, ttl))
+        return True
+
+    monkeypatch.setattr(cache, "touch", touch)
+    route = respx.get(f"{API}/repos/octocat/r1/languages")
+    route.side_effect = [
+        httpx.Response(200, json={"Python": 7000}, headers={"ETag": '"abc"'}),
+        httpx.Response(304),
+    ]
+    client.get_languages("octocat/r1")
+    assert touched == []  # a 200 stores the entry; only a 304 renews it
+    assert client.get_languages("octocat/r1") == {"Python": 7000}
+    [(key, ttl)] = touched
+    assert key.startswith("github:etag:t1:") and ttl == 3600
+
+
+@respx.mock
 def test_etag_cache_is_scoped_per_user() -> None:
     route = respx.get(f"{API}/repos/octocat/r1/languages")
     route.side_effect = [
@@ -218,7 +273,7 @@ def test_transient_failures(client, outcome) -> None:
 
 
 @respx.mock
-def test_rate_limit_headers_recorded(client) -> None:
+def test_rate_limit_headers_not_stored(client) -> None:
     from django.core.cache import cache
 
     respx.get(f"{API}/user").respond(
@@ -227,7 +282,7 @@ def test_rate_limit_headers_recorded(client) -> None:
         headers={"X-RateLimit-Remaining": "4999", "X-RateLimit-Limit": "5000"},
     )
     client.get_authenticated_user()
-    assert cache.get("github:ratelimit:t1")["remaining"] == "4999"
+    assert cache.get("github:ratelimit:t1") is None  # nothing reads it (A-16)
 
 
 @respx.mock

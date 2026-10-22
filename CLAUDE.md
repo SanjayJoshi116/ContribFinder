@@ -88,7 +88,8 @@ ContribFinder/
 │  │  ├─ config/            settings/{base,development,test,production}.py, urls.py, celery.py,
 │  │  │                     exceptions.py (error envelope)
 │  │  ├─ core/              health, auth class, CSRF/400/403/404 JSON views, log redaction, checks,
-│  │  │                     startup (production check gate), throttling (cache-outage fallback)
+│  │  │                     startup (production check gate), throttling (cache-outage fallback),
+│  │  │                     backoff (per-process skip after a cache error)
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
 │  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API, recover_stale_jobs task
@@ -98,7 +99,8 @@ ContribFinder/
 │  │  ├─ repositories/      Repository (lifecycle, eligibility), RepositoryLanguage, RepositoryTopic,
 │  │  │                     RepositoryDependency, UserRepository (owner | contributor),
 │  │  │                     RepositoryReadme, RepositorySnapshot, RepositoryCandidate,
-│  │  │                     CandidateDiscovery; discovery API; discovery/refresh/beat tasks
+│  │  │                     CandidateDiscovery; discovery API; discovery/refresh/beat tasks;
+│  │  │                     queries.py (latest_snapshot prefetch)
 │  │  ├─ issues/            Issue (shared, analysis on the row), RecommendedIssue; issue
 │  │  │                     detail API (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason; API; generation
@@ -106,8 +108,9 @@ ContribFinder/
 │  │  │                     benchmark_sheet, import_judgments, build_benchmark commands
 │  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
 │  │  │                     saved and dismissed API (Phase 8a)
-│  │  ├─ e2e/               e2e_seed command (browser-test users and sessions); installed only by
-│  │  │                     config/settings/e2e.py, never in production
+│  │  ├─ e2e/               e2e_seed command (browser-test users and sessions), builders.py (seed
+│  │  │                     builders, also re-exported to tests; imports nothing from tests/);
+│  │  │                     installed only by config/settings/e2e.py, never in production
 │  │  ├─ embeddings/        (Phase 6, future)
 │  │  ├─ evaluation/        data only: benchmark-v1.json (seed benchmark), holdout-v1.json and
 │  │  │                     holdout-v2.json (acceptance only, never for choosing; both used, so
@@ -116,9 +119,11 @@ ContribFinder/
 │  │  │                     baselines.json (format 4, keyed by dataset, top N each)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
 │  │     │                  jobs), errors.py (PermanentJobError, JobCancelled), job_guard.py
-│  │     │                  (stale_before, lost_before, job_write, save_progress, heartbeat),
+│  │     │                  (stale_before, lost_before, job_write, save_progress, merge_metadata,
+│  │     │                  heartbeat),
 │  │     │                  locks.py (lock_developer: one lock order for recommendations and
-│  │     │                  feedback), feedback.py (record, save, dismiss, restore),
+│  │     │                  feedback), feedback.py (record, save, dismiss, restore), text.py
+│  │     │                  (join_names),
 │  │     │                  data_deletion.py (GitHub data / account deletion)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
 │  │     │                  storage.py (shared repository upserts)
@@ -159,7 +164,9 @@ ContribFinder/
 - Only `services/github/` talks to GitHub. It handles pagination, ETag conditional requests,
   timeouts, retries with exponential backoff, `Retry-After`/secondary rate limits, and
   Redis caching (`github:user:{u}`, `github:repo:{o}:{r}`, `github:issues:{o}:{r}`).
-  The rest of the app sees normalized dataclasses, never raw GitHub JSON.
+  The ETag cache only saves requests: a cache error makes the request unconditional and the
+  process skips the cache for `GITHUB_CACHE_BACKOFF_SECONDS` (`core/backoff.py`); a 304 renews
+  the entry. The rest of the app sees normalized dataclasses, never raw GitHub JSON.
 - Celery tasks are idempotent, create/update a `SyncJob`, and retry through Celery with backoff.
 - Every DRF endpoint lives under `/api/v1/`, is paginated where it returns lists, enforces
   per-user authorization, and appears in the OpenAPI schema.
@@ -327,8 +334,7 @@ user, started_at, completed_at, attempts, error, metadata`.
 
 **FR-GH-007: Rate limits and transient failures**
 - Build: timeouts, exponential backoff, `Retry-After` / `X-RateLimit-Reset` handling that
-  schedules a Celery retry (never a hot loop), ETag conditional requests, Redis cache,
-  rate-limit state in Redis.
+  schedules a Celery retry (never a hot loop), ETag conditional requests, Redis cache.
 - Done when: fixture tests cover 403/429 secondary limits, 5xx retry, and 304 not-modified.
 
 **FR-DATA-001: Sync status**
@@ -894,6 +900,35 @@ deltas to `api-platform`, `recommendation-engine`. Batch 10 of `Bug_Backlog.md`.
   (spec change), Z-4, Z-5, Z-8 and the `/simplify` skips Z-9, Z-10 in batch 11.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Performance and cleanup** (MVP+, fix release)  ✅ shipped in v0.12.10 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-22-performance-cleanup/`. Spec: delta to
+`github-data-sync`. Batch 11 of `Bug_Backlog.md` (A-18 wontfix: a shared cache scope would let
+the user's repository responses outlive "delete my data").
+- GitHub client: ETag cache calls go through `_cached` (`services/github/client.py`); an error
+  marks the cache down for `GITHUB_CACHE_BACKOFF_SECONDS` (default 30) via
+  `core.backoff.Backoff`, which `core/throttling.py` uses too (one instance each, the caller's
+  logger). `github:ratelimit:*` is no longer written; deletion still purges the user's key for
+  one release (keys from before the upgrade). `Backoff.call(fn, *args, fallback=)` is the one
+  try/skip wrapper; `conftest.py` runs `Backoff.reset_all()` and clears the health client.
+- `job_guard.merge_metadata(job, **values)`: PostgreSQL `metadata || values` under the claim;
+  discovery progress uses it. `repositories.queries.latest_snapshot(prefix)` (sliced
+  `Prefetch`, `to_attr="latest_snapshots"`) is the one way to read a repository's newest
+  snapshot. `lifecycle.complete(..., topics=, has_dependencies=)` takes what the analysis just
+  stored. `core.health._redis_client(url)` is cached per process.
+- Test fixtures shared by import live in `tests/shared_fixtures.py` (`make_developer`,
+  autouse `single_band`, `developer`, `public_client` registered as `client`), not
+  `conftest.py`: a global `client` would replace pytest-django's. Ruff ignores F811 in `tests/`.
+  `tests/checks_helpers.ids`; frontend `callsTo` in `src/test/render.tsx`.
+- `killTree(pidOrPids)` (one `taskkill` for many); `parsePs` (`scripts/stack.mjs`) names a
+  process by its first argument. On Windows `npm run format:check` fails on CRLF checkouts
+  (`core.autocrlf`); `prettier --check --end-of-line auto` checks content.
+- `merge_metadata(job, values, **fields)` is used by every job service that writes metadata
+  (sync, discovery, generation); `save_progress` stays for steps only.
+- Review follow-ups Q-1, Q-2, Q-4, Q-5, Q-7…Q-9 of `Bug_Backlog.md` fixed in the same release;
+  Q-3, Q-6 accepted; Q-10…Q-12 (`/simplify` skips) and notes P-1…P-5 (batch 16) open.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
@@ -907,7 +942,8 @@ Round 3 (2026-10-21): content-based `not_code`, post-analysis pool cleanup, sear
 (`no_license` rejections, per-band yield), queuing released-name refreshes. Round 4: data
 versions for client freshness, keyset saved lists, server page clamping, route-level ids. Round 5:
 lint `scripts/`, loud helper modules, generic migration round trip, explicit config activation.
-Ranking-visible ideas wait for K-1; bootstrap CIs should land before or with it.
+Round 6 (2026-10-22): newest-snapshot index, one metadata write path, `.gitattributes` eol, direct
+builder imports. Ranking-visible ideas wait for K-1; bootstrap CIs should land before or with it.
 
 ## 8. Release housekeeping
 

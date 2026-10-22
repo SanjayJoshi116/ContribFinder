@@ -34,7 +34,7 @@ def refresh(client: APIClient, capture) -> None:
 def test_full_refresh_runs_stages_in_order(
     signed_in_client: APIClient,
     user,
-    developer,  # noqa: F811
+    developer,
     stages,
     django_capture_on_commit_callbacks,
 ) -> None:
@@ -55,8 +55,8 @@ class DiscoveryBroke(PermanentJobError):
 def test_failed_discovery_starts_no_generation(
     signed_in_client: APIClient,
     user,
-    developer,  # noqa: F811
-    pool,  # noqa: F811
+    developer,
+    pool,
     stages,
     monkeypatch,
     django_capture_on_commit_callbacks,

@@ -38,6 +38,21 @@ def test_profile(analyzed, signed_in_client: APIClient) -> None:
     assert "experience" not in response.content.decode()
 
 
+def test_profile_counts_match_rows_without_a_join(analyzed, signed_in_client: APIClient) -> None:
+    from developers.models import DeveloperInterest, DeveloperSkill
+
+    profile = analyzed.developer_profile
+    assert DeveloperInterest.objects.filter(profile=profile).count() >= 1
+    with CaptureQueriesContext(connection) as queries:
+        body = signed_in_client.get("/api/v1/profile").json()
+    assert body["skill_count"] == DeveloperSkill.objects.filter(profile=profile).count()
+    assert body["interest_count"] == DeveloperInterest.objects.filter(profile=profile).count()
+    [profile_query] = [
+        q["sql"] for q in queries if 'FROM "developers_developerprofile"' in q["sql"]
+    ]
+    assert "JOIN" not in profile_query.upper()  # two subqueries, no skills-by-interests rows
+
+
 def test_profile_not_analyzed(signed_in_client: APIClient) -> None:
     response = signed_in_client.get("/api/v1/profile")
     assert response.status_code == 404

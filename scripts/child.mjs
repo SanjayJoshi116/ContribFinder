@@ -59,12 +59,17 @@ export function pruneRecords(dir = RUN_DIR) {
   for (const { file, pid } of readRecords(dir)) if (!pid || !alive(pid)) removeRecord(file)
 }
 
-/** Force-kill a process and all its descendants. */
-export function killTree(pid) {
-  if (pid === undefined) return
+/** Force-kill processes (one pid or an array) and all their descendants. */
+export function killTree(pidOrPids) {
+  const pids = [pidOrPids].flat().filter((pid) => pid !== undefined)
+  if (pids.length === 0) return
   if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' })
-  } else {
+    // One taskkill for all: it goes on past pids that are already gone (killed with a parent).
+    const args = pids.flatMap((pid) => ['/pid', String(pid)])
+    spawnSync('taskkill', [...args, '/T', '/F'], { stdio: 'ignore' })
+    return
+  }
+  for (const pid of pids) {
     try {
       process.kill(-pid, 'SIGKILL') // the child leads its own process group (detached)
     } catch {

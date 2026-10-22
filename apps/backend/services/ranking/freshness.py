@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Exists, F, OuterRef, Subquery
+from django.db.models import Exists, F, OuterRef, Q, Subquery
 from django.db.models.functions import Greatest
 from django.utils import timezone
 
@@ -68,26 +68,23 @@ def due_profiles() -> list[DeveloperProfile]:
         - timedelta(minutes=settings.RECOMMENDATION_FAILED_RETRY_MINUTES),
     )
     profiles = (
-        DeveloperProfile.objects.annotate(has_candidates=Exists(candidates))
-        .filter(Exists(candidates) | Exists(recommendations))
-        .annotate(
+        DeveloperProfile.objects.filter(Exists(candidates) | Exists(recommendations))
+        # Aliases, not annotations: used only here, each correlated subquery runs once per
+        # profile. GREATEST ignores NULLs (no pool or data time); analyzed_at is never NULL.
+        .alias(
             last_generation=Subquery(last_generation),
-            pool_changed=Subquery(pool_changed),
-            data_changed=Subquery(data_changed),
-            outdated_config=Exists(outdated_config),
+            changed=Greatest(F("analyzed_at"), Subquery(pool_changed), Subquery(data_changed)),
         )
         .exclude(Exists(failed_recently))
+        .filter(
+            Q(last_generation__isnull=True)
+            | Q(changed__gt=F("last_generation"))
+            | Exists(outdated_config)
+            | ~Exists(candidates)  # recommendations left from a pool that is now empty
+        )
         .select_related("user")
     )
-    return [
-        p
-        for p in profiles
-        if p.last_generation is None
-        or p.outdated_config
-        or p.analyzed_at > p.last_generation
-        or any(t is not None and t > p.last_generation for t in (p.pool_changed, p.data_changed))
-        or not p.has_candidates  # recommendations left from a pool that is now empty
-    ]
+    return list(profiles)
 
 
 def start_due_generations() -> int:

@@ -9,6 +9,7 @@ import {
   ME,
   NEVER_GENERATED,
   SYNCED_USER,
+  callsTo,
   discoveryJob,
   json,
   mockFetch,
@@ -18,15 +19,6 @@ import {
 } from '@/test/render'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
-
-type FetchMock = ReturnType<typeof mockFetch>
-
-/** Requests made so far for "METHOD /api/v1/path" (exact URL, query string included). */
-function count(fetchMock: FetchMock, route: string): number {
-  return fetchMock.mock.calls.filter(
-    ([input, init]) => `${(init?.method ?? 'GET').toUpperCase()} ${String(input)}` === route,
-  ).length
-}
 
 const generationJob = (status: string) => ({
   id: 9,
@@ -59,7 +51,7 @@ describe('retry policy', () => {
 
     expect(await screen.findByText(/being prepared/i)).toBeInTheDocument()
     await settle()
-    expect(count(fetchMock, 'GET /api/v1/profile')).toBe(1)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(1)
   })
 
   it('retries a server error', async () => {
@@ -77,7 +69,7 @@ describe('retry policy', () => {
     renderRoute('/app')
 
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
-    expect(count(fetchMock, 'GET /api/v1/profile')).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(2)
   })
 
   it('does not retry a 429', async () => {
@@ -91,7 +83,7 @@ describe('retry policy', () => {
 
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
     await settle()
-    expect(count(fetchMock, 'GET /api/v1/profile/skills?page_size=200')).toBe(1)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile/skills?page_size=200').length).toBe(1)
   })
 })
 
@@ -148,16 +140,16 @@ describe('refresh on job transitions', () => {
     const { router } = renderRoute('/app')
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
     await settle()
-    const skills = count(fetchMock, 'GET /api/v1/profile/skills?page_size=200')
-    const list = count(fetchMock, 'GET /api/v1/recommendations')
+    const skills = callsTo(fetchMock, 'GET', '/api/v1/profile/skills?page_size=200').length
+    const list = callsTo(fetchMock, 'GET', '/api/v1/recommendations').length
 
     await act(() => router.navigate('/privacy'))
     await act(() => router.navigate('/app'))
-    await waitFor(() => expect(count(fetchMock, 'GET /api/v1/sync/status')).toBe(2))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/sync/status').length).toBe(2))
     await settle()
 
-    expect(count(fetchMock, 'GET /api/v1/profile/skills?page_size=200')).toBe(skills)
-    expect(count(fetchMock, 'GET /api/v1/recommendations')).toBe(list)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile/skills?page_size=200').length).toBe(skills)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(list)
   })
 
   it('refetches profile data once when a sync finishes', async () => {
@@ -179,12 +171,12 @@ describe('refresh on job transitions', () => {
     })
     renderRoute('/app')
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
-    expect(count(fetchMock, 'GET /api/v1/profile')).toBe(1)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(1)
 
     await vi.advanceTimersByTimeAsync(2100)
-    await waitFor(() => expect(count(fetchMock, 'GET /api/v1/profile')).toBe(2))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(2))
     await vi.advanceTimersByTimeAsync(5000)
-    expect(count(fetchMock, 'GET /api/v1/profile')).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(2)
   })
 
   it('refetches the list once per finished generation, however many components show it', async () => {
@@ -202,12 +194,12 @@ describe('refresh on job transitions', () => {
     renderRoute('/app')
     // The list and the pipeline indicator both observe the generation status.
     expect(await screen.findByText('Preparing recommendations…')).toBeInTheDocument()
-    expect(count(fetchMock, 'GET /api/v1/recommendations')).toBe(1)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(1)
 
     await vi.advanceTimersByTimeAsync(3100)
-    await waitFor(() => expect(count(fetchMock, 'GET /api/v1/recommendations')).toBe(2))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2))
     await vi.advanceTimersByTimeAsync(4000)
-    expect(count(fetchMock, 'GET /api/v1/recommendations')).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2)
   })
 
   it('looks for the generation once when discovery finishes', async () => {
@@ -225,11 +217,13 @@ describe('refresh on job transitions', () => {
     })
     renderRoute('/app')
     expect(await screen.findByText('Finding projects…')).toBeInTheDocument()
-    expect(count(fetchMock, 'GET /api/v1/recommendations/status')).toBe(1)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations/status').length).toBe(1)
 
     await vi.advanceTimersByTimeAsync(3100)
-    await waitFor(() => expect(count(fetchMock, 'GET /api/v1/recommendations/status')).toBe(2))
+    await waitFor(() =>
+      expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations/status').length).toBe(2),
+    )
     await vi.advanceTimersByTimeAsync(4000)
-    expect(count(fetchMock, 'GET /api/v1/recommendations/status')).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations/status').length).toBe(2)
   })
 })

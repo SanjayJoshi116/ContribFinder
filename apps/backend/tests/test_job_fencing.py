@@ -20,13 +20,14 @@ from services import jobs
 from services.errors import JobCancelled
 from services.github.errors import GitHubRateLimited
 from services.github.sync import initial_steps
-from services.job_guard import heartbeat, job_write, save_progress
+from services.job_guard import heartbeat, job_write, merge_metadata, save_progress
 from services.profiling.analysis import ProfileAnalysisService
 from services.repositories import lifecycle
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 
 from .repo_fixtures import API, add_candidate, analyze, make_candidate_repo, mock_repo_api
-from .test_repository_analysis import client, profile  # noqa: F401  (fixtures)
+from .shared_fixtures import public_client  # noqa: F401  (fixture "client")
+from .test_repository_analysis import profile  # noqa: F401  (fixture)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 
@@ -53,6 +54,8 @@ def test_reclaimed_worker_is_refused_every_write(user) -> None:
         heartbeat(first)
     with pytest.raises(JobCancelled):
         save_progress(first, steps={"profile": "done"})
+    with pytest.raises(JobCancelled):
+        merge_metadata(first, {"analyzed": [1]})
     with pytest.raises(JobCancelled), job_write(first):
         pytest.fail("the body must not run")
     assert jobs.finish_job(first, "COMPLETED") is False
@@ -61,6 +64,37 @@ def test_reclaimed_worker_is_refused_every_write(user) -> None:
     assert jobs.finish_job(second, "COMPLETED") is True
     job.refresh_from_db()
     assert (job.status, job.claim_token) == ("COMPLETED", None)
+
+
+def test_merge_metadata_sends_only_its_keys(user) -> None:
+    job = SyncJob.objects.create(
+        user=user, job_type=SYNC, status="PENDING", metadata={"plan": [1, 2], "analyzed": []}
+    )
+    claimed = jobs.claim_job(job.pk)
+    assert claimed is not None
+    # Another writer stores a key after this worker loaded the job.
+    SyncJob.objects.filter(pk=job.pk).update(metadata={**job.metadata, "other": "kept"})
+    merge_metadata(claimed, {"analyzed": [7], "outcomes": {"analyzed": 1}}, steps={"x": "done"})
+    job.refresh_from_db()
+    assert job.steps == {"x": "done"}  # stored in the same write
+    assert job.metadata == {
+        "plan": [1, 2],
+        "analyzed": [7],
+        "outcomes": {"analyzed": 1},
+        "other": "kept",
+    }
+    assert claimed.metadata == {"plan": [1, 2], "analyzed": [7], "outcomes": {"analyzed": 1}}
+
+
+def test_merge_metadata_refused_when_cancelled(user) -> None:
+    job = SyncJob.objects.create(user=user, job_type=SYNC, status="PENDING")
+    claimed = jobs.claim_job(job.pk)
+    assert claimed is not None
+    SyncJob.objects.filter(pk=job.pk).update(status="CANCELLED")
+    with pytest.raises(JobCancelled):
+        merge_metadata(claimed, {"analyzed": [1]})
+    job.refresh_from_db()
+    assert job.metadata == {}
 
 
 def test_reclaimed_worker_starts_no_follow_up(user) -> None:
@@ -213,7 +247,7 @@ def test_reclaimed_analysis_changes_nothing() -> None:
     )
 
 
-def test_analysis_reclaimed_mid_fetch_stores_nothing(client, respx_mock) -> None:  # noqa: F811
+def test_analysis_reclaimed_mid_fetch_stores_nothing(client, respx_mock) -> None:
     repo = make_candidate_repo(7, "encode/httpx")
     mock_repo_api(respx_mock, "encode/httpx", 7)
     calls = 0
@@ -242,7 +276,7 @@ def test_release_restores_discovered_when_nothing_was_saved() -> None:
     assert (repo.lifecycle, repo.claim_token, repo.claimed_at) == (Lifecycle.DISCOVERED, None, None)
 
 
-def test_transient_failure_keeps_the_failed_retry_clock(client, respx_mock) -> None:  # noqa: F811
+def test_transient_failure_keeps_the_failed_retry_clock(client, respx_mock) -> None:
     failed_at = timezone.now() - timedelta(days=2)
     repo = make_candidate_repo(
         7,
@@ -261,7 +295,7 @@ def test_transient_failure_keeps_the_failed_retry_clock(client, respx_mock) -> N
 
 
 @override_settings(REPO_DISCOVERED_GRACE_MINUTES=10)
-def test_released_discovered_repository_stays_due(client, respx_mock, profile, monkeypatch) -> None:  # noqa: F811
+def test_released_discovered_repository_stays_due(client, respx_mock, profile, monkeypatch) -> None:
     found_at = timezone.now() - timedelta(hours=2)
     repo = make_candidate_repo(7, "encode/httpx", lifecycle_changed_at=found_at)
     add_candidate(profile, repo)

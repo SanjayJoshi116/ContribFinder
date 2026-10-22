@@ -41,7 +41,7 @@ def test_relevance_basis_keeps_and_drops() -> None:
 
 @pytest.mark.django_db
 @pytest.mark.respx(assert_all_called=False)
-def test_config_minimum_wins_over_installation_value(developer, pool) -> None:  # noqa: F811
+def test_config_minimum_wins_over_installation_value(developer, pool) -> None:
     dev, candidates = load_developer(developer), load_candidates(developer)
 
     def run(params: dict[str, Any]) -> list[str]:
@@ -70,7 +70,7 @@ def test_validation() -> None:
 
 @pytest.mark.django_db
 @pytest.mark.respx(assert_all_called=False)
-def test_generation_uses_the_configuration_minimum(user, developer, pool) -> None:  # noqa: F811
+def test_generation_uses_the_configuration_minimum(user, developer, pool) -> None:
     generate(user)
     assert Recommendation.objects.filter(developer=developer).exists()
     v2 = ScoringConfig.objects.get(version="v2-deterministic")

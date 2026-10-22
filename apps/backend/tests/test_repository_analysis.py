@@ -11,7 +11,6 @@ from django.utils import timezone
 from developers.models import DeveloperProfile
 from repositories import tasks
 from repositories.models import Lifecycle, Repository, RepositorySnapshot
-from services.github.client import GitHubClient
 from services.github.errors import GitHubRateLimited
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import PARTS, stale_parts
@@ -24,7 +23,8 @@ from .repo_fixtures import (
     mock_repo_api,
     repo_payload,
 )
-from .test_github_client import SECONDARY_MESSAGES, TOKEN
+from .shared_fixtures import public_client  # noqa: F401
+from .test_github_client import SECONDARY_MESSAGES
 from .test_profiling_manifests import DEEP_PACKAGE_JSON
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
@@ -33,12 +33,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 @pytest.fixture
 def profile(user) -> DeveloperProfile:
     return DeveloperProfile.objects.create(user=user, analyzed_at=timezone.now())
-
-
-@pytest.fixture
-def client():
-    with GitHubClient(TOKEN, cache_scope="public") as c:
-        yield c
 
 
 def test_first_analysis_stores_every_part(client, respx_mock) -> None:
@@ -69,6 +63,37 @@ def test_first_analysis_stores_every_part(client, respx_mock) -> None:
         ]
     )
     assert stale_parts(repo, timezone.now()) == []
+
+
+def test_completion_uses_the_data_it_just_stored(client, respx_mock, monkeypatch) -> None:
+    from services.discovery import filters
+
+    repo = make_candidate_repo(7, "encode/httpx")
+    mock_repo_api(respx_mock, "encode/httpx", 7)
+
+    def not_read(*args, **kwargs):
+        raise AssertionError("eligibility read back what the analysis just stored")
+
+    monkeypatch.setattr(filters, "_topics", not_read)
+    monkeypatch.setattr(filters, "stored_has_dependencies", not_read)
+    assert analyze(client, repo) == Outcome.ANALYZED
+    repo.refresh_from_db()
+    assert (repo.lifecycle, repo.is_eligible) == (Lifecycle.RECOMMENDABLE, True)
+
+
+def test_completion_reads_parts_it_did_not_fetch(client, respx_mock) -> None:
+    from repositories.models import RepositoryTopic
+
+    from .repo_fixtures import fresh_repo
+
+    # A list repository analyzed earlier without manifest dependencies: only its README is
+    # refreshed now, so topics and dependencies come from the stored rows.
+    repo = fresh_repo(8, "acme/awesome-tools")
+    RepositoryTopic.objects.create(repository=repo, topic="python")
+    mock_repo_api(respx_mock, "acme/awesome-tools", 8)
+    assert analyze(client, repo, ["readme"]) == Outcome.ANALYZED
+    repo.refresh_from_db()
+    assert (repo.lifecycle, repo.ineligible_reason) == (Lifecycle.INDEXED, "not_code")
 
 
 def test_lifecycle_passes_through_intermediate_states(client, respx_mock, monkeypatch) -> None:

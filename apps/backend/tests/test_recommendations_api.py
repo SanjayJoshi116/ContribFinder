@@ -29,7 +29,7 @@ LIST = "/api/v1/recommendations"
 
 
 @pytest.fixture
-def generated(user, developer, pool):  # noqa: F811
+def generated(user, developer, pool):
     generate(user)
     return {
         name: Recommendation.objects.filter(repository=repo).first() for name, repo in pool.items()
@@ -129,7 +129,7 @@ def test_other_users_recommendations_are_invisible(generated, api_client: APICli
     assert api_client.get(f"{LIST}/{generated['django'].pk}").status_code == 404
 
 
-def test_status(signed_in_client: APIClient, user, developer) -> None:  # noqa: F811
+def test_status(signed_in_client: APIClient, user, developer) -> None:
     assert signed_in_client.get(f"{LIST}/status").json() == {
         "job": None,
         "last_generated_at": None,
@@ -152,7 +152,7 @@ def test_signed_out(api_client: APIClient, path: str) -> None:
     assert api_client.get(path).status_code == 401
 
 
-def test_query_count_constant(signed_in_client: APIClient, user, developer) -> None:  # noqa: F811
+def test_query_count_constant(signed_in_client: APIClient, user, developer) -> None:
     def count() -> int:
         with CaptureQueriesContext(connection) as ctx:
             assert signed_in_client.get(LIST).status_code == 200

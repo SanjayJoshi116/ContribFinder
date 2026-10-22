@@ -1,10 +1,12 @@
 """Recommendation generation job and freshness (Phase 5, group 5)."""
 
 from datetime import timedelta
+from typing import cast
 
 import pytest
 from django.utils import timezone
 
+from accounts.models import User
 from developers.models import (
     DeveloperInterest,
     DeveloperProfile,
@@ -28,6 +30,7 @@ from services.ranking import freshness
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 from services.ranking.service import RecommendationService
 
+from .factories import UserFactory
 from .repo_fixtures import add_candidate, make_candidate_repo
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
@@ -284,6 +287,28 @@ class TestFreshness:
         generate(user)
         assert not Recommendation.objects.filter(developer=developer).exists()
         assert self.due() == []
+
+    def test_due_check_runs_in_sql(self, user, developer, pool, django_assert_num_queries) -> None:
+        def current_developer() -> None:
+            other = cast(User, UserFactory())
+            profile = DeveloperProfile.objects.create(
+                user=other, analyzed_at=timezone.now() - timedelta(days=1)
+            )
+            add_candidate(profile, pool["go"], rank=1)
+            SyncJob.objects.create(
+                user=other,
+                job_type="recommendation_generation",
+                status="COMPLETED",
+                started_at=timezone.now() + timedelta(days=1),
+            )
+
+        current_developer()
+        with django_assert_num_queries(1):
+            assert self.due() == [developer.pk]
+        for _ in range(9):
+            current_developer()
+        with django_assert_num_queries(1):  # not one per profile, and only the due one loaded
+            assert self.due() == [developer.pk]
 
     def test_sweep_starts_one_job_per_due_developer(
         self, user, developer, pool, monkeypatch

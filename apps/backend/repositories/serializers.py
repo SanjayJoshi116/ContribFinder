@@ -55,7 +55,7 @@ class RepositoryCandidateSerializer(serializers.ModelSerializer[RepositoryCandid
     eligible = serializers.BooleanField(
         source="repository.is_eligible", allow_null=True, read_only=True
     )
-    ineligible_reason = serializers.CharField(source="repository.ineligible_reason")
+    ineligible_reason = serializers.CharField(source="repository.ineligible_reason", read_only=True)
     activity_label = serializers.ChoiceField(
         choices=ActivityLabel.choices, allow_null=True, read_only=True
     )

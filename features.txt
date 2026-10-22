@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.9 (2026-10-21)
+Version: 0.12.10 (2026-10-22)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -127,7 +127,7 @@ Frontend
 
 Developer experience
   [x] Celery beat and a threaded worker under npm start; npm run stop
-  [~] Ctrl+C in an interactive Windows console does not stop npm start (carried to Phase 5)
+  [x] Ctrl+C in an interactive Windows console stops npm start (carried, fixed in v0.6.0)
   [~] Docker Compose verification (moved to future scope in v0.5.0)
 
 ============================================================================
@@ -258,7 +258,7 @@ Evaluation
   [x] Selection benchmark: benchmark-v2 once it holds a judged real developer, else benchmark-v1
   [x] baselines.json format 3 (keyed by dataset)
   [x] Gitignored judging/ folder for exports and sheets
-  [~] Judge real developers and build benchmark-v2 (real-a exported, 3 of 39 graded; carried over)
+  [~] Judge real developers and build benchmark-v2 (now real-a-v2, 40 candidates; K-1, open)
 
 ============================================================================
 SHIPPED - v0.12.0 - Discovery project-size mix (MVP+)
@@ -439,6 +439,30 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.10 - Performance and cleanup (backlog batch 11)
+============================================================================
+
+GitHub client
+  [x] Response-cache errors make requests unconditional; per-process backoff
+      (GITHUB_CACHE_BACKOFF_SECONDS)
+  [x] 304 renews the ETag entry; unread rate-limit entry dropped
+  [~] A-18 wontfix: per-user cache scope kept for deletion finality
+
+Queries and writes
+  [x] One Redis client for the health check; profile counts without a join
+  [x] Freshness sweep in SQL; discovery merges only changed metadata keys
+  [x] Only the newest activity snapshot loaded; completion reuses stored topics/dependencies
+
+Cleanup
+  [x] Shared helpers (app credentials, join_names, label constants, weighted_score)
+  [x] Shared test fixtures and ids helper; e2e builders outside tests/; one callsTo helper
+  [x] npm run stop: records read first, real keep-alive pid, Linux executable names,
+      one taskkill
+  [x] Review follow-ups Q-1, Q-2, Q-4, Q-5, Q-7..Q-9: sync and generation merge metadata,
+      single contributions pass, shared join helper, legacy rate-limit purge, /proc exe names
+  [x] /simplify pass: one GREATEST in the freshness filter, Backoff.call, shared test helpers
+
+============================================================================
 SHIPPED - v0.12.9 - Dev scripts, checks and migrations (backlog batch 10)
 ============================================================================
 
@@ -473,9 +497,11 @@ PLANNED - MVP+ / FUTURE
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
-  [ ] Bug_Backlog.md batches 8, 11  signals, cleanup
+  [ ] Bug_Backlog.md batch 8  signal and explanation accuracy (waits for K-1)
   [ ] Bug_Backlog.md Y-6, Y-7  5-minute stale profile data, saved-list paging drift
   [ ] Bug_Backlog.md Z-1  v2 re-seed after a rollback overrides an operator's v1 (spec change)
+  [ ] Bug_Backlog.md P-1..P-5, Q-10..Q-12  keep-alive exit, CRLF format check, flaky tests,
+                     api:sync uv, scripts lint; snapshot index, ordering constant, wrappers
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation
@@ -483,4 +509,6 @@ PLANNED - MVP+ / FUTURE
   [ ] ideas.md  Unplanned gap analysis (2026-10-20): IDF weighting, time decay, diversity,
                 preferences, contribution-success signals, evaluation rigor, online report,
                 dismiss reasons, CSP, dependency scanning; round 5 (2026-10-21): lint
-                scripts/, loud helper modules, migration round trip, config activation
+                scripts/, loud helper modules, migration round trip, config activation;
+                round 6 (2026-10-22): snapshot index, one metadata write path,
+                .gitattributes, direct builder imports

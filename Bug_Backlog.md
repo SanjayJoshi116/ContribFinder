@@ -17,8 +17,8 @@ Status: `open` · `in-progress` · `fixed` · `wontfix`.
 
 | ID | Item | Where | Status |
 |---|---|---|---|
-| DOC-1 | Ctrl+C issue still `[~] carried to Phase 5`; fixed in Phase 8a per CLAUDE.md §6, no `[x]` entry records it. | features.txt:130 | open |
-| DOC-2 | Carry-over says "real-a exported, 3 of 39 graded"; current target is `real-a-v2` (40 candidates). The 3 grades are likely in the stale `real-a.csv`. | features.txt:261 | open |
+| DOC-1 | Ctrl+C issue still `[~] carried to Phase 5`; fixed in Phase 8a per CLAUDE.md §6, no `[x]` entry records it. | features.txt:130 | fixed (performance-cleanup) |
+| DOC-2 | Carry-over says "real-a exported, 3 of 39 graded"; current target is `real-a-v2` (40 candidates). The 3 grades are likely in the stale `real-a.csv`. | features.txt:261 | fixed (performance-cleanup) |
 
 ## Code review findings
 
@@ -97,8 +97,8 @@ under `apps/backend/`. Verified against the code; fixed in 0.12.7 before commit 
 | X-8 | cleanup | `services/discovery/service.py` (`_step_pool`) | `_remove_not_code` and `recheck_eligibility` both load the pool with topics and dependencies. Not one pass: they cover different lifecycles. | wontfix (batch 11 if it matters) |
 | X-9 | design | `services/discovery/service.py` (steps) | A suspected list found `not_code` by this run's analysis keeps its pool slot until the next run (pool runs before analysis, D7). | wontfix (by design) |
 | X-10 | — | `core/checks.py` | "W003 when the budget is below the band count": E025 already errors there and W003 is skipped. | false-positive |
-| X-11 | perf | `services/repositories/lifecycle.py` (`complete`) | Eligibility re-reads the topics and dependencies the analysis just wrote: 1–2 queries per analysis. Passing them in needs an annotation set by hand (skipped in the `/simplify` pass). | open (batch 11) |
-| X-12 | cleanup | `tests/` | `developer`, `single_band` and `client` fixtures are copied across `test_discovery_service.py`, `test_discovery_repository_data.py`, `test_repository_analysis.py` and `test_issue_ingestion.py`; move them to `conftest.py` (`fresh_repo` and `analyze` already moved to `repo_fixtures.py`). | open (batch 11) |
+| X-11 | perf | `services/repositories/lifecycle.py` (`complete`) | Eligibility re-reads the topics and dependencies the analysis just wrote: 1–2 queries per analysis. Passing them in needs an annotation set by hand (skipped in the `/simplify` pass). | fixed (performance-cleanup) |
+| X-12 | cleanup | `tests/` | `developer`, `single_band` and `client` fixtures are copied across `test_discovery_service.py`, `test_discovery_repository_data.py`, `test_repository_analysis.py` and `test_issue_ingestion.py`; move them to `conftest.py` (`fresh_repo` and `analyze` already moved to `repo_fixtures.py`). | fixed (performance-cleanup) |
 
 ## Batch 9 review (2026-10-21)
 
@@ -116,8 +116,8 @@ test that fails without the fix (Y-8 checked by `npm run e2e`).
 | Y-6 | design | `app/queryClient.ts` (`DERIVED_STALE_TIME_MS`) | Data changed by jobs no status query watches (a standalone `profile_analysis` from `reanalyze_profiles`, a backend repository refresh) stays cached up to 5 min where it used to refetch on mount. Intended trade-off of F-1; fix if it shows in use (watch the analysis job too, or a shorter stale time for profile and detail; `ideas.md` §14). | open |
 | Y-7 | bug | `features/feedback/api.ts` (`usePagedList`) | Saved and hidden lists page by number: a save or unsave in another tab between "Show more" clicks shifts the pages → a duplicated entry (duplicate React key) or a skipped one. Needs cursor or `saved_at`-keyset pagination in the API, or de-duplication by `repository_id` (`ideas.md` §14). | open |
 | Y-8 | bug | `apps/backend/config/settings/e2e.py` | Claimed self-contained but `base.py` read the whole local `.env` (`NUM_PROXIES`, `ALLOWED_HOSTS`, `DISCOVERY_MAX_POOL`, ranking settings used by the seed): local e2e differed from CI. The runner (`scripts/e2e-backend.mjs`) passes only `DATABASE_URL` from `.env` and sets `DJANGO_READ_DOTENV=0`, which `base.py` honors. | fixed (frontend-correctness) |
-| Y-9 | cleanup | `apps/backend/e2e/management/commands/e2e_seed.py` | An installed app's command imports `tests.repo_fixtures`; a test-helper refactor breaks `npm run e2e` while pytest stays green. Move the shared seeding helpers to a module both use. | open (batch 11) |
-| Y-10 | cleanup | `app/app.test.tsx` (`count`) | Reimplements `callsTo` from `features/feedback/feedback.test.tsx`; move one helper to `test/render.tsx`. | open (batch 11) |
+| Y-9 | cleanup | `apps/backend/e2e/management/commands/e2e_seed.py` | An installed app's command imports `tests.repo_fixtures`; a test-helper refactor breaks `npm run e2e` while pytest stays green. Move the shared seeding helpers to a module both use. | fixed (performance-cleanup) |
+| Y-10 | cleanup | `app/app.test.tsx` (`count`) | Reimplements `callsTo` from `features/feedback/feedback.test.tsx`; move one helper to `test/render.tsx`. | fixed (performance-cleanup) |
 
 ## Batch 10 review (2026-10-21)
 
@@ -129,13 +129,48 @@ Z-7 fixed in 0.12.9 before commit, each with a test where one can run locally (Z
 | Z-1 | design | `recommendations/migrations/0003_seed_v2_deterministic.py` (`seed`) | `operator_choice` ignores v1, so re-applying 0003 after a rollback activates v2 over an operator who deliberately chose v1 (for example because the benchmark does not favour v2). Matches the spec ("while no configuration or only `v1-deterministic` is active", design D8); changing it needs a spec change, and it only happens on a rollback. | open |
 | Z-2 | gap | `.github/workflows/ci.yml` (`concurrency`) | A group holds one pending run, and a newer one replaces it even with `cancel-in-progress: false` → three quick pushes to `main` skipped the middle commit (G-8 fixed only half). Pushes now group by `github.sha`; pull requests by ref, with cancellation. | fixed (dev-scripts-checks) |
 | Z-3 | bug | `scripts/check-version.mjs`, `scripts/wait-port.mjs` (main guard) | `process.argv[1] === fileURLToPath(import.meta.url)` is false when the repository is reached through a symlink or junction (Node resolves `import.meta.url`, not `argv[1]`) → `npm run check:version` printed nothing and exited 0 with mismatched versions. Both use `isMain(import.meta.url)` (`env.mjs`, compares real paths). | fixed (dev-scripts-checks) |
-| Z-4 | bug | `scripts/stop.mjs` | The process list is read before the records: a runner that starts in between has a record but no listed process → its record is deleted as stale, and a later stop cannot find it. Needs `npm run stop` during `npm start`'s spawn (milliseconds). Read records first. | open (batch 11) |
-| Z-5 | cleanup | `scripts/redis.mjs` (keep-alive record) | The comment says the detached `wsl.exe` is outside the runner's tree; on Windows its parent is still the runner, so `taskkill /T` reaches it too. A failed spawn (`pid` undefined) writes `redis-undefined.json`, later dropped as stale. Fix the comment; record only a real pid. | open (batch 11) |
+| Z-4 | bug | `scripts/stop.mjs` | The process list is read before the records: a runner that starts in between has a record but no listed process → its record is deleted as stale, and a later stop cannot find it. Needs `npm run stop` during `npm start`'s spawn (milliseconds). Read records first. | fixed (performance-cleanup) |
+| Z-5 | cleanup | `scripts/redis.mjs` (keep-alive record) | The comment says the detached `wsl.exe` is outside the runner's tree; on Windows its parent is still the runner, so `taskkill /T` reaches it too. A failed spawn (`pid` undefined) writes `redis-undefined.json`, later dropped as stale. Fix the comment; record only a real pid. | fixed (performance-cleanup) |
 | Z-6 | bug | `recommendations/migrations/0002_seed_v1_deterministic.py` (`unseed`) | v2 with recommendations survives 0003's unseed (inactive, v1 activated); 0002's unseed then deleted v1 → v2 stored, nothing active, generation fails. v1 unseed now keeps an active v1 while any other configuration is stored. | fixed (dev-scripts-checks) |
 | Z-7 | test | `scripts/env.test.mjs` | `'C:\work\contribfinder'` written with single backslashes is `C:workcontribfinder` (`\w` is no escape) → the schedule-name test never saw a Windows path. Uses `String.raw` now. | fixed (dev-scripts-checks) |
-| Z-8 | bug | `scripts/stack.mjs` (`ownedByPath`, `recordMatches`) | Matching needs `proc.name === 'node'`; on Linux `ps comm=` may report a newer Node's main thread name (`MainThread`) → `npm run stop` finds nothing there. Unverified; Windows (CIM `Name`) unaffected. Take the executable from `args=`. | open (batch 11) |
-| Z-9 | perf | `scripts/stop.mjs` (kill loop) | Every matched process gets its own `taskkill /T /F` (`killTree`, `spawnSync`), though killing `start` already ends its descendants → about 50–150 ms per mostly dead pid. Skip descendants of chosen pids (needs parent pids from CIM/`ps`) or pass all pids to one `taskkill`. Skipped in the `/simplify` pass (shared `killTree`). | open (batch 11) |
-| Z-10 | cleanup | `tests/test_config_checks.py` | `EXPERIENCE_THRESHOLDS` tests live in a new file instead of `test_profiling_config.py` (whose `test_default_config_is_valid` overlaps `test_defaults_pass`), and `ids()` is now defined in five test modules. Move the tests; share `ids` from one helper. Skipped in the `/simplify` pass (outside the diff). | open (batch 11) |
+| Z-8 | bug | `scripts/stack.mjs` (`ownedByPath`, `recordMatches`) | Matching needs `proc.name === 'node'`; on Linux `ps comm=` may report a newer Node's main thread name (`MainThread`) → `npm run stop` finds nothing there. Unverified; Windows (CIM `Name`) unaffected. Take the executable from `args=`. | fixed (performance-cleanup) |
+| Z-9 | perf | `scripts/stop.mjs` (kill loop) | Every matched process gets its own `taskkill /T /F` (`killTree`, `spawnSync`), though killing `start` already ends its descendants → about 50–150 ms per mostly dead pid. Skip descendants of chosen pids (needs parent pids from CIM/`ps`) or pass all pids to one `taskkill`. Skipped in the `/simplify` pass (shared `killTree`). | fixed (performance-cleanup) |
+| Z-10 | cleanup | `tests/test_config_checks.py` | `EXPERIENCE_THRESHOLDS` tests live in a new file instead of `test_profiling_config.py` (whose `test_default_config_is_valid` overlaps `test_defaults_pass`), and `ids()` is now defined in five test modules. Move the tests; share `ids` from one helper. Skipped in the `/simplify` pass (outside the diff). | fixed (performance-cleanup) |
+
+## Batch 11 review (2026-10-22)
+
+Source: `code-review` over the uncommitted `performance-cleanup` diff (v0.12.10). Q-1, Q-2, Q-4,
+Q-5, Q-7, Q-8 and Q-9 fixed in 0.12.10 before commit; Q-3 and Q-6 accepted. Q-10…Q-12 are the
+`/simplify` pass's skips (the pass's fixes, such as one `GREATEST` in the freshness filter and
+`Backoff.call`, shipped in 0.12.10).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| Q-1 | bug | `services/github/sync.py` (`_update_metadata`) | Still wrote the whole metadata (`{**job.metadata, **values}` + `save_progress`) → a key another writer stored meanwhile was dropped; C-20 changed discovery only. Uses `merge_metadata`. | fixed (performance-cleanup) |
+| Q-2 | bug | `services/ranking/service.py` (summary) | Same pattern for the generation summary. `merge_metadata(job, values, **fields)` now also stores `steps` in the same write. | fixed (performance-cleanup) |
+| Q-3 | design | `services/repositories/analysis.py` (`_store`) | Completion checks eligibility with the fetched topics, not the stored rows → would drift from `recheck_eligibility` if storage ever normalized topics. Today `replace_topics` only de-duplicates, as the returned list does. | wontfix (accepted: same values; revisit if topic storage changes) |
+| Q-4 | perf | `services/ranking/score.py` (`score_candidate`) | D-20 made it call `contributions()` twice per candidate (once for parts, again in `weighted_score`). Both now sum through `_total(parts)`. | fixed (performance-cleanup) |
+| Q-5 | cleanup | `services/ranking/explain.py` (`join`) | Third copy of the name-joining helper, missed by D-19. Uses `services.text.join_names`. | fixed (performance-cleanup) |
+| Q-6 | design | `services/github/client.py` (304 `touch`) | One more Redis call per 304, and an entry confirmed by 304s never ages out. Intended: spec `github-data-sync` (A-17); the call goes through the cache backoff. | wontfix (by design) |
+| Q-7 | privacy | `services/data_deletion.py` | The `github:ratelimit:{pk}` purge was dropped with the writer → keys from before the upgrade survived deletion for up to an hour. Purge kept for one release. | fixed (performance-cleanup) |
+| Q-8 | bug | `scripts/stack.mjs` (`parsePs`) | Name from the first word of `args` → a node or python path with a space (`/home/a b/...`) named `a`, so `npm run stop` found nothing. Linux reads `/proc/<pid>/exe`; macOS keeps the first word (limit). | fixed (performance-cleanup) |
+| Q-10 | perf | `repositories/queries.py` (`latest_snapshot`) | The sliced prefetch sends one row per repository but Postgres still window-sorts every snapshot of them (`ROW_NUMBER()`; the index lacks the `-pk` tie-break). Grows with `REPO_SNAPSHOT_HISTORY`. Skipped in the `/simplify` pass: needs a migration (`ideas.md` §16). | open |
+| Q-11 | cleanup | `services/repositories/analysis.py`, `repositories/api.py` | The "newest snapshot" order `("-captured_at", "-pk")` is still written by hand in a filter and a subquery outside `latest_snapshot`. A shared ordering constant keeps the three equal. Skipped in the `/simplify` pass (outside the diff). | open |
+| Q-12 | cleanup | `services/github/sync.py`, `services/discovery/service.py`, `tests/repo_fixtures.py` | One-line `_update_metadata` wrappers around `merge_metadata`, and a re-export shim of `e2e.builders` for 16 test imports. Skipped in the `/simplify` pass (churn, no behavior; `ideas.md` §16). | open |
+| Q-9 | docs | `CLAUDE.md` | Said no `github:ratelimit:*` key remains at all; now says it is no longer written and still purged for one release. ("rate-limit state in Redis" was already removed.) | fixed (performance-cleanup) |
+
+## Batch 11 notes (2026-10-22)
+
+Source: problems seen while implementing and verifying `performance-cleanup` (v0.12.10). None
+fixed there: outside the batch's rows.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| P-1 | bug | `scripts/redis.mjs` (WSL keep-alive) | First `npm start` from Claude Code's Git Bash: keep-alive `wsl.exe` exited `3221225786` (`0xC000013A`, Ctrl+C exit) ~8 s after start → `concurrently` stopped the whole stack ("WSL keep-alive session ended … Redis may stop"). Second run stayed up 90 s; not reproduced. Maybe the shell's inherited Ctrl+C handling (CLAUDE.md §6 testing note), maybe a real stray console event. Check in an interactive console; decide whether a keep-alive exit must end the stack or be restarted. | open (unverified) |
+| P-2 | tooling | `apps/frontend` (`format:check`), `.gitattributes` | With `core.autocrlf=true` (Windows default) files check out CRLF; prettier wants LF → `npm run format:check` fails on untouched files (HEAD too). CI (Linux) unaffected. `prettier --check --end-of-line auto` passes. Fix: `.gitattributes` `* text=auto eol=lf`, or `endOfLine: "auto"`. | open |
+| P-3 | test | `src/app/app.test.tsx`, `src/features/feedback/feedback.test.tsx` | Under load (other suites running, 82 s duration) 2 of 35 tests failed; rerun alone passed in 12 s. Likely `waitFor` default timeout. Flaky locally; not seen in CI. Find the two tests, raise their timeout or wait on the right signal. | open (seen once) |
+| P-4 | tooling | `apps/frontend/package.json` (`api:export`) | Runs bare `uv`, not `scripts/uv.mjs` → `npm run api:sync` fails ("'uv' is not recognized") where uv is not on PATH, though `npm run manage` etc. find it. Route through `scripts/uv.mjs`. | open |
+| P-5 | cleanup | `scripts/*.mjs` | Not prettier-clean (and unlinted); runner edits cannot follow a checked style. Same as `ideas.md` round 5 "lint `scripts/`". | open |
 
 ## Full-file reviews (2026-10-19)
 
@@ -163,11 +198,11 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | A-13 | bug | `services/github/sync.py:96` | Sync refreshes `GitHubProfile.login/avatar_url` but not `GitHubAccount.username/avatar_url` (what `/auth/me` serves) → stale login after a GitHub rename until the next sign-in. | fixed (github-error-resilience) |
 | A-14 | bug | `services/github/oauth.py:107` | `fetch_identity` does not guard `response.json()` or `data['id'/'login']` → malformed 200 gives a JSON 500 instead of an `auth_error=failed` redirect plus audit entry. | fixed (github-error-resilience) |
 | A-15 | bug | `accounts/views.py:75` | One OAuth state per session; signing in from a second tab overwrites it → first tab's callback fails `invalid_state`. | fixed (security-hardening) |
-| A-16 | perf | `services/github/client.py:530` | `github:ratelimit:{scope}` written on every response but never read; keyed per scope, not per credential (user `PUBLIC_SCOPE` overwrites the app's). | confirmed |
-| A-17 | perf | `services/github/client.py:511` | A 304 does not refresh the ETag cache TTL → valid entries expire at `GITHUB_ETAG_TTL`, forcing a counted 200 refetch. Use `cache.touch`. | confirmed |
-| A-18 | perf | `services/github/sync.py:79` | Profile sync caches public repository endpoints in the per-user scope, not `PUBLIC_SCOPE` → data duplicated per user, fewer 304 hits. | confirmed |
+| A-16 | perf | `services/github/client.py:530` | `github:ratelimit:{scope}` written on every response but never read; keyed per scope, not per credential (user `PUBLIC_SCOPE` overwrites the app's). | fixed (performance-cleanup) |
+| A-17 | perf | `services/github/client.py:511` | A 304 does not refresh the ETag cache TTL → valid entries expire at `GITHUB_ETAG_TTL`, forcing a counted 200 refetch. Use `cache.touch`. | fixed (performance-cleanup) |
+| A-18 | perf | `services/github/sync.py:79` | Profile sync caches public repository endpoints in the per-user scope, not `PUBLIC_SCOPE` → data duplicated per user, fewer 304 hits. | wontfix (performance-cleanup: the user-scope cache is purged on "delete my data"; a shared scope would let the user's repository responses outlive it, for few extra 304s) |
 | A-19 | cleanup | `accounts/views.py:183` | `cancel_active_syncs` runs twice on disconnect and account deletion (`_revoke_and_unlink` + `delete_github_data`). | fixed (privacy-deletion-finality) |
-| A-20 | perf | `core/health.py:31` | `check_redis` creates a new Redis client and pool on every health request. | confirmed |
+| A-20 | perf | `core/health.py:31` | `check_redis` creates a new Redis client and pool on every health request. | fixed (performance-cleanup) |
 
 ### B: Jobs, developer profiling
 
@@ -189,10 +224,10 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | B-14 | bug | `services/profiling/readme.py:32` | `_URLS` keeps `&amp;` → `parse_qs` keys like `amp;logo`; second and later badge params lost (e.g. Go not detected). | confirmed |
 | B-15 | bug | `services/profiling/readme.py:93` | shields.io parser reads only the first dash segment; `/badge/-Python-...` or `/badge/language-Rust-...` without `logo=` → no evidence. | confirmed |
 | B-16 | bug | `services/profiling/interests.py:33` | Contribution interest evidence uses `repo.pushed_at`, not `last_contributed_at` → "last observed" overstates recency. | confirmed |
-| B-17 | perf | `developers/api.py:44` | Two `Count(distinct=True)` over skills and interests joins → cross product (150×40 = 6,000 rows) per profile read. | confirmed |
+| B-17 | perf | `developers/api.py:44` | Two `Count(distinct=True)` over skills and interests joins → cross product (150×40 = 6,000 rows) per profile read. | fixed (performance-cleanup) |
 | B-18 | cleanup | `developers/tasks.py:15` | `extract_developer_skills` re-implements `run_tracked_job` by hand; lifecycle fixes (B-2, B-11) must be made twice; task isn't a thin wrapper. | fixed (job-claim-fencing) |
 | B-19 | cleanup | `services/jobs.py:277` | Four copy-pasted start_* functions have drifted (causes B-7 and B-8). Extract `_start_job`. | fixed (job-claim-fencing) |
-| B-20 | cleanup | `services/profiling/summary.py:28` | Docstring says languages are "by bytes"; callers pass them by confidence on purpose. | confirmed |
+| B-20 | cleanup | `services/profiling/summary.py:28` | Docstring says languages are "by bytes"; callers pass them by confidence on purpose. | fixed (performance-cleanup) |
 
 ### C: Repositories, discovery
 
@@ -217,10 +252,10 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | C-17 | cleanup | `repositories/api.py:112` | Candidate ordering written three times (API, `_pool_repositories`, `_step_pool`) and drifted. | fixed (discovery-repository-data) |
 | C-18 | cleanup | `services/discovery/service.py:366` | Null `lifecycle_changed_at` patched in two places; give the field a default. | fixed (discovery-repository-data) |
 | C-19 | bug | `services/repositories/lifecycle.py:365` | `release()` is read-then-update (not atomic); can restore a stale `previous_lifecycle`. | fixed (job-claim-fencing) |
-| C-20 | perf | `services/discovery/service.py:184` | Full metadata JSON rewritten after each analysis → quadratic write volume. | confirmed |
-| C-21 | cleanup | `repositories/serializers.py:58` | `ineligible_reason` not `read_only=True` → OpenAPI marks it writable and required. | confirmed |
+| C-20 | perf | `services/discovery/service.py:184` | Full metadata JSON rewritten after each analysis → quadratic write volume. | fixed (performance-cleanup) |
+| C-21 | cleanup | `repositories/serializers.py:58` | `ineligible_reason` not `read_only=True` → OpenAPI marks it writable and required. | fixed (performance-cleanup) |
 | C-22 | perf | `services/repositories/lifecycle.py:393` | `complete()` saves ANALYZED and INDEXED separately (unobservable) → 2 wasted UPDATEs per analysis. | fixed (job-claim-fencing) |
-| C-23 | cleanup | `repositories/tasks.py:309` | `_has_app_credentials` duplicates `GitHubClient.for_app()`'s check. | confirmed |
+| C-23 | cleanup | `repositories/tasks.py:309` | `_has_app_credentials` duplicates `GitHubClient.for_app()`'s check. | fixed (performance-cleanup) |
 
 ### D: Recommendations, ranking, matching, issues
 
@@ -246,9 +281,9 @@ Two runs, merged.
 | D-16 | bug | `services/matching/issues.py:136` | Difficulty-fit part of an unknown-difficulty issue's score has no reason → unexplained score. | confirmed |
 | D-17 | gap | `services/ranking/config.py:354` | Openness points not validated to sum ≤ 1; silently capped → saturated signal. | confirmed |
 | D-18 | gap | `services/issues/classify.py:423` | `technology_count >= 2` and `MIN_VOTES = 2` hard-coded (rule: weights are config). | confirmed |
-| D-19 | cleanup | `services/matching/issues.py:105` | `_join` copied three times; GOOD_FIRST_ISSUE/HELP_WANTED re-declared from `labels.py`. | confirmed |
-| D-20 | cleanup | `services/ranking/score.py:65` | `weighted_score` used only by tests; `score_candidate` duplicates the formula. | confirmed |
-| D-21 | perf | `services/ranking/freshness.py:43` | `due_profiles` loads every profile into Python every 30 min; express as SQL filter. | confirmed |
+| D-19 | cleanup | `services/matching/issues.py:105` | `_join` copied three times; GOOD_FIRST_ISSUE/HELP_WANTED re-declared from `labels.py`. | fixed (performance-cleanup) |
+| D-20 | cleanup | `services/ranking/score.py:65` | `weighted_score` used only by tests; `score_candidate` duplicates the formula. | fixed (performance-cleanup) |
+| D-21 | perf | `services/ranking/freshness.py:43` | `due_profiles` loads every profile into Python every 30 min; express as SQL filter. | fixed (performance-cleanup) |
 
 ### E: Feedback, evaluation services, benchmark commands
 
@@ -265,7 +300,7 @@ Excludes what R-1, R-2, R-7, R-8, R-13 and R-14 already cover.
 | E-7 | bug | `services/feedback.py:73` | `viewed` de-duplication is check-then-insert without a lock → two concurrent views (StrictMode double effect, two tabs) both store an event. | fixed (recommendation-consistency) |
 | E-8 | bug | `recommendations/management/commands/evaluate_ranking.py:183` | `--json` writes without creating the parent folder or catching `OSError` → raw traceback for `--json ../../judging/new/report.json`; the other commands create output folders (CLAUDE.md §7). | fixed (evaluation-tooling-integrity) |
 | E-9 | bug | `services/evaluation/sheet.py:155` | `_languages` sums byte counts, but the dataset format allows `null` bytes (`_count`) → `TypeError` in `benchmark_sheet`, not caught (only OSError/ValueError/KeyError/SheetError) → traceback. | fixed (evaluation-tooling-integrity) |
-| E-10 | perf | `feedback/api.py:252` | Saved list prefetches every snapshot of each repository (up to `REPO_SNAPSHOT_HISTORY`) to read only the newest. | confirmed |
+| E-10 | perf | `feedback/api.py:252` | Saved list prefetches every snapshot of each repository (up to `REPO_SNAPSHOT_HISTORY`) to read only the newest. | fixed (performance-cleanup) |
 
 ### F: Frontend (`apps/frontend/src`)
 
@@ -366,7 +401,9 @@ scenario or severity is narrower; `false-positive` = not a defect.
 | X batch 7 review | 12 | 11 | 0 | 1 |
 | Y batch 9 review | 10 | 9 | 1 | 0 |
 | Z batch 10 review | 10 | 7 | 3 | 0 |
-| **Total** | **205** | **158** | **37** | **3** |
+| P batch 11 notes | 5 | 3 | 2 | 0 |
+| Q batch 11 review | 12 | 12 | 0 | 0 |
+| **Total** | **222** | **173** | **39** | **3** |
 
 ## Verification notes
 
@@ -440,9 +477,12 @@ can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
 | 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7…X-9 accepted, X-10 false positive. X-11 and X-12 went to batch 11. |
 | 14 | **Batch 9 follow-ups** | Y-1…Y-10 | Review of `frontend-correctness`. Y-1…Y-5 and Y-8 fixed in the same release (0.12.8); Y-6 and Y-7 open (next frontend change); Y-9 and Y-10 went to batch 11. |
 | 15 | **Batch 10 follow-ups** | Z-1…Z-10 | Review and `/simplify` pass of `dev-scripts-checks`. Z-2, Z-3, Z-6, Z-7 fixed in the same release (0.12.9); Z-1 open (needs a spec change); Z-4, Z-5, Z-8, Z-9, Z-10 went to batch 11. |
+| 16 | **Batch 11 follow-ups** | P-1…P-5 | Found while implementing `performance-cleanup` (0.12.10). All open: P-1 needs a reproduction first; P-2, P-4, P-5 are local tooling; P-3 a flaky test. |
+| 17 | **Batch 11 review** | Q-1…Q-12 | Review and `/simplify` pass of `performance-cleanup`. Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 fixed in the same release (0.12.10); Q-3, Q-6 accepted; Q-10…Q-12 open. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
-W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9. Next: batch 11 (performance and
-cleanup); batch 8 (signal and explanation accuracy) is ranking-visible and waits for K-1.
+W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
+0.12.10 (A-18 wontfix). Next: batch 8 (signal and explanation accuracy) is ranking-visible and waits for
+K-1; Y-6, Y-7 and Z-1 stay open outside a batch; batch 16 (P-1…P-5) is open.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.

@@ -64,7 +64,7 @@ class SavedRepositorySerializer(serializers.ModelSerializer[SavedRepository]):
 
     @extend_schema_field(serializers.ChoiceField(choices=ActivityLabel.choices, allow_blank=True))
     def get_activity_label(self, obj: SavedRepository) -> str:
-        snapshots = obj.repository.ordered_snapshots  # type: ignore[attr-defined]
+        snapshots = obj.repository.latest_snapshots  # type: ignore[attr-defined]
         return str(snapshots[0].activity_label) if snapshots else ""
 
     @extend_schema_field(SavedRecommendationSerializer(allow_null=True))

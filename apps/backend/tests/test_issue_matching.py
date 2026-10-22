@@ -217,7 +217,7 @@ def test_no_issue_reasons_without_issues() -> None:
 
 
 @pytest.mark.django_db
-def test_load_issues_keeps_eligible_only(pool) -> None:  # noqa: F811
+def test_load_issues_keeps_eligible_only(pool) -> None:
     repo = pool["django"]
     make_issue(repo, 1)
     make_issue(repo, 2, has_assignee=True)
@@ -242,7 +242,7 @@ def django_issues(repo, count: int = 3, **fields) -> list[Issue]:
 
 
 @pytest.mark.django_db
-def test_generation_stores_relevant_issues_and_reasons(user, developer, pool) -> None:  # noqa: F811
+def test_generation_stores_relevant_issues_and_reasons(user, developer, pool) -> None:
     DeveloperProfile.objects.filter(pk=developer.pk).update(experience_level="beginner")
     django_issues(pool["django"])
     make_issue(pool["django"], 9, has_assignee=True, labels=["good_first_issue"])
@@ -267,7 +267,7 @@ def test_generation_stores_relevant_issues_and_reasons(user, developer, pool) ->
 
 
 @pytest.mark.django_db
-def test_issues_alone_do_not_make_a_recommendation(user, developer, pool) -> None:  # noqa: F811
+def test_issues_alone_do_not_make_a_recommendation(user, developer, pool) -> None:
     django_issues(pool["go"], 5, technologies=[])  # approachable, but nothing matches
     generate(user)
     assert not Recommendation.objects.filter(repository=pool["go"]).exists()
@@ -275,7 +275,7 @@ def test_issues_alone_do_not_make_a_recommendation(user, developer, pool) -> Non
 
 
 @pytest.mark.django_db
-def test_regeneration_replaces_recommended_issues(user, developer, pool) -> None:  # noqa: F811
+def test_regeneration_replaces_recommended_issues(user, developer, pool) -> None:
     first, second, third = django_issues(pool["django"])
     generate(user)
     rec = Recommendation.objects.get(repository=pool["django"])
@@ -291,7 +291,7 @@ def test_regeneration_replaces_recommended_issues(user, developer, pool) -> None
 
 
 @pytest.mark.django_db
-def test_dismissed_recommendation_loses_its_issues(user, developer, pool) -> None:  # noqa: F811
+def test_dismissed_recommendation_loses_its_issues(user, developer, pool) -> None:
     django_issues(pool["django"])
     generate(user)
     feedback.dismiss(user, Recommendation.objects.get(repository=pool["django"]))
@@ -300,7 +300,7 @@ def test_dismissed_recommendation_loses_its_issues(user, developer, pool) -> Non
 
 
 @pytest.mark.django_db
-def test_v1_scores_without_issue_signals(user, developer, pool) -> None:  # noqa: F811
+def test_v1_scores_without_issue_signals(user, developer, pool) -> None:
     django_issues(pool["django"])
     ScoringConfig.objects.update(is_active=False)
     ScoringConfig.objects.filter(version="v1-deterministic").update(is_active=True)
@@ -315,7 +315,7 @@ def test_v1_scores_without_issue_signals(user, developer, pool) -> None:  # noqa
 
 
 @pytest.mark.django_db
-def test_issue_signals_change_the_score(user, developer, pool) -> None:  # noqa: F811
+def test_issue_signals_change_the_score(user, developer, pool) -> None:
     generate(user)
     before = Recommendation.objects.get(repository=pool["django"]).score
     django_issues(pool["django"])
@@ -325,7 +325,7 @@ def test_issue_signals_change_the_score(user, developer, pool) -> None:  # noqa:
 
 
 @pytest.mark.django_db
-def test_generation_is_deterministic(user, developer, pool) -> None:  # noqa: F811
+def test_generation_is_deterministic(user, developer, pool) -> None:
     django_issues(pool["django"], 6)
 
     def state():
@@ -358,7 +358,7 @@ def test_upgrade_migration_activates_v2() -> None:
 
 
 @pytest.mark.django_db
-def test_upgrade_regenerates_under_v2(user, developer, pool) -> None:  # noqa: F811
+def test_upgrade_regenerates_under_v2(user, developer, pool) -> None:
     from services.ranking import freshness
 
     ScoringConfig.objects.update(is_active=False)
@@ -371,7 +371,7 @@ def test_upgrade_regenerates_under_v2(user, developer, pool) -> None:  # noqa: F
 
 
 @pytest.mark.django_db
-def test_issue_refresh_makes_recommendations_due(user, developer, pool, respx_mock) -> None:  # noqa: F811
+def test_issue_refresh_makes_recommendations_due(user, developer, pool, respx_mock) -> None:
     from services.github.client import GitHubClient
     from services.ranking import freshness
     from services.repositories.analysis import RepositoryAnalysisService

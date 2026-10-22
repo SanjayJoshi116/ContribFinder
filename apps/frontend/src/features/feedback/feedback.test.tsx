@@ -7,6 +7,7 @@ import {
   ME,
   NEVER_DISCOVERED,
   SYNCED_USER,
+  callsTo,
   discoveryJob,
   json,
   mockFetch,
@@ -76,10 +77,6 @@ const WITH_RECOMMENDATION = {
   'GET /api/v1/recommendations': () => page([RECOMMENDATION]),
 }
 
-type Calls = ReturnType<typeof mockFetch>['mock']['calls']
-const callsTo = (calls: Calls, method: string, url: string) =>
-  calls.filter(([u, init]) => u === url && (init?.method ?? 'GET').toUpperCase() === method)
-
 beforeEach(() => {
   document.cookie = 'csrftoken=test-csrf-token'
 })
@@ -103,7 +100,7 @@ describe('save and dismiss', () => {
 
     const saved = await within(card).findByRole('button', { name: 'Saved' })
     expect(saved).toHaveAttribute('aria-pressed', 'true')
-    expect(callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/save')).toHaveLength(1)
+    expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/save')).toHaveLength(1)
   })
 
   it('sends one request for a double click on Save', async () => {
@@ -124,10 +121,8 @@ describe('save and dismiss', () => {
     answer(json({ saved: true }))
 
     await waitFor(() => expect(within(card).getByRole('button', { name: 'Saved' })).toBeEnabled())
-    expect(callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/save')).toHaveLength(1)
-    expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/recommendations/7/save')).toHaveLength(
-      0,
-    )
+    expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/save')).toHaveLength(1)
+    expect(callsTo(fetchMock, 'DELETE', '/api/v1/recommendations/7/save')).toHaveLength(0)
   })
 
   it('returns to sign-in when Save finds the session ended', async () => {
@@ -187,16 +182,14 @@ describe('save and dismiss', () => {
       expect(screen.queryByRole('article', { name: 'httpx' })).not.toBeInTheDocument(),
     )
     await waitFor(() =>
-      expect(
-        callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/dismiss'),
-      ).toHaveLength(1),
+      expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/dismiss')).toHaveLength(1),
     )
     answerDismiss()
     const notice = await screen.findByText(/hidden encode\/httpx/i)
     await userEvent.click(within(notice.parentElement!).getByRole('button', { name: 'Undo' }))
 
     await waitFor(() =>
-      expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/dismissed/70')).toHaveLength(1),
+      expect(callsTo(fetchMock, 'DELETE', '/api/v1/dismissed/70')).toHaveLength(1),
     )
     await waitFor(() => expect(screen.queryByText(/hidden encode\/httpx/i)).not.toBeInTheDocument())
   })
@@ -320,11 +313,9 @@ describe('interaction events', () => {
     await screen.findByRole('heading', { name: 'encode/httpx' })
 
     await waitFor(() =>
-      expect(
-        callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/feedback'),
-      ).toHaveLength(1),
+      expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/feedback')).toHaveLength(1),
     )
-    const [, init] = callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/feedback')[0]!
+    const [, init] = callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/feedback')[0]!
     expect(JSON.parse(init!.body as string)).toEqual({ action: 'viewed' })
     expect(init!.keepalive).toBe(true)
   })
@@ -344,7 +335,7 @@ describe('interaction events', () => {
     await userEvent.click(link)
 
     await waitFor(() => {
-      const posts = callsTo(fetchMock.mock.calls, 'POST', '/api/v1/recommendations/7/feedback')
+      const posts = callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/feedback')
       expect(posts).toHaveLength(1)
       expect(JSON.parse(posts[0]![1]!.body as string)).toEqual({ action: 'opened_repository' })
     })
@@ -406,7 +397,7 @@ describe('saved projects page', () => {
     const hiddenList = await screen.findByRole('list', { name: 'Hidden projects' })
     await userEvent.click(within(hiddenList).getByRole('button', { name: 'Restore' }))
     expect(await screen.findByText('No hidden projects.')).toBeInTheDocument()
-    expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/dismissed/72')).toHaveLength(1)
+    expect(callsTo(fetchMock, 'DELETE', '/api/v1/dismissed/72')).toHaveLength(1)
   })
 
   it('shows more saved projects page by page', async () => {
@@ -568,12 +559,12 @@ describe('your data', () => {
     await user.click(await screen.findByRole('button', { name: 'Delete GitHub data' }))
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveTextContent(/recommendations, saved and hidden projects/)
-    expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/profile/github-data')).toHaveLength(0)
+    expect(callsTo(fetchMock, 'DELETE', '/api/v1/profile/github-data')).toHaveLength(0)
 
     await user.click(within(dialog).getByRole('button', { name: 'Delete data' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/onboarding'))
-    const [, init] = callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/profile/github-data')[0]!
+    const [, init] = callsTo(fetchMock, 'DELETE', '/api/v1/profile/github-data')[0]!
     expect(new Headers(init!.headers).get('X-CSRFToken')).toBe('test-csrf-token')
     expect(await screen.findByRole('button', { name: /sync/i })).toBeInTheDocument()
   })
@@ -586,7 +577,7 @@ describe('your data', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveTextContent(/cannot be undone/)
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
-    expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/auth/account')).toHaveLength(0)
+    expect(callsTo(fetchMock, 'DELETE', '/api/v1/auth/account')).toHaveLength(0)
   })
 
   it('deletes the account after confirmation and returns to the landing page', async () => {
@@ -611,7 +602,7 @@ describe('your data', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
     expect(await screen.findByRole('link', { name: /continue with github/i })).toBeInTheDocument()
-    expect(callsTo(fetchMock.mock.calls, 'DELETE', '/api/v1/auth/account')).toHaveLength(1)
+    expect(callsTo(fetchMock, 'DELETE', '/api/v1/auth/account')).toHaveLength(1)
   })
 
   it('links to the privacy page', async () => {

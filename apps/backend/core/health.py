@@ -1,3 +1,4 @@
+import functools
 import logging
 
 import redis
@@ -24,14 +25,18 @@ def check_database() -> str:
     return OK
 
 
+@functools.cache
+def _redis_client(url: str) -> redis.Redis:
+    """One client (and connection pool) per process: probes reuse it, and it reconnects by
+    itself after an outage."""
+    return redis.Redis.from_url(url, socket_connect_timeout=2, socket_timeout=2)
+
+
 def check_redis() -> str:
     if not settings.REDIS_URL:
         return NOT_CONFIGURED
     try:
-        client = redis.Redis.from_url(
-            settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2
-        )
-        client.ping()
+        _redis_client(settings.REDIS_URL).ping()
     except Exception:
         logger.warning("Health check: redis unavailable")
         return UNAVAILABLE

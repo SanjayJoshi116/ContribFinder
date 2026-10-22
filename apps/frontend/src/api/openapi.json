@@ -3376,7 +3376,8 @@
             "nullable": true
           },
           "ineligible_reason": {
-            "type": "string"
+            "type": "string",
+            "readOnly": true
           },
           "activity_label": {
             "readOnly": true,

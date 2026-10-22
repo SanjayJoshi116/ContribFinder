@@ -59,7 +59,7 @@ PER_USER_MODELS = (
 
 
 @pytest.fixture
-def everything(user, synced, developer, pool):  # noqa: F811
+def everything(user, synced, developer, pool):
     """A user with a synced profile, recommendations, saves, dismissals, feedback and jobs."""
     generate(user)
     django_rec = Recommendation.objects.get(repository=pool["django"])

@@ -163,8 +163,8 @@ class RepositoryAnalysisService:
                 return Outcome.FAILED
             with transaction.atomic():
                 lifecycle.hold(repo, fetched_name=fetched_name)
-                self._store(repo, fetched, now)
-                lifecycle.complete(repo, now=now)
+                topics, has_dependencies = self._store(repo, fetched, now)
+                lifecycle.complete(repo, now=now, topics=topics, has_dependencies=has_dependencies)
         except lifecycle.ClaimLost:
             # Reclaimed by another analysis, which owns the state now; or renamed meanwhile,
             # so the fetched data is discarded and the restored row stays due.
@@ -238,8 +238,14 @@ class RepositoryAnalysisService:
 
     # --- storing (one transaction) ---------------------------------------------------------
 
-    def _store(self, repo: Repository, f: _Fetched, now: datetime) -> None:
+    def _store(
+        self, repo: Repository, f: _Fetched, now: datetime
+    ) -> tuple[list[str] | None, bool | None]:
+        """Store the fetched parts. Returns the topics and dependency presence now stored,
+        each None when that part was not fetched."""
         fields: list[str] = []
+        topics: list[str] | None = None
+        has_dependencies: bool | None = None
         if f.metadata is not None:
             stored = upsert_repository(f.metadata, now)
             if stored.pk != repo.pk:  # pragma: no cover - fetched by GitHub ID (_metadata)
@@ -247,6 +253,7 @@ class RepositoryAnalysisService:
             repo.refresh_from_db()
             replace_languages(repo, f.languages or {})
             replace_topics(repo.pk, f.metadata.topics)
+            topics = list(f.metadata.topics)
         if f.readme_fetched:
             self._store_readme(repo, f.readme, now)
             repo.readme_synced_at = now
@@ -271,6 +278,7 @@ class RepositoryAnalysisService:
             ]
         if f.dependencies is not None:
             replace_dependencies(repo, f.dependencies)
+            has_dependencies = bool(f.dependencies)
             repo.dependencies_synced_at = now
             fields.append("dependencies_synced_at")
         if f.activity is not None:
@@ -284,6 +292,7 @@ class RepositoryAnalysisService:
             fields += ["issues_synced_at", "issues_truncated"]
         if fields:
             repo.save(update_fields=fields)
+        return topics, has_dependencies
 
     def _store_readme(self, repo: Repository, content: str | None, now: datetime) -> None:
         if content is None:

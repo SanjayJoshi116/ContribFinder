@@ -1,4 +1,5 @@
-from django.db.models import Count, Prefetch, QuerySet
+from django.db.models import Count, IntegerField, Model, OuterRef, Prefetch, QuerySet, Subquery
+from django.db.models.functions import Coalesce
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import NotFound
@@ -31,6 +32,19 @@ class NotAnalyzed(NotFound):
     default_detail = "Your developer profile has not been built yet."
 
 
+def _count_of(model: type[Model]) -> Coalesce:
+    """Rows of ``model`` for the profile: a subquery each, so two counts never join each
+    other's rows (skills times interests)."""
+    rows = (
+        model._default_manager.filter(profile=OuterRef("pk"))
+        .order_by()
+        .values("profile")
+        .annotate(n=Count("pk"))
+        .values("n")
+    )
+    return Coalesce(Subquery(rows, output_field=IntegerField()), 0)
+
+
 class DeveloperProfileView(APIView):
     """The analyzed developer profile. Stored data only: never calls GitHub."""
 
@@ -42,8 +56,8 @@ class DeveloperProfileView(APIView):
         profile = (
             DeveloperProfile.objects.filter(user=current_user(request))
             .annotate(
-                skill_count=Count("skills", distinct=True),
-                interest_count=Count("interests", distinct=True),
+                skill_count=_count_of(DeveloperSkill),
+                interest_count=_count_of(DeveloperInterest),
             )
             .first()
         )

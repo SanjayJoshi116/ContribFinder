@@ -38,6 +38,12 @@ class GitHubIdentity:
     avatar_url: str
 
 
+def has_app_credentials() -> bool:
+    """Whether the OAuth app's client credentials are configured (sign-in and the app-level
+    GitHub client both need them)."""
+    return bool(settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET)
+
+
 def _client() -> httpx.Client:
     return httpx.Client(timeout=settings.GITHUB_HTTP_TIMEOUT)
 

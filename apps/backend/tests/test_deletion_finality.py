@@ -21,7 +21,8 @@ from services.github.sync import GitHubSyncService, initial_steps
 from services.job_guard import job_write
 from services.profiling.analysis import ProfileAnalysisService
 
-from .test_discovery_service import HTTPX, make_developer, mock_search, new_job
+from .shared_fixtures import make_developer
+from .test_discovery_service import HTTPX, mock_search, new_job
 from .test_sync_api import make_job
 
 pytestmark = pytest.mark.django_db

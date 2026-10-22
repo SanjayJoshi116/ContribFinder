@@ -15,14 +15,14 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from issues.models import Difficulty, Issue
+from services.issues.labels import GOOD_FIRST_ISSUE, HELP_WANTED
 from services.profiling.taxonomy import SKILLS_BY_SLUG
 from services.ranking.config import DIFFICULTY_FIT_BEST, DIFFICULTY_FIT_WEIGHTED
+from services.text import join_names
 
 from .features import DeveloperFeatures
 from .signals import ZERO, Signal, signal_of
 
-GOOD_FIRST_ISSUE = "good_first_issue"
-HELP_WANTED = "help_wanted"
 APPROACHABILITY_TEXT = {GOOD_FIRST_ISSUE: "good first issue", HELP_WANTED: "help wanted"}
 LEVELS = (Difficulty.BEGINNER, Difficulty.INTERMEDIATE, Difficulty.ADVANCED, Difficulty.UNKNOWN)
 
@@ -105,12 +105,6 @@ def _name(slug: str) -> str:
     return skill.name if skill else slug
 
 
-def _join(names: Sequence[str]) -> str:
-    if len(names) <= 1:
-        return "".join(names)
-    return f"{', '.join(names[:-1])} and {names[-1]}"
-
-
 def _difficulty_text(level: str, fit: float) -> str:
     text = f"Estimated {level}-level"
     if fit >= 0.8:
@@ -151,7 +145,7 @@ def score_issue(
                 weights["technology"] * tech,
                 {
                     "type": "technology",
-                    "text": f"Mentions {_join(names)}, which you use",
+                    "text": f"Mentions {join_names(names)}, which you use",
                     "detail": {"technologies": [{"slug": s, "name": _name(s)} for s in matched]},
                 },
             )

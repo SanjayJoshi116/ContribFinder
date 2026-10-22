@@ -11,18 +11,17 @@ back: a bug in a throttle still raises.
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
-from django.conf import settings
 from django.core.cache import cache as default_cache
 from django.core.cache.backends.locmem import LocMemCache
 from rest_framework import throttling
 
+from core.backoff import Backoff
+
 logger = logging.getLogger(__name__)
 
-# Monotonic time until which throttling uses the local cache (per process).
-_down_until = 0.0
+_backoff = Backoff("THROTTLE_CACHE_BACKOFF_SECONDS", "Throttle cache", logger)
 _local = LocMemCache("throttle-fallback", {})
 
 
@@ -31,36 +30,14 @@ class _FallbackCache:
     down."""
 
     def get(self, key: str, default: Any = None) -> Any:
-        if not _cache_down():
-            try:
-                return default_cache.get(key, default)
-            except Exception as exc:
-                _mark_down(exc)
-        return _local.get(key, default)
+        return _backoff.call(
+            default_cache.get, key, default, fallback=lambda: _local.get(key, default)
+        )
 
     def set(self, key: str, value: Any, timeout: int | None = None) -> None:
-        if not _cache_down():
-            try:
-                default_cache.set(key, value, timeout)
-                return
-            except Exception as exc:
-                _mark_down(exc)
-        _local.set(key, value, timeout)
-
-
-def _cache_down() -> bool:
-    return time.monotonic() < _down_until
-
-
-def _mark_down(exc: Exception) -> None:
-    global _down_until
-    backoff = settings.THROTTLE_CACHE_BACKOFF_SECONDS
-    _down_until = time.monotonic() + backoff
-    logger.warning(
-        "Throttle cache unavailable (%s); counting in this process for %s s",
-        type(exc).__name__,
-        backoff,
-    )
+        _backoff.call(
+            default_cache.set, key, value, timeout, fallback=lambda: _local.set(key, value, timeout)
+        )
 
 
 class FallbackCacheMixin:

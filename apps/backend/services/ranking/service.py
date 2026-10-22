@@ -25,7 +25,7 @@ from recommendations.models import (
     ScoringConfig,
 )
 from services.errors import PermanentJobError
-from services.job_guard import heartbeat, job_write, save_progress
+from services.job_guard import heartbeat, job_write, merge_metadata, save_progress
 from services.locks import lock_developer
 from services.matching.features import DeveloperFeatures, load_candidates, load_developer
 from services.matching.issues import load_issues
@@ -138,15 +138,14 @@ class RecommendationService:
         labels: dict[str, int] = {}
         for s in kept:
             labels[s.label] = labels.get(s.label, 0) + 1
-        self.job.metadata = {
-            **self.job.metadata,
+        self.job.steps = {**self.job.steps, STEP: str(Step.DONE)}
+        summary = {
             "config_version": config.version,
             "candidates": len(candidates),
             "kept": len(kept),
             "label_counts": labels,
         }
-        self.job.steps = {**self.job.steps, STEP: str(Step.DONE)}
-        save_progress(self.job, metadata=self.job.metadata, steps=self.job.steps)
+        merge_metadata(self.job, summary, steps=self.job.steps)
 
     def _persist(
         self,

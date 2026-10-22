@@ -1,6 +1,21 @@
 // Which running processes belong to this repository's local stack (`npm run stop`). Pure: the
 // process list and the runner records come in, so tests need no real processes.
 
+/** Parses `ps -eo pid=,args=` output. The name is the basename of the executable, lowercase:
+ * `exeOf(pid)` (Linux: the `/proc/<pid>/exe` link, exact even with spaces in the path) when it
+ * answers, else the first argument. Never `comm`: it can be a thread name (a newer Node reports
+ * `MainThread`). */
+export function parsePs(out, exeOf = () => null) {
+  return out
+    .split('\n')
+    .map((line) => line.trim().match(/^(\d+)\s+(.*)$/))
+    .filter(Boolean)
+    .map(([, pid, cmd]) => {
+      const exe = exeOf(Number(pid)) ?? cmd.split(/\s/)[0]
+      return { pid: Number(pid), name: exe.split('/').pop().toLowerCase(), cmd }
+    })
+}
+
 /** A record still describes ``proc``: same executable, and its marker (the runner's script, or
  * `sleep infinity` for the WSL keep-alive) in the command line. A reused pid of another program
  * never matches. */

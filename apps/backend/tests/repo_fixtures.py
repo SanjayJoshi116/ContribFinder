@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import respx
 from django.utils import timezone
 
-from developers.models import DeveloperProfile
-from repositories.models import CandidateDiscovery, Repository, RepositoryCandidate
+from e2e.builders import add_candidate, fresh_repo, make_candidate_repo, make_issue
+from repositories.models import Repository
 from services.github.client import GitHubClient
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import PART_FIELDS, stale_parts
+
+__all__ = ["add_candidate", "fresh_repo", "make_candidate_repo", "make_issue"]
 
 API = "https://api.github.com"
 
@@ -122,54 +124,6 @@ def mock_repo_api(
     return routes
 
 
-def make_candidate_repo(github_id: int, full_name: str | None = None, **fields: Any) -> Repository:
-    full_name = full_name or f"upstream/proj{github_id}"
-    owner, name = full_name.split("/")
-    defaults: dict[str, Any] = {
-        "github_id": github_id,
-        "owner_login": owner,
-        "name": name,
-        "full_name": full_name,
-        "html_url": f"https://github.com/{full_name}",
-        "license_spdx": "MIT",
-        "primary_language": "Python",
-        "stars": 500,
-        "pushed_at": timezone.now() - timedelta(days=3),
-        "synced_at": timezone.now(),
-    }
-    return Repository.objects.create(**{**defaults, **fields})
-
-
-def add_candidate(
-    profile: DeveloperProfile,
-    repo: Repository,
-    *,
-    source: str = "language_search",
-    query: str = "language:Python",
-    rank: int | None = 1,
-    seen: datetime | None = None,
-    discovery_seen: datetime | None = None,
-) -> RepositoryCandidate:
-    """``discovery_seen`` (default ``seen``): when the discovery record was last seen. A run
-    prunes records it did not see again, so a record standing for "found by this run" needs a
-    time after the run starts."""
-    seen = seen or timezone.now()
-    cand, _ = RepositoryCandidate.objects.get_or_create(
-        developer=profile,
-        repository=repo,
-        defaults={"first_discovered_at": seen, "last_seen_at": seen},
-    )
-    CandidateDiscovery.objects.create(
-        candidate=cand,
-        source=source,
-        query=query,
-        search_rank=rank,
-        first_seen_at=seen,
-        last_seen_at=discovery_seen or seen,
-    )
-    return cand
-
-
 def issue_payload(number: int, **extra: Any) -> dict[str, Any]:
     """One item of ``GET /repos/{o}/{r}/issues``."""
     now = timezone.now()
@@ -191,23 +145,6 @@ def issue_payload(number: int, **extra: Any) -> dict[str, Any]:
     }
 
 
-def make_issue(repo: Repository, number: int, **fields: Any) -> Any:
-    from issues.models import Issue
-
-    now = timezone.now()
-    defaults: dict[str, Any] = {
-        "repository": repo,
-        "github_id": repo.github_id * 10_000 + number,
-        "number": number,
-        "title": f"Issue {number}",
-        "html_url": f"https://github.com/{repo.full_name}/issues/{number}",
-        "github_created_at": now - timedelta(days=10),
-        "github_updated_at": now - timedelta(days=1),
-        "analyzed_at": now,
-    }
-    return Issue.objects.create(**{**defaults, **fields})
-
-
 def expire_parts(repo: Repository, parts: list[str]) -> None:
     """Make ``parts`` stale (those not stale already): an analysis asked for particular parts
     fetches only the ones that are stale."""
@@ -217,17 +154,6 @@ def expire_parts(repo: Repository, parts: list[str]) -> None:
     fields = {PART_FIELDS[part]: old for part in parts if part not in stale}
     if fields:
         Repository.objects.filter(pk=repo.pk).update(**fields)
-
-
-def fresh_repo(github_id: int = 7, full_name: str = "encode/httpx", **fields: Any) -> Repository:
-    """An analyzed, recommendable repository whose data is all fresh."""
-    now = timezone.now()
-    defaults = {
-        "lifecycle": "recommendable",
-        "is_eligible": True,
-        **{field: now for field in PART_FIELDS.values()},
-    }
-    return make_candidate_repo(github_id, full_name, **{**defaults, **fields})
 
 
 def analyze(client: GitHubClient, repo: Repository, parts: list[str] | None = None) -> Outcome:

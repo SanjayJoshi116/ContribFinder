@@ -68,7 +68,11 @@ def weighted_score(
     params: Mapping[str, Any] | None = None,
 ) -> float:
     """Internal ranking value in 0..1 (never shown as a percentage)."""
-    return round(sum(contributions(signals, weights, params or {}).values()), 4)
+    return _total(contributions(signals, weights, params or {}))
+
+
+def _total(parts: Mapping[str, float]) -> float:
+    return round(sum(parts.values()), 4)
 
 
 def match_label(score: float, bands: Mapping[str, float]) -> str:
@@ -88,8 +92,8 @@ def score_candidate(
     issues: IssueMatch = NO_MATCH,
 ) -> Scored:
     parts = contributions(signals, weights, params)
-    value = round(sum(parts.values()), 4)
-    relevance = round(sum(parts.get(name, 0.0) for name in RELEVANCE_SIGNALS), 4)
+    value = _total(parts)
+    relevance = _total({name: parts.get(name, 0.0) for name in RELEVANCE_SIGNALS})
     return Scored(
         repo, techs, signals, value, match_label(value, params["bands"]), issues, relevance
     )

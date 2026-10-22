@@ -7,6 +7,8 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from accounts.models import User
+from core import health
+from core.backoff import Backoff
 from github.models import GitHubAccount
 
 from .factories import GitHubAccountFactory
@@ -15,10 +17,14 @@ from .profile_data import synced  # noqa: F401  (shared fixture)
 
 @pytest.fixture(autouse=True)
 def _clear_cache() -> Iterator[None]:
-    # Throttle counters live in the cache; isolate them per test.
+    # Throttle counters live in the cache; isolate them per test. A cache error in one test
+    # must not leave a later test skipping the cache.
     cache.clear()
+    health._redis_client.cache_clear()  # a test may build it from a patched Redis
     yield
     cache.clear()
+    Backoff.reset_all()
+    health._redis_client.cache_clear()
 
 
 @pytest.fixture(autouse=True)

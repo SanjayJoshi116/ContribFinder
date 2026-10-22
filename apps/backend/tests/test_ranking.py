@@ -7,6 +7,7 @@ from services.matching.signals import ZERO, Signal
 from services.ranking import explain
 from services.ranking.config import V1_PARAMS, V1_WEIGHTS
 from services.ranking.score import Scored, match_label, rank, weighted_score
+from services.text import join_names
 
 BANDS = V1_PARAMS["bands"]
 
@@ -154,6 +155,6 @@ def test_activity_without_details() -> None:
 
 
 def test_join() -> None:
-    assert explain.join(["A"]) == "A"
-    assert explain.join(["A", "B"]) == "A and B"
-    assert explain.join(["A", "B", "C"]) == "A, B and C"
+    assert join_names(["A"]) == "A"
+    assert join_names(["A", "B"]) == "A and B"
+    assert join_names(["A", "B", "C"]) == "A, B and C"

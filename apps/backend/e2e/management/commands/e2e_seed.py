@@ -17,6 +17,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from developers.models import DeveloperProfile, Interest, Skill
+from e2e.builders import add_candidate, fresh_repo, make_issue
 from github.models import GitHubAccount, GitHubProfile
 from jobs.models import SyncJob
 from repositories.models import (
@@ -31,7 +32,6 @@ from services import jobs
 from services.crypto import encrypt_token
 from services.profiling.analysis import ProfileAnalysisService
 from services.ranking.service import RecommendationService
-from tests.repo_fixtures import add_candidate, fresh_repo, make_issue
 
 # One user per test that changes data, so specs can run in any order.
 SYNCED_USERS = ("e2e-dashboard", "e2e-delete")

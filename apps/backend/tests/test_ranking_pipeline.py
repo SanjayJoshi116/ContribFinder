@@ -26,7 +26,7 @@ def config(version: str) -> ScoringConfig:
     return ScoringConfig.objects.get(version=version)
 
 
-def test_issues_loaded_once_for_gated_candidates_only(developer, pool) -> None:  # noqa: F811
+def test_issues_loaded_once_for_gated_candidates_only(developer, pool) -> None:
     calls: list[list[int]] = []
 
     def issues_for(ids: Sequence[int]) -> dict[int, list[IssueFeature]]:
@@ -47,7 +47,7 @@ def test_issues_loaded_once_for_gated_candidates_only(developer, pool) -> None: 
     assert calls == [sorted([pool["django"].pk, pool["plain"].pk])]
 
 
-def test_no_issue_lookup_without_issue_params(developer, pool) -> None:  # noqa: F811
+def test_no_issue_lookup_without_issue_params(developer, pool) -> None:
     v1 = config("v1-deterministic")
 
     def issues_for(ids: Sequence[int]) -> dict[int, list[IssueFeature]]:
@@ -65,7 +65,7 @@ def test_no_issue_lookup_without_issue_params(developer, pool) -> None:  # noqa:
     assert ranked
 
 
-def test_generation_and_rank_pool_agree(user, developer, pool) -> None:  # noqa: F811
+def test_generation_and_rank_pool_agree(user, developer, pool) -> None:
     DeveloperProfile.objects.filter(pk=developer.pk).update(experience_level="beginner")
     developer.refresh_from_db()
     django_issues(pool["django"])

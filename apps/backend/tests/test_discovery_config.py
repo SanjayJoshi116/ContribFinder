@@ -4,9 +4,7 @@ from django.test import override_settings
 
 from core.checks import discovery_config_check
 
-
-def ids(messages) -> list[str]:
-    return [m.id for m in messages]
+from .checks_helpers import ids
 
 
 def test_default_config_is_valid() -> None:

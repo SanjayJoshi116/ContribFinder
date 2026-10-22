@@ -6,6 +6,7 @@ from django.core.checks import CheckMessage, Error, Warning, register
 from django.core.exceptions import ImproperlyConfigured
 
 from services.crypto import validate_keys
+from services.github.oauth import has_app_credentials
 from services.profiling.experience import SIGNALS as EXPERIENCE_SIGNALS
 
 
@@ -27,7 +28,7 @@ def token_encryption_keys_check(app_configs: Any = None, **kwargs: Any) -> list[
 
 @register()
 def github_oauth_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
-    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+    if not has_app_credentials():
         return [
             Warning(
                 "GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET are not set; GitHub sign-in will fail.",
@@ -342,6 +343,7 @@ POSITIVE_INT_SETTINGS = (
     "GITHUB_MAX_PAGES",
     "GITHUB_MAX_RETRY_DELAY",
     "GITHUB_ETAG_TTL",
+    "GITHUB_CACHE_BACKOFF_SECONDS",
     "GITHUB_MANIFEST_MAX_REPOS",
     "GITHUB_MANIFEST_MAX_BYTES",
     "GITHUB_CONTRIB_MAX_PRS",

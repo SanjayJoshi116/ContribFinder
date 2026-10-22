@@ -255,7 +255,7 @@ def walk(value, keys=None, strings=None, numbers=None):
     return keys, strings, numbers
 
 
-def test_export_is_anonymized_and_unjudged(user, developer, pool, tmp_path) -> None:  # noqa: F811
+def test_export_is_anonymized_and_unjudged(user, developer, pool, tmp_path) -> None:
     django_issues(pool["django"], count=1)
     out = tmp_path / "dev-f.json"
     call_command(
@@ -317,7 +317,7 @@ def _export(user, *extra: str) -> tuple[list[str], str]:
     return sorted(c["repository"] for c in data["developers"][0]["candidates"]), err.getvalue()
 
 
-def test_export_leaves_out_interacted_repositories(user, developer, pool) -> None:  # noqa: F811
+def test_export_leaves_out_interacted_repositories(user, developer, pool) -> None:
     contributed = ready_repo(9, "friend/contributed")
     add_candidate(developer, contributed, source="previously_interacted", query="", rank=None)
     UserRepository.objects.create(user=user, repository=contributed, relation="contributor")
@@ -332,7 +332,7 @@ def test_export_leaves_out_interacted_repositories(user, developer, pool) -> Non
     assert err == ""
 
 
-def test_export_holds_stale_and_dismissed_candidates(user, developer, pool) -> None:  # noqa: F811
+def test_export_holds_stale_and_dismissed_candidates(user, developer, pool) -> None:
     Repository.objects.filter(pk=pool["plain"].pk).update(
         lifecycle="stale", previous_lifecycle="recommendable"
     )

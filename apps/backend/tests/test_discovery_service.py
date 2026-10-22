@@ -10,15 +10,7 @@ import pytest
 from django.test import override_settings
 from django.utils import timezone
 
-from developers.models import (
-    DeveloperInterest,
-    DeveloperProfile,
-    DeveloperSkill,
-    Interest,
-    Skill,
-    SkillEvidence,
-)
-from github.models import GitHubAccount, GitHubProfile
+from github.models import GitHubAccount
 from jobs.models import SyncJob
 from repositories.models import (
     CandidateDiscovery,
@@ -33,34 +25,12 @@ from services.github.errors import GitHubRateLimited
 
 from .factories import GitHubAccountFactory
 from .repo_fixtures import API, add_candidate, make_candidate_repo, mock_repo_api, repo_payload
+from .shared_fixtures import developer, make_developer, single_band  # noqa: F401
 from .test_github_client import TOKEN
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 
 FACTORY_TOKEN = "gho_testtoken0000000000000000000000"
-
-
-def make_developer(
-    user,
-    login: str = "octocat",
-    *,
-    skills=(("python", "language"),),
-    interests=("developer-tooling",),
-) -> DeveloperProfile:
-    GitHubProfile.objects.create(
-        user=user, github_id=user.pk, login=login, synced_at=timezone.now()
-    )
-    profile = DeveloperProfile.objects.create(user=user, analyzed_at=timezone.now())
-    for slug, category in skills:
-        skill, _ = Skill.objects.get_or_create(
-            slug=slug, defaults={"name": slug, "category": category}
-        )
-        ds = DeveloperSkill.objects.create(profile=profile, skill=skill, confidence=0.8)
-        SkillEvidence.objects.create(developer_skill=ds, source="language")
-    for slug in interests:
-        interest, _ = Interest.objects.get_or_create(slug=slug, defaults={"name": slug})
-        DeveloperInterest.objects.create(profile=profile, interest=interest, strength=0.6)
-    return profile
 
 
 def mock_search(respx_mock, results: dict[str, list[dict[str, Any]]]) -> Any:
@@ -98,19 +68,6 @@ RICH = repo_payload("Textualize/rich", 102)
 TOOL = repo_payload("astral-sh/ruff", 103)
 
 
-@pytest.fixture(autouse=True)
-def single_band(settings) -> None:
-    """One open-ended band: the pre-band plan shape, so provenance reads ``language:Python``.
-    Banded runs override this explicitly."""
-    settings.DISCOVERY_STAR_BANDS = [[20, None]]
-    settings.DISCOVERY_MAX_QUERIES = 10
-
-
-@pytest.fixture
-def developer(user) -> DeveloperProfile:
-    return make_developer(user)
-
-
 @pytest.fixture
 def apis(respx_mock):
     routes = {}
@@ -119,6 +76,26 @@ def apis(respx_mock):
             respx_mock, payload["full_name"], payload["id"]
         )
     return routes
+
+
+def test_analysis_progress_keeps_metadata_written_meanwhile(
+    user, developer, respx_mock, apis, settings, monkeypatch
+) -> None:
+    from services.repositories.analysis import RepositoryAnalysisService
+
+    settings.DISCOVERY_ANALYSIS_CONCURRENCY = 1
+    original = RepositoryAnalysisService.run
+
+    def run_and_write_elsewhere(self, repo_id, *args, **kwargs):
+        job = SyncJob.objects.get(user=user, job_type="repository_discovery")
+        SyncJob.objects.filter(pk=job.pk).update(metadata={**job.metadata, "other": "kept"})
+        return original(self, repo_id, *args, **kwargs)
+
+    monkeypatch.setattr(RepositoryAnalysisService, "run", run_and_write_elsewhere)
+    mock_search(respx_mock, {"language:Python": [HTTPX, RICH]})
+    job = run(user)
+    assert job.metadata["other"] == "kept"  # only changed keys were written over it
+    assert len(job.metadata["analyzed"]) == 2
 
 
 def test_full_run_builds_pool_with_provenance(user, developer, respx_mock, apis) -> None:

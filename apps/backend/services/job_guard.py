@@ -6,14 +6,14 @@ commits before the deletion, which then removes it, or sees the cancellation and
 A reclaim replaces the claim token, so a worker that lost its claim is refused the same way.
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import F, Func, JSONField, QuerySet, Value
 from django.utils import timezone
 
 from jobs.models import SyncJob
@@ -54,10 +54,27 @@ def job_write(job: SyncJob) -> Iterator[None]:
 
 
 def save_progress(job: SyncJob, **fields: Any) -> None:
-    """Store progress fields (steps, metadata) of a RUNNING job, which also counts as a
-    heartbeat. Raises JobCancelled when the job was cancelled, deleted or reclaimed."""
+    """Store progress fields of a RUNNING job, which also counts as a heartbeat. Raises
+    JobCancelled when the job was cancelled, deleted or reclaimed. Metadata goes through
+    ``merge_metadata``."""
     if not held(job).update(**fields, updated_at=timezone.now()):
         raise JobCancelled()
+
+
+def merge_metadata(job: SyncJob, values: Mapping[str, Any], **fields: Any) -> None:
+    """Merge ``values`` into the stored metadata of a RUNNING job (PostgreSQL ``||``): only
+    the changed keys are sent, and keys another writer stored meanwhile are kept. ``fields``
+    (steps) are stored in the same write. Counts as a heartbeat. Raises JobCancelled when the
+    job was cancelled, deleted or reclaimed."""
+    merged = Func(
+        F("metadata"),
+        Value(dict(values), output_field=JSONField()),
+        template="(%(expressions)s)",
+        arg_joiner=" || ",
+        output_field=JSONField(),
+    )
+    save_progress(job, metadata=merged, **fields)
+    job.metadata = {**job.metadata, **values}
 
 
 def heartbeat(job: SyncJob) -> None:

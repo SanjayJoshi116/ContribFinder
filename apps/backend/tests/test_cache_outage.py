@@ -9,35 +9,25 @@ from django.contrib.sessions.backends.cached_db import SessionStore as CachedDbS
 from rest_framework.test import APIClient
 
 from core import throttling
+from core.backoff import Backoff
+
+from .cache_helpers import DownCache
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("tests.urls")]
 
 THROTTLED = "/api/v1/_test/throttled/"  # 1/min per anonymous client
 
 
-class _DownCache:
-    def __init__(self) -> None:
-        self.calls = 0
-
-    def get(self, *args, **kwargs):
-        self.calls += 1
-        raise ConnectionError("redis down")
-
-    def set(self, *args, **kwargs):
-        self.calls += 1
-        raise ConnectionError("redis down")
-
-
 @pytest.fixture(autouse=True)
 def _reset_backoff(monkeypatch) -> None:
-    monkeypatch.setattr(throttling, "_down_until", 0.0)
+    Backoff.reset_all()
     throttling._local.clear()
 
 
 def test_redis_down_dashboard_read_still_answers(
     signed_in_client: APIClient, monkeypatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    down = _DownCache()
+    down = DownCache()
     monkeypatch.setattr(throttling, "default_cache", down)
     with caplog.at_level(logging.WARNING, logger="core.throttling"):
         first = signed_in_client.get("/api/v1/recommendations")
@@ -53,7 +43,7 @@ def test_redis_down_dashboard_read_still_answers(
 
 
 def test_throttling_counts_locally_while_cache_is_down(api_client: APIClient, monkeypatch) -> None:
-    monkeypatch.setattr(throttling, "default_cache", _DownCache())
+    monkeypatch.setattr(throttling, "default_cache", DownCache())
     assert api_client.get(THROTTLED).status_code == 200
     response = api_client.get(THROTTLED)  # over the limit: still limited, in this process
     assert response.status_code == 429
@@ -61,13 +51,13 @@ def test_throttling_counts_locally_while_cache_is_down(api_client: APIClient, mo
 
 
 def test_throttling_resumes_after_backoff(api_client: APIClient, monkeypatch) -> None:
-    monkeypatch.setattr(throttling, "default_cache", _DownCache())
+    monkeypatch.setattr(throttling, "default_cache", DownCache())
     assert api_client.get(THROTTLED).status_code == 200
 
     from django.core.cache import cache
 
     monkeypatch.setattr(throttling, "default_cache", cache)
-    monkeypatch.setattr(throttling, "_down_until", 0.0)  # the backoff has passed
+    Backoff.reset_all()  # the backoff has passed
     assert api_client.get(THROTTLED).status_code == 200  # counted in the shared cache again
     response = api_client.get(THROTTLED)
     assert response.status_code == 429
@@ -81,7 +71,7 @@ def test_throttle_bug_is_not_swallowed(api_client: APIClient, monkeypatch) -> No
     monkeypatch.setattr("rest_framework.throttling.AnonRateThrottle.get_cache_key", broken)
     # Not allowed through as a cache outage: the error handler answers 500.
     assert api_client.get(THROTTLED).status_code == 500
-    assert throttling._down_until == 0.0
+    assert not throttling._backoff.down()
 
 
 def test_session_from_cached_db_store_still_authenticates(api_client: APIClient, user) -> None:

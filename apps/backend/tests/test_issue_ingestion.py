@@ -14,11 +14,11 @@ from developers.models import DeveloperProfile
 from issues.models import Issue
 from repositories import tasks
 from repositories.models import Repository
-from services.github.client import GitHubClient
 from services.github.errors import GitHubTransientError
 from services.repositories.analysis import Outcome
 from services.repositories.staleness import stale_parts
 
+from .checks_helpers import ids
 from .factories import UserFactory
 from .repo_fixtures import (
     API,
@@ -30,7 +30,7 @@ from .repo_fixtures import (
     make_candidate_repo,
     mock_repo_api,
 )
-from .test_github_client import TOKEN
+from .shared_fixtures import public_client  # noqa: F401
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 
@@ -40,12 +40,6 @@ ISSUES = f"{API}/repos/encode/httpx/issues"
 @pytest.fixture
 def profile(user) -> DeveloperProfile:
     return DeveloperProfile.objects.create(user=user, analyzed_at=timezone.now())
-
-
-@pytest.fixture
-def client():
-    with GitHubClient(TOKEN, cache_scope="public") as c:
-        yield c
 
 
 def pull_request(number: int) -> dict[str, Any]:
@@ -214,10 +208,6 @@ def test_issues_shared_across_developers(client, respx_mock, profile) -> None:
 
 
 # --- settings checks ------------------------------------------------------------------
-
-
-def ids(messages) -> list[str]:
-    return [m.id for m in messages]
 
 
 def test_default_issue_config_is_valid() -> None:

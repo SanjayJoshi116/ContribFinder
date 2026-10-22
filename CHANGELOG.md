@@ -7,6 +7,57 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.10] - 2026-10-22
+
+Performance and cleanup (OpenSpec change `performance-cleanup`, backlog batch 11). No ranking,
+API behavior or UI change.
+
+### Fixed
+
+- A worker job no longer fails when the GitHub response cache (Redis) cannot be reached: the
+  request goes out without its ETag condition, and the process skips the cache for
+  `GITHUB_CACHE_BACKOFF_SECONDS` (new, default 30) (A-16).
+- A 304 from GitHub renews the cached response's lifetime, so an unchanged resource keeps
+  getting cheap conditional requests instead of a counted refetch (A-17).
+- `npm run stop` reads its records before the process list, so a runner starting at that
+  moment is never dropped as stale; the WSL keep-alive is recorded only with a real process id;
+  on Linux processes are named by their executable, not by `ps comm` (Z-4, Z-5, Z-8).
+
+### Changed
+
+- The unread `github:ratelimit:*` cache entry is no longer written or purged (A-16).
+- Fewer queries and writes:
+  - the health check reuses one Redis client per process (A-20);
+  - the profile read counts skills and interests without joining them (B-17);
+  - the recommendation freshness sweep filters due developers in SQL (D-21);
+  - discovery merges only changed metadata keys after each analysis (C-20);
+  - the saved list, recommendations and feature loading load only each repository's newest
+    snapshot (E-10);
+  - completing an analysis no longer reads back the topics and dependencies it just stored
+    (X-11);
+  - `npm run stop` ends every matched process with one `taskkill` (Z-9).
+- OpenAPI: `ineligible_reason` on discovery candidates is read-only (non-breaking).
+- Code and tests: one app-credentials check, one name-joining helper, issue label constants
+  from one module, `score_candidate` uses `weighted_score`; shared test fixtures and `ids`
+  helper, browser-test builders in `e2e/builders.py` (no import of test code), one frontend
+  `callsTo` helper (B-20, C-21, C-23, D-19, D-20, X-12, Y-9, Y-10, Z-10).
+
+- Review follow-ups Q-1, Q-2, Q-4, Q-5, Q-7, Q-8: profile sync and generation summaries merge
+  their metadata too, `score_candidate` computes contributions once, recommendation reasons use
+  the shared name-joining helper, data deletion still purges `github:ratelimit:{pk}` keys from
+  before the upgrade (one release), and `npm run stop` on Linux names a process by its
+  `/proc/<pid>/exe` link (paths with spaces).
+
+- `/simplify` pass: the freshness filter compares one `GREATEST` of the change times, so each
+  correlated subquery runs once per profile; `merge_metadata` writes through `save_progress`;
+  `Backoff.call` is the one try-or-skip wrapper (throttles and the GitHub client); tests reset
+  every backoff and the health client centrally and share one fake down cache.
+
+### Not changed
+
+- A-18 (cache a profile sync's public endpoints in the shared scope) is wontfix: those entries
+  would outlive "delete my data".
+
 ## [0.12.9] - 2026-10-21
 
 Dev scripts, checks and migrations (OpenSpec change `dev-scripts-checks`, backlog batch 10). No

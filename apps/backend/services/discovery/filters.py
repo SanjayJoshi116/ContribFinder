@@ -99,7 +99,16 @@ def prefilter(
     return reason
 
 
-def eligibility(repo: Repository, *, now: datetime, cfg: FilterConfig) -> str | None:
+def eligibility(
+    repo: Repository,
+    *,
+    now: datetime,
+    cfg: FilterConfig,
+    topics: Collection[str] | None = None,
+    has_dependencies: bool | None = None,
+) -> str | None:
+    """``topics`` and ``has_dependencies``, when given, are the stored values the caller
+    already holds (an analysis that just wrote them); otherwise they are read."""
     if repo.lifecycle == Lifecycle.FAILED:
         return REPOSITORY_UNAVAILABLE
     reason = _repository_rules(
@@ -110,7 +119,9 @@ def eligibility(repo: Repository, *, now: datetime, cfg: FilterConfig) -> str | 
         now=now,
         cfg=cfg,
     )
-    if reason is None and stored_not_code(repo, cfg):
+    if reason is None and stored_not_code(
+        repo, cfg, topics=topics, has_dependencies=has_dependencies
+    ):
         return NOT_CODE
     return reason
 
@@ -139,14 +150,23 @@ def suspected_list(full_name: str, topics: Collection[str], cfg: FilterConfig) -
     return any(t.lower() in cfg.excluded_topics for t in topics)
 
 
-def stored_not_code(repo: Repository, cfg: FilterConfig) -> bool:
-    """``not_code`` on a stored repository, with its dependencies once they were fetched."""
+def stored_not_code(
+    repo: Repository,
+    cfg: FilterConfig,
+    *,
+    topics: Collection[str] | None = None,
+    has_dependencies: bool | None = None,
+) -> bool:
+    """``not_code`` on a stored repository, with its dependencies once they were fetched.
+    Given ``topics`` / ``has_dependencies`` are used instead of reading them."""
     return not_code(
         repo.full_name,
-        _topics(repo),
+        _topics(repo) if topics is None else topics,
         repo.primary_language,
         cfg,
-        has_dependencies=stored_has_dependencies(repo),
+        has_dependencies=(
+            stored_has_dependencies(repo) if has_dependencies is None else has_dependencies
+        ),
     )
 
 

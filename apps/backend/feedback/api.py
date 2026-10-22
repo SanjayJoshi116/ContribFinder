@@ -15,7 +15,7 @@ from core.authentication import current_user
 from core.serializers import error_responses
 from issues.models import RecommendedIssue
 from recommendations.models import Recommendation
-from repositories.models import RepositorySnapshot
+from repositories.queries import latest_snapshot
 from services import feedback
 
 from .models import DismissedRepository, SavedRepository
@@ -120,11 +120,7 @@ class SavedListView(ListAPIView[SavedRepository]):
             .select_related("repository")
             .prefetch_related(
                 "repository__topics",
-                Prefetch(
-                    "repository__snapshots",
-                    queryset=RepositorySnapshot.objects.order_by("-captured_at", "-pk"),
-                    to_attr="ordered_snapshots",
-                ),
+                latest_snapshot("repository__"),
                 Prefetch(
                     "repository__recommendations",
                     queryset=Recommendation.objects.filter(developer__user=user).prefetch_related(

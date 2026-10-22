@@ -90,6 +90,15 @@ def test_health_degraded_when_redis_down(api_client: APIClient, settings) -> Non
     assert "redis://" not in response.content.decode()
 
 
+def test_health_reuses_one_redis_client(api_client: APIClient, settings) -> None:
+    settings.REDIS_URL = "redis://localhost:6379/9"
+    with patch("core.health.redis.Redis.from_url") as from_url:
+        api_client.get("/api/v1/health/")
+        api_client.get("/api/v1/health/")
+    assert from_url.call_count == 1
+    assert from_url.return_value.ping.call_count == 2
+
+
 def test_health_degraded_when_database_down(api_client: APIClient) -> None:
     with (
         patch("core.health.check_redis", return_value="ok"),

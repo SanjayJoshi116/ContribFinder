@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.9** (dev scripts, checks and migrations: `npm run stop` stops only this checkout, startup checks cover every numeric setting, and seeding never overrides an operator's active configuration; MVP+). After signing in with
+**Version 0.12.10** (performance and cleanup: fewer queries and writes, and a GitHub response-cache outage no longer fails a worker job; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -93,7 +93,9 @@ without a retry records the error on the repository and waits `REPO_REFRESH_RETR
 
 If Redis goes down while the app runs, API reads keep working: sessions live in PostgreSQL, and
 request throttling counts in each process's memory for `THROTTLE_CACHE_BACKOFF_SECONDS` (30)
-after a Redis error, then tries Redis again.
+after a Redis error, then tries Redis again. A worker that loses the GitHub response cache keeps
+going: requests go out without their ETag condition, and the cache is skipped for
+`GITHUB_CACHE_BACKOFF_SECONDS` (30).
 
 Open http://localhost:5173. API health: http://localhost:5173/api/v1/health/.
 
@@ -272,8 +274,8 @@ from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consiste
 batch 7 (discovery and repository data) in 0.12.7, batch 9 (frontend correctness) in 0.12.8,
 together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 and Y-7 still open),
 and batch 10 (dev scripts, checks and migrations) in 0.12.9, together with the follow-ups from its
-review (rows Z-1…Z-10, batch 15; Z-1 still open). Batches 8 (ranking-visible, waits for K-1) and
-11 (performance and cleanup) remain.
+review (rows Z-1…Z-10, batch 15; Z-1 still open), and batch 11 (performance and cleanup) in
+0.12.10 (A-18 wontfix). Batch 8 (ranking-visible, waits for K-1) remains.
 
 ## Versioning
 

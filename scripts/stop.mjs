@@ -3,10 +3,11 @@
 // keep-alive it recorded (.run/, scripts/child.mjs), and its virtualenv (Django, Celery) and
 // Vite by path. The redis-server service in WSL is left running; the distro may then idle out.
 import { execFileSync } from 'node:child_process'
+import { readlinkSync } from 'node:fs'
 
 import { killTree, readRecords, removeRecord } from './child.mjs'
 import { root } from './env.mjs'
-import { matchStack } from './stack.mjs'
+import { matchStack, parsePs } from './stack.mjs'
 
 function processes() {
   if (process.platform === 'win32') {
@@ -24,26 +25,22 @@ function processes() {
       cmd: r.CommandLine,
     }))
   }
-  const out = execFileSync('ps', ['-eo', 'pid=,comm=,args='], { encoding: 'utf8' })
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const [, pid, name, cmd] = line.trim().match(/^(\d+)\s+(\S+)\s+(.*)$/)
-      return { pid: Number(pid), name: name.split('/').pop().toLowerCase(), cmd }
-    })
+  const out = execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' })
+  return parsePs(out, (pid) => {
+    try {
+      return readlinkSync(`/proc/${pid}/exe`) // Linux; macOS has no /proc
+    } catch {
+      return null
+    }
+  })
 }
 
-const { kill: ours, remove } = matchStack(
-  processes(),
-  readRecords(),
-  root.toLowerCase(),
-  process.pid,
-)
+// Records first: a runner that starts in between then has a listed process, so its record is
+// never mistaken for a stale one.
+const records = readRecords()
+const { kill: ours, remove } = matchStack(processes(), records, root.toLowerCase(), process.pid)
 
 if (ours.length === 0) console.log('Nothing to stop.')
-for (const { pid, cmd } of ours) {
-  console.log(`Stopping ${pid}: ${cmd.slice(0, 100)}`)
-  killTree(pid)
-}
+for (const { pid, cmd } of ours) console.log(`Stopping ${pid}: ${cmd.slice(0, 100)}`)
+killTree(ours.map(({ pid }) => pid))
 for (const file of remove) removeRecord(file)

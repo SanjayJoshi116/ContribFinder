@@ -8,9 +8,7 @@ from django.test import override_settings
 from core.checks import recommendation_config_check
 from services.ranking.config import V1_PARAMS, V1_WEIGHTS, V2_PARAMS, V2_WEIGHTS, validate
 
-
-def ids(messages) -> list[str]:
-    return [m.id for m in messages]
+from .checks_helpers import ids
 
 
 def test_v2_is_valid() -> None:

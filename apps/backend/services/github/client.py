@@ -2,7 +2,8 @@
 
 The only place that decrypts a user's token (``GitHubClient.for_user``). It handles
 pagination, ETag conditional requests (cached in the Django cache), rate-limit detection and
-error mapping, and returns normalized dataclasses instead of raw GitHub JSON.
+error mapping, and returns normalized dataclasses instead of raw GitHub JSON. The ETag cache
+only saves requests: when it errors, requests go out unconditionally (performance-cleanup D1).
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from accounts.models import User
+from core.backoff import Backoff
 from github.models import GitHubAccount
 from services.crypto import TokenDecryptionError, decrypt_token
 
@@ -40,8 +42,10 @@ from .errors import (
     GitHubUnavailableForLegalReasons,
     GitHubValidationError,
 )
+from .oauth import has_app_credentials
 
 logger = logging.getLogger(__name__)
+_cache_backoff = Backoff("GITHUB_CACHE_BACKOFF_SECONDS", "GitHub response cache", logger)
 
 API_VERSION = "2022-11-28"
 JSON = "application/vnd.github+json"
@@ -309,9 +313,9 @@ class GitHubClient:
         """Client authenticated with the OAuth app's client credentials, for public data that
         belongs to no user (background repository refresh). Raises GitHubAuthError when the
         credentials are not configured."""
-        client_id, secret = settings.GITHUB_CLIENT_ID, settings.GITHUB_CLIENT_SECRET
-        if not client_id or not secret:
+        if not has_app_credentials():
             raise GitHubAuthError("GitHub client credentials are not configured")
+        client_id, secret = settings.GITHUB_CLIENT_ID, settings.GITHUB_CLIENT_SECRET
         basic = base64.b64encode(f"{client_id}:{secret}".encode()).decode()
         return cls(auth_header=f"Basic {basic}", cache_scope=PUBLIC_SCOPE)
 
@@ -546,7 +550,7 @@ class GitHubClient:
 
     def _get(self, url: str, *, accept: str = JSON) -> _Response:
         key = self._cache_key(url, accept)
-        cached: dict[str, Any] | None = cache.get(key)
+        cached: dict[str, Any] | None = _cached(cache.get, key)
         headers = {"Accept": accept, "Authorization": self._auth}
         if cached:
             headers["If-None-Match"] = cached["etag"]
@@ -555,13 +559,16 @@ class GitHubClient:
         response = self._send(url, headers, path)
 
         if response.status_code == 304 and cached:
+            # Confirmed unchanged: keep the entry for another lifetime.
+            _cached(cache.touch, key, settings.GITHUB_ETAG_TTL)
             return _Response(status=200, text=cached["body"], link=cached.get("link", ""))
         if response.status_code == 204:
             return _Response(status=204, text="", link="")
         if response.status_code == 200:
             result = _Response(200, response.text, response.headers.get("Link", ""))
             if etag := response.headers.get("ETag"):
-                cache.set(
+                _cached(
+                    cache.set,
                     key,
                     {"etag": etag, "body": result.text, "link": result.link},
                     settings.GITHUB_ETAG_TTL,
@@ -579,7 +586,6 @@ class GitHubClient:
                 response = self._http.get(target, headers=headers)
             except httpx.TransportError as exc:
                 raise GitHubTransientError(f"GET {path}: {type(exc).__name__}") from None
-            self._record_rate_limit(response)
             if response.status_code not in REDIRECTS:
                 return response
             location = response.headers.get("Location")
@@ -592,20 +598,11 @@ class GitHubClient:
                 raise GitHubClientError(f"GET {path}: redirect points outside the GitHub API")
         raise GitHubClientError(f"GET {path}: too many redirects")
 
-    def _record_rate_limit(self, response: httpx.Response) -> None:
-        remaining = response.headers.get("X-RateLimit-Remaining")
-        if remaining is None:
-            return
-        cache.set(
-            f"github:ratelimit:{self._scope}",
-            {
-                "limit": response.headers.get("X-RateLimit-Limit"),
-                "remaining": remaining,
-                "reset": response.headers.get("X-RateLimit-Reset"),
-                "resource": response.headers.get("X-RateLimit-Resource"),
-            },
-            60 * 60,
-        )
+
+def _cached(call: Callable[..., Any], *args: Any) -> Any:
+    """One ETag cache call, or None while the cache is failing in this process: the request
+    is then sent without a condition and its result not stored."""
+    return _cache_backoff.call(call, *args, fallback=lambda: None)
 
 
 def _count_from_single_item_page(response: _Response) -> int:

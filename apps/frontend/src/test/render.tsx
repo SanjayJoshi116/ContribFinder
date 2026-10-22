@@ -37,6 +37,15 @@ export function mockFetch(handlers: Record<string, Handler>) {
   return fetchMock
 }
 
+export type FetchMock = ReturnType<typeof mockFetch>
+
+/** Requests made so far with `method` to `url` (exact URL, query string included). */
+export function callsTo(fetchMock: FetchMock, method: string, url: string) {
+  return fetchMock.mock.calls.filter(
+    ([input, init]) => String(input) === url && (init?.method ?? 'GET').toUpperCase() === method,
+  )
+}
+
 export const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,

@@ -208,7 +208,7 @@ class RecommendationDetailSerializer(RecommendationSerializer):
 
     @extend_schema_field(ActivitySignalsSerializer(allow_null=True))
     def get_activity_signals(self, obj: Recommendation) -> dict[str, Any] | None:
-        snapshots = obj.repository.ordered_snapshots  # type: ignore[attr-defined]
+        snapshots = obj.repository.latest_snapshots  # type: ignore[attr-defined]
         return ActivitySignalsSerializer(snapshots[0]).data if snapshots else None
 
 

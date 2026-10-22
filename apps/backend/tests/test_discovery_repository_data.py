@@ -29,7 +29,7 @@ from services.discovery.filters import (
 from services.discovery.queries import configured_star_bands, default_star_bands
 from services.discovery.service import DiscoveryService, _band_counts
 from services.errors import JobCancelled
-from services.github.client import GitHubClient, GitHubRepo
+from services.github.client import GitHubRepo
 from services.github.errors import GitHubNotFound
 from services.github.storage import upsert_repository
 from services.job_guard import lost_before
@@ -46,27 +46,10 @@ from .repo_fixtures import (
     mock_repo_api,
     repo_payload,
 )
-from .test_discovery_service import make_developer, mock_search, new_job, run
-from .test_github_client import TOKEN
+from .shared_fixtures import developer, public_client, single_band  # noqa: F401
+from .test_discovery_service import mock_search, new_job, run
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
-
-
-@pytest.fixture(autouse=True)
-def single_band(settings) -> None:
-    settings.DISCOVERY_STAR_BANDS = [[20, None]]
-    settings.DISCOVERY_MAX_QUERIES = 10
-
-
-@pytest.fixture
-def developer(user):
-    return make_developer(user)
-
-
-@pytest.fixture
-def client():
-    with GitHubClient(TOKEN, cache_scope="public") as c:
-        yield c
 
 
 # --- data model (1) ---------------------------------------------------------------------

@@ -234,6 +234,8 @@ GITHUB_SYNC_MAX_REPOS = env.int("GITHUB_SYNC_MAX_REPOS", default=100)
 GITHUB_MAX_PAGES = env.int("GITHUB_MAX_PAGES", default=10)
 GITHUB_MAX_RETRY_DELAY = env.int("GITHUB_MAX_RETRY_DELAY", default=900)
 GITHUB_ETAG_TTL = env.int("GITHUB_ETAG_TTL", default=24 * 60 * 60)
+# After a response-cache error, a process sends GitHub requests unconditionally this long.
+GITHUB_CACHE_BACKOFF_SECONDS = env.int("GITHUB_CACHE_BACKOFF_SECONDS", default=30)
 SYNC_MAX_ATTEMPTS = env.int("SYNC_MAX_ATTEMPTS", default=5)
 SYNC_COOLDOWN_SECONDS = env.int("SYNC_COOLDOWN_SECONDS", default=300)
 # A RUNNING job with no heartbeat for this long is treated as dead (worker crash). Jobs beat

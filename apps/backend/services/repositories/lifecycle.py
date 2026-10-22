@@ -18,7 +18,7 @@ Repository rows locked in bulk are locked in GitHub ID order.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from datetime import datetime
 
 from django.db import transaction
@@ -174,12 +174,25 @@ def record_refresh_failure(repo_id: int, code: str, *, since: datetime) -> None:
     )
 
 
-def complete(repo: Repository, *, now: datetime | None = None) -> None:
+def complete(
+    repo: Repository,
+    *,
+    now: datetime | None = None,
+    topics: Collection[str] | None = None,
+    has_dependencies: bool | None = None,
+) -> None:
     """Finish the analysis as RECOMMENDABLE if eligible, else INDEXED (ANALYZED and INDEXED
     are passed through within the same transaction). Call after ``hold`` inside the
-    transaction that stored the analyzed data."""
+    transaction that stored the analyzed data; pass the topics and dependency presence it
+    just stored, so eligibility does not read them back."""
     now = now or timezone.now()
-    reason = eligibility(repo, now=now, cfg=FilterConfig.from_settings())
+    reason = eligibility(
+        repo,
+        now=now,
+        cfg=FilterConfig.from_settings(),
+        topics=topics,
+        has_dependencies=has_dependencies,
+    )
     repo.is_eligible = reason is None
     repo.ineligible_reason = reason or ""
     repo.lifecycle = Lifecycle.RECOMMENDABLE if reason is None else Lifecycle.INDEXED

@@ -1136,7 +1136,7 @@ export interface components {
       readonly repository: components['schemas']['CandidateRepository']
       readonly lifecycle: components['schemas']['LifecycleEnum']
       readonly eligible: boolean | null
-      ineligible_reason: string
+      readonly ineligible_reason: string
       readonly activity_label:
         (components['schemas']['ActivityLabelEnum'] | components['schemas']['NullEnum']) | null
       readonly discoveries: components['schemas']['CandidateDiscovery'][]

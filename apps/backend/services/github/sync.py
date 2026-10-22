@@ -25,7 +25,7 @@ from repositories.models import (
     Repository,
     UserRepository,
 )
-from services.job_guard import heartbeat, job_write, save_progress
+from services.job_guard import heartbeat, job_write, merge_metadata, save_progress
 from services.profiling.analysis import ProfileAnalysisService
 
 from .client import GitHubClient, GitHubUser, PullRequestRef, PushRef
@@ -326,8 +326,7 @@ class GitHubSyncService:
         save_progress(self.job, steps=self.job.steps)
 
     def _update_metadata(self, **values: Any) -> None:
-        self.job.metadata = {**self.job.metadata, **values}
-        save_progress(self.job, metadata=self.job.metadata)
+        merge_metadata(self.job, values)
 
 
 def _parse_dt(value: str | None) -> datetime | None:

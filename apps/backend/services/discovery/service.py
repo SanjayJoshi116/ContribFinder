@@ -38,7 +38,7 @@ from services.errors import PermanentJobError
 from services.github.client import PUBLIC_SCOPE, GitHubClient, GitHubRepo
 from services.github.errors import GitHubValidationError
 from services.github.storage import replace_topics, upsert_repository
-from services.job_guard import heartbeat, job_write, save_progress
+from services.job_guard import heartbeat, job_write, merge_metadata, save_progress
 from services.repositories.analysis import RepositoryAnalysisService
 from services.repositories.lifecycle import IN_PROGRESS, recheck_eligibility
 from services.repositories.staleness import stale_parts
@@ -459,8 +459,7 @@ class DiscoveryService:
         save_progress(self.job, steps=self.job.steps)
 
     def _update_metadata(self, **values: Any) -> None:
-        self.job.metadata = {**self.job.metadata, **values}
-        save_progress(self.job, metadata=self.job.metadata)
+        merge_metadata(self.job, values)
 
 
 def _band_counts(stars: Iterable[int]) -> dict[str, int]:

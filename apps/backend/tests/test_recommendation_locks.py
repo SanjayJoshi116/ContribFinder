@@ -85,7 +85,7 @@ def _paused_generation(monkeypatch, user) -> tuple[threading.Event, threading.Ev
     return paused, resume
 
 
-def test_dismiss_during_a_generation_write(user, developer, pool, monkeypatch) -> None:  # noqa: F811
+def test_dismiss_during_a_generation_write(user, developer, pool, monkeypatch) -> None:
     generate(user)
     rec = Recommendation.objects.get(repository=pool["django"])
     paused, resume = _paused_generation(monkeypatch, user)
@@ -104,7 +104,7 @@ def test_dismiss_during_a_generation_write(user, developer, pool, monkeypatch) -
     assert not Recommendation.objects.filter(repository=pool["django"]).exists()
 
 
-def test_issue_refresh_during_a_generation_write(user, developer, pool, monkeypatch) -> None:  # noqa: F811
+def test_issue_refresh_during_a_generation_write(user, developer, pool, monkeypatch) -> None:
     django_issues(pool["django"])
     generate(user)
     assert Recommendation.objects.get(repository=pool["django"]).relevant_issue_count == 3
@@ -128,7 +128,7 @@ def test_issue_refresh_during_a_generation_write(user, developer, pool, monkeypa
     assert not pool["django"].issues.exists()
 
 
-def test_simultaneous_views_are_recorded_once(user, developer, pool) -> None:  # noqa: F811
+def test_simultaneous_views_are_recorded_once(user, developer, pool) -> None:
     generate(user)
     rec = Recommendation.objects.get(repository=pool["django"])
     barrier = threading.Barrier(2, timeout=10)
@@ -145,7 +145,7 @@ def test_simultaneous_views_are_recorded_once(user, developer, pool) -> None:  #
     assert RecommendationFeedback.objects.filter(user=user, action="viewed").count() == 1
 
 
-def test_issue_update_during_a_generation_write(user, developer, pool, monkeypatch) -> None:  # noqa: F811
+def test_issue_update_during_a_generation_write(user, developer, pool, monkeypatch) -> None:
     from services.github.client import IssueData
 
     issues = django_issues(pool["django"])
@@ -187,7 +187,7 @@ def test_issue_update_during_a_generation_write(user, developer, pool, monkeypat
     assert pool["django"].issues.filter(title__endswith="(edited)").count() == 3
 
 
-def test_dismiss_after_a_generation_dropped_the_recommendation(user, developer, pool) -> None:  # noqa: F811
+def test_dismiss_after_a_generation_dropped_the_recommendation(user, developer, pool) -> None:
     generate(user)
     stale = Recommendation.objects.get(repository=pool["django"])  # the page's copy
     Recommendation.objects.filter(pk=stale.pk).delete()  # a generation dropped it, committed
@@ -199,7 +199,7 @@ def test_dismiss_after_a_generation_dropped_the_recommendation(user, developer, 
     assert event.recommendation is None and event.repository_full_name == "encode/django-tool"
 
 
-def test_view_of_a_dropped_recommendation_records_nothing(user, developer, pool) -> None:  # noqa: F811
+def test_view_of_a_dropped_recommendation_records_nothing(user, developer, pool) -> None:
     generate(user)
     stale = Recommendation.objects.get(repository=pool["django"])
     Recommendation.objects.filter(pk=stale.pk).delete()

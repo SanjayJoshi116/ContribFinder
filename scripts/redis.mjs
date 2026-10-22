@@ -54,8 +54,12 @@ const keepAlive = spawn('wsl.exe', ['-d', distro, '--', 'sleep', 'infinity'], {
   ...WSL_OPTIONS,
   stdio: 'ignore',
 })
-// Detached, so it is not in this runner's process tree: `npm run stop` finds it by its record.
-recordProcess({ pid: keepAlive.pid, exe: 'wsl', marker: 'sleep infinity' })
+// Detached for its own hidden console (see WSL_OPTIONS). On Windows it is still this runner's
+// child, so killing the runner's tree ends it too; the record lets `npm run stop` find it when
+// the runner is already gone. A failed spawn has no pid and nothing to record.
+if (typeof keepAlive.pid === 'number') {
+  recordProcess({ pid: keepAlive.pid, exe: 'wsl', marker: 'sleep infinity' })
+}
 const stop = () => {
   keepAlive.kill()
   process.exit(0)

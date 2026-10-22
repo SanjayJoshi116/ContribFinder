@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { matchStack } from './stack.mjs'
+import { matchStack, parsePs } from './stack.mjs'
 
 const REPO = 'c:\\work\\contribfinder'
 const SELF = 1
@@ -60,4 +60,29 @@ test('a runner started with a Windows path still matches its record', () => {
   const processes = [node(50, String.raw`node scripts\backend.mjs`)]
   const result = matchStack(processes, [record(50, 'backend')], REPO, SELF)
   assert.deepEqual(killed(result), [50])
+})
+
+test('ps output is named by the started executable, not its thread name', () => {
+  const out = [
+    '  101 /usr/local/bin/node /work/contribfinder/scripts/start.mjs',
+    '  102 /work/contribfinder/apps/backend/.venv/bin/python manage.py runserver',
+    '',
+    '  103 sleep infinity',
+  ].join('\n')
+  assert.deepEqual(
+    parsePs(out).map(({ pid, name }) => [pid, name]),
+    [
+      [101, 'node'],
+      [102, 'python'],
+      [103, 'sleep'],
+    ],
+  )
+  assert.equal(parsePs(out)[0].cmd, '/usr/local/bin/node /work/contribfinder/scripts/start.mjs')
+})
+
+test('an executable path with spaces is named by its exe link', () => {
+  const out = '  201 /home/a b/.nvm/bin/node /work/contribfinder/scripts/start.mjs'
+  const exeOf = (pid) => (pid === 201 ? '/home/a b/.nvm/bin/node' : null)
+  assert.equal(parsePs(out, exeOf)[0].name, 'node')
+  assert.equal(parsePs(out)[0].name, 'a') // without the link only the first word is known
 })

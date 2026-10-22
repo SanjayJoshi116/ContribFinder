@@ -49,7 +49,7 @@ def relevant_issue(repo, number: int, **fields) -> Issue:
 
 
 @pytest.fixture
-def generated(user, developer, pool):  # noqa: F811
+def generated(user, developer, pool):
     DeveloperProfile.objects.filter(pk=developer.pk).update(experience_level="beginner")
     relevant_issue(pool["django"], 1)
     relevant_issue(pool["django"], 2, difficulty="unknown", contribution_type="bug_fix")
@@ -138,7 +138,7 @@ def test_detail_lists_relevant_issues_in_order(signed_in_client: APIClient, gene
     assert not {"score", "rank"} & walk_keys(body["issues"])
 
 
-def test_detail_without_relevant_issues(signed_in_client: APIClient, user, developer) -> None:  # noqa: F811
+def test_detail_without_relevant_issues(signed_in_client: APIClient, user, developer) -> None:
     add_candidate(developer, ready_repo(1, "a/one", topics=("django",)))
     generate(user)
     rec = Recommendation.objects.get()
@@ -149,7 +149,7 @@ def test_detail_without_relevant_issues(signed_in_client: APIClient, user, devel
 def test_list_query_count_constant_with_issues(
     signed_in_client: APIClient,
     user,
-    developer,  # noqa: F811
+    developer,
 ) -> None:
     def count() -> int:
         with CaptureQueriesContext(connection) as ctx:

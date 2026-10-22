@@ -36,7 +36,7 @@ RECS = "/api/v1/recommendations"
 
 
 @pytest.fixture
-def recs(user, developer, pool):  # noqa: F811
+def recs(user, developer, pool):
     generate(user)
     return {
         name: Recommendation.objects.filter(repository=repo).first() for name, repo in pool.items()
@@ -174,7 +174,7 @@ def test_save_endpoint_racing_a_dismiss_is_404(
     assert not SavedRepository.objects.filter(user=user).exists()
 
 
-def test_dismissed_repository_absent_after_regeneration(user, recs, pool) -> None:  # noqa: F811
+def test_dismissed_repository_absent_after_regeneration(user, recs, pool) -> None:
     feedback.dismiss(user, recs["django"])
     generate(user)
     repos = list(Recommendation.objects.order_by("rank").values_list("repository_id", "rank"))
@@ -182,7 +182,7 @@ def test_dismissed_repository_absent_after_regeneration(user, recs, pool) -> Non
     assert [rank for _, rank in repos] == list(range(1, len(repos) + 1))
 
 
-def test_dismissal_during_a_run_is_honored(user, recs, pool, monkeypatch) -> None:  # noqa: F811
+def test_dismissal_during_a_run_is_honored(user, recs, pool, monkeypatch) -> None:
     from services.matching.features import load_candidates as real_load
 
     def load_then_dismiss(profile):
@@ -201,7 +201,7 @@ def test_dismissal_during_a_run_is_honored(user, recs, pool, monkeypatch) -> Non
     assert job.metadata["kept"] == len(ranks)
 
 
-def test_restore_records_and_starts_a_generation(user, recs, pool, monkeypatch) -> None:  # noqa: F811
+def test_restore_records_and_starts_a_generation(user, recs, pool, monkeypatch) -> None:
     queued: list[int] = []
     monkeypatch.setattr(
         "recommendations.tasks.generate_recommendations.delay", lambda pk: queued.append(pk)
@@ -330,6 +330,41 @@ def test_saved_list(signed_in_client: APIClient, user, recs) -> None:
     assert "score" not in first["recommendation"]
 
 
+def test_latest_snapshot_is_the_only_one_loaded(
+    signed_in_client: APIClient,
+    user,
+    developer,
+    recs,
+) -> None:
+    from repositories.models import RepositorySnapshot
+    from repositories.queries import latest_snapshot
+    from services.matching.features import load_candidates
+
+    repo = recs["django"].repository
+    newest = RepositorySnapshot.objects.filter(repository=repo).get()
+    for days in (3, 2, 1):  # older snapshots, labelled differently
+        RepositorySnapshot.objects.create(
+            repository=repo,
+            captured_at=newest.captured_at - timedelta(days=days),
+            stars=1,
+            forks=0,
+            open_issues=0,
+            activity_label="low_activity",
+            thresholds_version="x",
+        )
+    feedback.save(user, recs["django"])
+    assert signed_in_client.get("/api/v1/saved").json()["results"][0]["activity_label"] == (
+        "recently_active"
+    )
+    detail = signed_in_client.get(f"{RECS}/{recs['django'].pk}").json()
+    assert detail["activity_signals"]["commits_90d"] == newest.commits_90d
+    [loaded] = [r for r in load_candidates(developer) if r.id == repo.pk]
+    assert loaded.snapshot is not None and loaded.snapshot.activity_label == "recently_active"
+    [prefetched] = Repository.objects.filter(pk=repo.pk).prefetch_related(latest_snapshot())
+    latest = prefetched.latest_snapshots  # type: ignore[attr-defined]
+    assert [s.pk for s in latest] == [newest.pk]  # one row, not four
+
+
 def test_saved_list_keeps_no_longer_recommended(signed_in_client: APIClient, user, recs) -> None:
     feedback.save(user, recs["django"])
     Repository.objects.filter(pk=recs["django"].repository_id).update(is_eligible=False)
@@ -349,7 +384,7 @@ def test_saved_list_shows_only_own_saves(api_client: APIClient, user, recs) -> N
     assert api_client.get("/api/v1/saved").json()["count"] == 0
 
 
-def test_list_query_count_is_constant(signed_in_client: APIClient, user, recs, pool) -> None:  # noqa: F811
+def test_list_query_count_is_constant(signed_in_client: APIClient, user, recs, pool) -> None:
     signed_in_client.get(RECS)  # warm up session and content types
     with CaptureQueriesContext(connection) as few:
         signed_in_client.get(RECS)

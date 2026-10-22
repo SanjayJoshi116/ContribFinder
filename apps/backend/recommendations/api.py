@@ -17,7 +17,8 @@ from core.serializers import error_responses
 from feedback.models import SavedRepository
 from issues.models import ContributionType, Difficulty, RecommendedIssue
 from jobs.models import SyncJob
-from repositories.models import ActivityLabel, RepositoryLanguage, RepositorySnapshot
+from repositories.models import ActivityLabel, RepositoryLanguage
+from repositories.queries import latest_snapshot
 from services.jobs import RECOMMENDATIONS
 from services.profiling.taxonomy import LINGUIST_INDEX, SKILLS_BY_SLUG
 
@@ -134,11 +135,7 @@ class RecommendationDetailView(RetrieveAPIView[Recommendation]):
                 "reasons",
                 "repository__topics",
                 "repository__languages",
-                Prefetch(
-                    "repository__snapshots",
-                    queryset=RepositorySnapshot.objects.order_by("-captured_at", "-pk"),
-                    to_attr="ordered_snapshots",
-                ),
+                latest_snapshot("repository__"),
                 Prefetch(
                     "recommended_issues",
                     queryset=RecommendedIssue.objects.select_related("issue").order_by("rank"),

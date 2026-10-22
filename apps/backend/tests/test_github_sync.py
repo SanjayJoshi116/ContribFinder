@@ -20,6 +20,7 @@ from services.github.errors import (
 from services.github.retry import Fail, Retry, decide_retry
 from services.github.sync import GitHubSyncService, initial_steps
 
+from .cache_helpers import DownCache
 from .factories import GitHubAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -135,6 +136,18 @@ def test_full_sync_stores_everything(job, user) -> None:
         ],
         "done",
     )
+
+
+@respx.mock
+def test_sync_completes_when_response_cache_is_down(job, user, monkeypatch) -> None:
+    from services.github import client as client_module
+
+    monkeypatch.setattr(client_module, "cache", DownCache())
+    mock_github(respx.mock)
+    run(job)
+    job.refresh_from_db()
+    assert set(job.steps.values()) == {"done"}
+    assert Repository.objects.filter(user_links__user=user).count() == 3
 
 
 @respx.mock

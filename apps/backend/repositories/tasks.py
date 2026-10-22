@@ -16,6 +16,7 @@ from jobs.models import SyncJob
 from services.discovery.service import DiscoveryService
 from services.github.client import GitHubClient
 from services.github.errors import GitHubAuthError
+from services.github.oauth import has_app_credentials
 from services.github.retry import Retry, decide_retry
 from services.jobs import run_tracked_job, start_recommendations_after
 from services.repositories import backlog
@@ -23,10 +24,6 @@ from services.repositories.analysis import RepositoryAnalysisService
 from services.repositories.lifecycle import record_refresh_failure
 
 logger = logging.getLogger(__name__)
-
-
-def _has_app_credentials() -> bool:
-    return bool(settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET)
 
 
 @shared_task(name="repositories.mark_stale_repositories")
@@ -40,7 +37,7 @@ def mark_stale_repositories() -> int:
 @shared_task(name="repositories.process_repository_backlog")
 def process_repository_backlog() -> int:
     """Queue the refreshes ``services.repositories.backlog`` finds due."""
-    if not _has_app_credentials():
+    if not has_app_credentials():
         logger.warning("GitHub client credentials are not configured; backlog not processed")
         return 0
     batch = backlog.queue_batch(timezone.now())

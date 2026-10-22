@@ -5,11 +5,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.db.models import Count, Exists, Min, OuterRef, Prefetch
+from django.db.models import Count, Exists, Min, OuterRef
 
 from developers.models import DeveloperInterest, DeveloperProfile, DeveloperSkill
 from feedback.models import DismissedRepository
 from repositories.models import RepositoryCandidate, RepositorySnapshot
+from repositories.queries import latest_snapshot
 from services.repositories.lifecycle import SCORABLE
 
 
@@ -95,18 +96,14 @@ def load_candidates(
             "repository__languages",
             "repository__topics",
             "repository__dependencies",
-            Prefetch(
-                "repository__snapshots",
-                queryset=RepositorySnapshot.objects.order_by("-captured_at", "-pk"),
-                to_attr="ordered_snapshots",
-            ),
+            latest_snapshot("repository__"),
         )
         .order_by("repository__full_name")
     )
     result = []
     for candidate in candidates:
         repo = candidate.repository
-        latest = repo.ordered_snapshots[0] if repo.ordered_snapshots else None  # type: ignore[attr-defined]
+        latest = repo.latest_snapshots[0] if repo.latest_snapshots else None  # type: ignore[attr-defined]
         result.append(
             RepoData(
                 id=repo.pk,

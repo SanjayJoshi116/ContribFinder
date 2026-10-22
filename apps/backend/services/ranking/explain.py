@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from services.matching.signals import Signal
+from services.text import join_names
 
 from .score import contributions
 
@@ -59,19 +60,12 @@ class Reason:
     detail: dict[str, Any]
 
 
-def join(names: Sequence[str]) -> str:
-    """``A``, ``A and B``, ``A, B and C``."""
-    if len(names) <= 1:
-        return "".join(names)
-    return f"{', '.join(names[:-1])} and {names[-1]}"
-
-
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
 
 def _skill(items: Sequence[Mapping[str, Any]]) -> str:
-    return f"Shares {join([i['name'] for i in items])} with your profile"
+    return f"Shares {join_names([i['name'] for i in items])} with your profile"
 
 
 def _language(items: Sequence[Mapping[str, Any]]) -> str:
@@ -87,7 +81,7 @@ def _language(items: Sequence[Mapping[str, Any]]) -> str:
         known = "a language you have touched"
     text = f"Written {how} in {first['name']}, {known}"
     if rest:
-        text += f"; also uses {join([i['name'] for i in rest])}"
+        text += f"; also uses {join_names([i['name'] for i in rest])}"
     return text
 
 
@@ -97,7 +91,7 @@ def _your_repositories(n: int) -> str:
 
 def _framework(items: Sequence[Mapping[str, Any]]) -> str:
     first = items[0]
-    text = f"Uses {join([i['name'] for i in items])}"
+    text = f"Uses {join_names([i['name'] for i in items])}"
     if first["repo_count"]:
         where = _your_repositories(first["repo_count"])
         if len(items) == 1:
@@ -112,7 +106,7 @@ def _interest(items: Sequence[Mapping[str, Any]]) -> str:
     via = f'topic "{first["match"]}"' if first["via"] == "topic" else f'mentions "{first["match"]}"'
     text = f"Matches your interest in {first['name'].lower()} ({via})"
     if len(items) > 1:
-        text += f"; also {join([i['name'].lower() for i in items[1:]])}"
+        text += f"; also {join_names([i['name'].lower() for i in items[1:]])}"
     return text
 
 
@@ -131,7 +125,7 @@ def _activity(items: Sequence[Mapping[str, Any]]) -> str:
 
 
 def _openness(items: Sequence[Mapping[str, Any]]) -> str:
-    return f"Has {join([OPENNESS_TEXT[i['flag']] for i in items])}"
+    return f"Has {join_names([OPENNESS_TEXT[i['flag']] for i in items])}"
 
 
 def _issue_availability(items: Sequence[Mapping[str, Any]]) -> str:

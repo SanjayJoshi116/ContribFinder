@@ -101,11 +101,12 @@ def _delete_orphans(repository_ids: set[int]) -> int:
 
 
 def purge_user_github_cache(user_id: int) -> None:
-    """Delete the user-scope GitHub response cache (``github:etag:{pk}:*``) and rate-limit
-    state. ``public`` entries are shared and expire on their own. Failures are logged, never
-    raised: entries expire within ``GITHUB_ETAG_TTL`` anyway."""
+    """Delete the user-scope GitHub response cache (``github:etag:{pk}:*``). ``public``
+    entries are shared and expire on their own. Failures are logged, never raised: entries
+    expire within ``GITHUB_ETAG_TTL`` anyway."""
     cache = caches["default"]
     try:
+        # Written before 0.12.10 (one-hour TTL). Remove this delete in a later release.
         cache.delete(f"github:ratelimit:{user_id}")
         pattern = cache.make_key(f"github:etag:{user_id}:*")
         if isinstance(cache, RedisCache):
