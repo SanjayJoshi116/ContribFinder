@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.11 (2026-10-22)
+Version: 0.12.14 (2026-10-23)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,6 +439,59 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.14 - Signal and explanation fixes without a spec change (B-14..B-16, D-7)
+============================================================================
+
+Developer profile
+  [x] README badges in HTML attributes keep their later parameters (&amp;)
+  [x] shields.io badges name a skill in the message segment too
+  [x] Contribution interest evidence dated by the contribution
+
+  [x] shields.io badge messages count only with no label or a technology label
+
+Explanations
+  [x] No reason for a signal weighted 0
+
+Evaluation (review of 0.12.13, S-1..S-4)
+  [x] Forced activation works when the benchmark or active config is unusable
+  [x] Activation fails when the active config changed while it was judged
+  [x] Activation verdict uses the pinned baseline min score and top N
+  [x] Audit marks an activation forced only when the rule was overridden
+  [ ] Admin activation off the request path (S-6)
+  [ ] Saved/hidden page mode: previous link consistent with cursor next (S-7)
+
+============================================================================
+SHIPPED - v0.12.13 - Config activation and loose ends (P-3, Q-10, ideas round 5)
+============================================================================
+
+Scoring configuration
+  [x] activate_scoring_config: benchmark-gated, --force --reason, audited
+  [x] Admin "Activate" uses the same rule (never forced)
+
+Tooling and tests
+  [x] Flaky frontend tests fixed (lazy chart preloaded in the test setup)
+  [x] Library scripts exit 1 when run directly
+  [x] Q-10 snapshot prefetch sort accepted (bounded, measured)
+
+============================================================================
+SHIPPED - v0.12.12 - Freshness, paging and seed (Y-6, Y-7, Z-1)
+============================================================================
+
+Saved and hidden lists
+  [x] Cursor paging on /saved and /dismissed: no repeated or skipped entries between pages
+  [x] Unreadable cursor answers 400 invalid_cursor; page numbers still accepted
+
+Client freshness
+  [~] A finished generation refreshes profile, skills and interests (data with no generation
+      after it still waits up to 5 minutes)
+
+Scoring configuration
+  [x] Re-applied v2 seed never changes activation when v2 is already stored
+
+CI
+  [x] e2e job no longer hangs after the last test (Django not detached); job timeouts
+
+============================================================================
 SHIPPED - v0.12.11 - Tooling and data hygiene (backlog batch 16, Q-10..Q-12)
 ============================================================================
 
@@ -515,10 +568,7 @@ PLANNED - MVP+ / FUTURE
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
   [ ] Bug_Backlog.md batch 8  signal and explanation accuracy (waits for K-1)
-  [ ] Bug_Backlog.md Y-6, Y-7  5-minute stale profile data, saved-list paging drift
-  [ ] Bug_Backlog.md Z-1  v2 re-seed after a rollback overrides an operator's v1 (spec change)
-  [ ] Bug_Backlog.md P-1, P-3, Q-10  keep-alive exit cause, flaky frontend tests (not
-                     reproduced), multi-repository snapshot prefetch sort
+  [ ] Bug_Backlog.md P-1  keep-alive exit cause
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation

@@ -50,6 +50,46 @@ def test_shields_badges() -> None:
     assert skills(readme)["postgresql"] == "Badge or skill icon"
 
 
+def test_badge_url_in_html_attribute_keeps_later_params() -> None:
+    readme = '<img src="https://img.shields.io/badge/x-00ADD8?style=flat&amp;logo=go" />'
+    assert "go" in badge_skills(readme)
+
+
+def test_shields_badge_message_segment() -> None:
+    readme = (
+        "![](https://img.shields.io/badge/-Python-3776AB)"
+        " ![](https://img.shields.io/badge/language-Rust-orange)"
+        " ![](https://img.shields.io/badge/build-passing-green)"
+    )
+    assert badge_skills(readme) == {"python", "rust"}
+
+
+def test_shields_badge_color_segment_ignored() -> None:
+    assert badge_skills("![](https://img.shields.io/badge/license-MIT-go)") == set()
+
+
+def test_shields_badge_free_text_message_ignored() -> None:
+    readme = (
+        "![](https://img.shields.io/badge/code%20style-black-000000)"
+        " ![](https://img.shields.io/badge/platform-linux-blue)"
+        " ![](https://img.shields.io/badge/docs-go%20to%20site-blue)"
+    )
+    assert badge_skills(readme) == set()
+
+
+def test_shields_badge_message_after_tech_label() -> None:
+    readme = (
+        "![](https://img.shields.io/badge/made%20with-Go-00ADD8)"
+        " ![](https://img.shields.io/badge/Tech%20Stack-Django-green)"
+    )
+    assert badge_skills(readme) == {"go", "django"}
+
+
+def test_shields_badge_encoded_dash_is_not_a_separator() -> None:
+    # %2D is part of the label, so "go" is the message of a non-tech label.
+    assert badge_skills("![](https://img.shields.io/badge/ci%2Dstatus-go-green)") == set()
+
+
 def test_skill_icons_and_devicons() -> None:
     readme = (
         "[![My Skills](https://skillicons.dev/icons?i=go,rust,k8s,py)](https://skillicons.dev)\n"

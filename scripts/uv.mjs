@@ -6,6 +6,8 @@ import { existsSync, readdirSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
+import { refuseRun } from './env.mjs'
+
 const exe = process.platform === 'win32' ? 'uv.exe' : 'uv'
 
 /** Absolute paths where installers put uv without necessarily adding it to PATH. */
@@ -59,3 +61,5 @@ export function uv(args, { cwd } = {}) {
   const result = spawnSync(cmd, [...prefix, ...args], { cwd, stdio: 'inherit', shell: false })
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
+
+refuseRun(import.meta.url)

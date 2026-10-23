@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 
 from .confidence import compute_confidence
 from .inputs import Evidence, ProfileInput, RepoInput
@@ -22,7 +23,9 @@ class DetectedInterest:
     evidence: tuple[Evidence, ...]
 
 
-def _repo_evidence(repo: RepoInput, *, contributed: bool) -> list[Evidence]:
+def _repo_evidence(
+    repo: RepoInput, *, contributed: bool, observed_at: datetime | None
+) -> list[Evidence]:
     """Topic and description evidence for one repository: one record per interest and kind
     for owned repositories, one record per interest for contributed ones."""
     found: dict[tuple[str, str], Evidence] = {}
@@ -30,12 +33,12 @@ def _repo_evidence(repo: RepoInput, *, contributed: bool) -> list[Evidence]:
         if slug := interest_for_topic(topic):
             source = "contribution" if contributed else "topic"
             found.setdefault(
-                (slug, source), Evidence(slug, source, repo.id, f'"{topic}"', repo.pushed_at)
+                (slug, source), Evidence(slug, source, repo.id, f'"{topic}"', observed_at)
             )
     for slug, phrase in SYNONYM_MATCHER.find(repo.description).items():
         source = "contribution" if contributed else "repo_description"
         detail = f'Mentions "{phrase}"'
-        found.setdefault((slug, source), Evidence(slug, source, repo.id, detail, repo.pushed_at))
+        found.setdefault((slug, source), Evidence(slug, source, repo.id, detail, observed_at))
     return list(found.values())
 
 
@@ -45,9 +48,11 @@ def interest_evidence(profile: ProfileInput) -> list[Evidence]:
         for slug, phrase in SYNONYM_MATCHER.find(plain_text(profile.readme)).items()
     ]
     for repo in profile.own_work:
-        evidence += _repo_evidence(repo, contributed=False)
+        evidence += _repo_evidence(repo, contributed=False, observed_at=repo.pushed_at)
     for contribution in profile.contributions:
-        evidence += _repo_evidence(contribution.repo, contributed=True)
+        evidence += _repo_evidence(
+            contribution.repo, contributed=True, observed_at=contribution.observed_at
+        )
     return evidence
 
 

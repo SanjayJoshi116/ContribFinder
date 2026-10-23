@@ -1,6 +1,8 @@
 // Which running processes belong to this repository's local stack (`npm run stop`). Pure: the
 // process list and the runner records come in, so tests need no real processes.
 
+import { refuseRun } from './env.mjs'
+
 /** Parses `ps -eo pid=,args=` output. The name is the basename of the executable, lowercase:
  * `exeOf(pid)` (Linux: the `/proc/<pid>/exe` link, exact even with spaces in the path) when it
  * answers, else the first argument. Never `comm`: it can be a thread name (a newer Node reports
@@ -62,3 +64,5 @@ export function matchStack(processes, records, repo, selfPid) {
   }
   return { kill: [...kill.values()], remove }
 }
+
+refuseRun(import.meta.url)

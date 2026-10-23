@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.11** (tooling and data hygiene: the Redis runner restarts a lost WSL keep-alive, LF checkouts on every OS, runner scripts linted in CI; MVP+). After signing in with
+**Version 0.12.14** (signal and explanation fixes: README badges and contribution dates read correctly, no reason for a signal weighted 0, config activation hardened; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -174,6 +174,24 @@ and the selection benchmark. It merges: `--config v2-deterministic` replaces v2'
 keeps v1's. A different `--top-n` must cover every configuration recorded for the dataset, and
 `--min-score` is refused (the test recomputes each configuration at its own minimum score).
 
+To make a configuration active, use the activation command (the admin "Activate" action applies
+the same rule, without force):
+
+```bash
+npm run manage -- activate_scoring_config v3-example
+npm run manage -- activate_scoring_config v1-deterministic --force --reason "rollback after incident"
+```
+
+It refuses an unknown or invalid configuration, and one that is not an improvement over the
+active one on the selection benchmark (it prints the failed metrics). `--force --reason` makes a
+deliberate exception, such as a rollback; it also works when the benchmark or the active
+configuration is unusable (audited as not compared). The verdict uses the pinned baseline
+minimum score and top N, so a local `.env` cannot change it. If another activation lands while
+one is being judged, it fails: run it again. Every activation is audited with both versions,
+whether the rule was overridden, the reason and the failed metrics. Check the acceptance holdout yourself before activating: the
+command does not read it. Recommendations regenerate under the new configuration on the next
+freshness run.
+
 ### Judging real developers
 
 The personas were invented and judged by the same author who designed the ranking, so the
@@ -282,11 +300,12 @@ Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion fi
 fencing) in 0.12.4, batch 5 (GitHub error resilience) in 0.12.5, together with the follow-ups
 from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consistency) in 0.12.6,
 batch 7 (discovery and repository data) in 0.12.7, batch 9 (frontend correctness) in 0.12.8,
-together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 and Y-7 still open),
+together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 in part and Y-7 in 0.12.12),
 and batch 10 (dev scripts, checks and migrations) in 0.12.9, together with the follow-ups from its
-review (rows Z-1…Z-10, batch 15; Z-1 still open), and batch 11 (performance and cleanup) in
-0.12.10 (A-18 wontfix), and batch 16 (tooling and data hygiene) in 0.12.11. Batch 8
-(ranking-visible, waits for K-1) remains.
+review (rows Z-1…Z-10, batch 15; Z-1 in 0.12.12), and batch 11 (performance and cleanup) in
+0.12.10 (A-18 wontfix), and batch 16 (tooling and data hygiene) in 0.12.11. B-14…B-16 and D-7
+of batch 8 shipped in 0.12.14 with S-1…S-5 from the review of 0.12.13/0.12.14 (batch 18). The
+rest of batch 8 (ranking-visible, waits for K-1), S-6, S-7 and S-9…S-11 remain.
 
 ## Versioning
 

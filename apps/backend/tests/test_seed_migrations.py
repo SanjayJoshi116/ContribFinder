@@ -13,6 +13,7 @@ from e2e.builders import make_candidate_repo
 from recommendations.models import ScoringConfig
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 
+from .shared_fixtures import active_configs as active
 from .test_models_phase5 import make_recommendation
 
 seed_v1 = importlib.import_module("recommendations.migrations.0002_seed_v1_deterministic")
@@ -21,10 +22,6 @@ seed_v2 = importlib.import_module("recommendations.migrations.0003_seed_v2_deter
 
 def run(migration, direction: str) -> None:
     getattr(migration, direction)(global_apps, None)
-
-
-def active() -> list[str]:
-    return list(ScoringConfig.objects.filter(is_active=True).values_list("version", flat=True))
 
 
 def assert_one_active_if_any() -> None:
@@ -53,7 +50,9 @@ def test_reverse_and_reapply_keeps_one_active(user, recommendations_on: str | No
         run(migration, direction)
         assert_one_active_if_any()
 
-    assert active() == ["v2-deterministic"]
+    # A v2 kept by the rollback (it had recommendations) is not re-activated by the seed (Z-1).
+    kept = recommendations_on == "v2-deterministic"
+    assert active() == ["v1-deterministic" if kept else "v2-deterministic"]
 
 
 @pytest.mark.django_db
@@ -95,12 +94,26 @@ def test_operator_config_stays_active_through_v2_seed() -> None:
 
 @pytest.mark.django_db
 def test_v2_seed_replaces_v1() -> None:
-    ScoringConfig.objects.update(is_active=False)
+    """An upgrade: v2 is not stored yet."""
+    ScoringConfig.objects.filter(version="v2-deterministic").delete()
     ScoringConfig.objects.filter(version="v1-deterministic").update(is_active=True)
 
     run(seed_v2, "seed")
 
     assert active() == ["v2-deterministic"]
+
+
+@pytest.mark.django_db
+def test_operator_v1_stays_active_when_v2_is_reseeded() -> None:
+    """Z-1: an operator chose v1 over a stored v2; a rollback and re-apply keeps that choice."""
+    ScoringConfig.objects.update(is_active=False)
+    ScoringConfig.objects.filter(version="v1-deterministic").update(is_active=True)
+
+    run(seed_v2, "unseed")
+    assert ScoringConfig.objects.filter(version="v2-deterministic").exists()
+    run(seed_v2, "seed")
+
+    assert active() == ["v1-deterministic"]
 
 
 @pytest.mark.django_db(transaction=True)

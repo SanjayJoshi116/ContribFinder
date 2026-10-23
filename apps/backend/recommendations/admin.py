@@ -1,7 +1,9 @@
 from django.contrib import admin, messages
-from django.db import transaction
 from django.db.models import Model, QuerySet
 from django.http import HttpRequest
+
+from accounts.models import User
+from services.ranking import activation
 
 from .models import Recommendation, RecommendationReason, ScoringConfig
 
@@ -35,12 +37,29 @@ class ScoringConfigAdmin(admin.ModelAdmin[ScoringConfig]):
         if queryset.count() != 1:
             self.message_user(request, "Select exactly one configuration.", messages.ERROR)
             return
-        config = queryset.get()
-        with transaction.atomic():
-            ScoringConfig.objects.exclude(pk=config.pk).update(is_active=False)
-            ScoringConfig.objects.filter(pk=config.pk).update(is_active=True)
+        version = queryset.get().version
+        user = request.user if isinstance(request.user, User) else None
+        try:
+            # The same rule as the command, never forced (spec recommendation-evaluation,
+            # "Activating a configuration").
+            result = activation.activate(version, via="admin", user=user, request=request)
+        except activation.ActivationRefused as refused:
+            self.message_user(
+                request,
+                f"{version} was not activated: {'; '.join(refused.failures)}. For a deliberate "
+                f"exception run `npm run manage -- activate_scoring_config {version} --force "
+                '--reason "..."`.',
+                messages.ERROR,
+            )
+            return
+        except activation.ActivationError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+            return
+        if not result.changed:
+            self.message_user(request, f"{version} is already active.")
+            return
         self.message_user(
-            request, f"{config.version} is active; recommendations regenerate on the next refresh."
+            request, f"{version} is active; recommendations regenerate on the next refresh."
         )
 
 

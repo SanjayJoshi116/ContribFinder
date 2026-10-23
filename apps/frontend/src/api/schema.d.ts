@@ -1548,6 +1548,8 @@ export interface operations {
   dismissed_list: {
     parameters: {
       query?: {
+        /** @description Continue after the entry this opaque value marks (from `next`). */
+        cursor?: string
         /** @description A page number within the paginated result set. */
         page?: number
         /** @description Number of results to return per page. */
@@ -2738,6 +2740,8 @@ export interface operations {
   saved_list: {
     parameters: {
       query?: {
+        /** @description Continue after the entry this opaque value marks (from `next`). */
+        cursor?: string
         /** @description A page number within the paginated result set. */
         page?: number
         /** @description Number of results to return per page. */

@@ -413,11 +413,11 @@ describe('saved projects page', () => {
       'GET /api/v1/saved?page_size=50': () =>
         json({
           count: 2,
-          next: '/api/v1/saved?page=2&page_size=50',
+          next: 'http://testserver/api/v1/saved?cursor=c1&page_size=50',
           previous: null,
           results: [saved(1)],
         }),
-      'GET /api/v1/saved?page=2&page_size=50': () =>
+      'GET /api/v1/saved?page_size=50&cursor=c1': () =>
         json({ count: 2, next: null, previous: '/api/v1/saved?page_size=50', results: [saved(2)] }),
       'GET /api/v1/dismissed?page_size=50': () => page([]),
     })
@@ -429,6 +429,41 @@ describe('saved projects page', () => {
     expect(await screen.findByRole('article', { name: 'org/repo-2' })).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'org/repo-1' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
+  })
+
+  it('continues after the last shown entry when one was unsaved meanwhile', async () => {
+    const saved = (n: number) => ({
+      repository_id: 100 + n,
+      repository: { ...REPOSITORY, full_name: `org/repo-${n}`, name: `repo-${n}` },
+      saved_at: '2026-09-29T10:00:00Z',
+      activity_label: '',
+      recommendation: null,
+    })
+    // As the server pages: the cursor marks repo-2, so an unsave of repo-1 (in another tab)
+    // shifts nothing; a page number would have started the next page at repo-4.
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/saved?page_size=50': () =>
+        json({
+          count: 4,
+          next: 'http://testserver/api/v1/saved?page_size=50&cursor=after-2',
+          previous: null,
+          results: [saved(1), saved(2)],
+        }),
+      'GET /api/v1/saved?page_size=50&cursor=after-2': () =>
+        json({ count: 3, next: null, previous: null, results: [saved(3), saved(4)] }),
+      'GET /api/v1/dismissed?page_size=50': () => page([]),
+    })
+    renderRoute('/app/saved')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Show more' }))
+
+    expect(await screen.findByRole('article', { name: 'org/repo-4' })).toBeInTheDocument()
+    expect(screen.getAllByRole('article')).toHaveLength(4)
+    for (const n of [1, 2, 3, 4]) {
+      expect(screen.getAllByRole('article', { name: `org/repo-${n}` })).toHaveLength(1)
+    }
+    expect(callsTo(fetchMock, 'GET', '/api/v1/saved?page_size=50&cursor=after-2')).toHaveLength(1)
   })
 
   it('keeps loaded hidden projects listed after a restore', async () => {
@@ -444,15 +479,15 @@ describe('saved projects page', () => {
       'GET /api/v1/dismissed?page_size=50': () =>
         json({
           count: 3,
-          next: '/api/v1/dismissed?page=2&page_size=50',
+          next: 'http://testserver/api/v1/dismissed?cursor=c2&page_size=50',
           previous: null,
           results: [hidden(1), hidden(2)],
         }),
-      'GET /api/v1/dismissed?page=2&page_size=50': () =>
+      'GET /api/v1/dismissed?page_size=50&cursor=c2': () =>
         json({
           count: restored ? 2 : 3,
           next: null,
-          previous: '/api/v1/dismissed?page_size=50',
+          previous: null,
           results: restored ? [] : [hidden(3)],
         }),
       'DELETE /api/v1/dismissed/203': () => {

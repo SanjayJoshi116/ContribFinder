@@ -141,19 +141,23 @@ export function useUnsaveRepository() {
 /** Entries per request; "Show more" loads the next page. */
 export const LIST_PAGE_SIZE = 50
 
-/** `/saved` or `/dismissed`, one page at a time, so every entry can be reached. An
- * invalidation refetches all loaded pages, so entries already shown stay listed. */
+/** `/saved` or `/dismissed`, one page at a time, so every entry can be reached. Each page
+ * continues after the previous page's last entry (the `cursor` in `next`), so saves and
+ * removals between "Show more" clicks never repeat or skip an entry. An invalidation refetches
+ * all loaded pages in order, so entries already shown stay listed. */
 function usePagedList<P extends { next?: string | null }>(key: readonly unknown[], path: string) {
-  return useInfiniteQuery<P, ApiError, InfiniteData<P>, readonly unknown[], number>({
+  return useInfiniteQuery<P, ApiError, InfiniteData<P>, readonly unknown[], string | null>({
     queryKey: key,
     queryFn: ({ pageParam }) =>
       apiFetch<P>(
-        pageParam > 1
-          ? `${path}?page=${pageParam}&page_size=${LIST_PAGE_SIZE}`
+        pageParam
+          ? `${path}?page_size=${LIST_PAGE_SIZE}&cursor=${encodeURIComponent(pageParam)}`
           : `${path}?page_size=${LIST_PAGE_SIZE}`,
       ),
-    initialPageParam: 1,
-    getNextPageParam: (last, _pages, lastPage) => (last.next ? lastPage + 1 : undefined),
+    initialPageParam: null,
+    getNextPageParam: (last) =>
+      (last.next && new URL(last.next, window.location.origin).searchParams.get('cursor')) ||
+      undefined,
   })
 }
 

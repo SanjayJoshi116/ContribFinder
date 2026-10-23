@@ -38,6 +38,12 @@ class ContributionInput:
     push_count: int = 0
     last_contributed_at: datetime | None = None
 
+    @property
+    def observed_at(self) -> datetime | None:
+        """When evidence from this contribution was observed: the contribution's own time, else
+        the repository's last push."""
+        return self.last_contributed_at or self.repo.pushed_at
+
 
 @dataclass(frozen=True)
 class ProfileInput:

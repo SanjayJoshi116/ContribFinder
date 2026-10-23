@@ -24,6 +24,12 @@ ALLOWED_METADATA_KEYS = frozenset(
         "revocation",
         "created_user",
         "deleted",  # counts of deleted rows per kind, never content
+        # scoring configuration activation (services/ranking/activation.py)
+        "config_version",
+        "previous_version",
+        "forced",
+        "failures",
+        "via",
     }
 )
 

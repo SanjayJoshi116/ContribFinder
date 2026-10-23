@@ -168,8 +168,9 @@ def reasons(
     weights: Mapping[str, float],
     params: Mapping[str, Any] | None = None,
 ) -> list[Reason]:
-    """Reasons for every signal above 0 with evidence, highest contribution to the score first
-    (the same contributions the score sums, relevance scaling included)."""
+    """Reasons for every signal that adds to the score and has evidence, highest contribution
+    first (the same contributions the score sums, relevance scaling included). A signal the
+    configuration weights 0 gets no reason, whatever its value."""
     contribution = contributions(signals, weights, params or {})
     result = [
         Reason(
@@ -179,7 +180,7 @@ def reasons(
             detail={"items": [dict(item) for item in signal.evidence]},
         )
         for name, signal in signals.items()
-        if signal.value > 0 and signal.evidence
+        if contribution[name] > 0 and signal.evidence
     ]
     result.sort(key=lambda r: (-r.weight, ORDER.index(r.type)))
     return result

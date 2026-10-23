@@ -202,6 +202,39 @@ describe('refresh on job transitions', () => {
     expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2)
   })
 
+  it('refetches the profile once per finished generation, not the other statuses', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let statusCalls = 0
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/recommendations/status': () =>
+        json({
+          ...NEVER_GENERATED,
+          job: generationJob(statusCalls++ === 0 ? 'RUNNING' : 'COMPLETED'),
+        }),
+    })
+    const profileCalls = () =>
+      [
+        '/api/v1/profile',
+        '/api/v1/profile/skills?page_size=200',
+        '/api/v1/profile/interests?page_size=200',
+      ].map((path) => callsTo(fetchMock, 'GET', path).length)
+    renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+    expect(profileCalls()).toEqual([1, 1, 1])
+    const syncStatus = callsTo(fetchMock, 'GET', '/api/v1/sync/status').length
+    const discoveryStatus = callsTo(fetchMock, 'GET', '/api/v1/discovery/status').length
+
+    await vi.advanceTimersByTimeAsync(3100)
+    await waitFor(() => expect(profileCalls()).toEqual([2, 2, 2]))
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(profileCalls()).toEqual([2, 2, 2])
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/status').length).toBe(syncStatus)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/discovery/status').length).toBe(discoveryStatus)
+  })
+
   it('looks for the generation once when discovery finishes', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let discoveryCalls = 0

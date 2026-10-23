@@ -9,3 +9,8 @@ configure({ asyncUtilTimeout: 5000 })
 afterEach(() => {
   cleanup()
 })
+
+// AppShell loads LanguageChart (Recharts) lazily. Its first import evaluates for about a second
+// and would land inside whichever test is running when it resolves (P-3), so every test file
+// pays it here instead. Preload any other lazy component the same way.
+await import('@/features/profile/LanguageChart')

@@ -138,7 +138,8 @@ ContribFinder/
 │  │     ├─ matching/       activity, technologies, features (loading), signals,
 │  │     │                  issues (issue matching) (Phase 4–7)
 │  │     ├─ ranking/        config (validation), pipeline (rank_pool, shared by generation and
-│  │     │                  evaluation), score, explain, service (generation), freshness (Phase 5)
+│  │     │                  evaluation), score, explain, service (generation), freshness (Phase 5),
+│  │     │                  activation (activate_scoring_config and the admin action)
 │  │     ├─ evaluation/     dataset (benchmark load/validate, selection_dataset), metrics, runner
 │  │     │                  (evaluate, compare, persona/real subsets), baseline, export, sheet
 │  │     │                  (blind judging sheets), build (merge datasets) (Phase 8b+)
@@ -233,6 +234,10 @@ Local, no Docker (primary on this machine):
   must not regress on a fresh acceptance holdout (`holdout-v1`/`-v2` are used; add `holdout-v3`
   first; spec `recommendation-evaluation`). A config's own `min_score` wins over the setting;
   `--min-score` overrides it.
+- `npm run manage -- activate_scoring_config <version> [--force --reason "..."]` is the one way
+  to switch the active config (`services/ranking/activation.py`; the admin action calls it, never
+  forced): refused unless an improvement over the active one on the selection benchmark
+  (settings defaults), audited (`scoring_config_activated`). It does not read a holdout.
 - Real judged developers (README "Judging real developers"): `export_benchmark_developer` →
   `benchmark_sheet` (blind CSV) → `import_judgments` → `build_benchmark`. `evaluate_ranking`
   defaults to the selection benchmark: `benchmark-v2` once it holds a `real` developer, else
@@ -862,17 +867,22 @@ deltas to `recommendations-view`, `recommendation-feedback`, `issue-matching`,
   dashboard refetch it).
 - `fetchStatusAndRefresh` (`src/app/jobTransitions.ts`) runs inside each status `queryFn` and
   refreshes derived data once per newly finished job (sync → `['profile']`; generation → list,
-  details, issues, saved; discovery → generation status). No per-observer effects.
+  details, issues, saved, and since 0.12.12 the developer profile, skills and interests;
+  discovery → generation status). No per-observer effects.
 - `positiveId` and `DeadEnd` for detail routes; `useScrollToHash(ready)` for hash links to
-  content that loads later; saved/hidden lists are infinite queries (50 per page).
+  content that loads later; saved/hidden lists are infinite queries (50 per page, by cursor
+  since 0.12.12).
 - Browser tests: `scripts/e2e-backend.mjs` runs `e2e_seed` (creates, migrates, seeds
   `contribfinder_e2e`) then Django; Playwright starts web servers before `globalSetup`, so the
   seed lives there. CI job `e2e`.
 - Sign-out mutations carry `meta: { endsSession: true }` (`ENDS_SESSION_META_KEY`), which
   suspends the 401 handler; new sign-out flows must set it. `DJANGO_READ_DOTENV=0` stops
   `base.py` reading `.env`; `scripts/e2e-backend.mjs` sets it and passes only `DATABASE_URL`.
-- Review follow-ups Y-1…Y-5 and Y-8 of `Bug_Backlog.md` fixed in the same release; Y-6, Y-7
-  open; Y-9, Y-10 in batch 11.
+  It spawns Django with `detached: false` (0.12.12): Playwright stops a web server by `SIGKILL`
+  to its process group, and a detached Django kept the pipe open, so CI hung after the last
+  test. Every CI job has `timeout-minutes`.
+- Review follow-ups Y-1…Y-5 and Y-8 of `Bug_Backlog.md` fixed in the same release; Y-6 (in
+  part), Y-7 in 0.12.12; Y-9, Y-10 in batch 11.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
 **Dev scripts, checks and migrations** (MVP+, fix release)  ✅ shipped in v0.12.9 (no ranking change)
@@ -903,8 +913,8 @@ deltas to `api-platform`, `recommendation-engine`. Batch 10 of `Bug_Backlog.md`.
   never `argv[1] === fileURLToPath(...)`. `scripts/uv.mjs` is a library, not a CLI.
 - CI concurrency groups pushes by `github.sha` (a group keeps one pending run, so a shared group
   on `main` drops queued commits) and pull requests by ref with cancellation.
-- Review follow-ups Z-2, Z-3, Z-6, Z-7 of `Bug_Backlog.md` fixed in the same release; Z-1 open
-  (spec change), Z-4, Z-5, Z-8 and the `/simplify` skips Z-9, Z-10 in batch 11.
+- Review follow-ups Z-2, Z-3, Z-6, Z-7 of `Bug_Backlog.md` fixed in the same release; Z-1 in
+  0.12.12 (spec change), Z-4, Z-5, Z-8 and the `/simplify` skips Z-9, Z-10 in batch 11.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
 **Performance and cleanup** (MVP+, fix release)  ✅ shipped in v0.12.10 (no ranking change)
@@ -958,6 +968,70 @@ Archived: `openspec/changes/archive/2026-10-22-tooling-data-hygiene/`. Spec: del
 - P-3 (flaky frontend tests) not reproduced in 8 runs under load; stays open.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Freshness, paging and seed** (MVP+, fix release)  ✅ shipped in v0.12.12 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-22-freshness-paging-seed/`. Specs: deltas to
+`web-client`, `recommendation-feedback`, `recommendation-engine`. `Bug_Backlog.md` Y-6, Y-7, Z-1
+(open outside a batch), plus the CI e2e hang fix.
+- A finished generation also invalidates `developerProfileKey`, `skillsKey`, `interestsKey`
+  (every analysis ends in one: analysis → discovery → generation). Never invalidate the
+  `['profile']` prefix from a status `queryFn`: the status keys live under it.
+- `/saved` and `/dismissed` use `feedback.api.KeysetPagination` (`SavedPagination`,
+  `DismissedPagination`, `time_field`): `cursor` = unpadded URL-safe base64 of
+  `"<iso time with µs>|<pk>"`, rows strictly older than it, `count` the total, `next` carries the
+  cursor (never `page`), `previous` null with a cursor; without one `page` works as before. An
+  unreadable cursor is 400 `invalid_cursor` (`InvalidCursor`). `usePagedList` reads `cursor`
+  from `next`. Not a contract break (OpenAPI `1.0.0`).
+- `0003_seed_v2_deterministic.seed` returns early when v2 is stored: a re-apply after a rollback
+  never changes activation. Re-activating v2 over v1 is not a benchmark improvement (P@5), so it
+  takes `activate_scoring_config v2-deterministic --force --reason ...` (0.12.13).
+  `test_v2_seed_replaces_v1` deletes v2 first (an upgrade has none).
+- Y-6 leaves data with no generation after it (failed discovery) cached up to 5 min.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Config activation and loose ends** (MVP+, fix release)  ✅ shipped in v0.12.13 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-22-config-activation-loose-ends/`. Specs: deltas to
+`recommendation-evaluation` (new "Activating a configuration"), `developer-tooling` (new
+"Library scripts refuse to run as commands"). `Bug_Backlog.md` P-3, Q-10, `ideas.md` §15.
+- `services/ranking/activation.activate(version, *, force, reason, via, user, request, judge)`:
+  `stored_config` validation → already active is a no-op (no audit) → force needs a reason →
+  `judge` (default `benchmark_judge`, looked up at call time so tests patch it; pinned
+  `baseline.MIN_SCORE`/`TOP_N`, never settings) → one transaction locking every config row by
+  pk, re-reading the active row (changed since judging → `ActivationError`) → audit. Forced, a
+  comparison that cannot run (`ConfigError`, `DatasetError`) is recorded as `not compared: ...`
+  instead of raised; `forced` is audited only when the rule was not met or not evaluated
+  (0.12.14, S-1…S-4). Errors: `ActivationError`, `ActivationRefused(failures)`.
+- Audit: `AuditEvent.Action.SCORING_CONFIG_ACTIVATED` (choices-only migration
+  `accounts.0003`); allowed metadata `config_version`, `previous_version`, `forced`,
+  `failures`, `via` (none identifying).
+- P-3 cause: AppShell's lazy `LanguageChart` (Recharts) blocked the event loop ~1 s inside a
+  random test on first import. `src/test/setup.ts` preloads it; preload any new lazy component.
+- `refuseRun(import.meta.url)` (`env.mjs`) ends every library script (`child`, `env`, `stack`,
+  `uv`, `restarts`): run directly they exit 1. A new library calls it too
+  (`scripts/libraries.test.mjs` lists them).
+- Q-10 accepted (bounded); the EXPLAIN is in `Bug_Backlog.md`.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Signal and explanation fixes** (MVP+, fix release)  ✅ shipped in v0.12.14 (no ranking change)
+
+No OpenSpec change: the code now follows the existing specs (`skill-detection`,
+`developer-profile`, `recommendation-explanations`). `Bug_Backlog.md` B-14, B-15, B-16, D-7 of
+batch 8; the rest of batch 8 changes specified behavior and needs a change.
+- README badge URLs are `html.unescape`d before parsing. A shields.io `/badge/` path is split on
+  `-` before decoding (`--` literal); the label always counts, the message only with no label or
+  a technology label (`_SECTION_TITLE`, `built/made/powered/written`), so free-text messages
+  (`code style-black`) add no skill (S-5).
+- `ContributionInput.observed_at` (`last_contributed_at`, else the repository's push) is the one
+  date for contribution evidence; skill and interest collectors both read it.
+- `explain.reasons` skips a signal whose contribution is 0 (weight 0).
+- `feedback.api.KeysetPagination` applies its own order (`-time_field, -pk`); views do not order.
+  Test helper `shared_fixtures.active_configs()`.
+- Review of 0.12.13/0.12.14 (`Bug_Backlog.md` batch 18): S-1…S-5 fixed here, S-8 accepted; S-6
+  (admin activation runs the benchmark in the request), S-7 (page-mode `previous` link) and the
+  `/simplify` skips S-9…S-11 (`ideas.md` §17) open.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
@@ -969,9 +1043,10 @@ responsiveness, linked PRs), evaluation rigor (bootstrap CIs, inter-rater agreem
 recall), online report per config from feedback, dismiss reasons, CSP, dependency scanning.
 Round 3 (2026-10-21): content-based `not_code`, post-analysis pool cleanup, search budget
 (`no_license` rejections, per-band yield), queuing released-name refreshes. Round 4: data
-versions for client freshness, keyset saved lists, server page clamping, route-level ids. Round 5:
-loud helper modules, generic migration round trip, explicit config activation (lint `scripts/`
-shipped in 0.12.11). Round 6 (2026-10-22): stored activity on `Repository` (the index tie-break,
+versions for client freshness (narrower since 0.12.12), server page clamping, route-level ids
+(keyset saved lists shipped in 0.12.12). Round 5:
+generic migration round trip, seeds that store new versions inactive (lint `scripts/` shipped in
+0.12.11; loud helper modules and the activation command in 0.12.13). Round 6 (2026-10-22): stored activity on `Repository` (the index tie-break,
 wrappers, `.gitattributes` and builder imports shipped in 0.12.11). Ranking-visible ideas wait
 for K-1; bootstrap CIs should land before or with it.
 

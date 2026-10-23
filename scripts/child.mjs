@@ -6,7 +6,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { root } from './env.mjs'
+import { refuseRun, root } from './env.mjs'
 
 const GRACE_MS = 5_000
 
@@ -134,3 +134,5 @@ export function runChild(cmd, args, options = {}) {
   child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)))
   return child
 }
+
+refuseRun(import.meta.url)

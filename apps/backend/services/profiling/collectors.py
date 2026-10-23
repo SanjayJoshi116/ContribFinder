@@ -80,7 +80,7 @@ def contribution_skills(
     evidence = []
     for contribution in profile.contributions:
         repo = contribution.repo
-        when = contribution.last_contributed_at or repo.pushed_at
+        when = contribution.observed_at
         prs, pushes = contribution.merged_pr_count, contribution.push_count
         for slug in _contributed_skills(contribution, min_share):
             if prs > 0:

@@ -42,3 +42,14 @@ export function redisTarget() {
   const host = url.hostname === 'localhost' ? '127.0.0.1' : url.hostname
   return { host, port: Number(url.port || 6379), isLocal: ['127.0.0.1', '::1'].includes(host) }
 }
+
+/** Exits 1 with a message when the module at ``moduleUrl`` was started directly: a library run
+ * by mistake must fail, not exit 0 having done nothing (that once passed for a green check). */
+export function refuseRun(moduleUrl) {
+  if (!isMain(moduleUrl)) return
+  const file = path.relative(root, fileURLToPath(moduleUrl)).replaceAll('\\', '/')
+  console.error(`${file} is a library used by other scripts; it is not a command.`)
+  process.exit(1)
+}
+
+refuseRun(import.meta.url)

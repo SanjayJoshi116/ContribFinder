@@ -16,6 +16,7 @@ from developers.models import (
     SkillEvidence,
 )
 from github.models import GitHubProfile
+from recommendations.models import ScoringConfig
 from services.github.client import PUBLIC_SCOPE, GitHubClient
 
 from .test_github_client import TOKEN
@@ -62,3 +63,7 @@ def public_client() -> Iterator[GitHubClient]:
     """A GitHub client in the shared public cache scope (repository analysis)."""
     with GitHubClient(TOKEN, cache_scope=PUBLIC_SCOPE) as c:
         yield c
+
+
+def active_configs() -> list[str]:
+    return list(ScoringConfig.objects.filter(is_active=True).values_list("version", flat=True))

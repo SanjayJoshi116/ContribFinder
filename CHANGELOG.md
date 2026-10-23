@@ -7,8 +7,98 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.14] - 2026-10-23
+
+Signal and explanation fixes that need no spec change (`Bug_Backlog.md` B-14, B-15, B-16, D-7,
+from batch 8), plus fixes from the review of 0.12.13 and 0.12.14 (S-1…S-5, batch 18). The code now does what the specs already say. No API or UI change, and the
+benchmark numbers are unchanged (`baselines.json` untouched).
+
 ### Fixed
 
+- Profile README badges inside HTML attributes (`&amp;` in the URL) lost every parameter after
+  the first, so a later `logo=` was never read (B-14).
+- shields.io badges named their skill only through the first path segment; a skill in the
+  message (`/badge/-Python-3776AB`, `/badge/language-Rust-orange`) was missed. Every segment but
+  the color now counts (B-15).
+- Interest evidence from a contributed repository was dated by the repository's last push
+  instead of the contribution, as skill evidence already is (B-16).
+- A signal the scoring configuration weights 0 no longer gets a recommendation reason; only
+  signals that add to the score are explained (D-7).
+- shields.io badge messages count only when the badge has no label or a technology label
+  (`language`, `made with`); free text such as `code style-black` or `platform-linux` no longer
+  adds README skills, and an encoded `%2D` is no longer a separator (S-5, review of B-15).
+- `activate_scoring_config --force` works when the benchmark or the active configuration is
+  unusable (the audit records "not compared"); `forced` is audited only when the improvement rule
+  was not met; an activation fails when the active configuration changed while it was judged;
+  the benchmark verdict uses the pinned baseline minimum score and top N, not local settings
+  (S-1…S-4, review of 0.12.13).
+
+### Changed
+
+- Cleanup without behavior change: contribution evidence dates come from one
+  `ContributionInput.observed_at`; the saved/hidden list paginator applies its own order; the v2
+  seed migration drops two exclusions its early return made dead; one shared test helper for
+  active configurations. The new `accounts` migration is stored with LF line endings.
+
+### Documentation
+
+- `recommendation-evaluation` spec: activation uses the pinned baseline minimum score and top N,
+  a forced activation proceeds when the comparison cannot run, `forced` means the rule was
+  overridden, and a concurrent change of the active configuration fails the activation.
+- `Bug_Backlog.md` batch 18 (S-1…S-11): S-6, S-7 open; S-8 accepted; `/simplify` skips S-9…S-11
+  (`ideas.md` §17).
+
+## [0.12.13] - 2026-10-22
+
+Config activation and loose ends (OpenSpec change `config-activation-loose-ends`,
+`Bug_Backlog.md` P-3, Q-10, `ideas.md` §15). No ranking, API or UI change.
+
+### Added
+
+- `npm run manage -- activate_scoring_config <version>` switches the active scoring
+  configuration. It refuses an unknown or invalid configuration and one that is not an
+  improvement over the active one on the selection benchmark, printing the failed metrics;
+  `--force --reason "..."` makes a deliberate exception such as a rollback. Every activation is
+  recorded in the audit log (new action `scoring_config_activated`) with both versions, the
+  reason and the failed metrics.
+
+### Changed
+
+- The admin "Activate" action applies the same rule (never forced): a refusal shows the failed
+  metrics and points to the command.
+- Library scripts (`scripts/child.mjs`, `env.mjs`, `stack.mjs`, `uv.mjs`, `restarts.mjs`) exit 1
+  with a message when run directly, instead of exiting 0 having done nothing.
+
+### Fixed
+
+- Flaky frontend tests (P-3): the lazily loaded language chart blocked the event loop for about
+  a second inside whichever test was running when it first loaded. The test setup now preloads
+  it.
+
+### Not changed
+
+- Q-10 (newest-snapshot prefetch sort) is accepted: the cost is bounded by the snapshot history
+  and measured at 0.4 ms; a `DISTINCT ON` rewrite still sorts on PostgreSQL 18.
+
+## [0.12.12] - 2026-10-22
+
+Freshness, paging and seed (OpenSpec change `freshness-paging-seed`, `Bug_Backlog.md` Y-6, Y-7,
+Z-1). No ranking or UI change; the API change is additive (OpenAPI stays `1.0.0`).
+
+### Fixed
+
+- The saved and hidden lists no longer repeat or skip a project when one is saved, unsaved,
+  dismissed or restored (for example in another tab) between "Show more" clicks.
+  `GET /api/v1/saved` and `GET /api/v1/dismissed` continue after the previous page's last entry
+  through an opaque `cursor` in `next`; `count` and `page` keep working, and an unreadable cursor
+  answers 400 `invalid_cursor` (Y-7).
+- Profile changes from an analysis no sync started (`reanalyze_profiles`) show on an open
+  dashboard when the generation that follows finishes: a finished generation also refetches the
+  developer profile, skills and interests, instead of waiting up to 5 minutes (Y-6, in part).
+- Re-applying the `v2-deterministic` seed after a rollback no longer re-activates v2 over
+  `v1-deterministic`: when v2 is already stored, the seed changes no activation. Re-activate v2
+  with `activate_scoring_config v2-deterministic --force --reason ...` (0.12.13) (Z-1; spec
+  `recommendation-engine` changed).
 - CI's `e2e` job no longer hangs after the last browser test: the e2e backend runner keeps
   Django in Playwright's process group, so Playwright's `SIGKILL` stops it and its output pipe
   closes. Every CI job now has a `timeout-minutes` limit.

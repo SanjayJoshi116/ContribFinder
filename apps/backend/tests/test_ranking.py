@@ -122,6 +122,12 @@ def test_zero_signal_gives_no_reason() -> None:
     assert "interest" not in {r.type for r in reasons}
 
 
+def test_weight_zero_signal_gives_no_reason() -> None:
+    reasons = explain.reasons(all_signals(), {**V1_WEIGHTS, "interest": 0.0})
+    assert "interest" not in {r.type for r in reasons}
+    assert "skill" in {r.type for r in reasons}
+
+
 def test_reasons_ordered_by_contribution_with_detail() -> None:
     reasons = explain.reasons(all_signals(), V1_WEIGHTS)
     weights = [r.weight for r in reasons]

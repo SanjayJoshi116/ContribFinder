@@ -13,6 +13,7 @@ one README evidence record.
 
 from __future__ import annotations
 
+import html
 import re
 from datetime import datetime
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -28,6 +29,7 @@ _ATX = re.compile(r"^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
 _HTML_HEADING = re.compile(r"<h([1-6])[^>]*>(.*?)</h\1>", re.I | re.S)
 _BOLD_LABEL = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*|__)([^*_]{1,60})(?:\*\*|__)\s*:?\s*(.*)$")
 _TAG = re.compile(r"<[^>]+>")
+_BADGE_USES = re.compile(r"\b(?:built|made|powered|written)\b", re.I)
 
 _URLS = re.compile(r"https?://[^\s)\"'<>]+")
 _MD_ALT = re.compile(r"!\[([^\]]*)\]")
@@ -78,11 +80,31 @@ def tech_sections(readme: str) -> list[tuple[str, str]]:
     return sections
 
 
+def _shields_badge_skills(path: str) -> set[str]:
+    """``<label>-<message>-<color>`` or ``<message>-<color>``; "--" is a literal dash. The label
+    may name the skill; the message only when there is no label or the label introduces
+    technologies ("language", "tech stack"), since messages are often free text ("code
+    style-black", "platform-linux")."""
+    segments = [
+        unquote(segment.replace("\0", "-")).replace("_", " ")
+        for segment in path.replace("--", "\0").split("-")
+    ]
+    if len(segments) > 1:
+        segments.pop()  # the color
+    message = segments.pop()
+    label = segments[0] if segments else ""
+    found = set(ALL_MATCHER.find(label))
+    if not label.strip() or _SECTION_TITLE.search(label) or _BADGE_USES.search(label):
+        found.update(ALL_MATCHER.find(message))
+    return found
+
+
 def badge_skills(readme: str) -> set[str]:
     """Skills named by badges, skill icons and image alt text."""
     found: set[str] = set()
     for url in _URLS.findall(readme):
-        parts = urlsplit(url)
+        # URLs inside HTML attributes escape "&" as "&amp;".
+        parts = urlsplit(html.unescape(url))
         host = parts.netloc.lower()
         query = parse_qs(parts.query)
         if host.endswith("shields.io"):
@@ -90,9 +112,7 @@ def badge_skills(readme: str) -> set[str]:
                 if slug := skill_for_icon(logo):
                     found.add(slug)
             if "/badge/" in parts.path:
-                label = unquote(parts.path.split("/badge/", 1)[1]).replace("--", "\0")
-                label = label.split("-", 1)[0].replace("\0", "-").replace("_", " ")
-                found.update(ALL_MATCHER.find(label))
+                found.update(_shields_badge_skills(parts.path.split("/badge/", 1)[1]))
         elif host.endswith("skillicons.dev"):
             for icons in query.get("i", []):
                 for token in icons.split(","):

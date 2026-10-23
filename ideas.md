@@ -1,9 +1,31 @@
 # Ideas
 
-Gap analysis from 2026-10-20 (v0.12.4); rounds 3–5 added 2026-10-21 (v0.12.7–v0.12.9); round 6
-added 2026-10-22 (v0.12.10). These are not yet planned: each needs an OpenSpec
-change before work starts. Ranking-visible items must win on the benchmark, which needs K-1
-(`Bug_Backlog.md`) first.
+Gap analysis from 2026-10-20 (v0.12.4), with later rounds added 2026-10-21 and 2026-10-22
+(v0.12.7–v0.12.10). Nothing here is planned yet: each idea needs an OpenSpec change before work
+starts. Ranking-visible items (marked † below) must win on the benchmark, so they wait for K-1
+(`Bug_Backlog.md`).
+
+Layout: the priority table first, then the open ideas grouped by theme, then what has shipped.
+Section numbers (§1–§16) are stable, because other documents cite them, so they are not in
+numeric order.
+
+## Priorities
+
+Open ideas only. † = changes what users are recommended (waits for K-1).
+
+| | Cheap | Expensive |
+|---|---|---|
+| **High value** | bootstrap CIs (§3, before or with K-1); online report per config (§4); dismiss reasons (§4); labeled-issue fetch† (§7); opportunity qualifiers† (§6); setup readiness (§8); post-analysis pool cleanup (§11); `no_license` measurement (§12) | responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6); content-based `not_code`† (§11, needs a judged sample); data versions (§14); new seeds stored inactive (§15) |
+| **Lower value** | IDF weighting† (§1); per-owner diversity cap† (§1); CSP (§5); pip-audit (§5); queue released-name refresh (§13); per-band yield (§12); route-level ids (§14); production build in CI (§14) | discovery-recall metric (§3); second judge / κ (§3); GitHub budget load model (§5); starred repos† (§6, privacy disclosure); periodic resync (§9, budget); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration) |
+
+Not ranked yet: time decay on skill evidence† (§1), label calibration (§4), pooling bias (§3),
+accessibility and observability (§5).
+
+Offline items (online report, CIs) change no ranking and can ship at any time.
+
+---
+
+# Ranking and matching
 
 ## 1. Matching techniques
 
@@ -37,6 +59,19 @@ merged first contribution:
 Show them as observable facts ("Maintainers usually reply within 3 days"), never "friendly"
 (invariant §3.7). Measure the GitHub API cost per repo against the discovery budget first.
 
+## 4. Learning from interaction
+
+- **Online report per config.** `RecommendationFeedback` already snapshots `rank`,
+  `config_version` and `match_label`, but nothing reads it. Report save, dismiss and
+  open-on-GitHub rates by config version and rank position (correct for position bias).
+  Offline and no ranking change.
+- **Label calibration.** Check that Strong beats Good beats Partial on real outcomes. The bands
+  have never been checked, and they are the user-visible promise.
+- **Dismiss reasons.** Optional enum (not my stack, too big, inactive, already know it). This
+  turns dismissals into labeled negatives, which helps judging.
+
+# Evaluation
+
 ## 3. Evaluation rigor
 
 - **Significance testing.** With 6–7 developers, NDCG +0.02 (v2 vs v1) is noise. Add a paired
@@ -50,44 +85,11 @@ Show them as observable facts ("Maintainers usually reply within 3 days"), never
   Add a stage metric: of the judged-relevant repos, how many did discovery find?
 - **Issue-level evaluation** (K-3, already tracked).
 
-## 4. Learning from interaction
-
-- **Online report per config.** `RecommendationFeedback` already snapshots `rank`,
-  `config_version` and `match_label`, but nothing reads it. Report save, dismiss and
-  open-on-GitHub rates by config version and rank position (correct for position bias).
-  Offline and no ranking change.
-- **Label calibration.** Check that Strong beats Good beats Partial on real outcomes. The bands
-  have never been checked, and they are the user-visible promise.
-- **Dismiss reasons.** Optional enum (not my stack, too big, inactive, already know it). This
-  turns dismissals into labeled negatives, which helps judging.
-
-## 5. Platform
-
-- **Content-Security-Policy.** No CSP in `config/`; matters because README excerpts are
-  rendered.
-- **Dependency scanning in CI.** `pip-audit`, `npm audit`, Dependabot or CodeQL.
-- **GitHub API budget across users.** Search allows 30 requests/min per token and the
-  app-credential backlog is shared. Model what many concurrent onboardings do.
-- **Accessibility.** Not covered by any spec or backlog row.
-- **Observability.** Stage latencies, failure-rate trends (post-MVP: Sentry/Prometheus).
-
-## Suggested order
-
-| | Cheap | Expensive |
-|---|---|---|
-| **High value** | online report per config; bootstrap CIs; dismiss reasons | responsiveness signals; user intent / preferences |
-| **Lower value** | IDF weighting; per-owner diversity cap; CSP; pip-audit | discovery-recall metric; second judge / κ; GitHub budget load model |
-
-Offline items (online report, CIs) change no ranking and can ship alongside backlog batches
-5–11.
-
----
-
-# Round 2 (2026-10-20): retrieval and freshness
+# Discovery and repository data
 
 Ranking only reorders what discovery finds. All four strategies (`services/discovery/queries.py`)
 are keyword search; qualifiers are only `archived/fork/pushed/stars/-user`. Retrieval changes
-need the discovery-recall metric (§3) first, or gains stay invisible.
+need the discovery-recall metric (§3) first, or gains stay invisible. (Round 2, 2026-10-20.)
 
 ## 6. Retrieval sources
 
@@ -116,30 +118,10 @@ need the discovery-recall metric (§3) first, or gains stay invisible.
   `list_root_contents` exists, so about 1 call per repo. Observable label: "Has CI and tests ·
   devcontainer". Local setup pain is a top first-PR drop-off cause.
 
-## 9. Profile freshness
-
-- Beat schedule (`config/settings/base.py`) has no user resync: the profile is frozen until the
-  user clicks Refresh, while recommendations keep refreshing against it. Option: weekly resync
-  for users active in the last N days, within the GitHub budget.
-
-## 10. Notes
-
-- **CSP (§5) is lower priority than stated:** README excerpts are rendered as text (no
-  `dangerouslySetInnerHTML` or markdown renderer). Still defense in depth.
-- **Playwright:** in the declared stack, no e2e directory yet. Covered by backlog batch 9.
-
-## Suggested order (round 2)
-
-| | Cheap | Expensive |
-|---|---|---|
-| **High value** | labeled-issue fetch (§7); opportunity qualifiers (§6); setup readiness (§8) | upstream dependencies (§6); similar_repo from saves (§6) |
-| **Lower value** | — | starred repos (§6, privacy disclosure); periodic resync (§9, budget) |
-
-# Round 3 (2026-10-21): what batch 7 showed
-
-From the `discovery-repository-data` change (v0.12.7) and its first real discovery run.
-
 ## 11. Code-or-list detection
+
+Round 3 (2026-10-21), from the `discovery-repository-data` change (v0.12.7) and its first real
+discovery run; also §12 and §13.
 
 - **`not_code` by content, not only markers.** Today a suspected list (`awesome-*`, list
   topic) is code when it declares manifest dependencies, and docs repositories without a list
@@ -168,12 +150,40 @@ From the `discovery-repository-data` change (v0.12.7) and its first real discove
   `name_released` (not recommended) until the hourly sweep and backlog resolve it by GitHub ID.
   Queuing that refresh directly when the name is released would close the gap to minutes.
 
-## Suggested order (round 3)
+## 16. Data access and repository hygiene
 
-| | Cheap | Expensive |
-|---|---|---|
-| **High value** | post-analysis cleanup (§11); `no_license` measurement (§12) | content-based `not_code` (§11, needs a judged sample) |
-| **Lower value** | queue released-name refresh (§13); per-band yield (§12) | — |
+Round 6 (2026-10-22), from the `performance-cleanup` review and `/simplify` pass.
+
+- **Stored activity on `Repository`.** `latest_snapshot()` slices a prefetch, which Postgres
+  runs as `ROW_NUMBER()` over every snapshot of the prefetched repositories. The `-id` index
+  tie-break shipped (v0.12.11) and the remaining sort was accepted as bounded (Q-10, v0.12.13:
+  0.4 ms; `DISTINCT ON` still sorts on PostgreSQL 18). Keeping the activity fields (or a
+  pointer to the newest snapshot) on `Repository` would remove the read entirely.
+
+## 17. Review round 7
+
+Round 7 (2026-10-23), from the review and `/simplify` pass of 0.12.13/0.12.14 (`Bug_Backlog.md`
+S-6, S-9…S-11).
+
+- **Job status keys outside `['profile']`.** Generation and discovery status keys live under
+  `['profile']`, so a finished generation invalidates seven profile keys one by one instead of
+  the prefix. A `['jobs', ...]` namespace (as `['sync', 'status']`) makes it one invalidation, and
+  a new profile query cannot be missed (S-9).
+- **One registry of lazy components.** `src/test/setup.ts` preloads `LanguageChart` by hand; a
+  new lazy route brings back P-3's random timeouts. AppShell could export its loaders and the
+  tests that render it preload them all (also saves ~1 s in every other test file) (S-10).
+- **Seekable keyset index.** `(user, -saved_at, -id)` and `(user, -dismissed_at, -id)` with a
+  row-value comparison, if saved or hidden lists grow large (S-11).
+- **Activation off the request path.** The admin action runs the benchmark inside the request;
+  a tracked job, or the admin pointing to the command, once `benchmark-v2` grows (S-6).
+
+# Freshness and client
+
+## 9. Profile freshness
+
+- Beat schedule (`config/settings/base.py`) has no user resync: the profile is frozen until the
+  user clicks Refresh, while recommendations keep refreshing against it. Option: weekly resync
+  for users active in the last N days, within the GitHub budget.
 
 ## 14. Client freshness and paging
 
@@ -181,11 +191,11 @@ Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 
 - **Data versions instead of job watching.** The SPA refreshes derived data when a sync,
   discovery or generation job finishes. Data changed by anything else (`reanalyze_profiles`, a
-  backend repository refresh) stays cached up to 5 minutes (Y-6). One small endpoint returning
-  per-area update times (profile, recommendations, saved) would let the status poll refresh
-  exactly what changed, whatever changed it.
-- **Keyset pagination for saved and hidden lists.** Page numbers shift when entries are added
-  or removed between "Show more" clicks (Y-7). A `saved_at` cursor keeps pages stable.
+  backend repository refresh) stays cached up to 5 minutes (Y-6). *(v0.12.12: a finished
+  generation refreshes the profile too, and every analysis ends in one; what remains is data
+  with no generation after it.)* One small endpoint returning per-area update times (profile,
+  recommendations, saved) would let the status poll refresh exactly what changed, whatever
+  changed it.
 - **Clamp past-the-end pages on the server.** `/recommendations?page=N` past the end returns
   404, and the client has two recovery paths (404 → page 1, emptied page → previous page).
   Returning the last page (with its number) removes both; with the list refetched after a
@@ -196,58 +206,49 @@ Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 - **Browser tests on a production build in CI.** The e2e suite drives the Vite dev server;
   `vite build && vite preview` would test what ships and load faster per page.
 
-## Suggested order (round 4)
+# Platform and tooling
 
-| | Cheap | Expensive |
-|---|---|---|
-| **High value** | keyset saved lists (§14) | data versions (§14) |
-| **Lower value** | route-level ids, production build in CI (§14) | server page clamping (§14, API change) |
+## 5. Platform
+
+- **Content-Security-Policy.** No CSP in `config/`; matters because README excerpts are
+  rendered.
+- **Dependency scanning in CI.** `pip-audit`, `npm audit`, Dependabot or CodeQL.
+- **GitHub API budget across users.** Search allows 30 requests/min per token and the
+  app-credential backlog is shared. Model what many concurrent onboardings do.
+- **Accessibility.** Not covered by any spec or backlog row.
+- **Observability.** Stage latencies, failure-rate trends (post-MVP: Sentry/Prometheus).
+
+## 10. Notes
+
+- **CSP (§5) is lower priority than stated:** README excerpts are rendered as text (no
+  `dangerouslySetInnerHTML` or markdown renderer). Still defense in depth.
 
 ## 15. Dev tooling and operations
 
 Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
-- ~~**Lint and format `scripts/` in CI.**~~ Shipped in v0.12.11 (P-5). The runners are tested (`npm run test:scripts`) but no
-  ESLint or Prettier config covers them; the frontend's config does not reach the root.
-- **Helper modules fail loudly when run.** `node scripts/uv.mjs ...` exits 0 without doing
-  anything (it is a library), which once passed for a green mypy run. A guard that prints usage
-  and exits 1 under `isMain` would catch that.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.
-- **Activation as an explicit operator action.** Seed migrations decide which configuration is
-  active (Z-1). A `activate_scoring_config <version>` command (audit-logged, refusing a config
-  that loses on the benchmark unless forced) would let seeds always store new versions
-  inactive.
-- ~~**One `taskkill` per stop.**~~ Shipped in v0.12.10 (Z-9).
+- **New seeds stored inactive.** Seed migrations still decide which configuration is active
+  (Z-1). Now that `activate_scoring_config` exists (v0.12.13: benchmark-gated, `--force
+  --reason`, audited), a future seed could always store its version inactive and leave
+  activation to the operator.
 
-## Suggested order (round 5)
+---
 
-| | Cheap | Expensive |
+# Shipped
+
+| Idea | § | Shipped in |
 |---|---|---|
-| **High value** | loud helper modules, ~~lint `scripts/`~~ (§15) | activation command (§15, changes seeding) |
-| **Lower value** | ~~one `taskkill`~~ (shipped) | generic migration round trip (§15, slow test) |
-
-## 16. Data access and repository hygiene
-
-Round 6 (2026-10-22), from the `performance-cleanup` review and `/simplify` pass.
-
-- **Newest snapshot without a window sort.** *(v0.12.11: the index has `-id`; single-repository
-  reads no longer sort, the multi-repository prefetch still does.)* `latest_snapshot()` slices a prefetch, which
-  Postgres runs as `ROW_NUMBER()` over every snapshot of the prefetched repositories. Add `-id`
-  to the `(repository, -captured_at)` index, use `DISTINCT ON`, or keep the activity fields
-  (or a pointer) on `Repository` (Q-10).
-- ~~**One metadata write path.**~~ The wrappers are gone in v0.12.11 (Q-12). `merge_metadata` and `save_progress` are separate calls;
-  `save_progress` could merge any `metadata` it gets, and the per-service `_update_metadata`
-  wrappers could go (Q-12).
-- ~~**Line endings fixed in the repository.**~~ Shipped in v0.12.11 (P-2). `.gitattributes` with `* text=auto eol=lf` makes
-  `npm run format:check` pass on Windows checkouts (P-2).
-- ~~**Tests import builders where they live.**~~ Shipped in v0.12.11 (Q-12). `tests/repo_fixtures.py` re-exports
-  `e2e.builders`; importing it directly removes the shim (Q-12).
-
-## Suggested order (round 6)
-
-| | Cheap | Expensive |
-|---|---|---|
-| **High value** | ~~`.gitattributes`~~ (shipped) | stored activity (§16, migration; index shipped) |
-| **Lower value** | ~~builders import, wrappers~~ (shipped) | |
+| Playwright browser tests for the main flows | §10 | v0.12.8 (backlog batch 9) |
+| One `taskkill` per stop | §15 | v0.12.10 (Z-9) |
+| Lint and format `scripts/` in CI | §15 | v0.12.11 (P-5) |
+| Line endings fixed in the repository (`.gitattributes` `* text=auto eol=lf`) | §16 | v0.12.11 (P-2) |
+| One metadata write path (`_update_metadata` wrappers removed) | §16 | v0.12.11 (Q-12) |
+| Tests import builders from `e2e.builders` | §16 | v0.12.11 (Q-12) |
+| Snapshot index with the `-id` tie-break | §16 | v0.12.11 (Q-10 in part; the rest accepted in v0.12.13) |
+| Keyset (cursor) pagination for saved and hidden lists | §14 | v0.12.12 (Y-7) |
+| Profile refreshed when a generation finishes (part of "data versions") | §14 | v0.12.12 (Y-6 in part) |
+| Helper modules fail loudly when run (`refuseRun`) | §15 | v0.12.13 |
+| Activation as an explicit operator action (`activate_scoring_config`) | §15 | v0.12.13 (seeds still activate: §15 "New seeds stored inactive") |

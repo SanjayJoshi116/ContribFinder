@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '@/api/client'
 import type { RecommendationDetail, RecommendationPage, RecommendationStatus } from '@/api/types'
 import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
+import { developerProfileKey, interestsKey, skillsKey } from '@/features/profile/api'
 
 // Under ['profile'], so a completed sync (useSyncStatus) invalidates them too.
 const ROOT = ['profile', 'recommendations'] as const
@@ -36,7 +37,10 @@ export function recommendationsPath(filters: RecommendationFilters): string {
 }
 
 /** Latest generation job and counts. Polls while a generation runs, and refreshes the list
- * once per newly seen finished job, also one that started and finished between two polls. */
+ * once per newly seen finished job, also one that started and finished between two polls.
+ * Every profile analysis ends in a generation, also one no sync started (`reanalyze_profiles`),
+ * so the profile keys are refreshed here too. Not all of ['profile']: the status keys live
+ * under it, and this runs inside the status fetch. */
 export function useRecommendationStatus(enabled = true) {
   const queryClient = useQueryClient()
   return useQuery<RecommendationStatus, ApiError>({
@@ -53,6 +57,9 @@ export function useRecommendationStatus(enabled = true) {
             queryClient.invalidateQueries({ queryKey: ['profile', 'issues'] }),
             // Saved entries show the current recommendation (features/feedback savedKey).
             queryClient.invalidateQueries({ queryKey: ['profile', 'saved'] }),
+            queryClient.invalidateQueries({ queryKey: developerProfileKey }),
+            queryClient.invalidateQueries({ queryKey: skillsKey }),
+            queryClient.invalidateQueries({ queryKey: interestsKey }),
           ]),
       ),
     staleTime: 0,

@@ -355,6 +355,15 @@
         "description": "Hidden repositories, most recently dismissed first.",
         "parameters": [
           {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Continue after the entry this opaque value marks (from `next`).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -1600,6 +1609,15 @@
         "operationId": "saved_list",
         "description": "Saved repositories, most recently saved first, whether or not still recommended.",
         "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Continue after the entry this opaque value marks (from `next`).",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "page",
             "required": false,

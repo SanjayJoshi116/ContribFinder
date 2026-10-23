@@ -1,3 +1,6 @@
+from dataclasses import replace
+from datetime import UTC, datetime
+
 from django.conf import settings
 
 from services.profiling.interests import detect_interests, interest_evidence
@@ -58,6 +61,18 @@ def test_contributed_repository() -> None:
         "contribution",
         c.repo.id,
     )
+
+
+def test_contribution_evidence_observed_at_contribution_time() -> None:
+    c = contribution(prs=1, topics=("security",), pushed_at=datetime(2026, 8, 20, tzinfo=UTC))
+    [evidence] = interest_evidence(profile(contributions=(c,)))
+    assert evidence.observed_at == c.last_contributed_at
+
+
+def test_contribution_without_time_falls_back_to_push() -> None:
+    c = replace(contribution(prs=1, topics=("security",)), last_contributed_at=None)
+    [evidence] = interest_evidence(profile(contributions=(c,)))
+    assert evidence.observed_at == c.repo.pushed_at
 
 
 def test_forks_ignored() -> None:

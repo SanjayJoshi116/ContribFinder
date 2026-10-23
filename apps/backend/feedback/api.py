@@ -1,14 +1,21 @@
 """Feedback, save and dismiss endpoints (spec: recommendation-feedback; design D4). Thin
 wrappers around ``services.feedback``."""
 
-from django.db.models import Prefetch, QuerySet
+import base64
+import binascii
+from collections.abc import Sequence
+from datetime import datetime
+from typing import Any
+
+from django.db.models import Model, Prefetch, Q, QuerySet
 from django.http import Http404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.generics import ListAPIView, get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.utils.urls import remove_query_param, replace_query_param
 from rest_framework.views import APIView
 
 from core.authentication import current_user
@@ -98,17 +105,107 @@ class DismissView(APIView):
         return Response(status=204)
 
 
-class FeedbackPagination(PageNumberPagination):
+class InvalidCursor(APIException):
+    status_code = 400
+    default_code = "invalid_cursor"
+    default_detail = "The page cursor is not valid."
+
+
+class KeysetPagination(PageNumberPagination):
+    """Pages newest first by (``time_field``, pk), continuing after the previous page's last
+    entry (spec recommendation-feedback, "Complete saved and hidden lists"; design D2), so
+    entries added or removed between requests never shift a page. ``next`` carries an opaque
+    ``cursor``; without one, ``page`` works as before. ``count`` is always the total. The
+    paginator applies the order itself, since the keyset filter depends on it."""
+
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
+    cursor_query_param = "cursor"
+    time_field = ""
+    total: int | None = None  # set in cursor mode only
+    next_link: str | None = None
+
+    def paginate_queryset(
+        self,
+        queryset: QuerySet[Any, Any] | Sequence[Any],
+        request: Request,
+        view: APIView | None = None,
+    ) -> list[Any] | None:
+        if not isinstance(queryset, QuerySet):
+            raise TypeError("KeysetPagination pages a QuerySet")
+        queryset = queryset.order_by(f"-{self.time_field}", "-pk")
+        self.base_url = remove_query_param(request.build_absolute_uri(), self.page_query_param)
+        raw = request.query_params.get(self.cursor_query_param)
+        if raw is None:
+            self.total = None
+            rows = super().paginate_queryset(queryset, request, view) or []
+            has_more = self.page is not None and self.page.has_next()
+        else:
+            time, pk = self.decode(raw)
+            self.total = queryset.count()
+            size = self.get_page_size(request) or self.page_size
+            after = Q(**{f"{self.time_field}__lt": time}) | Q(**{self.time_field: time}, pk__lt=pk)
+            rows = list(queryset.filter(after)[: size + 1])
+            has_more = len(rows) > size
+            rows = rows[:size]
+        self.next_link = self._next(rows[-1]) if has_more else None
+        return rows
+
+    def get_paginated_response(self, data: Any) -> Response:
+        if self.total is None:
+            response = super().get_paginated_response(data)
+            response.data["next"] = self.next_link
+            return response
+        return Response(
+            {"count": self.total, "next": self.next_link, "previous": None, "results": data}
+        )
+
+    def _next(self, last: Model) -> str:
+        return replace_query_param(self.base_url, self.cursor_query_param, self.encode(last))
+
+    def encode(self, row: Model) -> str:
+        value = f"{getattr(row, self.time_field).isoformat()}|{row.pk}"
+        return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
+
+    @staticmethod
+    def decode(raw: str) -> tuple[datetime, int]:
+        try:
+            value = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode()
+            time, pk = value.split("|")
+            parsed = datetime.fromisoformat(time)
+            if parsed.tzinfo is None:
+                raise ValueError("naive time")
+            return parsed, int(pk)
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            raise InvalidCursor from None
+
+    def get_schema_operation_parameters(self, view: APIView) -> list[dict[str, Any]]:
+        return [
+            *super().get_schema_operation_parameters(view),
+            {
+                "name": self.cursor_query_param,
+                "required": False,
+                "in": "query",
+                "description": "Continue after the entry this opaque value marks (from `next`).",
+                "schema": {"type": "string"},
+            },
+        ]
+
+
+class SavedPagination(KeysetPagination):
+    time_field = "saved_at"
+
+
+class DismissedPagination(KeysetPagination):
+    time_field = "dismissed_at"
 
 
 class SavedListView(ListAPIView[SavedRepository]):
     """Saved repositories, most recently saved first, whether or not still recommended."""
 
     serializer_class = SavedRepositorySerializer
-    pagination_class = FeedbackPagination
+    pagination_class = SavedPagination
     filter_backends = []
 
     def get_queryset(self) -> QuerySet[SavedRepository]:
@@ -129,8 +226,7 @@ class SavedListView(ListAPIView[SavedRepository]):
                     to_attr="user_recommendations",
                 ),
             )
-            .order_by("-saved_at", "-pk")
-        )
+        )  # SavedPagination orders
 
     @extend_schema(
         operation_id="saved_list",
@@ -154,7 +250,7 @@ class DismissedListView(ListAPIView[DismissedRepository]):
     """Hidden repositories, most recently dismissed first."""
 
     serializer_class = DismissedRepositorySerializer
-    pagination_class = FeedbackPagination
+    pagination_class = DismissedPagination
     filter_backends = []
 
     def get_queryset(self) -> QuerySet[DismissedRepository]:
@@ -164,8 +260,7 @@ class DismissedListView(ListAPIView[DismissedRepository]):
             DismissedRepository.objects.filter(user=current_user(self.request))
             .select_related("repository")
             .prefetch_related("repository__topics")
-            .order_by("-dismissed_at", "-pk")
-        )
+        )  # DismissedPagination orders
 
     @extend_schema(
         operation_id="dismissed_list",

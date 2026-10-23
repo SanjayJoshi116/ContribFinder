@@ -1,7 +1,47 @@
 # Bug Backlog
 
-Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8).
-Status: `open` · `in-progress` · `fixed` · `wontfix`.
+Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
+each fix release since. Open items come first, then the fix-batch plan, then the review history
+(oldest first) with every row as verified.
+Status: `open` · `confirmed` / `partial` (verified, not fixed) · `fixed in part` · `fixed` ·
+`accepted` / `wontfix` · `false-positive`.
+
+## Open items
+
+Every row not yet closed, as of 0.12.14. Known gaps (K) are in the next section. Details are in the
+row's history section.
+
+| ID | Type | Item | Batch | Status |
+|---|---|---|---|---|
+| B-6 | bug | Experience-level cutoffs 0.67/1.34 are not the documented rounded mean | 8 | confirmed |
+| D-8 | bug | Relevance gate checks raw signal values, not weights | 8 | partial |
+| D-9 | bug | An issue matching only by approachability is worded "matches your profile" | 8 | partial |
+| D-11 | bug | Issue title keyword order puts docs/test/CI before bug | 8 | confirmed |
+| D-12 | bug | `body_length` difficulty vote counts template markup | 8 | confirmed |
+| D-13 | bug | `[Type] Bug`-style labels are never normalized | 8 | confirmed |
+| D-15 | gap | A scoring config is editable while no recommendation references it | 8 | partial (activation validated since 0.12.13) |
+| D-16 | bug | Difficulty-fit part of an unknown-difficulty issue has no reason | 8 | confirmed |
+| D-17 | gap | Openness points not validated to sum ≤ 1 | 8 | confirmed |
+| D-18 | gap | Issue classifier thresholds hard-coded, not config | 8 | confirmed |
+| P-1 | bug | Why the WSL keep-alive once exited (`0xC000013A`); the runner now restarts it | 16 | fixed in part |
+| S-6 | design | Admin activation runs the whole benchmark inside the HTTP request | 18 | partial |
+| S-7 | bug | `/saved`, `/dismissed` page mode mixes a cursor `next` with a page `previous` | 18 | confirmed |
+| S-9 | design | Job status keys under `['profile']`: generation invalidates profile keys by hand | 18 | open |
+| S-10 | test | Lazy components preloaded by hand in test setup | 18 | open |
+| S-11 | perf | No index for the saved/hidden keyset order | 18 | open |
+| Y-6 | design | Data changed with no generation after it stays cached up to 5 min | 14 | fixed in part |
+
+Batch 8 is ranking-visible and waits for K-1 (evaluate on the benchmark). B-14, B-15, B-16 and
+D-7 shipped in 0.12.14 without an OpenSpec change (the code now follows the existing specs; the
+benchmark does not see profiling or reason text).
+
+Triage of the rest (2026-10-22), by whether a fix changes specified behavior:
+
+| Needs | Rows | Why |
+|---|---|---|
+| Code only | D-12, D-13 | `issue-analysis` already requires canonical labels and leaves body-length counting open. Changes issue difficulty and type in live data; confirm `evaluate_ranking` shows no baseline diff. |
+| OpenSpec change | B-6, D-8, D-9, D-11, D-15, D-16, D-17, D-18, Y-6 | New or changed rule: experience cutoffs (pick the correct one first), relevance gate on weights, issue relevance wording, title keyword order, config immutability, unknown-difficulty reason vs. contribution (spec says unknown SHALL NOT contribute), openness validation (v1 and v2 must pass), classifier thresholds as `params.issues`, `web-client` freshness. |
+| Investigation | P-1 | No code yet; reproduce in an interactive console (CLAUDE.md §6 testing note). |
 
 ## Known gaps (already tracked elsewhere)
 
@@ -13,12 +53,72 @@ Status: `open` · `in-progress` · `fixed` · `wontfix`.
 | K-4 | Docs-style repositories with a code language and no list topic (`system-design-primer`, `developer-roadmap`) pass `not_code`. Since 0.12.7 a suspected list (`awesome-*`, list topic) that declares manifest dependencies (lint or site tooling) passes too. | CHANGELOG 0.12.0, 0.12.7 | open (known limit; `ideas.md` §11) |
 | K-5 | Active config v2 is not an improvement over v1 on `benchmark-v1` (NDCG@10 +0.0195, P@5 −0.0333). | CLAUDE.md Phase 8b | open (needs K-1) |
 
-## Documentation drift
+## Fix batches
 
-| ID | Item | Where | Status |
+Each batch fits one OpenSpec change. Order = suggested priority. Partial rows are included but
+can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
+
+| # | Batch | Rows | Why together |
 |---|---|---|---|
-| DOC-1 | Ctrl+C issue still `[~] carried to Phase 5`; fixed in Phase 8a per CLAUDE.md §6, no `[x]` entry records it. | features.txt:130 | fixed (performance-cleanup) |
-| DOC-2 | Carry-over says "real-a exported, 3 of 39 graded"; current target is `real-a-v2` (40 candidates). The 3 grades are likely in the stale `real-a.csv`. | features.txt:261 | fixed (performance-cleanup) |
+| 1 | **Security hardening** | H-2, H-4, H-3, H-12, H-15, H-16, H-6, H-13, H-14, G-5, G-6, A-15 | Spoofable throttle IP, secrets in logs, settings drift between tiers, deploy defaults. Small, isolated, high value. |
+| 2 | **Privacy and deletion finality** | A-1, B-4, A-7, A-8, A-9, A-12, H-8, H-9, E-3, A-19 | "Delete" must mean deleted: running work re-checks before writing; identity leftovers; privacy page matches reality; export anonymization. **E-3 before committing benchmark-v2.** |
+| 3 | **Evaluation tooling** | R-1, R-2, E-1, E-2, R-7, R-8, R-13, R-14, E-8, E-9 | `--write-baseline` and sheet import must be trustworthy before K-1 (judging real-a-v2). Offline only, low risk. |
+| 4 | **Job lifecycle and claim fencing** | B-1, B-2, B-3, B-5, B-7, B-8, B-9, B-10, B-11, B-12, B-18, B-19, C-3, C-4, C-10, C-19 | One claim-token mechanism for jobs and repositories; zombie PENDING jobs (B-1); one `_start_job` helper; ordered catalog upsert. |
+| 5 | **GitHub error handling and resilience** | A-2, A-3, A-4, A-5, A-6, A-11, A-13, A-14, B-13, C-1, C-6, C-9, H-1 | Classify 301, secondary 403, 451 and decryption errors correctly; one bad repository or manifest never fails a whole job; a Redis outage never breaks reads. |
+| 6 | **Recommendation consistency** | D-1, D-2, D-3, D-4, D-5, D-6, D-10, D-14, E-4, E-5, E-6, E-7, F-4 | Stale ≠ gone; one lock order and one dismissal check for save, dismiss and persist; freshness sees restores and new candidates. |
+| 7 | **Discovery and repository data** | C-2, C-5, C-7, C-8, C-11, C-12, C-13, C-14, C-15, C-16, C-17, C-18, R-3, R-4, R-5, R-6, R-9, R-10, R-11, R-12 | Eligibility re-check via lifecycle, provenance pruning, not_code false positives, search upsert side effects, one shared ordering helper. |
+| 8 | **Signal and explanation accuracy** | B-6, B-14, B-15, B-16, D-7, D-8, D-9, D-11, D-12, D-13, D-15, D-16, D-17, D-18 | Wrong experience level, missed README badges, misclassified issues, reasons not backed by scoring. Ranking-visible: evaluate on the benchmark. B-14, B-15, B-16, D-7 shipped in 0.12.14 (no spec change). |
+| 9 | **Frontend correctness** | F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18 | Query invalidation churn, no 4xx retry, pagination gaps, 401 handling; add Playwright for the main flows. |
+| 10 | **Dev scripts, checks and migrations** | G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20 | `npm run stop` kills only this repo; config checks for unchecked settings; safe seed migrations; tests for those paths. |
+| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12, Y-9, Y-10, Z-4, Z-5, Z-8, Z-9, Z-10 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
+| 12 | **Batch 5 follow-ups** | V-1, V-2, V-3, V-4, V-5, V-6, V-7, V-8, V-9 | Review of `github-error-resilience`. Fixed in the same release (0.12.5); V-1 and V-3 replace design decisions D7 (client raises `GitHubInvalidResponse`) and D9 (in-memory throttle fallback instead of fail-open). |
+| 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7…X-9 accepted, X-10 false positive. X-11 and X-12 went to batch 11. |
+| 14 | **Batch 9 follow-ups** | Y-1…Y-10 | Review of `frontend-correctness`. Y-1…Y-5 and Y-8 fixed in the same release (0.12.8); Y-6 (in part) and Y-7 fixed in 0.12.12 (`freshness-paging-seed`); Y-9 and Y-10 went to batch 11. |
+| 15 | **Batch 10 follow-ups** | Z-1…Z-10 | Review and `/simplify` pass of `dev-scripts-checks`. Z-2, Z-3, Z-6, Z-7 fixed in the same release (0.12.9); Z-1 fixed in 0.12.12 (spec change, `freshness-paging-seed`); Z-4, Z-5, Z-8, Z-9, Z-10 went to batch 11. |
+| 16 | **Batch 11 follow-ups** | P-1…P-5 | Found while implementing `performance-cleanup` (0.12.10). Shipped with Q-10…Q-12 in 0.12.11 (`tooling-data-hygiene`): P-2, P-4, P-5 fixed, P-1 fixed in part (restart; cause unknown), P-3 open (not reproduced). |
+| 17 | **Batch 11 review** | Q-1…Q-12 | Review and `/simplify` pass of `performance-cleanup`. Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 fixed in the same release (0.12.10); Q-3, Q-6 accepted; Q-10…Q-12 went to batch 16 (0.12.11; Q-10 in part). |
+| 18 | **0.12.13/0.12.14 review** | S-1…S-11 | Review and `/simplify` pass of `config-activation-loose-ends` and the batch 8 fixes. S-1…S-5 fixed in 0.12.14 before commit; S-8 accepted; S-6, S-7, S-9…S-11 open. |
+
+Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
+W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
+0.12.10 (A-18 wontfix), 16 with Q-10…Q-12 in 0.12.11 (P-1 and Q-10 in part, P-3 not reproduced),
+Y-6 (in part), Y-7 and Z-1 in 0.12.12, P-3 (and Q-10 accepted) in 0.12.13, B-14, B-15, B-16
+and D-7 of batch 8 in 0.12.14 (the code follows the existing specs, so no OpenSpec change), with
+S-1…S-5 of batch 18.
+Next: the rest of batch 8 (signal and explanation accuracy) is ranking-visible and waits for
+K-1; S-6, S-7 and S-9…S-11 (batch 18) are open; P-1 (cause) stays open.
+
+Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.
+
+## Fixed by release
+
+Index only: each row's Status column (in its history section) is the record, and this table
+must match it. Newest first. Counts are fixed rows.
+
+| Version | Change | Fixed | In part, accepted or wontfix |
+|---|---|---|---|
+| 0.12.14 | (no OpenSpec change) | 9: B-14, B-15, B-16, D-7, S-1, S-2, S-3, S-4, S-5 | S-8 accepted |
+| 0.12.13 | `config-activation-loose-ends` | 1: P-3 | Q-10 accepted; D-15 in part (activation validates) |
+| 0.12.12 | `freshness-paging-seed` | 2: Y-7, Z-1 | Y-6 in part |
+| 0.12.11 | `tooling-data-hygiene` | 5: P-2, P-4, P-5, Q-11, Q-12 | P-1 in part (restart; cause unknown), Q-10 in part |
+| 0.12.10 | `performance-cleanup` | 30: DOC-1, DOC-2, A-16, A-17, A-20, B-17, B-20, C-20, C-21, C-23, D-19, D-20, D-21, E-10, X-11, X-12, Y-9, Y-10, Z-4, Z-5, Z-8, Z-9, Z-10, Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 | A-18 wontfix; Q-3, Q-6 accepted |
+| 0.12.9 | `dev-scripts-checks` | 17: G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20, Z-2, Z-3, Z-6, Z-7 | — |
+| 0.12.8 | `frontend-correctness` | 17: F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18, Y-1, Y-2, Y-3, Y-4, Y-5, Y-8 | — |
+| 0.12.7 | `discovery-repository-data` | 26: R-3, R-4, R-5, R-6, R-9, R-10, R-11, R-12, C-2, C-5, C-7, C-8, C-11, C-12, C-13, C-14, C-15, C-16, C-17, C-18, X-1, X-2, X-3, X-4, X-5, X-6 | X-7, X-8, X-9 wontfix; X-10 false positive |
+| 0.12.6 | `recommendation-consistency` | 23: D-1, D-2, D-3, D-4, D-5, D-6, D-10, D-14, E-4, E-5, E-6, E-7, F-4, W-1, W-2, W-3, W-4, W-5, W-6, W-7, W-8, W-9, W-10 | — |
+| 0.12.5 | `github-error-resilience` | 21: A-2, A-3, A-4, A-5, A-6, A-11, A-13, A-14, B-13, C-1, C-6, C-9, H-1, V-1, V-2, V-3, V-4, V-5, V-6, V-7, V-9 | V-8 wontfix |
+| 0.12.4 | `job-claim-fencing` | 17: B-1, B-2, B-3, B-5, B-7, B-8, B-9, B-10, B-11, B-12, B-18, B-19, C-3, C-4, C-10, C-19, C-22 | — |
+| 0.12.3 | `evaluation-tooling-integrity` | 10: R-1, R-2, R-7, R-8, R-13, R-14, E-1, E-2, E-8, E-9 | — |
+| 0.12.2 | `privacy-deletion-finality` | 10: A-1, A-7, A-8, A-9, A-12, A-19, B-4, E-3, H-8, H-9 | — |
+| 0.12.1 | `security-hardening` | 12: A-15, G-5, G-6, H-2, H-3, H-4, H-6, H-12, H-13, H-14, H-15, H-16 | — |
+
+Total fixed: 200. Never in a release: A-10 (false positive, in no batch).
+
+## Review history
+
+The sections below are the record, oldest first: the 2026-10-19 sweep (last-commit review,
+documentation drift, full-file reviews and their verification), then each fix release's review.
+The totals are in "Summary" at the end.
 
 ## Code review findings
 
@@ -44,133 +144,12 @@ severe first.
 | R-13 | `apps/backend/services/evaluation/build.py:34` | `build` assumes each input is a JSON object; a top-level list raises uncaught `AttributeError`. Differing `format` merged unchecked until final `parse`. | `build_benchmark --input report.json` (array) → raw traceback instead of `CommandError`. | fixed (evaluation-tooling-integrity) |
 | R-14 | `apps/backend/recommendations/management/commands/build_benchmark.py:174` | Real developers keep the export description "Add judgments ... by hand before using this developer"; `import_sheet` does not update it. | Committed benchmark-v2 shows judged developers labeled as unjudged. | fixed (evaluation-tooling-integrity) |
 
-## Batch 5 review (2026-10-21)
+## Documentation drift
 
-Source: `code-review` over the uncommitted `github-error-resilience` diff (v0.12.5), plus the
-`/simplify` altitude pass (V-1 overlap). Verified against the code 2026-10-21 (V-5, V-6 partial: narrow windows; V-8 matches the metadata convention) and fixed in 0.12.5 before commit. Paths under
-`apps/backend/`. Ranked most severe first. Type: bug · gap · design · cleanup.
-
-| ID | Type | Where | Finding → failure | Status |
-|---|---|---|---|---|
-| V-1 | design | `services/repositories/analysis.py:69` | `ERROR_CODES` maps bare `KeyError`/`ValueError`/`TypeError`/`IndexError` → FAILED `invalid_response`. Also catches transient bad bodies (truncated/HTML 200 → `JSONDecodeError`), corrupt ETag cache entries and programming bugs → every analyzed repository FAILED and ineligible for `REPO_FAILED_RETRY_HOURS`, logged at INFO. Deeper fix: raise typed `GitHubInvalidResponse(GitHubClientError)` at the `.json()`/`from_api` boundary in `services/github`; sync's `SKIPPABLE` and `oauth.fetch_identity` then get it for free. Module docstring also outdated. | fixed (github-error-resilience) |
-| V-2 | bug | `services/github/client.py:545` | Redirect guard in `_send` compares host only, not scheme/port. `Location: http://api.github.com/...` passes → bearer token sent in cleartext. Compare origin (scheme, host, port) with `GITHUB_API_BASE_URL`. | fixed (github-error-resilience) |
-| V-3 | design | `core/throttling.py:55` | Fail-open applies to every throttle, incl. anon throttle on `/auth/github` and scoped `/profile/sync`. Redis down (or induced cache errors) → no rate limiting per process for `THROTTLE_CACHE_BACKOFF_SECONDS`, renewed each error → OAuth-state churn, sync flooding into GitHub. Sensitive scopes: fail closed or in-process fallback counter. Revisits design D9. | fixed (github-error-resilience) |
-| V-4 | gap | `repositories/tasks.py:98` | `_refresh`'s app-credentials `GitHubAuthError` branch stays log-only (task 5.3), so `refresh_failed_at` stays null → rejected/rotated `GITHUB_CLIENT_SECRET` requeues the same `REPO_REFRESH_BATCH` every beat, the loop C-9 fixed for other errors. | fixed (github-error-resilience) |
-| V-5 | bug | `services/repositories/lifecycle.py:116` | `record_refresh_failure` runs as a separate UPDATE after `release()`. Another analysis can claim + complete in between → stale `lifecycle_error` and `refresh_failed_at` land on fresh RECOMMENDABLE data, next refresh delayed up to 60 min. Record inside `release()` under the held claim token. | fixed (github-error-resilience) |
-| V-6 | bug | `repositories/tasks.py:81` | `.exclude(refresh_failed_at__gte=...)` applies to the whole backlog query → also hides abandoned claims (dead worker, stuck FETCHING/REFRESHING) and DISCOVERED rows for up to `REPO_REFRESH_RETRY_MINUTES`. Scope it to the STALE branch. | fixed (github-error-resilience) |
-| V-7 | bug | `services/github/oauth.py:113` | `str(data["login"])` turns JSON `null` into `"None"`, passing the non-empty check → account upserted with username `"None"`. Check `isinstance(login, str)` and non-empty before converting. | fixed (github-error-resilience) |
-| V-8 | cleanup | `services/github/sync.py:187` | `languages_skipped` written to job metadata, never read (no code, API or UI). Spec-required (task 2.1), so: surface it (step detail or warning) or drop it from the spec. | wontfix (internal diagnostics, like `repos_capped`; spec-required) |
-| V-9 | cleanup | `services/github/sync.py:190` | `/simplify` altitude: `_step_topics` re-checks existing pks to work around topics being written a step later from `job.metadata["repo_topics"]`. Writing topics in `_step_repositories`' `job_write` removes the race (and rename re-points) and the metadata copy; `_step_topics` stays as a no-op step. Design accepted A-11 as partial. | fixed (github-error-resilience) |
-
-## Batch 6 review (2026-10-21)
-
-Source: `code-review` over the uncommitted `recommendation-consistency` diff (v0.12.6). Paths
-under `apps/backend/`. All fixed in 0.12.6 before commit.
-
-| ID | Type | Where | Finding → failure | Status |
-|---|---|---|---|---|
-| W-1 | bug | `services/feedback.py` (`dismiss`) | Events referenced a recommendation a concurrent generation deleted → deferred FK fails at commit → dismiss 500. | fixed (recommendation-consistency) |
-| W-2 | bug | `services/feedback.py` (`record`) | Same for `viewed` (and other events), with the profile lock widening the window. | fixed (recommendation-consistency) |
-| W-3 | bug | `services/repositories/analysis.py` (`_store_issues`) | Only deleted issues were locked by pk; the unordered `bulk_update` of open issues could deadlock with persist's pk-ordered lock. | fixed (recommendation-consistency) |
-| W-4 | perf | `services/ranking/freshness.py` | The sweep flagged running generations as due → `rerun_requested` → a redundant generation after every overlap. | fixed (recommendation-consistency) |
-| W-5 | gap | `services/jobs.py` | A retry reloads its inputs but kept the rerun flag (extra run). A flag lost on permanent failure stays an accepted risk (design). | fixed (recommendation-consistency) |
-| W-6 | gap | `services/ranking/freshness.py` | A staleness mark overwrote the completion time of an analysis newer than the last generation → missed regeneration. | fixed (recommendation-consistency) |
-| W-7 | gap | `services/ranking/freshness.py` | A generation that keeps failing was restarted every sweep (30 min) forever. | fixed (recommendation-consistency) |
-| W-8 | bug | `services/ranking/service.py` | An issue re-analyzed (not deleted) between ranking and storing passed the check → reasons from stale analysis. | fixed (recommendation-consistency) |
-| W-9 | gap | `services/feedback.py` (`save`) | Dismissal enforced only through the recommendation's deletion. | fixed (recommendation-consistency) |
-| W-10 | perf | `services/feedback.py` (`record`) | View de-duplication waited on the profile lock held by a whole persist. | fixed (recommendation-consistency) |
-
-## Batch 7 review (2026-10-21)
-
-Source: `code-review` over the uncommitted `discovery-repository-data` diff (v0.12.7). Paths
-under `apps/backend/`. Verified against the code; fixed in 0.12.7 before commit unless noted.
-
-| ID | Type | Where | Finding → failure | Status |
-|---|---|---|---|---|
-| X-1 | bug | `services/repositories/lifecycle.py` (`release_name`) | A holder that gave up its name stayed eligible: recommended as `a/b~5` with a URL that now opens another repository. Now ineligible `name_released` (INDEXED) until resolved. | fixed (discovery-repository-data) |
-| X-2 | bug | `services/discovery/service.py` (`_prune_discoveries`) | A run with no search (empty plan) or a query rejected with 422 pruned valid records, leaving candidates with no provenance. | fixed (discovery-repository-data) |
-| X-3 | gap | `services/discovery/service.py` (`_step_pool`) | Pool writes (prune, not_code, re-check, eviction) ran outside `job_write`: a cancelled or reclaimed run kept writing. | fixed (discovery-repository-data) |
-| X-4 | perf | `services/repositories/analysis.py` (`run`) | A queued refresh with nothing stale left still completed and stamped a transition → needless regenerations for every developer. Now released, SKIPPED. | fixed (discovery-repository-data) |
-| X-5 | bug | `services/discovery/service.py` (`_record`) | One query matching a repository in both bands in one run kept the later band's rank. Now the better rank within a run. | fixed (discovery-repository-data) |
-| X-6 | bug | `services/repositories/backlog.py` (`queue_batch`) | Overlapping backlog runs could queue the same rows. Now selected `skip_locked` and stamped in one transaction. | fixed (discovery-repository-data) |
-| X-7 | design | `services/github/storage.py` (`upsert_repository`) | `release_name` locks a second row outside GitHub ID order; deadlock needs a rename race plus two concurrent runs (accepted in design D3; the old delete had the same shape). | wontfix (accepted) |
-| X-8 | cleanup | `services/discovery/service.py` (`_step_pool`) | `_remove_not_code` and `recheck_eligibility` both load the pool with topics and dependencies. Not one pass: they cover different lifecycles. | wontfix (batch 11 if it matters) |
-| X-9 | design | `services/discovery/service.py` (steps) | A suspected list found `not_code` by this run's analysis keeps its pool slot until the next run (pool runs before analysis, D7). | wontfix (by design) |
-| X-10 | — | `core/checks.py` | "W003 when the budget is below the band count": E025 already errors there and W003 is skipped. | false-positive |
-| X-11 | perf | `services/repositories/lifecycle.py` (`complete`) | Eligibility re-reads the topics and dependencies the analysis just wrote: 1–2 queries per analysis. Passing them in needs an annotation set by hand (skipped in the `/simplify` pass). | fixed (performance-cleanup) |
-| X-12 | cleanup | `tests/` | `developer`, `single_band` and `client` fixtures are copied across `test_discovery_service.py`, `test_discovery_repository_data.py`, `test_repository_analysis.py` and `test_issue_ingestion.py`; move them to `conftest.py` (`fresh_repo` and `analyze` already moved to `repo_fixtures.py`). | fixed (performance-cleanup) |
-
-## Batch 9 review (2026-10-21)
-
-Source: `code-review` over the uncommitted `frontend-correctness` diff (v0.12.8). Paths under
-`apps/frontend/src/` unless noted. Y-1…Y-5 and Y-8 fixed in 0.12.8 before commit, each with a
-test that fails without the fix (Y-8 checked by `npm run e2e`).
-
-| ID | Type | Where | Finding → failure | Status |
-|---|---|---|---|---|
-| Y-1 | bug | `app/queryClient.ts` (401 handler) | Log out, disconnect or delete account while a poll is in flight: its 401 called `endSession` → "Your session ended" after a deliberate sign-out. Sign-out mutations now carry `meta.endsSession` (`features/auth/api.ts`), which suspends the handler until it fails or `/auth/me` succeeds again. | fixed (frontend-correctness) |
-| Y-2 | bug | `app/jobTransitions.ts` (`fetchStatusAndRefresh`) | The status `queryFn` awaited the whole refresh cascade (which includes other status queries); one slow or hung derived request froze the status and its polling. Refresh is now started, not awaited. | fixed (frontend-correctness) |
-| Y-3 | bug | `lib/useScrollToHash.ts` | `decodeURIComponent` threw on a malformed hash (`#%E0`) inside an effect → blank page. Falls back to the raw hash. | fixed (frontend-correctness) |
-| Y-4 | bug | `features/recommendations/RecommendationList.tsx` (page recovery) | Dismissing the last card on page N moved to page N−1 from the optimistic cache; a failed dismissal restored the card on a page no longer shown. Recovery now waits for pending dismissals (`dismissMutationKey`). | fixed (frontend-correctness) |
-| Y-5 | bug | `lib/utils.ts` (`positiveId`) | `Number()` accepted `0x1f`, `1e2`, ` 7` → `/app/recommendations/0x1f` fetched id 31. Now decimal digits only. | fixed (frontend-correctness) |
-| Y-6 | design | `app/queryClient.ts` (`DERIVED_STALE_TIME_MS`) | Data changed by jobs no status query watches (a standalone `profile_analysis` from `reanalyze_profiles`, a backend repository refresh) stays cached up to 5 min where it used to refetch on mount. Intended trade-off of F-1; fix if it shows in use (watch the analysis job too, or a shorter stale time for profile and detail; `ideas.md` §14). | open |
-| Y-7 | bug | `features/feedback/api.ts` (`usePagedList`) | Saved and hidden lists page by number: a save or unsave in another tab between "Show more" clicks shifts the pages → a duplicated entry (duplicate React key) or a skipped one. Needs cursor or `saved_at`-keyset pagination in the API, or de-duplication by `repository_id` (`ideas.md` §14). | open |
-| Y-8 | bug | `apps/backend/config/settings/e2e.py` | Claimed self-contained but `base.py` read the whole local `.env` (`NUM_PROXIES`, `ALLOWED_HOSTS`, `DISCOVERY_MAX_POOL`, ranking settings used by the seed): local e2e differed from CI. The runner (`scripts/e2e-backend.mjs`) passes only `DATABASE_URL` from `.env` and sets `DJANGO_READ_DOTENV=0`, which `base.py` honors. | fixed (frontend-correctness) |
-| Y-9 | cleanup | `apps/backend/e2e/management/commands/e2e_seed.py` | An installed app's command imports `tests.repo_fixtures`; a test-helper refactor breaks `npm run e2e` while pytest stays green. Move the shared seeding helpers to a module both use. | fixed (performance-cleanup) |
-| Y-10 | cleanup | `app/app.test.tsx` (`count`) | Reimplements `callsTo` from `features/feedback/feedback.test.tsx`; move one helper to `test/render.tsx`. | fixed (performance-cleanup) |
-
-## Batch 10 review (2026-10-21)
-
-Source: `code-review` over the uncommitted `dev-scripts-checks` diff (v0.12.9). Z-2, Z-3, Z-6 and
-Z-7 fixed in 0.12.9 before commit, each with a test where one can run locally (Z-2 is CI config).
-
-| ID | Type | Where | Finding → failure | Status |
-|---|---|---|---|---|
-| Z-1 | design | `recommendations/migrations/0003_seed_v2_deterministic.py` (`seed`) | `operator_choice` ignores v1, so re-applying 0003 after a rollback activates v2 over an operator who deliberately chose v1 (for example because the benchmark does not favour v2). Matches the spec ("while no configuration or only `v1-deterministic` is active", design D8); changing it needs a spec change, and it only happens on a rollback. | open |
-| Z-2 | gap | `.github/workflows/ci.yml` (`concurrency`) | A group holds one pending run, and a newer one replaces it even with `cancel-in-progress: false` → three quick pushes to `main` skipped the middle commit (G-8 fixed only half). Pushes now group by `github.sha`; pull requests by ref, with cancellation. | fixed (dev-scripts-checks) |
-| Z-3 | bug | `scripts/check-version.mjs`, `scripts/wait-port.mjs` (main guard) | `process.argv[1] === fileURLToPath(import.meta.url)` is false when the repository is reached through a symlink or junction (Node resolves `import.meta.url`, not `argv[1]`) → `npm run check:version` printed nothing and exited 0 with mismatched versions. Both use `isMain(import.meta.url)` (`env.mjs`, compares real paths). | fixed (dev-scripts-checks) |
-| Z-4 | bug | `scripts/stop.mjs` | The process list is read before the records: a runner that starts in between has a record but no listed process → its record is deleted as stale, and a later stop cannot find it. Needs `npm run stop` during `npm start`'s spawn (milliseconds). Read records first. | fixed (performance-cleanup) |
-| Z-5 | cleanup | `scripts/redis.mjs` (keep-alive record) | The comment says the detached `wsl.exe` is outside the runner's tree; on Windows its parent is still the runner, so `taskkill /T` reaches it too. A failed spawn (`pid` undefined) writes `redis-undefined.json`, later dropped as stale. Fix the comment; record only a real pid. | fixed (performance-cleanup) |
-| Z-6 | bug | `recommendations/migrations/0002_seed_v1_deterministic.py` (`unseed`) | v2 with recommendations survives 0003's unseed (inactive, v1 activated); 0002's unseed then deleted v1 → v2 stored, nothing active, generation fails. v1 unseed now keeps an active v1 while any other configuration is stored. | fixed (dev-scripts-checks) |
-| Z-7 | test | `scripts/env.test.mjs` | `'C:\work\contribfinder'` written with single backslashes is `C:workcontribfinder` (`\w` is no escape) → the schedule-name test never saw a Windows path. Uses `String.raw` now. | fixed (dev-scripts-checks) |
-| Z-8 | bug | `scripts/stack.mjs` (`ownedByPath`, `recordMatches`) | Matching needs `proc.name === 'node'`; on Linux `ps comm=` may report a newer Node's main thread name (`MainThread`) → `npm run stop` finds nothing there. Unverified; Windows (CIM `Name`) unaffected. Take the executable from `args=`. | fixed (performance-cleanup) |
-| Z-9 | perf | `scripts/stop.mjs` (kill loop) | Every matched process gets its own `taskkill /T /F` (`killTree`, `spawnSync`), though killing `start` already ends its descendants → about 50–150 ms per mostly dead pid. Skip descendants of chosen pids (needs parent pids from CIM/`ps`) or pass all pids to one `taskkill`. Skipped in the `/simplify` pass (shared `killTree`). | fixed (performance-cleanup) |
-| Z-10 | cleanup | `tests/test_config_checks.py` | `EXPERIENCE_THRESHOLDS` tests live in a new file instead of `test_profiling_config.py` (whose `test_default_config_is_valid` overlaps `test_defaults_pass`), and `ids()` is now defined in five test modules. Move the tests; share `ids` from one helper. Skipped in the `/simplify` pass (outside the diff). | fixed (performance-cleanup) |
-
-## Batch 11 review (2026-10-22)
-
-Source: `code-review` over the uncommitted `performance-cleanup` diff (v0.12.10). Q-1, Q-2, Q-4,
-Q-5, Q-7, Q-8 and Q-9 fixed in 0.12.10 before commit; Q-3 and Q-6 accepted. Q-10…Q-12 are the
-`/simplify` pass's skips (the pass's fixes, such as one `GREATEST` in the freshness filter and
-`Backoff.call`, shipped in 0.12.10); they shipped in 0.12.11 (Q-10 in part).
-
-| ID | Type | Where | Finding → failure | Status |
-|---|---|---|---|---|
-| Q-1 | bug | `services/github/sync.py` (`_update_metadata`) | Still wrote the whole metadata (`{**job.metadata, **values}` + `save_progress`) → a key another writer stored meanwhile was dropped; C-20 changed discovery only. Uses `merge_metadata`. | fixed (performance-cleanup) |
-| Q-2 | bug | `services/ranking/service.py` (summary) | Same pattern for the generation summary. `merge_metadata(job, values, **fields)` now also stores `steps` in the same write. | fixed (performance-cleanup) |
-| Q-3 | design | `services/repositories/analysis.py` (`_store`) | Completion checks eligibility with the fetched topics, not the stored rows → would drift from `recheck_eligibility` if storage ever normalized topics. Today `replace_topics` only de-duplicates, as the returned list does. | wontfix (accepted: same values; revisit if topic storage changes) |
-| Q-4 | perf | `services/ranking/score.py` (`score_candidate`) | D-20 made it call `contributions()` twice per candidate (once for parts, again in `weighted_score`). Both now sum through `_total(parts)`. | fixed (performance-cleanup) |
-| Q-5 | cleanup | `services/ranking/explain.py` (`join`) | Third copy of the name-joining helper, missed by D-19. Uses `services.text.join_names`. | fixed (performance-cleanup) |
-| Q-6 | design | `services/github/client.py` (304 `touch`) | One more Redis call per 304, and an entry confirmed by 304s never ages out. Intended: spec `github-data-sync` (A-17); the call goes through the cache backoff. | wontfix (by design) |
-| Q-7 | privacy | `services/data_deletion.py` | The `github:ratelimit:{pk}` purge was dropped with the writer → keys from before the upgrade survived deletion for up to an hour. Purge kept for one release. | fixed (performance-cleanup) |
-| Q-8 | bug | `scripts/stack.mjs` (`parsePs`) | Name from the first word of `args` → a node or python path with a space (`/home/a b/...`) named `a`, so `npm run stop` found nothing. Linux reads `/proc/<pid>/exe`; macOS keeps the first word (limit). | fixed (performance-cleanup) |
-| Q-10 | perf | `repositories/queries.py` (`latest_snapshot`) | The sliced prefetch sends one row per repository but Postgres still window-sorts every snapshot of them (`ROW_NUMBER()`; the index lacks the `-pk` tie-break). Grows with `REPO_SNAPSHOT_HISTORY`. Skipped in the `/simplify` pass: needs a migration (`ideas.md` §16). | fixed in part (tooling-data-hygiene: index gains `-id`, so single-repository newest reads are an index scan + limit; the multi-repository prefetch still sorts its bounded rows, Postgres bitmap-scans `= ANY`) |
-| Q-11 | cleanup | `services/repositories/analysis.py`, `repositories/api.py` | The "newest snapshot" order `("-captured_at", "-pk")` is still written by hand in a filter and a subquery outside `latest_snapshot`. A shared ordering constant keeps the three equal. Skipped in the `/simplify` pass (outside the diff). | fixed (tooling-data-hygiene) |
-| Q-12 | cleanup | `services/github/sync.py`, `services/discovery/service.py`, `tests/repo_fixtures.py` | One-line `_update_metadata` wrappers around `merge_metadata`, and a re-export shim of `e2e.builders` for 16 test imports. Skipped in the `/simplify` pass (churn, no behavior; `ideas.md` §16). | fixed (tooling-data-hygiene) |
-| Q-9 | docs | `CLAUDE.md` | Said no `github:ratelimit:*` key remains at all; now says it is no longer written and still purged for one release. ("rate-limit state in Redis" was already removed.) | fixed (performance-cleanup) |
-
-## Batch 11 notes (2026-10-22)
-
-Source: problems seen while implementing and verifying `performance-cleanup` (v0.12.10). None
-fixed there: outside the batch's rows.
-
-| ID | Type | Where | Finding → failure | Status |
-|---|---|---|---|---|
-| P-1 | bug | `scripts/redis.mjs` (WSL keep-alive) | First `npm start` from Claude Code's Git Bash: keep-alive `wsl.exe` exited `3221225786` (`0xC000013A`, Ctrl+C exit) ~8 s after start → `concurrently` stopped the whole stack ("WSL keep-alive session ended … Redis may stop"). Second run stayed up 90 s; not reproduced. Maybe the shell's inherited Ctrl+C handling (CLAUDE.md §6 testing note), maybe a real stray console event. Check in an interactive console; decide whether a keep-alive exit must end the stack or be restarted. | fixed in part (tooling-data-hygiene: the runner restarts the keep-alive and logs the code in hex; the cause is still unknown) |
-| P-2 | tooling | `apps/frontend` (`format:check`), `.gitattributes` | With `core.autocrlf=true` (Windows default) files check out CRLF; prettier wants LF → `npm run format:check` fails on untouched files (HEAD too). CI (Linux) unaffected. `prettier --check --end-of-line auto` passes. Fix: `.gitattributes` `* text=auto eol=lf`, or `endOfLine: "auto"`. | fixed (tooling-data-hygiene) |
-| P-3 | test | `src/app/app.test.tsx`, `src/features/feedback/feedback.test.tsx` | Under load (other suites running, 82 s duration) 2 of 35 tests failed; rerun alone passed in 12 s. Likely `waitFor` default timeout. Flaky locally; not seen in CI. Find the two tests, raise their timeout or wait on the right signal. | open (not reproduced in 8 runs under backend-suite load on 2026-10-22: 5 of the two files, 3 cold full suites; tooling-data-hygiene) |
-| P-4 | tooling | `apps/frontend/package.json` (`api:export`) | Runs bare `uv`, not `scripts/uv.mjs` → `npm run api:sync` fails ("'uv' is not recognized") where uv is not on PATH, though `npm run manage` etc. find it. Route through `scripts/uv.mjs`. | fixed (tooling-data-hygiene) |
-| P-5 | cleanup | `scripts/*.mjs` | Not prettier-clean (and unlinted); runner edits cannot follow a checked style. Same as `ideas.md` round 5 "lint `scripts/`". | fixed (tooling-data-hygiene) |
+| ID | Item | Where | Status |
+|---|---|---|---|
+| DOC-1 | Ctrl+C issue still `[~] carried to Phase 5`; fixed in Phase 8a per CLAUDE.md §6, no `[x]` entry records it. | features.txt:130 | fixed (performance-cleanup) |
+| DOC-2 | Carry-over says "real-a exported, 3 of 39 graded"; current target is `real-a-v2` (40 candidates). The 3 grades are likely in the stale `real-a.csv`. | features.txt:261 | fixed (performance-cleanup) |
 
 ## Full-file reviews (2026-10-19)
 
@@ -221,9 +200,9 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | B-11 | bug | `services/jobs.py:183` | Recovery, expiry and cancel don't update `steps` → a FAILED or CANCELLED job still shows a step `running` (UI spinner on a dead job). | fixed (job-claim-fencing) |
 | B-12 | bug | `services/jobs.py:174` | `recover_stale_jobs` re-sends `.delay` every beat without changing status → duplicate messages in a busy queue, repeated misleading log. | fixed (job-claim-fencing) |
 | B-13 | bug | `services/profiling/manifests.py:161` | `parse_manifest` doesn't catch RecursionError or MemoryError → a deeply nested package.json fails the dependencies step. | fixed (github-error-resilience) |
-| B-14 | bug | `services/profiling/readme.py:32` | `_URLS` keeps `&amp;` → `parse_qs` keys like `amp;logo`; second and later badge params lost (e.g. Go not detected). | confirmed |
-| B-15 | bug | `services/profiling/readme.py:93` | shields.io parser reads only the first dash segment; `/badge/-Python-...` or `/badge/language-Rust-...` without `logo=` → no evidence. | confirmed |
-| B-16 | bug | `services/profiling/interests.py:33` | Contribution interest evidence uses `repo.pushed_at`, not `last_contributed_at` → "last observed" overstates recency. | confirmed |
+| B-14 | bug | `services/profiling/readme.py:32` | `_URLS` keeps `&amp;` → `parse_qs` keys like `amp;logo`; second and later badge params lost (e.g. Go not detected). | fixed (0.12.14, no spec change) |
+| B-15 | bug | `services/profiling/readme.py:93` | shields.io parser reads only the first dash segment; `/badge/-Python-...` or `/badge/language-Rust-...` without `logo=` → no evidence. | fixed (0.12.14, no spec change) |
+| B-16 | bug | `services/profiling/interests.py:33` | Contribution interest evidence uses `repo.pushed_at`, not `last_contributed_at` → "last observed" overstates recency. | fixed (0.12.14, no spec change) |
 | B-17 | perf | `developers/api.py:44` | Two `Count(distinct=True)` over skills and interests joins → cross product (150×40 = 6,000 rows) per profile read. | fixed (performance-cleanup) |
 | B-18 | cleanup | `developers/tasks.py:15` | `extract_developer_skills` re-implements `run_tracked_job` by hand; lifecycle fixes (B-2, B-11) must be made twice; task isn't a thin wrapper. | fixed (job-claim-fencing) |
 | B-19 | cleanup | `services/jobs.py:277` | Four copy-pasted start_* functions have drifted (causes B-7 and B-8). Extract `_start_job`. | fixed (job-claim-fencing) |
@@ -269,7 +248,7 @@ Two runs, merged.
 | D-4 | bug | `services/ranking/service.py:159` | Persist locks Issue rows then deletes RecommendedIssue; issue refresh deletes RecommendedIssue then Issue → deadlock. | fixed (recommendation-consistency) |
 | D-5 | bug | `services/ranking/freshness.py:45` | Restore reuses a running generation that already loaded candidates; freshness ignores dismissals and new pool members → restored or newly found repositories missing until an unrelated change. | fixed (recommendation-consistency) |
 | D-6 | bug | `services/ranking/service.py:164` | Concurrently deleted issues are dropped from rows and snapshot, but score, signals, label and reason text ("3 open issues…") still count them → explanation not backed by stored data. | fixed (recommendation-consistency) |
-| D-7 | gap | `services/ranking/explain.py:188` | Reasons emitted for signals > 0 even when weight 0 → explanations for signals scoring didn't use (FR-REC-003). Filter on contribution > 0. | partial |
+| D-7 | gap | `services/ranking/explain.py:188` | Reasons emitted for signals > 0 even when weight 0 → explanations for signals scoring didn't use (FR-REC-003). Filter on contribution > 0. | fixed (0.12.14, no spec change) |
 | D-8 | bug | `services/ranking/score.py:99` | Relevance gate checks raw signal values, not weights → a weight-0 relevance signal still admits a candidate. | partial |
 | D-9 | bug | `services/matching/issues.py:193` | Issue with only technologies the developer lacks still counts via approachability + difficulty (score 0.40 ≥ 0.3) → "matches your profile" for a Rust issue shown to a Python dev. | partial |
 | D-10 | bug | `services/ranking/service.py:156` | Dismissals during a run removed after the `top_n` cut → fewer than N stored although next candidates exist. | fixed (recommendation-consistency) |
@@ -277,7 +256,7 @@ Two runs, merged.
 | D-12 | bug | `services/issues/classify.py:412` | `body_length` vote uses raw markdown (template HTML comments included) → wrong or unknown difficulty. | confirmed |
 | D-13 | bug | `services/issues/labels.py:110` | `[Type] Bug`-style labels never normalized (`_EDGES` strips only `[`) → no category, filter misses, documentation vote lost. | confirmed |
 | D-14 | bug | `services/ranking/freshness.py:34` | `due_profiles` requires candidates → profile with an emptied pool keeps old recommendations forever. | fixed (recommendation-consistency) |
-| D-15 | gap | `recommendations/admin.py:25` | ScoringConfig editable once no Recommendation references it → past versions' numbers can change (feedback snapshots, baselines). Activate action doesn't validate (`stored=True`). | partial |
+| D-15 | gap | `recommendations/admin.py:25` | ScoringConfig editable once no Recommendation references it → past versions' numbers can change (feedback snapshots, baselines). Activate action doesn't validate (`stored=True`). | partial (activation validates since 0.12.13, `activate_scoring_config`; the edit part is open) |
 | D-16 | bug | `services/matching/issues.py:136` | Difficulty-fit part of an unknown-difficulty issue's score has no reason → unexplained score. | confirmed |
 | D-17 | gap | `services/ranking/config.py:354` | Openness points not validated to sum ≤ 1; silently capped → saturated signal. | confirmed |
 | D-18 | gap | `services/issues/classify.py:423` | `technology_count >= 2` and `MIN_VOTES = 2` hard-coded (rule: weights are config). | confirmed |
@@ -378,33 +357,6 @@ Nothing major. Every area has had one unverified review pass.
 11. **Production hardening** (H-2, H-6, H-12, H-13, H-15, H-16, G-5, G-6): settings drift between tiers, spoofable client IP, unchecked config.
 12. **Secrets in logs** (H-3, H-4): redaction gaps plus a filter that can crash its caller.
 
-## Summary
-
-Status after verification: `confirmed` = defect exists as described; `partial` = defect exists but
-scenario or severity is narrower; `false-positive` = not a defect.
-
-| Section | Rows | Confirmed | Partial | False positive |
-|---|---|---|---|---|
-| K (known) | 5 | — | — | — |
-| DOC | 2 | — | — | — |
-| R last-commit review | 14 | 12 | 2 | 0 |
-| A auth/GitHub | 20 | 16 | 3 | 1 |
-| B jobs/profiling | 20 | 15 | 5 | 0 |
-| C repositories/discovery | 23 | 19 | 4 | 0 |
-| D recommendations/issues | 21 | 15 | 6 | 0 |
-| E feedback/evaluation | 10 | 8 | 2 | 0 |
-| F frontend | 9 | 8 | 1 | 0 |
-| G scripts/infra | 10 | 6 | 4 | 0 |
-| H platform/settings/tests | 20 | 16 | 4 | 0 |
-| V batch 5 review | 9 | 6 | 2 | 1 |
-| W batch 6 review | 10 | 10 | 0 | 0 |
-| X batch 7 review | 12 | 11 | 0 | 1 |
-| Y batch 9 review | 10 | 9 | 1 | 0 |
-| Z batch 10 review | 10 | 7 | 3 | 0 |
-| P batch 11 notes | 5 | 3 | 2 | 0 |
-| Q batch 11 review | 12 | 12 | 0 | 0 |
-| **Total** | **222** | **173** | **39** | **3** |
-
 ## Verification notes
 
 **False positive**
@@ -422,7 +374,7 @@ scenario or severity is narrower; `false-positive` = not a defect.
 - C-3, C-4, C-19: only reachable when an analysis takes more than 10 min (pathological latency).
 - C-5: needs a queued readme task to run after the repository was marked FAILED (race).
 - D-1: saved items do **not** vanish (the Saved list is keyed on repository). The rest holds: recommendations drop out on the hourly stale sweep and come back with new ids, or never without app credentials.
-- D-7, D-8: latent. Reachable only with a config that gives a weight of 0; no seeded config does.
+- D-7, D-8: latent. Reachable only with a config that gives a weight of 0; no seeded config does. D-7 fixed in 0.12.14.
 - D-9: spec-mandated (issue-matching spec: "technology match or an approachability label"). The real defect is the wording "matches your profile".
 - D-14: discovery's pool-step completion starts a generation that empties the list. Stuck only when D-5 reuse or a failed generation interferes.
 - D-15: the edit part holds; activation already re-validates, so an invalid config fails loudly.
@@ -455,35 +407,178 @@ scenario or severity is narrower; `false-positive` = not a defect.
 - H-1 extra: `cached_db` sessions also hit Redis. Fixed with H-1 (sessions now use the database backend).
 - G-10 extra: `uv sync` in setup is not `--frozen` either.
 
-## Fix batches
+## Batch 5 review (2026-10-21)
 
-Each batch fits one OpenSpec change. Order = suggested priority. Partial rows are included but
-can be deprioritized. Every verified row is in exactly one batch (A-10 dropped).
+Source: `code-review` over the uncommitted `github-error-resilience` diff (v0.12.5), plus the
+`/simplify` altitude pass (V-1 overlap). Verified against the code 2026-10-21 (V-5, V-6 partial: narrow windows; V-8 matches the metadata convention) and fixed in 0.12.5 before commit. Paths under
+`apps/backend/`. Ranked most severe first. Type: bug · gap · design · cleanup.
 
-| # | Batch | Rows | Why together |
-|---|---|---|---|
-| 1 | **Security hardening** | H-2, H-4, H-3, H-12, H-15, H-16, H-6, H-13, H-14, G-5, G-6, A-15 | Spoofable throttle IP, secrets in logs, settings drift between tiers, deploy defaults. Small, isolated, high value. |
-| 2 | **Privacy and deletion finality** | A-1, B-4, A-7, A-8, A-9, A-12, H-8, H-9, E-3, A-19 | "Delete" must mean deleted: running work re-checks before writing; identity leftovers; privacy page matches reality; export anonymization. **E-3 before committing benchmark-v2.** |
-| 3 | **Evaluation tooling** | R-1, R-2, E-1, E-2, R-7, R-8, R-13, R-14, E-8, E-9 | `--write-baseline` and sheet import must be trustworthy before K-1 (judging real-a-v2). Offline only, low risk. |
-| 4 | **Job lifecycle and claim fencing** | B-1, B-2, B-3, B-5, B-7, B-8, B-9, B-10, B-11, B-12, B-18, B-19, C-3, C-4, C-10, C-19 | One claim-token mechanism for jobs and repositories; zombie PENDING jobs (B-1); one `_start_job` helper; ordered catalog upsert. |
-| 5 | **GitHub error handling and resilience** | A-2, A-3, A-4, A-5, A-6, A-11, A-13, A-14, B-13, C-1, C-6, C-9, H-1 | Classify 301, secondary 403, 451 and decryption errors correctly; one bad repository or manifest never fails a whole job; a Redis outage never breaks reads. |
-| 6 | **Recommendation consistency** | D-1, D-2, D-3, D-4, D-5, D-6, D-10, D-14, E-4, E-5, E-6, E-7, F-4 | Stale ≠ gone; one lock order and one dismissal check for save, dismiss and persist; freshness sees restores and new candidates. |
-| 7 | **Discovery and repository data** | C-2, C-5, C-7, C-8, C-11, C-12, C-13, C-14, C-15, C-16, C-17, C-18, R-3, R-4, R-5, R-6, R-9, R-10, R-11, R-12 | Eligibility re-check via lifecycle, provenance pruning, not_code false positives, search upsert side effects, one shared ordering helper. |
-| 8 | **Signal and explanation accuracy** | B-6, B-14, B-15, B-16, D-7, D-8, D-9, D-11, D-12, D-13, D-15, D-16, D-17, D-18 | Wrong experience level, missed README badges, misclassified issues, reasons not backed by scoring. Ranking-visible: evaluate on the benchmark. |
-| 9 | **Frontend correctness** | F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18 | Query invalidation churn, no 4xx retry, pagination gaps, 401 handling; add Playwright for the main flows. |
-| 10 | **Dev scripts, checks and migrations** | G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20 | `npm run stop` kills only this repo; config checks for unchecked settings; safe seed migrations; tests for those paths. |
-| 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12, Y-9, Y-10, Z-4, Z-5, Z-8, Z-9, Z-10 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
-| 12 | **Batch 5 follow-ups** | V-1, V-2, V-3, V-4, V-5, V-6, V-7, V-8, V-9 | Review of `github-error-resilience`. Fixed in the same release (0.12.5); V-1 and V-3 replace design decisions D7 (client raises `GitHubInvalidResponse`) and D9 (in-memory throttle fallback instead of fail-open). |
-| 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7…X-9 accepted, X-10 false positive. X-11 and X-12 went to batch 11. |
-| 14 | **Batch 9 follow-ups** | Y-1…Y-10 | Review of `frontend-correctness`. Y-1…Y-5 and Y-8 fixed in the same release (0.12.8); Y-6 and Y-7 open (next frontend change); Y-9 and Y-10 went to batch 11. |
-| 15 | **Batch 10 follow-ups** | Z-1…Z-10 | Review and `/simplify` pass of `dev-scripts-checks`. Z-2, Z-3, Z-6, Z-7 fixed in the same release (0.12.9); Z-1 open (needs a spec change); Z-4, Z-5, Z-8, Z-9, Z-10 went to batch 11. |
-| 16 | **Batch 11 follow-ups** | P-1…P-5 | Found while implementing `performance-cleanup` (0.12.10). Shipped with Q-10…Q-12 in 0.12.11 (`tooling-data-hygiene`): P-2, P-4, P-5 fixed, P-1 fixed in part (restart; cause unknown), P-3 open (not reproduced). |
-| 17 | **Batch 11 review** | Q-1…Q-12 | Review and `/simplify` pass of `performance-cleanup`. Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 fixed in the same release (0.12.10); Q-3, Q-6 accepted; Q-10…Q-12 went to batch 16 (0.12.11; Q-10 in part). |
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| V-1 | design | `services/repositories/analysis.py:69` | `ERROR_CODES` maps bare `KeyError`/`ValueError`/`TypeError`/`IndexError` → FAILED `invalid_response`. Also catches transient bad bodies (truncated/HTML 200 → `JSONDecodeError`), corrupt ETag cache entries and programming bugs → every analyzed repository FAILED and ineligible for `REPO_FAILED_RETRY_HOURS`, logged at INFO. Deeper fix: raise typed `GitHubInvalidResponse(GitHubClientError)` at the `.json()`/`from_api` boundary in `services/github`; sync's `SKIPPABLE` and `oauth.fetch_identity` then get it for free. Module docstring also outdated. | fixed (github-error-resilience) |
+| V-2 | bug | `services/github/client.py:545` | Redirect guard in `_send` compares host only, not scheme/port. `Location: http://api.github.com/...` passes → bearer token sent in cleartext. Compare origin (scheme, host, port) with `GITHUB_API_BASE_URL`. | fixed (github-error-resilience) |
+| V-3 | design | `core/throttling.py:55` | Fail-open applies to every throttle, incl. anon throttle on `/auth/github` and scoped `/profile/sync`. Redis down (or induced cache errors) → no rate limiting per process for `THROTTLE_CACHE_BACKOFF_SECONDS`, renewed each error → OAuth-state churn, sync flooding into GitHub. Sensitive scopes: fail closed or in-process fallback counter. Revisits design D9. | fixed (github-error-resilience) |
+| V-4 | gap | `repositories/tasks.py:98` | `_refresh`'s app-credentials `GitHubAuthError` branch stays log-only (task 5.3), so `refresh_failed_at` stays null → rejected/rotated `GITHUB_CLIENT_SECRET` requeues the same `REPO_REFRESH_BATCH` every beat, the loop C-9 fixed for other errors. | fixed (github-error-resilience) |
+| V-5 | bug | `services/repositories/lifecycle.py:116` | `record_refresh_failure` runs as a separate UPDATE after `release()`. Another analysis can claim + complete in between → stale `lifecycle_error` and `refresh_failed_at` land on fresh RECOMMENDABLE data, next refresh delayed up to 60 min. Record inside `release()` under the held claim token. | fixed (github-error-resilience) |
+| V-6 | bug | `repositories/tasks.py:81` | `.exclude(refresh_failed_at__gte=...)` applies to the whole backlog query → also hides abandoned claims (dead worker, stuck FETCHING/REFRESHING) and DISCOVERED rows for up to `REPO_REFRESH_RETRY_MINUTES`. Scope it to the STALE branch. | fixed (github-error-resilience) |
+| V-7 | bug | `services/github/oauth.py:113` | `str(data["login"])` turns JSON `null` into `"None"`, passing the non-empty check → account upserted with username `"None"`. Check `isinstance(login, str)` and non-empty before converting. | fixed (github-error-resilience) |
+| V-8 | cleanup | `services/github/sync.py:187` | `languages_skipped` written to job metadata, never read (no code, API or UI). Spec-required (task 2.1), so: surface it (step detail or warning) or drop it from the spec. | wontfix (internal diagnostics, like `repos_capped`; spec-required) |
+| V-9 | cleanup | `services/github/sync.py:190` | `/simplify` altitude: `_step_topics` re-checks existing pks to work around topics being written a step later from `job.metadata["repo_topics"]`. Writing topics in `_step_repositories`' `job_write` removes the race (and rename re-points) and the metadata copy; `_step_topics` stays as a no-op step. Design accepted A-11 as partial. | fixed (github-error-resilience) |
 
-Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
-W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
-0.12.10 (A-18 wontfix), 16 with Q-10…Q-12 in 0.12.11 (P-1 and Q-10 in part, P-3 not reproduced).
-Next: batch 8 (signal and explanation accuracy) is ranking-visible and waits for K-1; Y-6, Y-7 and
-Z-1 stay open outside a batch.
+## Batch 6 review (2026-10-21)
 
-Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1 depends on batches 2 (E-3) and 3.
+Source: `code-review` over the uncommitted `recommendation-consistency` diff (v0.12.6). Paths
+under `apps/backend/`. All fixed in 0.12.6 before commit.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| W-1 | bug | `services/feedback.py` (`dismiss`) | Events referenced a recommendation a concurrent generation deleted → deferred FK fails at commit → dismiss 500. | fixed (recommendation-consistency) |
+| W-2 | bug | `services/feedback.py` (`record`) | Same for `viewed` (and other events), with the profile lock widening the window. | fixed (recommendation-consistency) |
+| W-3 | bug | `services/repositories/analysis.py` (`_store_issues`) | Only deleted issues were locked by pk; the unordered `bulk_update` of open issues could deadlock with persist's pk-ordered lock. | fixed (recommendation-consistency) |
+| W-4 | perf | `services/ranking/freshness.py` | The sweep flagged running generations as due → `rerun_requested` → a redundant generation after every overlap. | fixed (recommendation-consistency) |
+| W-5 | gap | `services/jobs.py` | A retry reloads its inputs but kept the rerun flag (extra run). A flag lost on permanent failure stays an accepted risk (design). | fixed (recommendation-consistency) |
+| W-6 | gap | `services/ranking/freshness.py` | A staleness mark overwrote the completion time of an analysis newer than the last generation → missed regeneration. | fixed (recommendation-consistency) |
+| W-7 | gap | `services/ranking/freshness.py` | A generation that keeps failing was restarted every sweep (30 min) forever. | fixed (recommendation-consistency) |
+| W-8 | bug | `services/ranking/service.py` | An issue re-analyzed (not deleted) between ranking and storing passed the check → reasons from stale analysis. | fixed (recommendation-consistency) |
+| W-9 | gap | `services/feedback.py` (`save`) | Dismissal enforced only through the recommendation's deletion. | fixed (recommendation-consistency) |
+| W-10 | perf | `services/feedback.py` (`record`) | View de-duplication waited on the profile lock held by a whole persist. | fixed (recommendation-consistency) |
+
+## Batch 7 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `discovery-repository-data` diff (v0.12.7). Paths
+under `apps/backend/`. Verified against the code; fixed in 0.12.7 before commit unless noted.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| X-1 | bug | `services/repositories/lifecycle.py` (`release_name`) | A holder that gave up its name stayed eligible: recommended as `a/b~5` with a URL that now opens another repository. Now ineligible `name_released` (INDEXED) until resolved. | fixed (discovery-repository-data) |
+| X-2 | bug | `services/discovery/service.py` (`_prune_discoveries`) | A run with no search (empty plan) or a query rejected with 422 pruned valid records, leaving candidates with no provenance. | fixed (discovery-repository-data) |
+| X-3 | gap | `services/discovery/service.py` (`_step_pool`) | Pool writes (prune, not_code, re-check, eviction) ran outside `job_write`: a cancelled or reclaimed run kept writing. | fixed (discovery-repository-data) |
+| X-4 | perf | `services/repositories/analysis.py` (`run`) | A queued refresh with nothing stale left still completed and stamped a transition → needless regenerations for every developer. Now released, SKIPPED. | fixed (discovery-repository-data) |
+| X-5 | bug | `services/discovery/service.py` (`_record`) | One query matching a repository in both bands in one run kept the later band's rank. Now the better rank within a run. | fixed (discovery-repository-data) |
+| X-6 | bug | `services/repositories/backlog.py` (`queue_batch`) | Overlapping backlog runs could queue the same rows. Now selected `skip_locked` and stamped in one transaction. | fixed (discovery-repository-data) |
+| X-7 | design | `services/github/storage.py` (`upsert_repository`) | `release_name` locks a second row outside GitHub ID order; deadlock needs a rename race plus two concurrent runs (accepted in design D3; the old delete had the same shape). | wontfix (accepted) |
+| X-8 | cleanup | `services/discovery/service.py` (`_step_pool`) | `_remove_not_code` and `recheck_eligibility` both load the pool with topics and dependencies. Not one pass: they cover different lifecycles. | wontfix (batch 11 if it matters) |
+| X-9 | design | `services/discovery/service.py` (steps) | A suspected list found `not_code` by this run's analysis keeps its pool slot until the next run (pool runs before analysis, D7). | wontfix (by design) |
+| X-10 | — | `core/checks.py` | "W003 when the budget is below the band count": E025 already errors there and W003 is skipped. | false-positive |
+| X-11 | perf | `services/repositories/lifecycle.py` (`complete`) | Eligibility re-reads the topics and dependencies the analysis just wrote: 1–2 queries per analysis. Passing them in needs an annotation set by hand (skipped in the `/simplify` pass). | fixed (performance-cleanup) |
+| X-12 | cleanup | `tests/` | `developer`, `single_band` and `client` fixtures are copied across `test_discovery_service.py`, `test_discovery_repository_data.py`, `test_repository_analysis.py` and `test_issue_ingestion.py`; move them to `conftest.py` (`fresh_repo` and `analyze` already moved to `repo_fixtures.py`). | fixed (performance-cleanup) |
+
+## Batch 9 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `frontend-correctness` diff (v0.12.8). Paths under
+`apps/frontend/src/` unless noted. Y-1…Y-5 and Y-8 fixed in 0.12.8 before commit, each with a
+test that fails without the fix (Y-8 checked by `npm run e2e`).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| Y-1 | bug | `app/queryClient.ts` (401 handler) | Log out, disconnect or delete account while a poll is in flight: its 401 called `endSession` → "Your session ended" after a deliberate sign-out. Sign-out mutations now carry `meta.endsSession` (`features/auth/api.ts`), which suspends the handler until it fails or `/auth/me` succeeds again. | fixed (frontend-correctness) |
+| Y-2 | bug | `app/jobTransitions.ts` (`fetchStatusAndRefresh`) | The status `queryFn` awaited the whole refresh cascade (which includes other status queries); one slow or hung derived request froze the status and its polling. Refresh is now started, not awaited. | fixed (frontend-correctness) |
+| Y-3 | bug | `lib/useScrollToHash.ts` | `decodeURIComponent` threw on a malformed hash (`#%E0`) inside an effect → blank page. Falls back to the raw hash. | fixed (frontend-correctness) |
+| Y-4 | bug | `features/recommendations/RecommendationList.tsx` (page recovery) | Dismissing the last card on page N moved to page N−1 from the optimistic cache; a failed dismissal restored the card on a page no longer shown. Recovery now waits for pending dismissals (`dismissMutationKey`). | fixed (frontend-correctness) |
+| Y-5 | bug | `lib/utils.ts` (`positiveId`) | `Number()` accepted `0x1f`, `1e2`, ` 7` → `/app/recommendations/0x1f` fetched id 31. Now decimal digits only. | fixed (frontend-correctness) |
+| Y-6 | design | `app/queryClient.ts` (`DERIVED_STALE_TIME_MS`) | Data changed by jobs no status query watches (a standalone `profile_analysis` from `reanalyze_profiles`, a backend repository refresh) stays cached up to 5 min where it used to refetch on mount. Intended trade-off of F-1; fix if it shows in use (watch the analysis job too, or a shorter stale time for profile and detail; `ideas.md` §14). | fixed in part (freshness-paging-seed: a finished generation also refetches the profile, skills and interests, and every analysis ends in one; data changed with no generation after it, e.g. a failed discovery, still waits up to 5 min) |
+| Y-7 | bug | `features/feedback/api.ts` (`usePagedList`) | Saved and hidden lists page by number: a save or unsave in another tab between "Show more" clicks shifts the pages → a duplicated entry (duplicate React key) or a skipped one. Needs cursor or `saved_at`-keyset pagination in the API, or de-duplication by `repository_id` (`ideas.md` §14). | fixed (freshness-paging-seed: keyset `cursor` on `/saved` and `/dismissed`) |
+| Y-8 | bug | `apps/backend/config/settings/e2e.py` | Claimed self-contained but `base.py` read the whole local `.env` (`NUM_PROXIES`, `ALLOWED_HOSTS`, `DISCOVERY_MAX_POOL`, ranking settings used by the seed): local e2e differed from CI. The runner (`scripts/e2e-backend.mjs`) passes only `DATABASE_URL` from `.env` and sets `DJANGO_READ_DOTENV=0`, which `base.py` honors. | fixed (frontend-correctness) |
+| Y-9 | cleanup | `apps/backend/e2e/management/commands/e2e_seed.py` | An installed app's command imports `tests.repo_fixtures`; a test-helper refactor breaks `npm run e2e` while pytest stays green. Move the shared seeding helpers to a module both use. | fixed (performance-cleanup) |
+| Y-10 | cleanup | `app/app.test.tsx` (`count`) | Reimplements `callsTo` from `features/feedback/feedback.test.tsx`; move one helper to `test/render.tsx`. | fixed (performance-cleanup) |
+
+## Batch 10 review (2026-10-21)
+
+Source: `code-review` over the uncommitted `dev-scripts-checks` diff (v0.12.9). Z-2, Z-3, Z-6 and
+Z-7 fixed in 0.12.9 before commit, each with a test where one can run locally (Z-2 is CI config).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| Z-1 | design | `recommendations/migrations/0003_seed_v2_deterministic.py` (`seed`) | `operator_choice` ignores v1, so re-applying 0003 after a rollback activates v2 over an operator who deliberately chose v1 (for example because the benchmark does not favour v2). Matches the spec ("while no configuration or only `v1-deterministic` is active", design D8); changing it needs a spec change, and it only happens on a rollback. | fixed (freshness-paging-seed: the seed leaves activation alone when v2 is already stored; spec changed) |
+| Z-2 | gap | `.github/workflows/ci.yml` (`concurrency`) | A group holds one pending run, and a newer one replaces it even with `cancel-in-progress: false` → three quick pushes to `main` skipped the middle commit (G-8 fixed only half). Pushes now group by `github.sha`; pull requests by ref, with cancellation. | fixed (dev-scripts-checks) |
+| Z-3 | bug | `scripts/check-version.mjs`, `scripts/wait-port.mjs` (main guard) | `process.argv[1] === fileURLToPath(import.meta.url)` is false when the repository is reached through a symlink or junction (Node resolves `import.meta.url`, not `argv[1]`) → `npm run check:version` printed nothing and exited 0 with mismatched versions. Both use `isMain(import.meta.url)` (`env.mjs`, compares real paths). | fixed (dev-scripts-checks) |
+| Z-4 | bug | `scripts/stop.mjs` | The process list is read before the records: a runner that starts in between has a record but no listed process → its record is deleted as stale, and a later stop cannot find it. Needs `npm run stop` during `npm start`'s spawn (milliseconds). Read records first. | fixed (performance-cleanup) |
+| Z-5 | cleanup | `scripts/redis.mjs` (keep-alive record) | The comment says the detached `wsl.exe` is outside the runner's tree; on Windows its parent is still the runner, so `taskkill /T` reaches it too. A failed spawn (`pid` undefined) writes `redis-undefined.json`, later dropped as stale. Fix the comment; record only a real pid. | fixed (performance-cleanup) |
+| Z-6 | bug | `recommendations/migrations/0002_seed_v1_deterministic.py` (`unseed`) | v2 with recommendations survives 0003's unseed (inactive, v1 activated); 0002's unseed then deleted v1 → v2 stored, nothing active, generation fails. v1 unseed now keeps an active v1 while any other configuration is stored. | fixed (dev-scripts-checks) |
+| Z-7 | test | `scripts/env.test.mjs` | `'C:\work\contribfinder'` written with single backslashes is `C:workcontribfinder` (`\w` is no escape) → the schedule-name test never saw a Windows path. Uses `String.raw` now. | fixed (dev-scripts-checks) |
+| Z-8 | bug | `scripts/stack.mjs` (`ownedByPath`, `recordMatches`) | Matching needs `proc.name === 'node'`; on Linux `ps comm=` may report a newer Node's main thread name (`MainThread`) → `npm run stop` finds nothing there. Unverified; Windows (CIM `Name`) unaffected. Take the executable from `args=`. | fixed (performance-cleanup) |
+| Z-9 | perf | `scripts/stop.mjs` (kill loop) | Every matched process gets its own `taskkill /T /F` (`killTree`, `spawnSync`), though killing `start` already ends its descendants → about 50–150 ms per mostly dead pid. Skip descendants of chosen pids (needs parent pids from CIM/`ps`) or pass all pids to one `taskkill`. Skipped in the `/simplify` pass (shared `killTree`). | fixed (performance-cleanup) |
+| Z-10 | cleanup | `tests/test_config_checks.py` | `EXPERIENCE_THRESHOLDS` tests live in a new file instead of `test_profiling_config.py` (whose `test_default_config_is_valid` overlaps `test_defaults_pass`), and `ids()` is now defined in five test modules. Move the tests; share `ids` from one helper. Skipped in the `/simplify` pass (outside the diff). | fixed (performance-cleanup) |
+
+## Batch 11 review (2026-10-22)
+
+Source: `code-review` over the uncommitted `performance-cleanup` diff (v0.12.10). Q-1, Q-2, Q-4,
+Q-5, Q-7, Q-8 and Q-9 fixed in 0.12.10 before commit; Q-3 and Q-6 accepted. Q-10…Q-12 are the
+`/simplify` pass's skips (the pass's fixes, such as one `GREATEST` in the freshness filter and
+`Backoff.call`, shipped in 0.12.10); they shipped in 0.12.11 (Q-10 in part).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| Q-1 | bug | `services/github/sync.py` (`_update_metadata`) | Still wrote the whole metadata (`{**job.metadata, **values}` + `save_progress`) → a key another writer stored meanwhile was dropped; C-20 changed discovery only. Uses `merge_metadata`. | fixed (performance-cleanup) |
+| Q-2 | bug | `services/ranking/service.py` (summary) | Same pattern for the generation summary. `merge_metadata(job, values, **fields)` now also stores `steps` in the same write. | fixed (performance-cleanup) |
+| Q-3 | design | `services/repositories/analysis.py` (`_store`) | Completion checks eligibility with the fetched topics, not the stored rows → would drift from `recheck_eligibility` if storage ever normalized topics. Today `replace_topics` only de-duplicates, as the returned list does. | wontfix (accepted: same values; revisit if topic storage changes) |
+| Q-4 | perf | `services/ranking/score.py` (`score_candidate`) | D-20 made it call `contributions()` twice per candidate (once for parts, again in `weighted_score`). Both now sum through `_total(parts)`. | fixed (performance-cleanup) |
+| Q-5 | cleanup | `services/ranking/explain.py` (`join`) | Third copy of the name-joining helper, missed by D-19. Uses `services.text.join_names`. | fixed (performance-cleanup) |
+| Q-6 | design | `services/github/client.py` (304 `touch`) | One more Redis call per 304, and an entry confirmed by 304s never ages out. Intended: spec `github-data-sync` (A-17); the call goes through the cache backoff. | wontfix (by design) |
+| Q-7 | privacy | `services/data_deletion.py` | The `github:ratelimit:{pk}` purge was dropped with the writer → keys from before the upgrade survived deletion for up to an hour. Purge kept for one release. | fixed (performance-cleanup) |
+| Q-8 | bug | `scripts/stack.mjs` (`parsePs`) | Name from the first word of `args` → a node or python path with a space (`/home/a b/...`) named `a`, so `npm run stop` found nothing. Linux reads `/proc/<pid>/exe`; macOS keeps the first word (limit). | fixed (performance-cleanup) |
+| Q-9 | docs | `CLAUDE.md` | Said no `github:ratelimit:*` key remains at all; now says it is no longer written and still purged for one release. ("rate-limit state in Redis" was already removed.) | fixed (performance-cleanup) |
+| Q-10 | perf | `repositories/queries.py` (`latest_snapshot`) | The sliced prefetch sends one row per repository but Postgres still window-sorts every snapshot of them (`ROW_NUMBER()`; the index lacks the `-pk` tie-break). Grows with `REPO_SNAPSHOT_HISTORY`. Skipped in the `/simplify` pass: needs a migration (`ideas.md` §16). | accepted (bounded; config-activation-loose-ends: on PostgreSQL 18 a `DISTINCT ON` rewrite still plans an incremental sort (0.4 ms for 40 repositories, 336 snapshots, seq/bitmap scans off); the window prefetch is bounded by `REPO_SNAPSHOT_HISTORY`. Stored activity stays `ideas.md` §16) |
+| Q-11 | cleanup | `services/repositories/analysis.py`, `repositories/api.py` | The "newest snapshot" order `("-captured_at", "-pk")` is still written by hand in a filter and a subquery outside `latest_snapshot`. A shared ordering constant keeps the three equal. Skipped in the `/simplify` pass (outside the diff). | fixed (tooling-data-hygiene) |
+| Q-12 | cleanup | `services/github/sync.py`, `services/discovery/service.py`, `tests/repo_fixtures.py` | One-line `_update_metadata` wrappers around `merge_metadata`, and a re-export shim of `e2e.builders` for 16 test imports. Skipped in the `/simplify` pass (churn, no behavior; `ideas.md` §16). | fixed (tooling-data-hygiene) |
+
+## Batch 11 notes (2026-10-22)
+
+Source: problems seen while implementing and verifying `performance-cleanup` (v0.12.10). None
+fixed there: outside the batch's rows.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| P-1 | bug | `scripts/redis.mjs` (WSL keep-alive) | First `npm start` from Claude Code's Git Bash: keep-alive `wsl.exe` exited `3221225786` (`0xC000013A`, Ctrl+C exit) ~8 s after start → `concurrently` stopped the whole stack ("WSL keep-alive session ended … Redis may stop"). Second run stayed up 90 s; not reproduced. Maybe the shell's inherited Ctrl+C handling (CLAUDE.md §6 testing note), maybe a real stray console event. Check in an interactive console; decide whether a keep-alive exit must end the stack or be restarted. | fixed in part (tooling-data-hygiene: the runner restarts the keep-alive and logs the code in hex; the cause is still unknown) |
+| P-2 | tooling | `apps/frontend` (`format:check`), `.gitattributes` | With `core.autocrlf=true` (Windows default) files check out CRLF; prettier wants LF → `npm run format:check` fails on untouched files (HEAD too). CI (Linux) unaffected. `prettier --check --end-of-line auto` passes. Fix: `.gitattributes` `* text=auto eol=lf`, or `endOfLine: "auto"`. | fixed (tooling-data-hygiene) |
+| P-3 | test | `src/app/app.test.tsx`, `src/features/feedback/feedback.test.tsx` | Under load (other suites running, 82 s duration) 2 of 35 tests failed; rerun alone passed in 12 s. Likely `waitFor` default timeout. Flaky locally; not seen in CI. Find the two tests, raise their timeout or wait on the right signal. | fixed (config-activation-loose-ends: cause was AppShell's lazy `LanguageChart` (Recharts), whose first import blocks the event loop ~1 s inside whichever test is running; the test setup now preloads it. `does not retry a 429` 1.2–1.3 s → ~0.36 s; both files 5/5 under backend-suite load) |
+| P-4 | tooling | `apps/frontend/package.json` (`api:export`) | Runs bare `uv`, not `scripts/uv.mjs` → `npm run api:sync` fails ("'uv' is not recognized") where uv is not on PATH, though `npm run manage` etc. find it. Route through `scripts/uv.mjs`. | fixed (tooling-data-hygiene) |
+| P-5 | cleanup | `scripts/*.mjs` | Not prettier-clean (and unlinted); runner edits cannot follow a checked style. Same as `ideas.md` round 5 "lint `scripts/`". | fixed (tooling-data-hygiene) |
+
+## 0.12.13/0.12.14 review (2026-10-23)
+
+Source: `code-review` over the uncommitted 0.12.13 (`config-activation-loose-ends`) and 0.12.14
+(batch 8 fixes) diff. S-1…S-5 fixed in 0.12.14 before commit; S-8 accepted; S-6 and S-7 open. S-9…S-11 are the
+`/simplify` pass's skips (its fixes shipped in 0.12.14).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| S-1 | bug | `services/ranking/activation.py` | The active config was loaded and the judge run before the force check; a `ConfigError` or `DatasetError` raised `ActivationError` even with `--force`, so a broken benchmark or active config blocked the emergency rollback. Forced, a failed comparison is now recorded in `failures` (`not compared: ...`). | fixed (0.12.14) |
+| S-2 | bug | `services/ranking/activation.py` | Active config and verdict read outside the transaction; two activations judged against the same active config could both commit, the last one unjudged against its real predecessor and audited with the wrong `previous_version`. The active row is re-read under the lock: a change is an `ActivationError` (try again), the target already active a no-op. | fixed (0.12.14) |
+| S-3 | bug | `services/ranking/activation.py` (`benchmark_judge`) | Used `RECOMMENDATION_MIN_SCORE`/`RECOMMENDATIONS_TOP_N` from settings, so a local `.env` could change the verdict. Uses `baseline.MIN_SCORE`/`TOP_N`, as the baseline does. | fixed (0.12.14) |
+| S-4 | bug | `services/ranking/activation.py` (audit) | `forced` was the flag, not whether the rule was bypassed: `--force` on an improvement audited `forced=True`. Now `forced` only when the verdict was not an improvement or not computed. | fixed (0.12.14) |
+| S-5 | bug | `services/profiling/readme.py` (shields badges) | B-15 matched every segment but the color against the catalog → free-text messages (`code style-black`, `platform-linux`, `docs-go to site`) became README skills; `unquote` before the split made `%2D` a separator. The message now counts only with no label or a tech label (section-title words, `built/made/powered/written`); segments are split before decoding. | fixed (0.12.14) |
+| S-6 | design | `recommendations/admin.py` (activate action) | The action runs `benchmark_judge` (`rank_pool` per developer, twice) inside the request, against CLAUDE.md §3.3 "long-running work runs in Celery"; an unexpected judge exception (not `DatasetError`/`ConfigError`) is a 500. Small today (benchmark-v1: 6 personas); grows with `benchmark-v2`. Options: a tracked job, or admin points to the command. | open (partial: bounded by the benchmark size) |
+| S-7 | bug | `feedback/api.py` (`KeysetPagination`) | Page mode (`?page=2`) rewrites `next` to a cursor but leaves DRF's page-based `previous` (`?page=1`); a client alternating them repeats or skips rows under concurrent saves. `cursor` plus `page` silently ignores `page`. Make page-mode `previous` null (as cursor mode), or reject the mix. API-visible: spec `recommendation-feedback`. | open |
+| S-8 | perf | `src/features/recommendations/api.ts` | Every finished generation (freshness sweep, reruns) invalidates profile, skills and interests, refetching three unchanged queries; after a sync the profile is fetched twice. Intended by 0.12.12 (Y-6: every analysis ends in a generation); narrowing needs a status flag (`ideas.md` round 4 data versions). | wontfix (accepted: by design) |
+| S-9 | design | `src/features/recommendations/api.ts`, status keys | Status keys live under `['profile']`, so a finished generation invalidates seven profile keys by hand; a new profile query left off the list stays stale up to 5 min. Move status keys to a `['jobs', ...]` namespace and invalidate the prefix. Skipped in the `/simplify` pass: outside the diff (`ideas.md` §17). | open |
+| S-10 | test | `src/test/setup.ts` | Only `LanguageChart` is preloaded; the next lazy component brings back P-3. The preload also costs ~1 s in every test file. One registry of lazy loaders (AppShell exports them), preloaded where AppShell renders. Skipped in the `/simplify` pass: would weaken the P-3 fix as written (`ideas.md` §17). | open |
+| S-11 | perf | `feedback/api.py` (`KeysetPagination`) | No index covers `(user, saved_at, id)` / `(user, dismissed_at, id)`; a cursor page sorts all the user's rows. Small lists today. Skipped in the `/simplify` pass: needs a migration (`ideas.md` §17). | open |
+
+## Summary
+
+Status after verification: `confirmed` = defect exists as described; `partial` = defect exists but
+scenario or severity is narrower; `false-positive` = not a defect.
+
+| Section | Rows | Confirmed | Partial | False positive |
+|---|---|---|---|---|
+| K (known) | 5 | — | — | — |
+| DOC | 2 | — | — | — |
+| R last-commit review | 14 | 12 | 2 | 0 |
+| A auth/GitHub | 20 | 16 | 3 | 1 |
+| B jobs/profiling | 20 | 15 | 5 | 0 |
+| C repositories/discovery | 23 | 19 | 4 | 0 |
+| D recommendations/issues | 21 | 15 | 6 | 0 |
+| E feedback/evaluation | 10 | 8 | 2 | 0 |
+| F frontend | 9 | 8 | 1 | 0 |
+| G scripts/infra | 10 | 6 | 4 | 0 |
+| H platform/settings/tests | 20 | 16 | 4 | 0 |
+| V batch 5 review | 9 | 6 | 2 | 1 |
+| W batch 6 review | 10 | 10 | 0 | 0 |
+| X batch 7 review | 12 | 11 | 0 | 1 |
+| Y batch 9 review | 10 | 9 | 1 | 0 |
+| Z batch 10 review | 10 | 7 | 3 | 0 |
+| P batch 11 notes | 5 | 3 | 2 | 0 |
+| Q batch 11 review | 12 | 12 | 0 | 0 |
+| S 0.12.13/0.12.14 review | 11 | 10 | 1 | 0 |
+| **Total** | **233** | **183** | **40** | **3** |

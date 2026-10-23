@@ -21,6 +21,7 @@ class AuditEvent(models.Model):
         GITHUB_DISCONNECT = "github_disconnect"
         GITHUB_DATA_DELETED = "github_data_deleted"
         ACCOUNT_DELETED = "account_deleted"
+        SCORING_CONFIG_ACTIVATED = "scoring_config_activated"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success"
