@@ -3,13 +3,14 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.14** (signal and explanation fixes: README badges and contribution dates read correctly, no reason for a signal weighted 0, config activation hardened; MVP+). After signing in with
+**Version 0.12.23** (dismiss reasons: say why a project is not for you, counted in the feedback report; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
 then ranks them with deterministic, versioned scoring and shows each recommendation with a match
 label (Strong, Good, Partial) and the reasons behind it, never a percentage. You can save or
-dismiss projects, refresh everything, and delete your GitHub data or your account at any time
+dismiss projects (optionally saying why: not my stack, too big, inactive, already know it),
+refresh everything, and delete your GitHub data or your account at any time
 (see the in-app privacy page). Each recommendation also lists the open issues that fit you, with
 their contribution type and an estimated difficulty (or "Not enough evidence"). Ranking changes
 are measured offline on a hand-judged benchmark before they count as improvements (see
@@ -150,6 +151,49 @@ the baseline, deltas in parentheses) and every developer's top 10 with judgments
 NDCG@10 is higher than the baseline's and no other metric drops by more than `--tolerance`
 (0.01); `--require-improvement` exits non-zero otherwise.
 
+With few developers a difference can be one developer's ranking moving, so every configuration
+after the baseline also gets a **paired bootstrap** block: per metric, the difference from the
+baseline, its 95% interval over developers (10,000 resamples of the developers, with
+replacement) and the share of resamples in which it is not better. A `*` marks an interval that
+excludes 0. An unmarked difference is inconclusive at this sample size, not zero; with a handful
+of developers the interval is a floor on the uncertainty, not a guarantee. The figures are
+information only: the improvement rule, `--require-improvement`, activation and `baselines.json`
+do not read them. The seed is fixed, so reruns print the same numbers; `--resamples N` and
+`--seed N` change them, and `--json` writes them under `comparisons`. On `benchmark-v1`, v2's
+NDCG@10 +0.0195 has the interval [-0.0023, +0.0501] (not better in 8.2% of resamples).
+
+### Feedback report
+
+```bash
+npm run manage -- feedback_report --since 90
+```
+
+Reads the stored feedback events (saves, dismissals, GitHub clicks, views) and reports them per
+scoring configuration version and rank bucket (1-5, 6-10, 11-20, 21+): the count of each action,
+the number of users, and the **positive share**, saved and opened (repository or issue) out of
+those plus dismissed. There is no "shown" event, so it is a share of what users decided, not a
+click-through rate. Each configuration also gets a **position-adjusted** share, its bucket shares
+weighted by one bucket mix common to every configuration in the report, so acting on
+higher-ranked items does not by itself make a configuration look better. Groups with fewer than
+`--minimum` (10) decisive actions show counts but no share. `--config` picks versions, `--json OUT`
+writes the report (put it in the gitignored `reports/` folder: `--json ../../reports/feedback.json`,
+since commands run in `apps/backend`). Aggregates only (no user, repository or recommendation
+ids); it changes nothing and never affects ranking.
+
+Each configuration also gets one row per **match label** (Strong, Good, Partial) and a
+**calibration** verdict: `ordered` when no label's share is below a lower label's, `not ordered
+(strong below good)` naming the first pair out of order, or `not enough data` when fewer than two
+labels reach the minimum. Label shares are raw, not adjusted for rank, because that is how users
+meet the label. Read the verdict with the user counts: a few heavy users can flip it. Changing
+the label bands is a ranking change and goes through `evaluate_ranking`.
+
+Each configuration with dismissals also gets a **dismiss reasons** line, for example
+`dismiss reasons: inactive 6, not_my_stack 3, none 4` (`none` = dismissed without a reason;
+JSON `dismiss_reasons`). Reasons change no share and never affect ranking: "inactive" points at
+the activity signal, "not my stack" at the technology signals, for a later ranking change to
+check on the benchmark. Dismissals without a recommendation snapshot get their own reasons line
+under "Without a recommendation snapshot" (JSON `unattributed_dismiss_reasons`).
+
 Holdout datasets (`evaluation/holdout-v1.json`, `holdout-v2.json`, four other personas each)
 guard against tuning to the benchmark: pass one with `--dataset`. A new configuration replaces the
 active one only when it is an improvement over every stored configuration on `benchmark-v1` and
@@ -174,8 +218,8 @@ and the selection benchmark. It merges: `--config v2-deterministic` replaces v2'
 keeps v1's. A different `--top-n` must cover every configuration recorded for the dataset, and
 `--min-score` is refused (the test recomputes each configuration at its own minimum score).
 
-To make a configuration active, use the activation command (the admin "Activate" action applies
-the same rule, without force):
+To make a configuration active, use the activation command. It is the only way: the Django admin
+shows the command on each configuration's page but never runs the benchmark comparison itself.
 
 ```bash
 npm run manage -- activate_scoring_config v3-example
@@ -304,8 +348,10 @@ together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 in 
 and batch 10 (dev scripts, checks and migrations) in 0.12.9, together with the follow-ups from its
 review (rows Z-1…Z-10, batch 15; Z-1 in 0.12.12), and batch 11 (performance and cleanup) in
 0.12.10 (A-18 wontfix), and batch 16 (tooling and data hygiene) in 0.12.11. B-14…B-16 and D-7
-of batch 8 shipped in 0.12.14 with S-1…S-5 from the review of 0.12.13/0.12.14 (batch 18). The
-rest of batch 8 (ranking-visible, waits for K-1), S-6, S-7 and S-9…S-11 remain.
+of batch 8 shipped in 0.12.14 with S-1…S-5 from the review of 0.12.13/0.12.14 (batch 18), and
+D-12, D-13 and S-9…S-11 in 0.12.15, D-8, D-9, D-15…D-18 of batch 8 in 0.12.16, and S-7 in
+0.12.17, S-6 in 0.12.18. B-6 and D-11 of batch 8 (OpenSpec changes, ranking-visible, wait for
+K-1) remain.
 
 ## Versioning
 

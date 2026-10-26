@@ -129,13 +129,25 @@ def _openness(items: Sequence[Mapping[str, Any]]) -> str:
 
 
 def _issue_availability(items: Sequence[Mapping[str, Any]]) -> str:
+    """Says how the issues matched: technologies, approachability labels only, or both.
+    Evidence stored before ``technology_count`` existed reads as all technology-matched."""
     facts = items[0]
     count = facts["count"]
-    text = (
-        "1 open issue matches your profile"
-        if count == 1
-        else f"{count} open issues match your profile"
-    )
+    by_technology = facts.get("technology_count", count)
+    if by_technology == count:
+        text = (
+            "1 open issue mentions technologies you use"
+            if count == 1
+            else f"{count} open issues mention technologies you use"
+        )
+    elif by_technology == 0:
+        text = (
+            "1 open issue is labeled good first issue or help wanted"
+            if count == 1
+            else f"{count} open issues are labeled good first issue or help wanted"
+        )
+    else:
+        text = f"{count} relevant open issues, {by_technology} mentioning technologies you use"
     known = [(t, n) for t, n in facts["by_type"].items() if t in CONTRIBUTION_TYPE_TEXT]
     if known:
         kind, n = min(known, key=lambda tn: (-tn[1], tn[0]))

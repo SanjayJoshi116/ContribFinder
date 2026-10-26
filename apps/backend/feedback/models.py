@@ -15,6 +15,15 @@ class FeedbackAction(models.TextChoices):
     OPENED_ISSUE = "opened_issue"
 
 
+class DismissReason(models.TextChoices):
+    """Why a user hid a repository: optional, recorded and reported, never scored."""
+
+    NOT_MY_STACK = "not_my_stack", "Not my stack"
+    TOO_BIG = "too_big", "Too big"
+    INACTIVE = "inactive", "Inactive"
+    ALREADY_KNOW = "already_know", "Already know it"
+
+
 class RecommendationFeedback(models.Model):
     """An interaction with a recommendation (FR-FEEDBACK-001, -004). Stored independently of the
     recommendation: the snapshot fields keep an event meaningful after regenerations, and the
@@ -40,6 +49,10 @@ class RecommendationFeedback(models.Model):
     match_label = models.CharField(max_length=10, blank=True)
     rank = models.PositiveIntegerField(null=True, blank=True)
     config_version = models.CharField(max_length=64, blank=True)
+    # dismissed only: the reason the user gave, blank when none.
+    dismiss_reason = models.CharField(
+        max_length=20, choices=DismissReason.choices, blank=True, default=""
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -69,6 +82,8 @@ class SavedRepository(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["user", "repository"], name="unique_saved_repository")
         ]
+        # The saved list's keyset order (SavedPagination): an ordered index scan per page.
+        indexes = [models.Index(fields=["user", "-saved_at", "-id"], name="saved_keyset_idx")]
 
     def __str__(self) -> str:
         return f"SavedRepository({self.repository_id} by {self.user_id})"
@@ -81,6 +96,7 @@ class DismissedRepository(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="dismissed_repositories"
     )
     repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="dismissals")
+    reason = models.CharField(max_length=20, choices=DismissReason.choices, blank=True, default="")
     dismissed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -89,6 +105,9 @@ class DismissedRepository(models.Model):
             models.UniqueConstraint(
                 fields=["user", "repository"], name="unique_dismissed_repository"
             )
+        ]
+        indexes = [
+            models.Index(fields=["user", "-dismissed_at", "-id"], name="dismissed_keyset_idx")
         ]
 
     def __str__(self) -> str:

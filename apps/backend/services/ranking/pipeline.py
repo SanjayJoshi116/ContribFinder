@@ -42,7 +42,7 @@ def rank_pool(
         computed.append((repo, techs, sig.compute(repo, techs, dev, params)))
     issue_params = params.get("issues")
     issues = (
-        issues_for([repo.id for repo, _, signals in computed if has_relevance(signals)])
+        issues_for([repo.id for repo, _, signals in computed if has_relevance(signals, weights)])
         if issue_params
         else {}
     )

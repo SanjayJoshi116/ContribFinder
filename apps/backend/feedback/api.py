@@ -28,6 +28,7 @@ from services import feedback
 from .models import DismissedRepository, SavedRepository
 from .serializers import (
     DismissedRepositorySerializer,
+    DismissSerializer,
     FeedbackSerializer,
     SavedRepositorySerializer,
     SaveResultSerializer,
@@ -97,11 +98,16 @@ class SaveView(APIView):
 class DismissView(APIView):
     @extend_schema(
         operation_id="recommendations_dismiss",
-        request=None,
-        responses={204: _NO_CONTENT, **error_responses(401, 403, 404)},
+        request=DismissSerializer,
+        responses={204: _NO_CONTENT, **error_responses(400, 401, 403, 404)},
     )
     def post(self, request: Request, pk: int) -> Response:
-        feedback.dismiss(current_user(request), _own_recommendation(request, pk))
+        recommendation = _own_recommendation(request, pk)
+        body = DismissSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        feedback.dismiss(
+            current_user(request), recommendation, body.validated_data.get("reason", "")
+        )
         return Response(status=204)
 
 
@@ -111,19 +117,27 @@ class InvalidCursor(APIException):
     default_detail = "The page cursor is not valid."
 
 
+class CursorWithPage(APIException):
+    status_code = 400
+    default_code = "cursor_with_page"
+    default_detail = "Send either a cursor or a page number, not both."
+
+
 class KeysetPagination(PageNumberPagination):
     """Pages newest first by (``time_field``, pk), continuing after the previous page's last
     entry (spec recommendation-feedback, "Complete saved and hidden lists"; design D2), so
     entries added or removed between requests never shift a page. ``next`` carries an opaque
-    ``cursor``; without one, ``page`` works as before. ``count`` is always the total. The
-    paginator applies the order itself, since the keyset filter depends on it."""
+    ``cursor``; without one, ``page`` works as before, and a request with both is refused.
+    Lists page forward only: ``previous`` is always null, so every link is a cursor link.
+    ``count`` is always the total. The paginator applies the order itself, since the keyset
+    filter depends on it."""
 
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
     cursor_query_param = "cursor"
     time_field = ""
-    total: int | None = None  # set in cursor mode only
+    total = 0
     next_link: str | None = None
 
     def paginate_queryset(
@@ -137,9 +151,11 @@ class KeysetPagination(PageNumberPagination):
         queryset = queryset.order_by(f"-{self.time_field}", "-pk")
         self.base_url = remove_query_param(request.build_absolute_uri(), self.page_query_param)
         raw = request.query_params.get(self.cursor_query_param)
+        if raw is not None and self.page_query_param in request.query_params:
+            raise CursorWithPage
         if raw is None:
-            self.total = None
             rows = super().paginate_queryset(queryset, request, view) or []
+            self.total = self.page.paginator.count if self.page is not None else 0
             has_more = self.page is not None and self.page.has_next()
         else:
             time, pk = self.decode(raw)
@@ -153,10 +169,6 @@ class KeysetPagination(PageNumberPagination):
         return rows
 
     def get_paginated_response(self, data: Any) -> Response:
-        if self.total is None:
-            response = super().get_paginated_response(data)
-            response.data["next"] = self.next_link
-            return response
         return Response(
             {"count": self.total, "next": self.next_link, "previous": None, "results": data}
         )
@@ -187,7 +199,8 @@ class KeysetPagination(PageNumberPagination):
                 "name": self.cursor_query_param,
                 "required": False,
                 "in": "query",
-                "description": "Continue after the entry this opaque value marks (from `next`).",
+                "description": "Continue after the entry this opaque value marks (from `next`). "
+                "Cannot be combined with `page`.",
                 "schema": {"type": "string"},
             },
         ]
@@ -230,7 +243,7 @@ class SavedListView(ListAPIView[SavedRepository]):
 
     @extend_schema(
         operation_id="saved_list",
-        responses={200: SavedRepositorySerializer(many=True), **error_responses(401)},
+        responses={200: SavedRepositorySerializer(many=True), **error_responses(400, 401)},
     )
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         return super().get(request, *args, **kwargs)
@@ -264,7 +277,7 @@ class DismissedListView(ListAPIView[DismissedRepository]):
 
     @extend_schema(
         operation_id="dismissed_list",
-        responses={200: DismissedRepositorySerializer(many=True), **error_responses(401)},
+        responses={200: DismissedRepositorySerializer(many=True), **error_responses(400, 401)},
     )
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         return super().get(request, *args, **kwargs)

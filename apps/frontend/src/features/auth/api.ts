@@ -47,6 +47,7 @@ export function useDeleteGitHubData() {
     mutationFn: () => apiFetch<void>('/profile/github-data', { method: 'DELETE' }),
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: ['profile'] })
+      queryClient.removeQueries({ queryKey: ['jobs'] })
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: meQueryKey }),
         queryClient.invalidateQueries({ queryKey: ['sync'] }),

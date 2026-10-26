@@ -4,6 +4,7 @@ import { ApiError, apiFetch } from '@/api/client'
 import type { GitHubProfile, RepositoryPage, SyncJob, SyncStatus } from '@/api/types'
 import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 
+// Not under ['jobs']: a finished sync invalidates that prefix and must not invalidate itself.
 export const syncStatusKey = ['sync', 'status'] as const
 export const githubProfileKey = ['profile', 'github'] as const
 export const repositoriesKey = ['profile', 'repositories'] as const
@@ -11,7 +12,8 @@ export const repositoriesKey = ['profile', 'repositories'] as const
 export const POLL_INTERVAL_MS = 2000
 
 /** Latest sync job and last successful sync. Polls while a job is in progress; a newly
- * finished sync refetches everything derived from GitHub data (all of ['profile']). */
+ * finished sync refetches everything derived from GitHub data (all of ['profile']) and the
+ * discovery and generation statuses (['jobs']), since it starts a new discovery run. */
 export function useSyncStatus() {
   const queryClient = useQueryClient()
   return useQuery<SyncStatus, ApiError>({
@@ -21,7 +23,11 @@ export function useSyncStatus() {
         queryClient,
         syncStatusKey,
         () => apiFetch<SyncStatus>('/sync/status'),
-        () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
+        () =>
+          Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['profile'] }),
+            queryClient.invalidateQueries({ queryKey: ['jobs'] }),
+          ]),
       ),
     staleTime: 0,
     refetchInterval: (query) => (isActive(query.state.data?.job) ? POLL_INTERVAL_MS : false),

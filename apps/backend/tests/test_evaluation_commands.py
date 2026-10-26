@@ -15,6 +15,7 @@ from repositories.models import Repository, UserRepository
 from services.evaluation import baseline
 from services.evaluation import dataset as datasets
 from services.evaluation.dataset import DatasetError, parse
+from services.evaluation.metrics import METRICS
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 
 from .test_evaluation_build import real
@@ -339,3 +340,32 @@ def test_export_holds_stale_and_dismissed_candidates(user, developer, pool) -> N
     DismissedRepository.objects.create(user=user, repository=pool["go"])
     names, _ = _export(user)
     assert names == sorted(r.full_name for r in pool.values())
+
+
+def test_uncertainty_block_for_each_candidate(dataset_path, tmp_path) -> None:
+    out = tmp_path / "report.json"
+    args = ["--dataset", str(dataset_path), "--config", "v1-deterministic"]
+    output = run(*args, "--config", "v2-deterministic", "--json", str(out), "--seed", "7")
+
+    header = "v2-deterministic vs v1-deterministic (paired bootstrap over developers, "
+    assert f"{header}10000 resamples, seed 7)" in output
+    assert all(f"  {name:<13} " in output for name in METRICS)
+    report = json.loads(out.read_text(encoding="utf-8"))
+    (comparison,) = report["comparisons"]
+    assert {k: comparison[k] for k in ("dataset", "baseline", "config", "resamples", "seed")} == {
+        "dataset": "mini",
+        "baseline": "v1-deterministic",
+        "config": "v2-deterministic",
+        "resamples": 10000,
+        "seed": 7,
+    }
+    assert set(comparison["metrics"]) == set(METRICS)
+    assert set(comparison["metrics"]["ndcg@10"]) == {"diff", "low", "high", "not_better", "marked"}
+    assert [r["config"] for r in report["reports"]] == ["v1-deterministic", "v2-deterministic"]
+
+    assert "paired bootstrap" not in run(*args)  # a single configuration: nothing to compare
+
+
+def test_resamples_must_be_positive(dataset_path) -> None:
+    with pytest.raises(CommandError, match="--resamples"):
+        run("--dataset", str(dataset_path), "--resamples", "0")

@@ -37,7 +37,9 @@ def repo(name: str, rank_: int | None = None) -> RepoData:
 
 def scored(name: str, score: float, rank_: int | None = None, relevant: bool = True) -> Scored:
     signals = sigs(skill=0.5) if relevant else sigs(activity=1.0, openness=1.0)
-    return Scored(repo(name, rank_), {}, signals, score, match_label(score, BANDS))
+    return Scored(
+        repo(name, rank_), {}, signals, score, match_label(score, BANDS), relevant=relevant
+    )
 
 
 def test_weighted_sum_with_seed_weights() -> None:

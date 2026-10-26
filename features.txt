@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.14 (2026-10-23)
+Version: 0.12.23 (2026-10-26)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,6 +439,101 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.23 - Dismiss reasons
+============================================================================
+
+Feedback
+  [x] Optional dismiss reason (not my stack, too big, inactive, already know it); plain
+      Dismiss stays one click with the same Undo
+  [x] Reason stored on the hidden entry and its dismissed event; shown on the hidden list
+  [x] feedback_report counts dismissals per reason per configuration (shares unchanged), and
+      the reasons of dismissals without a snapshot on their own line
+
+Review fixes (Bug_Backlog.md batch 19, T-1..T-10)
+  [x] Reason menu closed while a dismiss is in flight (no second request)
+  [x] Issue reasons only for parts that add to the score; neutral unknown-difficulty text
+  [x] Description edits on a stored scoring configuration no longer refused for tuples
+  [x] ISSUE_DIFFICULTY.min_votes bounded (core.E040); core.W004 when a level is unreachable
+  [x] Feedback report: rank 0 unattributed; one row builder for buckets and labels; events
+      streamed unordered
+  [x] Bootstrap draws once per comparison (same intervals)
+
+============================================================================
+SHIPPED - v0.12.22 - Docs and housekeeping
+============================================================================
+
+Documentation
+  [x] Bug_Backlog.md: open items, known gaps and release index first, totals before the history
+  [x] ideas.md: open ideas by when they can ship (no ranking change first, then after K-1)
+  [x] reports/ gitignored for --json report outputs
+
+============================================================================
+SHIPPED - v0.12.21 - Feedback report: match labels
+============================================================================
+
+Evaluation
+  [x] Positive share per match label and a calibration verdict (Strong >= Good >= Partial)
+
+============================================================================
+SHIPPED - v0.12.20 - Feedback report
+============================================================================
+
+Evaluation
+  [x] feedback_report: positive share per scoring configuration and rank bucket,
+      position-adjusted (aggregates only)
+
+============================================================================
+SHIPPED - v0.12.19 - Evaluation confidence
+============================================================================
+
+Evaluation
+  [x] Paired bootstrap interval per metric in evaluate_ranking (information only)
+
+============================================================================
+SHIPPED - v0.12.18 - Activation by command only (S-6)
+============================================================================
+
+Evaluation
+  [x] Admin activation action removed; the admin page shows the activation command
+
+============================================================================
+SHIPPED - v0.12.17 - Saved and hidden list links (S-7)
+============================================================================
+
+Feedback
+  [x] Saved and hidden lists page forward only (previous always null)
+  [x] cursor with page rejected (cursor_with_page)
+
+============================================================================
+SHIPPED - v0.12.16 - Signal and explanation accuracy (D-8, D-9, D-15..D-18)
+============================================================================
+
+Explanations
+  [x] Issue availability says whether issues matched by technology, by label only, or both
+  [x] Unknown issue difficulty explained ("Difficulty not estimated")
+
+Ranking configuration
+  [x] Relevance gate ignores a relevance signal weighted 0
+  [x] Openness points sum to at most 1
+  [x] Stored scoring configurations immutable (admin read-only, model save refuses)
+
+Issues
+  [x] Difficulty thresholds several_technologies and min_votes configurable (same defaults)
+
+============================================================================
+SHIPPED - v0.12.15 - Fixes without a spec change (D-12, D-13, S-9..S-11)
+============================================================================
+
+Issues
+  [x] Difficulty ignores issue-template comments when measuring the description
+  [x] [Type] Bug-style labels normalized
+
+Platform
+  [x] Job status queries under ['jobs']; a finished generation refreshes all profile data
+  [x] Lazy components through one registry, all preloaded in tests
+  [x] Saved/hidden list order indexed
+
+============================================================================
 SHIPPED - v0.12.14 - Signal and explanation fixes without a spec change (B-14..B-16, D-7)
 ============================================================================
 
@@ -567,15 +662,19 @@ PLANNED - MVP+ / FUTURE
 
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
-  [ ] Bug_Backlog.md batch 8  signal and explanation accuracy (waits for K-1)
+  [ ] Bug_Backlog.md batch 8  B-6 and D-11 (wait for K-1)
+  [ ] Bug_Backlog.md Y-6  data changed with no generation after it stays cached up to 5 min
+                          (fix when it shows in use; ideas.md §14 data versions)
   [ ] Bug_Backlog.md P-1  keep-alive exit cause
+  [ ] Bug_Backlog.md T-12 rank 0 storable (constraint rank >= 1)
+  [ ] Bug_Backlog.md T-11 issue relevance ignores part weights (waits for K-1)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation
   [ ]          Personalized ranking, notifications, contribution tracking
-  [ ] ideas.md  Unplanned gap analysis (2026-10-20): IDF weighting, time decay, diversity,
-                preferences, contribution-success signals, evaluation rigor, online report,
-                dismiss reasons, CSP, dependency scanning; round 5 (2026-10-21): lint
-                scripts/, loud helper modules, migration round trip, config activation;
-                round 6 (2026-10-22): snapshot index, one metadata write path,
-                .gitattributes, direct builder imports
+  [ ] ideas.md  Unplanned, ordered by when they can ship. Now (no ranking change):
+                setup readiness, no_license measurement, post-analysis
+                pool cleanup, data versions, new seeds stored inactive, CSP, dependency
+                scanning. After K-1: IDF weighting, diversity, preferences,
+                contribution-success signals, labeled-issue fetch, retrieval sources,
+                content-based not_code, label bands

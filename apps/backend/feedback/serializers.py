@@ -11,7 +11,7 @@ from repositories.models import ActivityLabel
 from repositories.serializers import CandidateRepositorySerializer
 from services.feedback import CLIENT_ACTIONS
 
-from .models import DismissedRepository, FeedbackAction, SavedRepository
+from .models import DismissedRepository, DismissReason, FeedbackAction, SavedRepository
 
 
 class FeedbackSerializer(serializers.Serializer[dict[str, Any]]):
@@ -31,6 +31,14 @@ class FeedbackSerializer(serializers.Serializer[dict[str, Any]]):
         if not opened_issue and "issue_id" in attrs:
             raise serializers.ValidationError({"issue_id": "Only allowed for opened_issue."})
         return attrs
+
+
+class DismissSerializer(serializers.Serializer[dict[str, Any]]):
+    reason = serializers.ChoiceField(
+        choices=DismissReason.choices,
+        required=False,
+        help_text="Optional: why the project is not for the user. Never used for ranking.",
+    )
 
 
 class SaveResultSerializer(serializers.Serializer[dict[str, bool]]):
@@ -76,8 +84,13 @@ class SavedRepositorySerializer(serializers.ModelSerializer[SavedRepository]):
 class DismissedRepositorySerializer(serializers.ModelSerializer[DismissedRepository]):
     repository_id = serializers.IntegerField(read_only=True)
     repository = CandidateRepositorySerializer(read_only=True)
+    reason = serializers.SerializerMethodField(help_text="The reason given, or null when none.")
 
     class Meta:
         model = DismissedRepository
-        fields = ["repository_id", "repository", "dismissed_at"]
+        fields = ["repository_id", "repository", "dismissed_at", "reason"]
         read_only_fields = fields
+
+    @extend_schema_field(serializers.ChoiceField(choices=DismissReason.choices, allow_null=True))
+    def get_reason(self, obj: DismissedRepository) -> str | None:
+        return obj.reason or None

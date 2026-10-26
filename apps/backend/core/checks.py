@@ -7,6 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from services.crypto import validate_keys
 from services.github.oauth import has_app_credentials
+from services.issues.classify import LEVEL_VOTERS, MAX_LEVEL_VOTES
 from services.profiling.experience import SIGNALS as EXPERIENCE_SIGNALS
 
 
@@ -116,7 +117,14 @@ def _experience_errors(thresholds: object) -> list[CheckMessage]:
 
 QUERY_STRATEGIES = ("language", "skill", "interest", "topic")
 STALE_PARTS = ("metadata", "readme", "community", "dependencies", "activity", "issues")
-ISSUE_DIFFICULTY_KEYS = ("short_body", "long_body", "many_technologies", "long_discussion")
+ISSUE_DIFFICULTY_KEYS = (
+    "short_body",
+    "long_body",
+    "several_technologies",
+    "many_technologies",
+    "long_discussion",
+    "min_votes",
+)
 ACTIVITY_KEYS = (
     "recent_push_days",
     "recent_commits",
@@ -329,6 +337,34 @@ def issue_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMess
                     "ISSUE_DIFFICULTY: many_technologies must be at least 2 and "
                     "long_discussion at least 1.",
                     id="core.E040",
+                )
+            )
+        if not 2 <= thresholds["several_technologies"] <= thresholds["many_technologies"]:
+            errors.append(
+                Error(
+                    "ISSUE_DIFFICULTY: several_technologies must be at least 2 and at most "
+                    "many_technologies.",
+                    id="core.E040",
+                )
+            )
+        if not 2 <= thresholds["min_votes"] <= MAX_LEVEL_VOTES:
+            errors.append(
+                Error(
+                    f"ISSUE_DIFFICULTY: min_votes must be at least 2 and at most "
+                    f"{MAX_LEVEL_VOTES} (the most votes one difficulty level can get).",
+                    id="core.E040",
+                )
+            )
+        elif unreachable := [
+            str(level)
+            for level, voters in LEVEL_VOTERS.items()
+            if len(voters) < thresholds["min_votes"]
+        ]:
+            errors.append(
+                Warning(
+                    f"ISSUE_DIFFICULTY: with min_votes {thresholds['min_votes']} no issue can be "
+                    f"classified {' or '.join(unreachable)}.",
+                    id="core.W004",
                 )
             )
     return errors

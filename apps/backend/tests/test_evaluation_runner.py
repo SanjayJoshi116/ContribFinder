@@ -5,17 +5,19 @@ import json
 
 import pytest
 
-from services.evaluation.dataset import parse
+from services.evaluation.dataset import DEFAULT_DATASET, load, parse
 from services.evaluation.metrics import METRICS
 from services.evaluation.runner import (
     ConfigError,
     ConfigSpec,
+    DeveloperResult,
     Report,
     active_config,
     compare,
     evaluate,
     file_config,
     stored_config,
+    uncertainty,
 )
 from services.ranking.config import V2_PARAMS, V2_WEIGHTS
 
@@ -121,3 +123,49 @@ def test_subsets_only_for_mixed_datasets() -> None:
     assert mixed.subsets["persona"] == persona.metrics  # one developer each: its own metrics
     assert mixed.subsets["real"] == found.metrics
     assert mixed.as_dict()["subsets"] == mixed.subsets
+
+
+@pytest.mark.django_db
+def test_uncertainty_on_the_seed_benchmark() -> None:
+    dataset = load(DEFAULT_DATASET)
+    v1, v2 = (
+        evaluate(dataset, stored_config(v), min_score=0.1, top_n=50)
+        for v in ("v1-deterministic", "v2-deterministic")
+    )
+    found = uncertainty(v1, v2)
+
+    assert set(found) == set(METRICS)
+    assert found == uncertainty(v1, v2)  # fixed seed
+    for name, interval in found.items():
+        expected = sum(
+            b.values[name] - a.values[name]
+            for a, b in zip(v1.developers, v2.developers, strict=True)
+        ) / len(v1.developers)
+        assert interval.diff == pytest.approx(expected)
+        assert interval.low <= interval.diff <= interval.high
+    assert compare(v1, [v2])[0].improvement is False  # the verdict does not read the intervals
+
+
+def test_uncertainty_needs_the_same_developers() -> None:
+    one = Report("a", "d", 0.1, 50, {}, (DeveloperResult("dev-a", (), 0, 0, {}),))
+    other = Report("b", "d", 0.1, 50, {}, (DeveloperResult("dev-b", (), 0, 0, {}),))
+    with pytest.raises(ValueError, match="different developers"):
+        uncertainty(one, other)
+
+
+def test_improvement_verdict_ignores_the_interval() -> None:
+    def dev_result(dev_id: str, ndcg: float) -> DeveloperResult:
+        values = {name: 0.5 for name in METRICS} | {"ndcg@10": ndcg}
+        return DeveloperResult(dev_id, (), 0, 0, values)
+
+    def built(label: str, ndcgs: list[float]) -> Report:
+        devs = tuple(dev_result(f"dev-{i}", v) for i, v in enumerate(ndcgs))
+        means = {name: 0.5 for name in METRICS} | {"ndcg@10": round(sum(ndcgs) / len(ndcgs), 4)}
+        return Report(label, "d", 0.1, 50, means, devs)
+
+    base = built("base", [0.5] * 6)
+    candidate = built("candidate", [0.9] + [0.5] * 5)  # better for one developer of six
+
+    interval = uncertainty(base, candidate)["ndcg@10"]
+    assert interval.low <= 0 < interval.high and not interval.marked
+    assert compare(base, [candidate])[0].improvement is True

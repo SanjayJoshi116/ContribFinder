@@ -1,5 +1,6 @@
 """Evaluate scoring configurations on a benchmark and compare them (spec:
-recommendation-evaluation "Evaluation command", "Improvement rule"; design D3, D5).
+recommendation-evaluation "Evaluation command", "Improvement rule", "Uncertainty of a
+comparison"; design D3, D5; change evaluation-confidence).
 
 Ranking goes through ``rank_pool``, the stage generation uses. Only ``stored_config`` reads
 the database.
@@ -18,7 +19,7 @@ from services.matching.issues import IssueFeature
 from services.ranking import config as scoring_config
 from services.ranking.pipeline import rank_pool
 
-from . import metrics
+from . import bootstrap, metrics
 from .dataset import Dataset
 
 DEFAULT_TOLERANCE = 0.01
@@ -71,8 +72,13 @@ class DeveloperResult:
     id: str
     top: tuple[tuple[str, int | None], ...]  # top 10: full name and judgment (None = unjudged)
     ranked: int  # length of the full ranked list
-    metrics: dict[str, float]  # rounded
     unjudged: int
+    values: dict[str, float]  # unrounded, for the bootstrap
+
+    @property
+    def metrics(self) -> dict[str, float]:
+        """Rounded, as reported."""
+        return metrics.rounded(self.values)
 
 
 @dataclass(frozen=True)
@@ -151,8 +157,8 @@ def evaluate(
                 id=dev.id,
                 top=tuple((n, dev.judgments.get(n)) for n in names[: metrics.TOP_K]),
                 ranked=len(names),
-                metrics=metrics.rounded(found.values),
                 unjudged=found.unjudged,
+                values=dict(found.values),
             )
         )
     return Report(
@@ -200,3 +206,26 @@ def compare(
                 failures.append(f"{name} dropped by {drop:.4f} (tolerance {tolerance:.4f})")
         verdicts.append(Verdict(report.config, not failures, tuple(failures)))
     return verdicts
+
+
+def uncertainty(
+    baseline: Report,
+    candidate: Report,
+    *,
+    resamples: int = bootstrap.DEFAULT_RESAMPLES,
+    seed: int = bootstrap.DEFAULT_SEED,
+) -> dict[str, bootstrap.Interval]:
+    """Per metric, the paired bootstrap interval of the candidate's difference from the
+    baseline over the same developers. Information only: ``compare`` alone decides."""
+    if [d.id for d in baseline.developers] != [d.id for d in candidate.developers]:
+        raise ValueError(f"{baseline.config} and {candidate.config} rank different developers")
+    # Every metric resamples the same developers: draw once.
+    drawn = bootstrap.draws(len(baseline.developers), resamples=resamples, seed=seed)
+    return {
+        name: bootstrap.paired(
+            [d.values[name] for d in baseline.developers],
+            [d.values[name] for d in candidate.developers],
+            drawn=drawn,
+        )
+        for name in metrics.METRICS
+    }

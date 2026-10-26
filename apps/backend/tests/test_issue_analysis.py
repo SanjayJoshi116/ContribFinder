@@ -2,12 +2,20 @@
 Pure functions: no database."""
 
 import pytest
+from django.conf import settings
 
 from services.issues import classify, labels
 from services.issues.analysis import IssueInput, analyze
 from services.issues.technologies import detect
 
-THRESHOLDS = {"short_body": 600, "long_body": 4000, "many_technologies": 3, "long_discussion": 15}
+THRESHOLDS = {
+    "short_body": 600,
+    "long_body": 4000,
+    "several_technologies": 2,
+    "many_technologies": 3,
+    "long_discussion": 15,
+    "min_votes": 2,
+}
 
 
 # --- labels -------------------------------------------------------------------------------
@@ -24,6 +32,8 @@ def test_every_alias_maps_to_its_category(alias: str, expected: str) -> None:
     [
         ("Type: Bug", "bug"),
         ("type:bug", "bug"),
+        ("[Type] Bug", "bug"),
+        ("[area] docs", "documentation"),
         ("kind/docs", "documentation"),
         ("area/frontend", "frontend"),
         ("area: Front-End", "frontend"),
@@ -109,14 +119,14 @@ def test_no_evidence_is_unknown() -> None:
 # --- difficulty ---------------------------------------------------------------------------
 
 
-def difficulty(raw=(), body="", techs=0, ctype="unknown", comments=0):
+def difficulty(raw=(), body="", techs=0, ctype="unknown", comments=0, **thresholds):
     return classify.difficulty(
         raw_labels=list(raw),
         body=body,
         technology_count=techs,
         contribution_type=ctype,
         comments=comments,
-        thresholds=THRESHOLDS,
+        thresholds={**THRESHOLDS, **thresholds},
     )
 
 
@@ -185,8 +195,58 @@ def test_empty_body_and_no_technology_abstain() -> None:
     assert votes_of(evidence)["technology_count"] is None
 
 
+def test_template_comments_do_not_count_as_description() -> None:
+    # Longer than long_body (4000) with the comments, short without them.
+    template = "<!-- Describe the bug in detail. Include steps, versions and logs. -->\n" * 60
+    _, evidence = difficulty(body=template + "Typo in README")
+    assert votes_of(evidence)["body_length"] == "beginner"
+    _, evidence = difficulty(body=template)
+    assert votes_of(evidence)["body_length"] is None
+
+
 def test_thresholds_are_recorded() -> None:
     assert difficulty()[1]["thresholds"] == THRESHOLDS
+
+
+def test_defaults_are_the_former_fixed_values() -> None:
+    # Two technologies voted intermediate and a level needed two votes before both were
+    # configurable; the defaults keep every stored analysis valid.
+    assert settings.ISSUE_DIFFICULTY == THRESHOLDS
+
+
+def test_several_technologies_threshold() -> None:
+    _, evidence = difficulty(techs=2, several_technologies=3)
+    assert votes_of(evidence)["technology_count"] is None
+    _, evidence = difficulty(techs=3, several_technologies=3, many_technologies=4)
+    assert votes_of(evidence)["technology_count"] == "intermediate"
+
+
+def test_min_votes_threshold() -> None:
+    args = {"raw": ["good first issue"], "body": "Short description."}
+    assert difficulty(**args)[0] == "beginner"  # two votes
+    level, evidence = difficulty(**args, min_votes=3)
+    assert level == "unknown"
+    assert evidence["votes"]["beginner"] == 2
+
+
+@pytest.mark.parametrize(
+    ("args", "level"),
+    [
+        (
+            {"raw": ["good first issue"], "body": "Short.", "techs": 1, "ctype": "documentation"},
+            "beginner",
+        ),
+        ({"raw": ["intermediate"], "techs": 2}, "intermediate"),
+        ({"raw": ["advanced"], "body": "x" * 5000, "techs": 3, "comments": 20}, "advanced"),
+    ],
+)
+def test_level_voters_match_the_classifier(args, level: str) -> None:
+    # LEVEL_VOTERS bounds min_votes at startup (core.E040, core.W004): every signal it lists
+    # must vote for the level at once, so the level wins at its full capacity.
+    voters = classify.LEVEL_VOTERS[level]
+    found, evidence = difficulty(**args, min_votes=len(voters))
+    assert found == level
+    assert tuple(s for s, vote in votes_of(evidence).items() if vote == level) == voters
 
 
 # --- technologies -------------------------------------------------------------------------

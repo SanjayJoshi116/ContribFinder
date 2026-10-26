@@ -24,9 +24,7 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         version = options["version"]
         try:
-            result = activation.activate(
-                version, force=options["force"], reason=options["reason"], via="command"
-            )
+            result = activation.activate(version, force=options["force"], reason=options["reason"])
         except activation.ActivationRefused as refused:
             self.stdout.write(f"{version}: not an improvement over the active configuration")
             for failure in refused.failures:

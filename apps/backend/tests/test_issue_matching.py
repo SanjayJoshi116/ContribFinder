@@ -20,6 +20,7 @@ from services.matching.issues import (
     match_issues,
     score_issue,
 )
+from services.matching.signals import Signal
 from services.ranking.config import V2_ISSUE_PARAMS
 from services.ranking.explain import reasons
 
@@ -133,7 +134,9 @@ def test_issue_fit_saturates() -> None:
         PARAMS,
     )
     assert many.issue_fit.value == 1.0
-    assert many.issue_fit.evidence == ({"count": 5, "by_type": {"unknown": 5}},)
+    assert many.issue_fit.evidence == (
+        {"count": 5, "technology_count": 5, "by_type": {"unknown": 5}},
+    )
 
 
 def test_difficulty_fit_ignores_unknown() -> None:
@@ -164,8 +167,33 @@ def test_issue_reasons_from_non_zero_parts_only() -> None:
     assert "Django" in texts and "beginner" in texts and "estimated" in texts.lower()
     assert '"good first issue"' in texts and "%" not in texts
 
-    bare = match_issues([issue(difficulty="unknown")], dev(), PARAMS).issues[0]
+    no_fit = copy.deepcopy(PARAMS)
+    no_fit["difficulty_fit"]["beginner"]["unknown"] = 0.0
+    bare = match_issues([issue(difficulty="unknown")], dev(), no_fit).issues[0]
     assert [r["type"] for r in bare.reasons] == ["technology"]
+
+
+@pytest.mark.parametrize("part", ["technology", "difficulty", "approachability"])
+def test_zero_weight_part_gives_no_reason(part: str) -> None:
+    params = copy.deepcopy(PARAMS)
+    params["weights"] = {**params["weights"], part: 0.0}
+    found = [
+        score_issue(issue(labels=("good_first_issue",), difficulty=level), dev("beginner"), params)
+        for level in ("beginner", "unknown")
+    ]
+    for _, _, _, scored in found:
+        assert part not in [r["type"] for r in scored.reasons]
+
+
+def test_unknown_difficulty_reason() -> None:
+    _, fit, _, scored = score_issue(issue(difficulty="unknown"), dev("beginner"), PARAMS)
+    assert fit == 0.3
+    assert scored.score == round(0.6 * 0.8 + 0.25 * 0.3, 4)  # unchanged by the reason
+    reason = next(r for r in scored.reasons if r["type"] == "difficulty")
+    assert reason["text"] == "Difficulty not estimated"  # too few signals or mixed ones
+    assert reason["detail"] == {"difficulty": "unknown", "estimated": False}
+    assert [r["type"] for r in scored.reasons] == ["technology", "difficulty"]
+    assert "-level" not in " ".join(r["text"] for r in scored.reasons)
 
 
 def test_no_issue_params_means_no_match() -> None:
@@ -200,10 +228,55 @@ def test_issue_reasons_on_the_recommendation() -> None:
         )
     }
     assert found["issue_availability"].text == (
-        "3 open issues match your profile, including 2 bug fix issues"
+        "3 open issues mention technologies you use, including 2 bug fix issues"
     )
     assert found["difficulty"].text == "Some issues look beginner-level (estimated)"
     assert all("%" not in r.text for r in found.values())
+
+
+def availability(issues: list[IssueFeature]) -> str:
+    match = match_issues(issues, dev("beginner"), PARAMS)
+    (found,) = [r for r in reasons({"issue_fit": match.issue_fit}, {"issue_fit": 0.05})]
+    return found.text
+
+
+GFI = ("good_first_issue",)
+
+
+@pytest.mark.parametrize(
+    ("issues", "text"),
+    [
+        ([issue(1)], "1 open issue mentions technologies you use"),
+        ([issue(1), issue(2)], "2 open issues mention technologies you use"),
+        (
+            [issue(1, labels=GFI, techs=(), difficulty="beginner")],
+            "1 open issue is labeled good first issue or help wanted",
+        ),
+        (
+            [
+                issue(1, labels=GFI, techs=(), difficulty="beginner"),
+                issue(2, labels=GFI, techs=("rust",), difficulty="beginner"),
+            ],
+            "2 open issues are labeled good first issue or help wanted",
+        ),
+        (
+            [
+                issue(1),
+                issue(2, labels=GFI, techs=(), difficulty="beginner"),
+                issue(3, labels=GFI, techs=(), difficulty="beginner"),
+            ],
+            "3 relevant open issues, 1 mentioning technologies you use",
+        ),
+    ],
+)
+def test_issue_availability_says_how_issues_matched(issues, text) -> None:
+    assert availability(issues) == text
+
+
+def test_issue_availability_from_evidence_without_technology_count() -> None:
+    old = Signal(0.5, ({"count": 2, "by_type": {"bug_fix": 2}},))  # stored before 0.12.16
+    (found,) = reasons({"issue_fit": old}, {"issue_fit": 0.05})
+    assert found.text == "2 open issues mention technologies you use, including 2 bug fix issues"
 
 
 def test_no_issue_reasons_without_issues() -> None:
@@ -259,7 +332,7 @@ def test_generation_stores_relevant_issues_and_reasons(user, developer, pool) ->
     assert rec.issue_contribution_types == ["documentation"]
     assert rec.signal_scores["issue_fit"] > 0 and rec.signal_scores["difficulty_fit"] == 1.0
     types = {r.type: r.text for r in rec.reasons.all()}
-    assert types["issue_availability"].startswith("3 open issues match your profile")
+    assert types["issue_availability"].startswith("3 open issues mention technologies you use")
     assert types["difficulty"] == "Some issues look beginner-level (estimated)"
     plain = Recommendation.objects.get(repository=pool["plain"])
     assert plain.relevant_issue_count == 0 and plain.issue_difficulties == []

@@ -1,6 +1,7 @@
-"""Activating a scoring configuration: the one path for the command and the admin (spec:
-recommendation-evaluation "Activating a configuration"; change config-activation-loose-ends,
-design D1).
+"""Activating a scoring configuration, used only by the ``activate_scoring_config`` command
+(spec: recommendation-evaluation "Activating a configuration"; changes
+config-activation-loose-ends, design D1, and activation-command-only). The benchmark comparison
+never runs inside a web request.
 
 A configuration replaces the active one only when it is an improvement on the selection
 benchmark, unless the operator forces it with a reason. Every activation is audited.
@@ -12,9 +13,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from django.db import transaction
-from django.http import HttpRequest
 
-from accounts.models import AuditEvent, User
+from accounts.models import AuditEvent
 from recommendations.models import ScoringConfig
 from services import audit
 from services.evaluation import baseline
@@ -70,9 +70,6 @@ def activate(
     *,
     force: bool = False,
     reason: str = "",
-    via: str,
-    user: User | None = None,
-    request: HttpRequest | None = None,
     judge: Judge | None = None,
 ) -> Activation:
     """``judge`` defaults to ``benchmark_judge`` (looked up at call time)."""
@@ -124,15 +121,13 @@ def activate(
         audit.record(
             AuditEvent.Action.SCORING_CONFIG_ACTIVATED,
             AuditEvent.Outcome.SUCCESS,
-            user=user,
-            request=request,
             metadata={
                 "config_version": version,
                 "previous_version": previous,
                 "forced": force,
                 "reason": reason,
                 "failures": list(failures),
-                "via": via,
+                "via": "command",  # entries from the former admin action say "admin"
             },
         )
     return Activation(version, previous, changed=True, forced=force, failures=failures)

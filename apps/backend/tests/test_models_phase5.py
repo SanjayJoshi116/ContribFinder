@@ -4,11 +4,17 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
+from django.urls import reverse
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
 from e2e.builders import make_candidate_repo
-from recommendations.models import Recommendation, RecommendationReason, ScoringConfig
+from recommendations.models import (
+    ImmutableConfig,
+    Recommendation,
+    RecommendationReason,
+    ScoringConfig,
+)
 from services.ranking.config import V1_PARAMS, V1_WEIGHTS, V2_PARAMS, V2_WEIGHTS
 
 pytestmark = pytest.mark.django_db
@@ -55,6 +61,58 @@ def test_invalid_weights_rejected_by_clean() -> None:
     config = ScoringConfig(version="bad", weights={**V2_WEIGHTS, "skill": 0.30}, params=V2_PARAMS)
     with pytest.raises(ValidationError, match="sum to 1"):
         config.full_clean()
+
+
+def unused_config() -> ScoringConfig:
+    return ScoringConfig.objects.create(version="v3-unused", weights=V2_WEIGHTS, params=V2_PARAMS)
+
+
+@pytest.mark.parametrize("field", ["version", "weights", "params"])
+def test_stored_config_numbers_cannot_change(field: str) -> None:
+    config = unused_config()
+    changed = {
+        "version": "v3-renamed",
+        "weights": {**V2_WEIGHTS, "skill": 0.30, "language": 0.20},
+        "params": {**V2_PARAMS, "min_score": 0.05},
+    }[field]
+    setattr(config, field, changed)
+    with pytest.raises(ImmutableConfig, match=field):
+        config.save()
+    stored = ScoringConfig.objects.get(pk=config.pk)
+    assert (stored.version, stored.weights, stored.params) == ("v3-unused", V2_WEIGHTS, V2_PARAMS)
+
+
+def test_stored_config_activation_and_description_stay_writable() -> None:
+    config = unused_config()
+    ScoringConfig.objects.filter(is_active=True).update(is_active=False)
+    config.is_active = True
+    config.description = "Promoted"
+    config.save()
+    config.weights = {**V2_WEIGHTS, "skill": 0.30, "language": 0.20}  # not saved below
+    config.save(update_fields=["is_active", "description"])
+    stored = ScoringConfig.objects.get(pk=config.pk)
+    assert (stored.is_active, stored.description, stored.weights) == (True, "Promoted", V2_WEIGHTS)
+
+
+def test_description_edit_with_json_equal_values_is_allowed() -> None:
+    # A tuple is stored as a list: the same numbers, so no ImmutableConfig.
+    config = ScoringConfig.objects.create(
+        version="v3-tuple", weights=V2_WEIGHTS, params={**V2_PARAMS, "note": (0.3, 0.6)}
+    )
+    config.description = "Edited"
+    config.save()
+    assert ScoringConfig.objects.get(pk=config.pk).description == "Edited"
+
+
+def test_admin_shows_stored_numbers_read_only(admin_client) -> None:
+    config = unused_config()
+    response = admin_client.get(
+        reverse("admin:recommendations_scoringconfig_change", args=[config.pk])
+    )
+    assert response.status_code == 200
+    form = response.context["adminform"].form
+    assert not {"version", "weights", "params"} & set(form.fields)
+    assert "description" in form.fields
 
 
 def test_config_in_use_cannot_be_deleted(profile) -> None:

@@ -7,6 +7,9 @@ import math
 from collections.abc import Mapping
 from typing import Any, TypeGuard
 
+# Float slack for "sums to 1" and "at most 1" rules.
+SUM_TOLERANCE = 1e-6
+
 SIGNALS = (
     "skill",
     "language",
@@ -117,7 +120,7 @@ def _issue_params(value: Any, errors: list[str]) -> None:
     if (
         isinstance(weights, Mapping)
         and all(_is_number(weights.get(k)) for k in ISSUE_WEIGHT_KEYS)
-        and not math.isclose(sum(weights[k] for k in ISSUE_WEIGHT_KEYS), 1.0, abs_tol=1e-6)
+        and not math.isclose(sum(weights[k] for k in ISSUE_WEIGHT_KEYS), 1.0, abs_tol=SUM_TOLERANCE)
     ):
         errors.append("issues.weights must sum to 1")
     min_score = value.get("min_score")
@@ -157,7 +160,7 @@ def validate(weights: Any, params: Any, *, stored: bool = False) -> list[str]:
         values = list(weights.values())
         if any(not _is_number(v) or v < 0 for v in values):
             errors.append("weights must be non-negative numbers")
-        elif not math.isclose(sum(values), 1.0, abs_tol=1e-6):
+        elif not math.isclose(sum(values), 1.0, abs_tol=SUM_TOLERANCE):
             errors.append(f"weights must sum to 1 (got {sum(values):.4f})")
     if not isinstance(params, Mapping):
         return [*errors, "params must be an object"]
@@ -169,6 +172,14 @@ def validate(weights: Any, params: Any, *, stored: bool = False) -> list[str]:
             errors.append("bands.good must be lower than bands.strong")
     _unit_map(params.get("activity"), ACTIVITY_KEYS, "activity", errors)
     _unit_map(params.get("openness"), OPENNESS_KEYS, "openness", errors)
+    # The signal is capped at 1: a larger sum would make half the affordances look like all.
+    openness = params.get("openness")
+    if (
+        isinstance(openness, Mapping)
+        and all(_is_number(v) for v in openness.values())
+        and sum(openness.values()) > 1 + SUM_TOLERANCE
+    ):
+        errors.append("openness points must sum to at most 1")
     _unit_map(params.get("tech_sources"), TECH_SOURCE_KEYS, "tech_sources", errors)
     if not legacy or "issues" in params:
         _issue_params(params.get("issues"), errors)

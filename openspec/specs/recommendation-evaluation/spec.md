@@ -58,7 +58,7 @@ For each developer the system SHALL compute, on the ranked list: Precision@5 and
 - **THEN** Precision@5 is 0.6 and Precision@10 is 0.3
 
 ### Requirement: Evaluation command
-A management command SHALL evaluate one or more scoring configurations against a dataset (default: the selection benchmark, `benchmark-v2` once it exists with at least one judged real developer, otherwise `benchmark-v1`). A configuration SHALL be given as a stored version or as a JSON file holding weights and params; both SHALL pass the same validation as stored configurations, and an unknown version or invalid configuration SHALL stop the command with an error before any evaluation. The first configuration SHALL be the baseline (default: the active configuration when none is given). The command SHALL print, per configuration, the dataset-level metrics and the difference from the baseline, and per developer the metrics and the top 10 with their judgments. With a JSON output option it SHALL also write the full report to a file, creating the file's folder when missing; a report that cannot be written SHALL end the command with an error naming the path, not a traceback. It SHALL NOT change any stored data.
+A management command SHALL evaluate one or more scoring configurations against a dataset (default: the selection benchmark, `benchmark-v2` once it exists with at least one judged real developer, otherwise `benchmark-v1`). A configuration SHALL be given as a stored version or as a JSON file holding weights and params; both SHALL pass the same validation as stored configurations, and an unknown version or invalid configuration SHALL stop the command with an error before any evaluation. The first configuration SHALL be the baseline (default: the active configuration when none is given). The command SHALL print, per configuration, the dataset-level metrics and the difference from the baseline, for every configuration after the baseline the uncertainty of each metric's difference (see "Uncertainty of a comparison"), and per developer the metrics and the top 10 with their judgments. With a JSON output option it SHALL also write the full report, including the uncertainty of each comparison, to a file, creating the file's folder when missing; a report that cannot be written SHALL end the command with an error naming the path, not a traceback. It SHALL NOT change any stored data.
 
 #### Scenario: Compare two stored versions
 - **WHEN** the command runs with `v1-deterministic` and `v2-deterministic`
@@ -76,6 +76,10 @@ A management command SHALL evaluate one or more scoring configurations against a
 - **WHEN** the JSON output path is in a folder that does not exist yet
 - **THEN** the folder is created and the report is written there
 
+#### Scenario: Comparison with its uncertainty
+- **WHEN** the command runs with `v1-deterministic` and `v2-deterministic`
+- **THEN** for each metric it prints v2's difference from v1 with a 95% interval and the share of resamples in which v2 is not better
+
 ### Requirement: Improvement rule
 A configuration SHALL count as an improvement over the baseline only when its mean NDCG@10 is higher than the baseline's and none of its other dataset-level metrics is lower than the baseline's by more than a tolerance (default 0.01). When asked to require improvement, the command SHALL exit with a non-zero status unless every non-baseline configuration is an improvement, and SHALL name each metric that failed.
 
@@ -86,6 +90,86 @@ A configuration SHALL count as an improvement over the baseline only when its me
 #### Scenario: Tie
 - **WHEN** a candidate's NDCG@10 equals the baseline's
 - **THEN** it is not an improvement
+
+### Requirement: Uncertainty of a comparison
+For every configuration after the baseline, evaluation SHALL estimate the uncertainty of each metric's difference from the baseline with a paired bootstrap over developers: each resample draws as many developers as the dataset holds, with replacement, and takes the mean over the drawn developers of the candidate's value minus the baseline's value for the same developer, from unrounded per-developer values. The report SHALL give, per metric, the observed mean difference, the 2.5th and 97.5th percentiles of the resampled differences as a 95% interval, and the share of resamples whose difference is 0 or below, and SHALL mark a difference whose interval lies entirely above or entirely below 0. The number of resamples (default 10,000) and the random seed (default fixed) SHALL be settable, and the same dataset, configurations, resample count and seed SHALL always give the same figures. A dataset with one developer SHALL report an interval of zero width at the observed difference. These figures SHALL NOT change the improvement verdict, the regression baseline or activation.
+
+#### Scenario: Reproducible interval
+- **WHEN** the same comparison is evaluated twice with the default resample count and seed
+- **THEN** both reports give the same intervals and shares
+
+#### Scenario: Noise is visible
+- **WHEN** a candidate is better than the baseline for one of six developers and equal for the other five
+- **THEN** its NDCG@10 interval includes 0 and the difference is not marked
+
+#### Scenario: Consistent improvement
+- **WHEN** a candidate's NDCG@10 is higher than the baseline's for every developer
+- **THEN** its interval lies above 0, the difference is marked, and the share of resamples not better is 0
+
+#### Scenario: Verdict unchanged
+- **WHEN** a candidate meets the improvement rule but its NDCG@10 interval includes 0
+- **THEN** it is still reported as an improvement, and `--require-improvement` succeeds
+
+### Requirement: Feedback report
+A management command SHALL report how users acted on recommendations, per scoring configuration
+version, from the stored feedback events and their snapshots, without changing any stored data.
+It SHALL group events by configuration version and by rank bucket (1–5, 6–10, 11–20, 21 and
+below), and SHALL give per group the count of each action and the number of distinct users.
+Saved, opened repository and opened issue SHALL count as positive actions; these and dismissed
+SHALL count as decisive actions; viewed, unsaved and undismissed SHALL be counted but be neither.
+Per group the report SHALL give the positive share, positive actions divided by decisive
+actions. Per configuration it SHALL give the raw positive share over all its groups and a
+position-adjusted share: the mean of its bucket shares weighted by the number of decisive
+actions per bucket over all configurations in the report, using only the buckets where the
+configuration has a share and renormalizing the weights over them; a configuration with no such
+bucket SHALL have no adjusted share. Per configuration the report SHALL also give one row per
+match label (strong, good, partial) with the same counts, distinct users and positive share, not
+adjusted for position, and a calibration verdict: `ordered` when the share of every label that
+has one is at least the share of every lower label that has one, `not ordered` naming the first
+higher label whose share is below a lower label's, or `not enough data` when fewer than two
+labels have a share. A group with fewer decisive actions than a minimum
+(configurable, default 10) SHALL show its counts but no share and SHALL be left out of the
+adjusted share. Events without a configuration version or rank (a rank below 1 counts as none) SHALL be counted on their own
+line and left out of every share; events without a match label SHALL be left out of the label
+rows only. Per configuration it SHALL also count dismissals by reason (including those without one), and the dismissals without a configuration version or rank SHALL be counted by reason on their own line; reasons SHALL NOT change any share. The command SHALL accept a time window in days, the
+configuration versions to include and a JSON output file. The report SHALL contain aggregates
+only: no user, repository, recommendation or issue identifiers. It SHALL NOT change any ranking.
+
+#### Scenario: Shares per configuration and bucket
+- **WHEN** under `v2-deterministic` users saved 12 and dismissed 8 recommendations ranked 1 to 5
+- **THEN** the report shows for `v2-deterministic`, ranks 1–5: 12 saved, 8 dismissed, the number of users, and a positive share of 0.60
+
+#### Scenario: Position adjustment
+- **WHEN** configuration A has 32 positive of 40 decisive actions at ranks 1–5 and 4 of 10 at ranks 6–10, and configuration B has 8 of 10 at ranks 1–5 and 16 of 40 at ranks 6–10
+- **THEN** A's raw positive share is 0.72 and B's 0.48, and both have a position-adjusted share of 0.60
+
+#### Scenario: Too few actions
+- **WHEN** a group has 4 decisive actions and the minimum is 10
+- **THEN** it shows its counts, no share, and does not enter the adjusted share
+
+#### Scenario: Events without a recommendation snapshot
+- **WHEN** some events have no configuration version or rank
+- **THEN** they are counted on a separate line and enter no share
+
+#### Scenario: Aggregates only
+- **WHEN** the report is written as JSON
+- **THEN** it contains no user, repository, recommendation or issue identifier, and no stored row changes
+
+#### Scenario: Labels in order
+- **WHEN** under `v2-deterministic` the positive shares are 0.70 for strong, 0.55 for good and 0.40 for partial recommendations
+- **THEN** the report shows the three label rows and the calibration verdict `ordered`
+
+#### Scenario: Labels out of order
+- **WHEN** the shares are 0.45 for strong and 0.60 for good
+- **THEN** the calibration verdict is `not ordered` and names strong below good
+
+#### Scenario: One label with a share
+- **WHEN** only strong recommendations reach the minimum number of decisive actions
+- **THEN** the calibration verdict is `not enough data`
+
+#### Scenario: Dismiss reasons per configuration
+- **WHEN** under `v2-deterministic` users dismissed 6 recommendations as `inactive`, 3 as `not_my_stack` and 4 without a reason
+- **THEN** the report shows those counts for `v2-deterministic`, and its shares are the same as if no reason had been given
 
 ### Requirement: Regression baseline
 The repository SHALL keep recorded dataset-level metrics of each seeded scoring configuration on `benchmark-v1` and, once it exists, on `benchmark-v2`, each dataset with the top N its metrics were computed at. The test suite SHALL recompute them at each dataset's recorded top N and fail when any differs, naming the configuration and metric, so a change that moves the ranking fails until the recorded values are updated deliberately in the same change.
@@ -166,25 +250,27 @@ A new configuration SHALL replace the active one only when, under the improvemen
 - **THEN** the active configuration is unchanged and the recorded candidates show why each failed
 
 ### Requirement: Activating a configuration
-An operator SHALL activate a stored scoring configuration through a management command that
-takes its version, and the admin activation action SHALL apply the same rule. Activation SHALL
-first validate the configuration as stored configurations are validated; an unknown version or
-invalid configuration SHALL be refused with an error and change nothing. Unless forced, it
-SHALL evaluate the configuration against the active one on the selection benchmark with the
-pinned baseline minimum score and top N (never local settings), and SHALL refuse it when it is not an improvement
-under the improvement rule, naming each failed metric and changing nothing. Forcing SHALL
-require a non-empty reason and SHALL only be possible from the command, not from the admin
-action. When the comparison cannot run (unusable benchmark, invalid active configuration), an
-unforced activation SHALL fail with an error and a forced one SHALL proceed, recording that it
-was not compared. An activation SHALL be recorded as forced only when the improvement rule was
-not met or not evaluated. When the active configuration changes between the comparison and the
-switch, the activation SHALL fail and change nothing. A successful activation SHALL deactivate the previous configuration and activate the
-new one in one step, so that exactly one configuration is active at every moment, and SHALL
-record an audit event with the new and previous versions, whether it was forced, the reason
-and any failed metrics. Activating the configuration that is already active SHALL change
-nothing, record nothing and report that it is already active. The acceptance holdout check
-(see "Replacing the active configuration") SHALL remain the operator's step before activation;
-the command SHALL NOT read a holdout.
+An operator SHALL activate a stored scoring configuration only through a management command that
+takes its version; activation SHALL never run inside a web request. The admin SHALL NOT offer an
+activation action: the page of a stored configuration SHALL show the command that activates it,
+or that it is already active, and SHALL NOT let the operator change which configuration is
+active. Activation SHALL first validate the configuration as stored configurations are
+validated; an unknown version or invalid configuration SHALL be refused with an error and change
+nothing. Unless forced, it SHALL evaluate the configuration against the active one on the
+selection benchmark with the pinned baseline minimum score and top N (never local settings), and
+SHALL refuse it when it is not an improvement under the improvement rule, naming each failed
+metric and changing nothing. Forcing SHALL require a non-empty reason. When the comparison
+cannot run (unusable benchmark, invalid active configuration), an unforced activation SHALL fail
+with an error and a forced one SHALL proceed, recording that it was not compared. An activation
+SHALL be recorded as forced only when the improvement rule was not met or not evaluated. When
+the active configuration changes between the comparison and the switch, the activation SHALL
+fail and change nothing. A successful activation SHALL deactivate the previous configuration and
+activate the new one in one step, so that exactly one configuration is active at every moment,
+and SHALL record an audit event with the new and previous versions, whether it was forced, the
+reason and any failed metrics. Activating the configuration that is already active SHALL change
+nothing, record nothing and report that it is already active. The acceptance holdout check (see
+"Replacing the active configuration") SHALL remain the operator's step before activation; the
+command SHALL NOT read a holdout.
 
 #### Scenario: Activation refused by the benchmark
 - **WHEN** `v2-deterministic` is active and an operator activates `v1-deterministic` without forcing
@@ -210,9 +296,9 @@ the command SHALL NOT read a holdout.
 - **WHEN** an operator activates the configuration that is already active
 - **THEN** the command reports that it is already active, and no audit event is recorded
 
-#### Scenario: Admin action refused
-- **WHEN** an administrator uses the admin activation action on a configuration that is not an improvement over the active one
-- **THEN** the admin shows the failed metrics, points to the command for a forced activation, and the active configuration is unchanged
+#### Scenario: Admin shows the command
+- **WHEN** an administrator opens the admin page of the stored configuration `v1-deterministic` while `v2-deterministic` is active
+- **THEN** the page shows `npm run manage -- activate_scoring_config v1-deterministic`, offers no activation action, and no benchmark comparison runs
 
 ### Requirement: Blind judging sheet
 A management command SHALL turn an exported developer snapshot into a judging sheet (CSV) with one row per candidate: repository full name, link, description, main languages with their share, topics, contribution files present, activity label, number of eligible open issues, an empty grade column and an empty note column, preceded by a grading guide (0 not relevant, 1 relevant, 2 highly relevant; blank = not judged). Rows SHALL be in alphabetical order of repository name. A language without a byte count SHALL count as zero for the shares; when no language of a repository has a byte count, its languages SHALL be listed by name without shares. The sheet SHALL NOT contain any score, signal value, rank, match label or reason computed by any scoring configuration, and SHALL NOT contain identifying data of the developer.

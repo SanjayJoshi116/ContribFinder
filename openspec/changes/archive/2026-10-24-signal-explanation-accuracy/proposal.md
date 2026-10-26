@@ -1,26 +1,29 @@
 ## Why
 
 Batch 8 of `Bug_Backlog.md` (signal and explanation accuracy) was parked until K-1 because it
-is ranking-visible. 0.12.14 shipped the four rows that needed no spec change (B-14, B-15, B-16,
-D-7). Re-checked on 2026-10-22, most of the rest leaves the v1 and v2 benchmark numbers alone:
+is ranking-visible. 0.12.14 shipped B-14, B-15, B-16 and D-7, and 0.12.15 shipped D-12 and
+D-13, without a spec change. Re-checked on 2026-10-22 and 2026-10-23, the rest of this change
+leaves the v1 and v2 benchmark numbers alone:
 - they touch only explanation text;
 - or validation, which v1 and v2 pass;
 - or issue analysis, which the benchmark does not run (its issues carry stored difficulty).
 
-These rows can ship now without a ranking search:
-- **D-7 is fixed in code but not in the spec.** `recommendation-explanations` still says "a
-  signal whose value is above 0". The code now also requires a weight above 0.
+**Shipped in code, missing from the specs** (this change records them; no code work):
+- **D-7** (0.12.14). `recommendation-explanations` still says "a signal whose value is above
+  0". The code also requires a weight above 0.
+- **D-12** (0.12.15). The description-length difficulty vote ignores issue-template HTML
+  comments (`<!-- Describe the bug -->`, `classify._HTML_COMMENT`). `issue-analysis` does not
+  say so.
+- **D-13** (0.12.15). `[Type] Bug`-style labels are normalized like `Type: Bug`
+  (`labels._SCOPE`, `ISSUE_TAXONOMY_VERSION` 2026.10.3). `issue-analysis` lists only `:` and
+  `/` scopes.
+
+**Still to build**, and can ship without a ranking search:
 - **D-8.** The relevance gate checks raw signal values. A configuration that weights a
   relevance signal 0 still lets that signal admit a candidate.
 - **D-9.** "3 open issues match your profile" is said even when the issues matched only through
   a `good first issue` or `help wanted` label. The spec allows such issues to count; the wording
   claims a profile match that did not happen.
-- **D-12.** The description-length difficulty vote counts issue-template HTML comments
-  (`<!-- Describe the bug -->`). A short report written into a long template votes advanced,
-  or votes nothing.
-- **D-13.** `[Type] Bug`-style labels are never normalized. `_EDGES` strips only the `[`, and
-  the scope rule knows `:` and `/` only. The issue gets no category, so the filters miss it and
-  the documentation vote is lost.
 - **D-15.** A scoring configuration stays editable in the admin until a recommendation
   references it. A version that was evaluated, recorded in `baselines.json`, snapshotted by
   feedback or briefly active can still change its numbers under the same name.
@@ -57,12 +60,13 @@ Both stay in batch 8.
   part is above 0 gets a `difficulty` reason, "Difficulty not estimated (too few signals)",
   with detail `{"difficulty": "unknown", "estimated": false}`. Scores are unchanged.
 - **Issue analysis.**
-  - D-12: description length ignores HTML comments, including one left open by truncation.
-  - D-13: a bracketed scope (`[Type] Bug`, `[area] docs`) is stripped like `type:`.
   - D-18: `ISSUE_DIFFICULTY` gains `several_technologies` (default 2) and `min_votes`
     (default 2), with startup checks: `several_technologies` from 2 up to `many_technologies`,
-    `min_votes` at least 2.
-  - `ISSUE_TAXONOMY_VERSION` is bumped.
+    `min_votes` at least 2. The defaults equal today's hard-coded values, so no analysis
+    changes and `ISSUE_TAXONOMY_VERSION` stays 2026.10.3.
+  - D-12, D-13 (spec only): description length ignores HTML comments, including one left open
+    by truncation; a bracketed scope (`[Type] Bug`, `[area] docs`) is stripped like `type:`.
+    The code already does both (0.12.15).
 - **Configuration validation (D-17).** Openness points must sum to at most 1. v1 and v2 sum to
   exactly 1 and stay valid.
 - **Stored configurations are immutable (D-15).**
@@ -89,9 +93,9 @@ None.
 - `issue-matching`, "Issue reasons": an unknown difficulty with a difficulty-fit part above 0
   has a reason saying it was not estimated.
 - `issue-analysis`:
-  - "Label normalization": bracketed scope prefixes.
-  - "Difficulty estimate": description length excludes HTML comments; the technology-count and
-    vote thresholds are configuration.
+  - "Label normalization": bracketed scope prefixes (already implemented, 0.12.15).
+  - "Difficulty estimate": description length excludes HTML comments (already implemented,
+    0.12.15); the technology-count and vote thresholds are configuration.
 
 ## Impact
 
@@ -101,16 +105,17 @@ None.
   - `services/matching/issues.py` (unknown-difficulty reason, technology-matched count);
   - `services/ranking/config.py` (openness sum);
   - `recommendations/models.py` and `admin.py` (immutability);
-  - `services/issues/classify.py` and `labels.py`;
+  - `services/issues/classify.py` (D-18 thresholds only; `labels.py` is unchanged);
   - `config/settings/base.py` and `core/checks.py` (`ISSUE_DIFFICULTY` keys);
   - `.env.example` if it lists `ISSUE_DIFFICULTY`;
   - tests.
 - Ranking:
   - v1 and v2 score and rank every benchmark dataset as before, and `baselines.json` is not
     rewritten. The baseline test must pass unchanged.
-  - Live data: issue types and difficulties can change on the next issue fetch (D-12, D-13).
+  - Live data: issue analyses are unchanged (D-18 defaults equal today's values; the D-12 and
+    D-13 shifts already shipped in 0.12.15).
 - API: reason texts change (D-9), and issues of unknown difficulty gain one reason (D-16). No
   schema change, OpenAPI stays `1.0.0`.
 - UI: no code change; the texts come from the API.
-- Release: patch 0.12.15. Docs: `Bug_Backlog.md` (batch 8 rows), CHANGELOG, features, README,
+- Release: patch 0.12.16. Docs: `Bug_Backlog.md` (batch 8 rows), CHANGELOG, features, README,
   CLAUDE.md §7.

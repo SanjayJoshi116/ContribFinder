@@ -66,13 +66,14 @@ const CATEGORIES: Category[] = [
   },
   {
     name: 'Saved and hidden projects',
-    purpose: 'To keep the projects you saved and never recommend the ones you hid.',
+    purpose:
+      'To keep the projects you saved and never recommend the ones you hid, with the reason you gave for hiding one, if any.',
     retention: UNTIL_DELETED,
   },
   {
     name: 'Feedback events',
     purpose:
-      'Which recommendations you viewed, saved, hid or opened, to evaluate recommendation quality. They do not change your ranking.',
+      'Which recommendations you viewed, saved, hid (with the optional reason) or opened, to evaluate recommendation quality. They do not change your ranking.',
     retention: UNTIL_DELETED,
   },
   {

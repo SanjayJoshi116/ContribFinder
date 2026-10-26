@@ -17,10 +17,12 @@ See proposal.md for why.
   `Issue` row.
   - The benchmark does not run it: dataset issues carry their difficulty, labels and
     technologies (`evaluation/dataset.py`).
-  - `labels.normalize` lower-cases, joins separators and strips edge symbols. `_SCOPE`
-    (`^[a-z ]{1,20}[:/]\s*`) strips a scope.
-  - `classify.difficulty` measures `len(body.strip())`, hard-codes `technology_count >= 2` and
-    `MIN_VOTES = 2`, and reads the other thresholds from `settings.ISSUE_DIFFICULTY`. The
+  - `labels.normalize` lower-cases, joins separators and strips edge symbols. Since 0.12.15
+    `_SCOPE` (`^[a-z ]{1,20}[:/\]]\s*`) also strips a `[type]` scope, whose `[` `_EDGES`
+    already dropped (D-13; `ISSUE_TAXONOMY_VERSION` 2026.10.3).
+  - `classify.difficulty` measures the body without HTML comments since 0.12.15
+    (`_HTML_COMMENT = <!--.*?(?:-->|\Z)`, D-12). It still hard-codes `technology_count >= 2`
+    and `MIN_VOTES = 2`, and reads the other thresholds from `settings.ISSUE_DIFFICULTY`. The
     startup check `core.E040` validates `ISSUE_DIFFICULTY`.
 - **Configurations.**
   - `config.validate` checks openness points as a unit map (each 0..1), not their sum.
@@ -84,24 +86,20 @@ See proposal.md for why.
   the issue detail page relies on for its React keys.
 - Scores are unchanged.
 
-**D4. Issue analysis.**
-- D-12: `_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)`. The length is
-  `len(_HTML_COMMENT.sub("", body).strip())`. A comment cut by `ISSUE_BODY_MAX_CHARS` is
-  dropped to the end. The evidence keeps the measured length.
-- D-13: `_SCOPE = re.compile(r"^(?:[a-z ]{1,20}[:/]|\[[a-z ]{1,20}\])\s*")`, applied to the
-  form before `_EDGES` strips the leading bracket.
-  - `normalize` stays as it is for the full form.
-  - `forms` now builds the stripped form from the separator-normalized, lower-cased name before
-    the edges are stripped, so `[type] bug` → `bug`.
-  - The emoji and bracket rules for unscoped labels (`[Bug]` → `bug`) still hold.
-- D-18: `ISSUE_DIFFICULTY` gains `several_technologies: 2` and `min_votes: 2`.
-  - `classify.difficulty` reads both, and they join the evidence's `thresholds`.
+**D4. Issue analysis thresholds (D-18).**
+- `ISSUE_DIFFICULTY` gains `several_technologies: 2` and `min_votes: 2`.
+  - `classify.difficulty` reads both, and they join the evidence's `thresholds`. `MIN_VOTES`
+    goes.
   - `ISSUE_DIFFICULTY_KEYS` in `core/checks.py` adds the two keys, so a partial override in
     `.env` still merges onto the defaults (`base.py` spreads the JSON over them).
   - New `core.E040` messages: `several_technologies` must be at least 2 and at most
     `many_technologies`; `min_votes` must be at least 2 (the spec's floor).
-- `ISSUE_TAXONOMY_VERSION` bumps to `2026.10.3`. Issues are re-analyzed on their next fetch,
-  as for every analysis change.
+- The defaults equal the hard-coded values, so every analysis is unchanged and
+  `ISSUE_TAXONOMY_VERSION` stays 2026.10.3 (the label taxonomy does not change).
+- D-12 and D-13 shipped in 0.12.15 as described in Context; the `issue-analysis` delta records
+  them and needs no code. As built, D-13 adds `]` to the scope separators after `_EDGES` drops
+  the `[`, rather than matching the bracket before the edges are stripped; `[Bug]` → `bug` and
+  emoji labels still hold.
 
 **D5. Openness sum.**
 - `validate` adds `"openness points must sum to at most 1"` when every point is a number and
@@ -123,9 +121,6 @@ See proposal.md for why.
 
 ## Risks / Trade-offs
 
-- [Live issue types and difficulties shift on the next fetch (D-12, D-13), and with them the
-  issue filters and `difficulty_fit`] → Intended: the spec already promised this behavior. The
-  CHANGELOG says so. The benchmark is unaffected (D4).
 - [A test or fixture edits a stored configuration in place] → Tests that need different numbers
   create a new version. The apply step fixes any test the guard trips.
 - [Old recommendations keep the "match your profile" text until regenerated] → The freshness
@@ -136,6 +131,6 @@ See proposal.md for why.
 ## Migration Plan
 
 - No schema migration.
-- Deploy, then wait for the issue backlog to refetch and the freshness sweep to regenerate.
-- Rollback: revert the release. Stored issue analyses carry the taxonomy version, and the next
-  fetch re-analyzes them.
+- Deploy, then wait for the freshness sweep to regenerate (new reason texts). Issue analyses
+  need no refetch: D-18's defaults change nothing.
+- Rollback: revert the release. The next generation writes the old reason texts back.

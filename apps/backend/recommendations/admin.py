@@ -1,9 +1,8 @@
-from django.contrib import admin, messages
-from django.db.models import Model, QuerySet
+from django.contrib import admin
+from django.db.models import Model
 from django.http import HttpRequest
-
-from accounts.models import User
-from services.ranking import activation
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 from .models import Recommendation, RecommendationReason, ScoringConfig
 
@@ -22,44 +21,32 @@ class ReadOnlyAdmin[M: Model](admin.ModelAdmin[M]):
 class ScoringConfigAdmin(admin.ModelAdmin[ScoringConfig]):
     list_display = ("version", "is_active", "created_at")
     readonly_fields = ("is_active", "created_at")
-    actions = ["activate"]
 
     def get_readonly_fields(
         self, request: HttpRequest, obj: ScoringConfig | None = None
     ) -> list[str] | tuple[str, ...]:
-        # A version that produced recommendations must keep meaning the same numbers.
-        if obj is not None and obj.recommendations.exists():
-            return (*self.readonly_fields, "version", "weights", "params")
+        # A stored version always means the same numbers (``ScoringConfig.save`` enforces it):
+        # it may have been evaluated, recorded in baselines.json or snapshotted by feedback
+        # without producing recommendations.
+        if obj is not None:
+            return (*self.readonly_fields, "version", "weights", "params", "activation")
         return self.readonly_fields
 
-    @admin.action(description="Activate the selected configuration")
-    def activate(self, request: HttpRequest, queryset: QuerySet[ScoringConfig]) -> None:
-        if queryset.count() != 1:
-            self.message_user(request, "Select exactly one configuration.", messages.ERROR)
-            return
-        version = queryset.get().version
-        user = request.user if isinstance(request.user, User) else None
-        try:
-            # The same rule as the command, never forced (spec recommendation-evaluation,
-            # "Activating a configuration").
-            result = activation.activate(version, via="admin", user=user, request=request)
-        except activation.ActivationRefused as refused:
-            self.message_user(
-                request,
-                f"{version} was not activated: {'; '.join(refused.failures)}. For a deliberate "
-                f"exception run `npm run manage -- activate_scoring_config {version} --force "
-                '--reason "..."`.',
-                messages.ERROR,
+    @admin.display(description="Activation")
+    def activation(self, obj: ScoringConfig) -> str:
+        # Activation runs the benchmark comparison, which never happens inside a web request
+        # (spec recommendation-evaluation, "Activating a configuration"): the page only names
+        # the command.
+        if obj.is_active:
+            return mark_safe(
+                "Active. To activate another configuration, run "
+                "<code>npm run manage -- activate_scoring_config &lt;version&gt;</code>."
             )
-            return
-        except activation.ActivationError as exc:
-            self.message_user(request, str(exc), messages.ERROR)
-            return
-        if not result.changed:
-            self.message_user(request, f"{version} is already active.")
-            return
-        self.message_user(
-            request, f"{version} is active; recommendations regenerate on the next refresh."
+        return format_html(
+            "Run <code>npm run manage -- activate_scoring_config {}</code>. The command "
+            "compares it with the active configuration on the selection benchmark first; add "
+            '<code>--force --reason "..."</code> for a deliberate exception.',
+            obj.version,
         )
 
 

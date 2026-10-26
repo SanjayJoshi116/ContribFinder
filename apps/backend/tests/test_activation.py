@@ -41,7 +41,7 @@ def events() -> list[AuditEvent]:
 
 def test_improvement_is_activated_and_audited() -> None:
     fake = judge(True)
-    result = activate("v1-deterministic", via="command", judge=fake)
+    result = activate("v1-deterministic", judge=fake)
 
     assert active() == ["v1-deterministic"]
     assert fake.calls == [("v1-deterministic", "v2-deterministic")]
@@ -60,7 +60,7 @@ def test_improvement_is_activated_and_audited() -> None:
 
 def test_refusal_changes_nothing() -> None:
     with pytest.raises(ActivationRefused) as refused:
-        activate("v1-deterministic", via="command", judge=judge(False))
+        activate("v1-deterministic", judge=judge(False))
 
     assert refused.value.failures == FAILURES
     assert active() == ["v2-deterministic"]
@@ -71,7 +71,7 @@ def test_refusal_changes_nothing() -> None:
 def test_force_needs_a_reason_before_evaluating(reason: str) -> None:
     fake = judge(False)
     with pytest.raises(ActivationError, match="reason"):
-        activate("v1-deterministic", force=True, reason=reason, via="command", judge=fake)
+        activate("v1-deterministic", force=True, reason=reason, judge=fake)
 
     assert fake.calls == []
     assert active() == ["v2-deterministic"]
@@ -82,7 +82,6 @@ def test_forced_activation_records_reason_and_failures() -> None:
         "v1-deterministic",
         force=True,
         reason=" rollback after incident ",
-        via="command",
         judge=judge(False),
     )
 
@@ -95,7 +94,7 @@ def test_forced_activation_records_reason_and_failures() -> None:
 
 
 def test_forced_improvement_is_not_recorded_as_forced() -> None:
-    result = activate("v1-deterministic", force=True, reason="x", via="command", judge=judge(True))
+    result = activate("v1-deterministic", force=True, reason="x", judge=judge(True))
 
     assert result.forced is False
     assert events()[0].metadata["forced"] is False
@@ -106,12 +105,10 @@ def test_broken_benchmark_refuses_unless_forced() -> None:
         raise DatasetError(["not JSON"])
 
     with pytest.raises(ActivationError, match="not JSON"):
-        activate("v1-deterministic", via="command", judge=broken)
+        activate("v1-deterministic", judge=broken)
     assert active() == ["v2-deterministic"]
 
-    result = activate(
-        "v1-deterministic", force=True, reason="rollback", via="command", judge=broken
-    )
+    result = activate("v1-deterministic", force=True, reason="rollback", judge=broken)
     assert active() == ["v1-deterministic"]
     assert result.forced is True
     assert "not JSON" in result.failures[0]
@@ -122,9 +119,9 @@ def test_broken_active_config_does_not_block_forced_rollback() -> None:
         weights={**V2_WEIGHTS, "skill": -1.0}
     )
     with pytest.raises(ActivationError, match="v2-deterministic"):
-        activate("v1-deterministic", via="command", judge=judge(True))
+        activate("v1-deterministic", judge=judge(True))
 
-    activate("v1-deterministic", force=True, reason="rollback", via="command", judge=judge(True))
+    activate("v1-deterministic", force=True, reason="rollback", judge=judge(True))
     assert active() == ["v1-deterministic"]
 
 
@@ -137,7 +134,7 @@ def test_active_changed_after_judging_is_refused() -> None:
         return Verdict(candidate.label, True, ())
 
     with pytest.raises(ActivationError, match="v3-other"):
-        activate("v1-deterministic", via="command", judge=racing)
+        activate("v1-deterministic", judge=racing)
     assert active() == ["v3-other"]
     assert events() == []
 
@@ -159,7 +156,7 @@ def test_benchmark_judge_ignores_local_settings(monkeypatch) -> None:
 
 def test_unknown_version_is_refused() -> None:
     with pytest.raises(ActivationError, match="v9-missing"):
-        activate("v9-missing", via="command", judge=judge(True))
+        activate("v9-missing", judge=judge(True))
     assert active() == ["v2-deterministic"]
 
 
@@ -168,13 +165,13 @@ def test_invalid_stored_configuration_is_refused() -> None:
         version="broken", weights={**V2_WEIGHTS, "skill": -1.0}, params=V2_PARAMS
     )
     with pytest.raises(ActivationError, match="invalid"):
-        activate("broken", via="command", judge=judge(True))
+        activate("broken", judge=judge(True))
     assert active() == ["v2-deterministic"]
 
 
 def test_already_active_changes_and_records_nothing() -> None:
     fake = judge(True)
-    result = activate("v2-deterministic", via="command", judge=fake)
+    result = activate("v2-deterministic", judge=fake)
 
     assert result.changed is False
     assert fake.calls == []
@@ -186,7 +183,7 @@ def test_nothing_active_activates_without_comparing() -> None:
     ScoringConfig.objects.update(is_active=False)
     fake = judge(False)
 
-    result = activate("v1-deterministic", via="command", judge=fake)
+    result = activate("v1-deterministic", judge=fake)
 
     assert fake.calls == []
     assert active() == ["v1-deterministic"]
@@ -200,13 +197,14 @@ def test_benchmark_judge_refuses_v1_over_v2() -> None:
     """The real rule on the selection benchmark (benchmark-v1 until benchmark-v2 holds a real
     developer): v1 has a lower NDCG@10 than v2 (baselines.json)."""
     with pytest.raises(ActivationRefused) as refused:
-        activate("v1-deterministic", via="command")
+        activate("v1-deterministic")
 
     assert any(failure.startswith(metrics.PRIMARY) for failure in refused.value.failures)
     assert active() == ["v2-deterministic"]
 
 
-# Command and admin (design D2, D3): thin wrappers around the service.
+# The command (a thin wrapper around the service) and the admin page that points to it
+# (change activation-command-only).
 
 
 @pytest.fixture
@@ -266,30 +264,34 @@ def test_command_already_active(fake_judge) -> None:
     assert events() == []
 
 
-def test_admin_action_refuses_and_points_to_the_command(fake_judge, admin_client) -> None:
-    v1 = ScoringConfig.objects.get(version="v1-deterministic")
-    response = admin_client.post(
-        reverse("admin:recommendations_scoringconfig_changelist"),
-        {"action": "activate", "_selected_action": [v1.pk]},
-        follow=True,
-    )
+def test_admin_offers_no_activation_action(admin_client, monkeypatch) -> None:
+    def judge_called(*args: object) -> Verdict:
+        raise AssertionError("no benchmark comparison in a web request")
 
-    text = response.content.decode()
-    assert "was not activated" in text and FAILURES[0] in text and "--force" in text
+    monkeypatch.setattr(activation, "benchmark_judge", judge_called)
+    changelist = reverse("admin:recommendations_scoringconfig_changelist")
+    actions = admin_client.get(changelist).context["action_form"].fields["action"].choices
+    assert "activate" not in [name for name, _ in actions]
+
+    v1 = ScoringConfig.objects.get(version="v1-deterministic")
+    admin_client.post(changelist, {"action": "activate", "_selected_action": [v1.pk]})
+
     assert active() == ["v2-deterministic"]
     assert events() == []
 
 
-def test_admin_action_activates_an_improvement_with_the_user(
-    fake_judge, admin_client, admin_user
-) -> None:
-    fake_judge.improvement = True
-    v1 = ScoringConfig.objects.get(version="v1-deterministic")
-    admin_client.post(
-        reverse("admin:recommendations_scoringconfig_changelist"),
-        {"action": "activate", "_selected_action": [v1.pk]},
-    )
+def test_admin_page_shows_the_command(admin_client) -> None:
+    def page(url: str) -> str:
+        response = admin_client.get(url)
+        assert response.status_code == 200
+        return str(response.content.decode())
 
-    assert active() == ["v1-deterministic"]
-    (event,) = events()
-    assert (event.user_id, event.metadata["via"]) == (admin_user.pk, "admin")
+    def change_page(version: str) -> str:
+        pk = ScoringConfig.objects.get(version=version).pk
+        return page(reverse("admin:recommendations_scoringconfig_change", args=[pk]))
+
+    assert "npm run manage -- activate_scoring_config v1-deterministic" in change_page(
+        "v1-deterministic"
+    )
+    assert "Active. To activate another configuration" in change_page("v2-deterministic")
+    assert "activate_scoring_config" not in page(reverse("admin:recommendations_scoringconfig_add"))

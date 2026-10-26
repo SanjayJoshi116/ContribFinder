@@ -26,7 +26,7 @@ def repo(name: str) -> RepoData:
 def scored(name: str, score: float, relevance: float) -> Scored:
     signals = {"skill": Signal(0.5), "language": Signal(0), "framework": Signal(0)}
     signals["interest"] = Signal(0)
-    return Scored(repo(name), {}, signals, score, "partial", relevance=relevance)
+    return Scored(repo(name), {}, signals, score, "partial", relevance=relevance, relevant=True)
 
 
 def names(kept: list[Scored]) -> list[str]:

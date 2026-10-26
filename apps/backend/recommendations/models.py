@@ -1,3 +1,6 @@
+import json
+from typing import Any
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -5,6 +8,7 @@ from django.db.models import Q
 from developers.models import DeveloperProfile
 from repositories.models import ActivityLabel, Repository
 from services.ranking import config
+from services.text import join_names
 
 
 class MatchLabel(models.TextChoices):
@@ -31,9 +35,16 @@ class ReasonType(models.TextChoices):
     DIFFICULTY = "difficulty"
 
 
+class ImmutableConfig(ValidationError):
+    """A stored configuration's version, weights or params were changed."""
+
+
 class ScoringConfig(models.Model):
     """A versioned set of signal weights and parameters (FR-REC-004). A version always means
-    the same numbers: change them by creating a new version, not by editing one in use."""
+    the same numbers: once stored, version, weights and params never change (``save`` refuses
+    it); new numbers need a new version. ``is_active`` and ``description`` stay writable."""
+
+    FIXED_FIELDS = ("version", "weights", "params")
 
     version = models.SlugField(max_length=64, unique=True)
     description = models.TextField(blank=True)
@@ -52,6 +63,24 @@ class ScoringConfig(models.Model):
 
     def __str__(self) -> str:
         return self.version
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        update_fields = kwargs.get("update_fields")
+        touches_fixed = update_fields is None or set(update_fields) & set(self.FIXED_FIELDS)
+        if not self._state.adding and touches_fixed:
+            stored = ScoringConfig.objects.filter(pk=self.pk).values(*self.FIXED_FIELDS).first()
+            # Compared as stored: a tuple reads back as a list and is not a change.
+            changed = stored and [
+                f
+                for f in self.FIXED_FIELDS
+                if stored[f] != json.loads(json.dumps(getattr(self, f)))
+            ]
+            if changed:
+                raise ImmutableConfig(
+                    f"A stored scoring configuration cannot change its {join_names(changed)}; "
+                    "create a new version instead."
+                )
+        super().save(*args, **kwargs)
 
     def clean(self) -> None:
         if errors := config.validate(self.weights, self.params):

@@ -3,9 +3,10 @@
 Contribution type: canonical labels decide first, in a fixed priority order; title keywords
 only when no label applies; otherwise ``unknown``.
 
-Difficulty: every signal votes for a level or abstains. A level wins only with at least two
-votes and no vote for another level, so a label alone never decides and contradicting signals
-give ``unknown``. The evidence lists every signal, including abstentions.
+Difficulty: every signal votes for a level or abstains. A level wins only with at least
+``min_votes`` votes (configured, never fewer than two) and no vote for another level, so a
+label alone never decides and contradicting signals give ``unknown``. The evidence lists every
+signal, including abstentions.
 """
 
 from __future__ import annotations
@@ -18,6 +19,9 @@ from issues.models import ContributionType as CT
 from issues.models import Difficulty
 
 from . import labels as L
+
+# Issue templates leave their instructions as HTML comments; they are not the description.
+_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
 
 # Canonical label -> contribution type, highest priority first.
 LABEL_TYPES: tuple[tuple[str, str], ...] = (
@@ -62,7 +66,6 @@ DIFFICULTY_LABELS: dict[str, str] = {
     **dict.fromkeys(("hard", "complex", "expert", "advanced", "difficult"), Difficulty.ADVANCED),
 }
 LEVELS = (Difficulty.BEGINNER, Difficulty.INTERMEDIATE, Difficulty.ADVANCED)
-MIN_VOTES = 2
 
 
 def contribution_type(canonical: Sequence[str], title: str) -> tuple[str, dict[str, Any]]:
@@ -79,6 +82,16 @@ def contribution_type(canonical: Sequence[str], title: str) -> tuple[str, dict[s
 
 def _vote(signal: str, vote: str | None, value: Any) -> dict[str, Any]:
     return {"signal": signal, "vote": str(vote) if vote else None, "value": value}
+
+
+# The signals that can vote for each level (``difficulty`` below). A level needs
+# ``min_votes`` agreeing votes, so these capacities bound the setting (core.E040, core.W004).
+LEVEL_VOTERS: dict[str, tuple[str, ...]] = {
+    Difficulty.BEGINNER: ("label", "body_length", "technology_count", "contribution_type"),
+    Difficulty.INTERMEDIATE: ("label", "technology_count"),
+    Difficulty.ADVANCED: ("label", "body_length", "technology_count", "comments"),
+}
+MAX_LEVEL_VOTES = max(len(voters) for voters in LEVEL_VOTERS.values())
 
 
 def _label_votes(raw: Sequence[str]) -> list[dict[str, Any]]:
@@ -106,12 +119,13 @@ def difficulty(
     thresholds: Mapping[str, int],
 ) -> tuple[str, dict[str, Any]]:
     """``(level, evidence)``. Signals: difficulty labels; description length (short votes
-    beginner, long advanced, empty abstains); technologies mentioned (one votes beginner, two
-    or more intermediate, ``many_technologies`` or more advanced, none abstains); a
-    documentation contribution votes beginner; a long discussion votes advanced."""
+    beginner, long advanced, empty abstains); technologies mentioned (one votes beginner,
+    ``several_technologies`` or more intermediate, ``many_technologies`` or more advanced, none
+    or a count between one and ``several_technologies`` abstains); a documentation
+    contribution votes beginner; a long discussion votes advanced."""
     signals = _label_votes(raw_labels)
 
-    length = len(body.strip())
+    length = len(_HTML_COMMENT.sub("", body).strip())
     body_vote: str | None = None  # an empty description says nothing about the work
     if 0 < length < thresholds["short_body"]:
         body_vote = Difficulty.BEGINNER
@@ -122,7 +136,7 @@ def difficulty(
     tech_vote: str | None = None
     if technology_count >= thresholds["many_technologies"]:
         tech_vote = Difficulty.ADVANCED
-    elif technology_count >= 2:
+    elif technology_count >= thresholds["several_technologies"]:
         tech_vote = Difficulty.INTERMEDIATE
     elif technology_count == 1:
         tech_vote = Difficulty.BEGINNER
@@ -136,5 +150,6 @@ def difficulty(
 
     votes = {str(level): sum(s["vote"] == level for s in signals) for level in LEVELS}
     voted = [level for level, count in votes.items() if count]
-    level = voted[0] if len(voted) == 1 and votes[voted[0]] >= MIN_VOTES else Difficulty.UNKNOWN
+    decided = len(voted) == 1 and votes[voted[0]] >= thresholds["min_votes"]
+    level = voted[0] if decided else Difficulty.UNKNOWN
     return str(level), {"signals": signals, "votes": votes, "thresholds": dict(thresholds)}

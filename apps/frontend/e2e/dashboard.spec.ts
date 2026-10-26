@@ -27,7 +27,8 @@ test('saves a project and lists it on the saved page', async ({ page }) => {
 
 test('dismisses a project and brings it back with Undo', async ({ page }) => {
   const card = page.getByRole('article', { name: 'project-07' })
-  await card.getByRole('button', { name: 'Dismiss' }).click()
+  // Exact: "Dismiss with a reason" is a second button on the card.
+  await card.getByRole('button', { name: 'Dismiss', exact: true }).click()
   await expect(card).toBeHidden()
   const notice = page.getByRole('status').filter({ hasText: 'Hidden seed-org/project-07' })
 

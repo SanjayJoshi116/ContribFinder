@@ -358,7 +358,7 @@
             "name": "cursor",
             "required": false,
             "in": "query",
-            "description": "Continue after the entry this opaque value marks (from `next`).",
+            "description": "Continue after the entry this opaque value marks (from `next`). Cannot be combined with `page`.",
             "schema": {
               "type": "string"
             }
@@ -394,6 +394,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaginatedDismissedRepositoryList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             },
@@ -1319,6 +1329,25 @@
           }
         ],
         "tags": ["recommendations"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissRequest"
+              }
+            }
+          }
+        },
         "security": [
           {
             "cookieAuth": []
@@ -1327,6 +1356,16 @@
         "responses": {
           "204": {
             "description": "Done."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
           },
           "401": {
             "content": {
@@ -1613,7 +1652,7 @@
             "name": "cursor",
             "required": false,
             "in": "query",
-            "description": "Continue after the entry this opaque value marks (from `next`).",
+            "description": "Continue after the entry this opaque value marks (from `next`). Cannot be combined with `page`.",
             "schema": {
               "type": "string"
             }
@@ -1649,6 +1688,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaginatedSavedRepositoryList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             },
@@ -2094,6 +2143,24 @@
         },
         "required": ["job", "last_completed_at", "pool"]
       },
+      "DismissReasonEnum": {
+        "enum": ["not_my_stack", "too_big", "inactive", "already_know"],
+        "type": "string",
+        "description": "* `not_my_stack` - Not my stack\n* `too_big` - Too big\n* `inactive` - Inactive\n* `already_know` - Already know it"
+      },
+      "DismissRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DismissReasonEnum"
+              }
+            ],
+            "description": "Optional: why the project is not for the user. Never used for ranking.\n\n* `not_my_stack` - Not my stack\n* `too_big` - Too big\n* `inactive` - Inactive\n* `already_know` - Already know it"
+          }
+        }
+      },
       "DismissedRepository": {
         "type": "object",
         "properties": {
@@ -2113,9 +2180,22 @@
             "type": "string",
             "format": "date-time",
             "readOnly": true
+          },
+          "reason": {
+            "description": "The reason given, or null when none.",
+            "nullable": true,
+            "readOnly": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DismissReasonEnum"
+              },
+              {
+                "$ref": "#/components/schemas/NullEnum"
+              }
+            ]
           }
         },
-        "required": ["dismissed_at", "repository", "repository_id"]
+        "required": ["dismissed_at", "reason", "repository", "repository_id"]
       },
       "Error": {
         "type": "object",

@@ -40,6 +40,7 @@ class Scored:
     label: str
     issues: IssueMatch = NO_MATCH
     relevance: float = 0.0  # the relevance signals' part of ``score``; never scaled
+    relevant: bool = False  # passes the relevance gate (``has_relevance``)
 
 
 def contributions(
@@ -95,29 +96,35 @@ def score_candidate(
     value = _total(parts)
     relevance = _total({name: parts.get(name, 0.0) for name in RELEVANCE_SIGNALS})
     return Scored(
-        repo, techs, signals, value, match_label(value, params["bands"]), issues, relevance
+        repo,
+        techs,
+        signals,
+        value,
+        match_label(value, params["bands"]),
+        issues,
+        relevance,
+        has_relevance(signals, weights),
     )
 
 
-def has_relevance(signals: Mapping[str, Signal]) -> bool:
-    return any(signals[name].value > 0 for name in RELEVANCE_SIGNALS)
-
-
-def is_relevant(scored: Scored) -> bool:
-    return has_relevance(scored.signals)
+def has_relevance(signals: Mapping[str, Signal], weights: Mapping[str, float]) -> bool:
+    """The relevance gate: some relevance signal contributes to the score (value and weight
+    above 0). Tested on the unrounded inputs, not on ``Scored.relevance``, which is rounded and
+    would drop a tiny contribution. Relevance scaling never scales these contributions."""
+    return any(weights.get(name, 0.0) > 0 and signals[name].value > 0 for name in RELEVANCE_SIGNALS)
 
 
 def rank(
     scored: Iterable[Scored], *, min_score: float, top_n: int | None, basis: str = BASIS_SCORE
 ) -> list[Scored]:
     """Best first: score, then best search rank (unranked last), then name. Keeps the top N
-    (all with ``top_n`` None) that are relevant (a relevance signal above 0) and reach
+    (all with ``top_n`` None) that are relevant (``has_relevance``) and reach
     ``min_score``: with ``basis`` ``relevance``, only the relevance part of the score is
     compared."""
     kept = [
         s
         for s in scored
-        if (s.relevance if basis == BASIS_RELEVANCE else s.score) >= min_score and is_relevant(s)
+        if (s.relevance if basis == BASIS_RELEVANCE else s.score) >= min_score and s.relevant
     ]
     kept.sort(
         key=lambda s: (

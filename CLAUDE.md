@@ -139,10 +139,11 @@ ContribFinder/
 │  │     │                  issues (issue matching) (Phase 4–7)
 │  │     ├─ ranking/        config (validation), pipeline (rank_pool, shared by generation and
 │  │     │                  evaluation), score, explain, service (generation), freshness (Phase 5),
-│  │     │                  activation (activate_scoring_config and the admin action)
+│  │     │                  activation (activate_scoring_config; the admin shows the command)
 │  │     ├─ evaluation/     dataset (benchmark load/validate, selection_dataset), metrics, runner
 │  │     │                  (evaluate, compare, persona/real subsets), baseline, export, sheet
-│  │     │                  (blind judging sheets), build (merge datasets) (Phase 8b+)
+│  │     │                  (blind judging sheets), build (merge datasets) (Phase 8b+),
+│  │     │                  bootstrap (paired intervals), feedback_report (outcomes per config)
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/           src/{app,components,features,hooks,lib,api,types,routes}; app/ holds
 │                         the query client (retry, stale time, 401) and job-transition refresh;
@@ -157,7 +158,9 @@ ContribFinder/
 │                           .prettierrc.json (shared with apps/frontend), .gitattributes (LF)
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
-│  ideas.md (unplanned gap analysis; each idea needs an OpenSpec change first)
+│  ideas.md (unplanned gap analysis by when it can ship: no ranking change first, then
+│  what waits for K-1; each idea needs an OpenSpec change first); reports/ (gitignored --json
+│  outputs)
 └─ .github/workflows/ci.yml
 ```
 
@@ -233,11 +236,19 @@ Local, no Docker (primary on this machine):
   (format 4, top N per dataset); it refuses `--min-score`. A new config also
   must not regress on a fresh acceptance holdout (`holdout-v1`/`-v2` are used; add `holdout-v3`
   first; spec `recommendation-evaluation`). A config's own `min_score` wins over the setting;
-  `--min-score` overrides it.
+  `--min-score` overrides it. Each candidate also gets a paired bootstrap block (95% interval per
+  metric over developers, `*` when it excludes 0; `--resamples`, `--seed`, JSON `comparisons`):
+  information only, the improvement rule ignores it (since 0.12.19).
 - `npm run manage -- activate_scoring_config <version> [--force --reason "..."]` is the one way
-  to switch the active config (`services/ranking/activation.py`; the admin action calls it, never
-  forced): refused unless an improvement over the active one on the selection benchmark
-  (settings defaults), audited (`scoring_config_activated`). It does not read a holdout.
+  to switch the active config (`services/ranking/activation.py`; the admin has no activation
+  action since 0.12.18, its change page shows this command): refused unless an improvement over
+  the active one on the selection benchmark (pinned baseline min score and top N), audited
+  (`scoring_config_activated`, `via: "command"`). It does not read a holdout.
+- `npm run manage -- feedback_report [--since DAYS] [--config V] [--minimum N] [--json OUT]`
+  reports feedback events per config version and rank bucket: positive share (saved + opened out
+  of those + dismissed), a position-adjusted share, per-label rows and a calibration verdict
+  (0.12.21). Aggregates only, read-only (0.12.20). `--json` outputs go in the gitignored
+  `reports/` (`../../reports/...` from `apps/backend`).
 - Real judged developers (README "Judging real developers"): `export_benchmark_developer` →
   `benchmark_sheet` (blind CSV) → `import_judgments` → `build_benchmark`. `evaluate_ranking`
   defaults to the selection benchmark: `benchmark-v2` once it holds a `real` developer, else
@@ -973,14 +984,14 @@ Archived: `openspec/changes/archive/2026-10-22-tooling-data-hygiene/`. Spec: del
 Archived: `openspec/changes/archive/2026-10-22-freshness-paging-seed/`. Specs: deltas to
 `web-client`, `recommendation-feedback`, `recommendation-engine`. `Bug_Backlog.md` Y-6, Y-7, Z-1
 (open outside a batch), plus the CI e2e hang fix.
-- A finished generation also invalidates `developerProfileKey`, `skillsKey`, `interestsKey`
-  (every analysis ends in one: analysis → discovery → generation). Never invalidate the
-  `['profile']` prefix from a status `queryFn`: the status keys live under it.
+- A finished generation also refreshes the developer profile, skills and interests (every
+  analysis ends in one: analysis → discovery → generation). Since 0.12.15 the status keys live
+  under `['jobs']`, so it invalidates all of `['profile']` (see 0.12.15 below).
 - `/saved` and `/dismissed` use `feedback.api.KeysetPagination` (`SavedPagination`,
   `DismissedPagination`, `time_field`): `cursor` = unpadded URL-safe base64 of
   `"<iso time with µs>|<pk>"`, rows strictly older than it, `count` the total, `next` carries the
-  cursor (never `page`), `previous` null with a cursor; without one `page` works as before. An
-  unreadable cursor is 400 `invalid_cursor` (`InvalidCursor`). `usePagedList` reads `cursor`
+  cursor (never `page`), `previous` null (always, since 0.12.17); without one `page` works as
+  before. An unreadable cursor is 400 `invalid_cursor` (`InvalidCursor`). `usePagedList` reads `cursor`
   from `next`. Not a contract break (OpenAPI `1.0.0`).
 - `0003_seed_v2_deterministic.seed` returns early when v2 is stored: a re-apply after a rollback
   never changes activation. Re-activating v2 over v1 is not a benchmark improvement (P@5), so it
@@ -1006,7 +1017,8 @@ Archived: `openspec/changes/archive/2026-10-22-config-activation-loose-ends/`. S
   `accounts.0003`); allowed metadata `config_version`, `previous_version`, `forced`,
   `failures`, `via` (none identifying).
 - P-3 cause: AppShell's lazy `LanguageChart` (Recharts) blocked the event loop ~1 s inside a
-  random test on first import. `src/test/setup.ts` preloads it; preload any new lazy component.
+  random test on first import. `src/test/setup.ts` preloads it (since 0.12.15 through the
+  `src/app/lazyLoaders.ts` registry).
 - `refuseRun(import.meta.url)` (`env.mjs`) ends every library script (`child`, `env`, `stack`,
   `uv`, `restarts`): run directly they exit 1. A new library calls it too
   (`scripts/libraries.test.mjs` lists them).
@@ -1032,23 +1044,159 @@ batch 8; the rest of batch 8 changes specified behavior and needs a change.
   `/simplify` skips S-9…S-11 (`ideas.md` §17) open.
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Fixes without a spec change** (MVP+, fix release)  ✅ shipped in v0.12.15 (no ranking change)
+
+No OpenSpec change. `Bug_Backlog.md` D-12, D-13 (batch 8) and S-9…S-11 (batch 18).
+- Issue difficulty measures the body without HTML comments (`classify._HTML_COMMENT`, template
+  instructions, D-12); `labels._SCOPE` also strips a `[type]` prefix (D-13,
+  `ISSUE_TAXONOMY_VERSION` 2026.10.3). Applied on the next issue fetch; baselines did not move.
+- Job status query keys live under `['jobs']` (`recommendationStatusKey = ['jobs',
+  'recommendations']`, `discoveryStatusKey = ['jobs', 'discovery']`); sync stays
+  `['sync', 'status']`. A finished generation invalidates `['profile']`, a finished sync
+  `['profile']` and `['jobs']`, restore also invalidates the generation status, delete-data
+  removes `['jobs']`. A status key never goes under a prefix its own job invalidates.
+- Lazy components only through `src/app/lazyLoaders.ts` (`lazy(lazyLoaders.X)`, never a bare
+  `lazy()`); `src/test/setup.ts` awaits `preloadLazyComponents()`.
+- Indexes `saved_keyset_idx (user, -saved_at, -id)`, `dismissed_keyset_idx (user,
+  -dismissed_at, -id)` (`feedback.0003`).
+- Open in batch 18: S-6 needs a decision (tracked job, or the admin points to the command); S-7
+  needs an OpenSpec change (design D2 of `freshness-paging-seed` keeps the page `previous`).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Signal and explanation accuracy** (MVP+, fix release)  ✅ shipped in v0.12.16 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-24-signal-explanation-accuracy/`. Specs: deltas to
+`recommendation-engine`, `recommendation-explanations`, `issue-matching`, `issue-analysis`.
+`Bug_Backlog.md` D-8, D-9, D-15…D-18 of batch 8 (plus spec text for D-7, D-12, D-13); batch 8
+keeps B-6 and D-11, which wait for K-1.
+- Relevance gate: `score.has_relevance(signals, weights)` (value and weight above 0, never the
+  rounded `Scored.relevance`); `score_candidate` stores it as `Scored.relevant`, `rank` reads
+  it, and `rank_pool` passes the weights for the issue preselection (`is_relevant` removed in
+  0.12.23).
+- `issue_fit` evidence holds `technology_count`; `_issue_availability` picks technology / label
+  only / mixed wording, and evidence without the key reads as all technology. An unknown-difficulty
+  issue with a difficulty fit above 0 gets a `difficulty` reason with `estimated: False`.
+- `ISSUE_DIFFICULTY` keys `several_technologies` and `min_votes` (defaults 2, `core.E040`);
+  `classify.MIN_VOTES` is gone. `ISSUE_TAXONOMY_VERSION` stays 2026.10.3.
+- `config.validate`: openness points sum to at most 1 (tolerance 1e-6).
+- `ScoringConfig.save()` raises `ImmutableConfig` (a `ValidationError`) when a stored row's
+  `FIXED_FIELDS` (version, weights, params) change; `update_fields` without them skip the check;
+  `QuerySet.update` and migrations bypass it (activation and seeds touch `is_active` only). The
+  admin shows the three read-only for every saved row. Tests needing other numbers create a
+  new version.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Saved and hidden list links** (MVP+, fix release)  ✅ shipped in v0.12.17 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-24-keyset-paging-links/`. Spec: delta to
+`recommendation-feedback`. `Bug_Backlog.md` S-7 (batch 18).
+- `KeysetPagination` pages forward only: `previous` is always null, so every link it hands out
+  is a cursor link. `cursor` together with `page` (any value) is 400 `cursor_with_page`
+  (`CursorWithPage`), checked before the cursor is decoded; `page_size` works in both modes.
+- `saved_list` and `dismissed_list` document `error_responses(400, 401)`. Not a contract break
+  (OpenAPI `1.0.0`); the SPA never read `previous`.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Activation by command only** (MVP+, fix release)  ✅ shipped in v0.12.18 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-24-activation-command-only/`. Spec: delta to
+`recommendation-evaluation`. `Bug_Backlog.md` S-6 (batch 18, option B).
+- `ScoringConfigAdmin` has no `activate` action; its change page has a read-only `activation`
+  field naming `npm run manage -- activate_scoring_config <version>` (or saying it is active).
+  No benchmark comparison runs inside a web request.
+- `activation.activate(version, *, force, reason, judge)`: `via`, `user` and `request` are gone;
+  audit metadata `via` is always `"command"` (older admin entries keep `"admin"`).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Evaluation confidence** (MVP+)  ✅ shipped in v0.12.19 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-24-evaluation-confidence/`. Spec: delta to
+`recommendation-evaluation` (new "Uncertainty of a comparison"). `ideas.md` §3 significance
+testing.
+- `services/evaluation/bootstrap.paired(baseline, candidate, *, resamples, seed) -> Interval`
+  (`diff`, `low`, `high`, `not_better`, `marked`): paired over developers, percentile interval by
+  nearest rank (rounded outwards), one `random.Random(seed)` per call. Defaults
+  `DEFAULT_RESAMPLES = 10_000`, `DEFAULT_SEED = 20261024`.
+- `DeveloperResult.values` holds the unrounded metrics; `runner.uncertainty(baseline,
+  candidate, ...)` pairs by developer id. `compare`, activation and `baselines.json` never read
+  the intervals.
+- `evaluate_ranking` prints one block per candidate and dataset; `--resamples`, `--seed`; JSON
+  `comparisons`. On `benchmark-v1`, v2 vs v1 NDCG@10 +0.0195 [-0.0023, +0.0501], not marked.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search); decide then whether
+  the improvement rule also needs a marked NDCG@10.
+
+**Feedback report** (MVP+)  ✅ shipped in v0.12.20 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-24-feedback-report/`. Spec: delta to
+`recommendation-evaluation` (new "Feedback report"). `ideas.md` §4 online report per config.
+- `services/evaluation/feedback_report`: `load(since, versions)` (one `values_list` query),
+  `build(events, *, minimum, since_days)` (pure). Buckets `1-5, 6-10, 11-20, 21+`;
+  `POSITIVE` = saved, opened_repository, opened_issue; `DECISIVE` adds dismissed. Group share
+  `None` below `minimum` (default 10). Adjusted share: bucket shares weighted by every config's
+  decisive actions per bucket, over the buckets where the config has a share.
+- Events with a blank `config_version` or null `rank` are `unattributed`. User ids only count
+  distinct users; the JSON holds no identifiers (test walks every key).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Feedback report: match labels** (MVP+)  ✅ shipped in v0.12.21 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-24-feedback-report-labels/`. Spec: delta to
+`recommendation-evaluation` ("Feedback report"). `ideas.md` §4 label calibration.
+- `Event.match_label` (default ""); `LabelRow` per `LABELS` (strong, good, partial), raw shares
+  through the shared `_tally`; `calibration(rows) -> Calibration(verdict, higher, lower)`:
+  `ordered` (ties included), `not ordered` with the first out-of-order pair, `not enough data`
+  under two shares. Unlabeled attributed events stay in the bucket rows only.
+- JSON per config: `labels`, `calibration`. Changing `params.bands` stays a ranking change.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Dismiss reasons** (MVP+)  ✅ shipped in v0.12.23 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-26-dismiss-reasons/`. Specs: deltas to
+`recommendation-feedback`, `recommendation-evaluation` ("Feedback report"). `ideas.md` §4.
+- `feedback.DismissReason` (`not_my_stack`, `too_big`, `inactive`, `already_know`);
+  `DismissedRepository.reason` and `RecommendationFeedback.dismiss_reason`, blank when none
+  (`feedback.0004`). `services.feedback.dismiss(user, recommendation, reason="")`; an already
+  hidden repository keeps its stored reason.
+- `DismissView` validates `DismissSerializer` (empty body = no reason); OpenAPI enum name
+  `DismissReasonEnum` (`ENUM_NAME_OVERRIDES`). The hidden list's `reason` is null when blank.
+- Frontend: `useDismiss().mutateAsync({ id, reason? })` sends a body only with a reason;
+  `DismissReasonMenu` (`RecommendationActions.tsx`) is a home-made `role="menu"` (no new
+  dependency): Escape returns focus to its button, a click elsewhere leaves focus there, and it
+  stays closed while a dismiss is pending. Labels live in `features/feedback/messages.ts`.
+  Playwright matches names by substring: locate the plain button with
+  `{ name: 'Dismiss', exact: true }`.
+- `feedback_report`: `Event.dismiss_reason`, `ConfigRows.dismiss_reasons` (most frequent first,
+  `none` last), JSON `dismiss_reasons`; unattributed dismissals (no snapshot, or rank below 1)
+  are counted by reason on their own line (`unattributed_dismiss_reasons`). Shares unchanged.
+  `load` streams events unordered; buckets and labels share one accumulator (`_add`, `_rows`).
+- Review fixes in the same release (`Bug_Backlog.md` batch 19, T-1…T-10):
+  - Issue reasons come from one per-part `contrib` dict and need a contribution above 0; the
+    unknown-difficulty text is "Difficulty not estimated". `MatchedIssue.mentions_technology`.
+  - `ScoringConfig.save` compares the fixed fields as stored JSON.
+  - `classify.LEVEL_VOTERS` lists which signals vote for each level: `MAX_LEVEL_VOTES` (4)
+    bounds `min_votes` (`core.E040`); `core.W004` warns when a level is unreachable (3 or 4:
+    intermediate has two voters). A test checks the table against the classifier.
+  - Bootstrap: `bootstrap.draws(n, ...)` once per comparison, shared by its metrics
+    (`paired(..., drawn=)`); `Interval.as_dict()`. `DeveloperResult.metrics` is a property of
+    `values`. `KeysetPagination` builds one response in both modes. `config.SUM_TOLERANCE`.
+  - Open from the review: T-11 (issue relevance ignores weights, waits for K-1), T-12 (rank 0
+    storable; needs a constraint).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).
 
-**Ideas** (`ideas.md`, gap analysis 2026-10-20, unplanned): IDF weighting, time decay on skill
-evidence, top-k diversity, stated preferences, contribution-success signals (maintainer
-responsiveness, linked PRs), evaluation rigor (bootstrap CIs, inter-rater agreement, discovery
-recall), online report per config from feedback, dismiss reasons, CSP, dependency scanning.
-Round 3 (2026-10-21): content-based `not_code`, post-analysis pool cleanup, search budget
-(`no_license` rejections, per-band yield), queuing released-name refreshes. Round 4: data
-versions for client freshness (narrower since 0.12.12), server page clamping, route-level ids
-(keyset saved lists shipped in 0.12.12). Round 5:
-generic migration round trip, seeds that store new versions inactive (lint `scripts/` shipped in
-0.12.11; loud helper modules and the activation command in 0.12.13). Round 6 (2026-10-22): stored activity on `Repository` (the index tie-break,
-wrappers, `.gitattributes` and builder imports shipped in 0.12.11). Ranking-visible ideas wait
-for K-1; bootstrap CIs should land before or with it.
+**Ideas** (`ideas.md`, unplanned; each needs an OpenSpec change). Since 0.12.22 ordered by when
+an idea can ship. Can ship now (no ranking change), in suggested order: setup readiness (§8), `no_license` measurement (§12), post-analysis pool cleanup (§11), data
+versions (§14, closes Y-6), new seeds stored inactive (§15), then platform items (CSP,
+dependency scanning, migration round trip). Waits for K-1 (†): IDF weighting, diversity, stated
+preferences, contribution-success signals, labeled-issue fetch, opportunity qualifiers,
+upstream dependencies, `similar_repo`, content-based `not_code`, and moving the label bands;
+whether a ranking change must also be significant is decided with K-1. Shipped from it in this
+series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibration report
+(0.12.21), dismiss reasons (0.12.23).
 
 ## 8. Release housekeeping
 

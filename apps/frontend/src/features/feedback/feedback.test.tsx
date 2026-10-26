@@ -184,6 +184,10 @@ describe('save and dismiss', () => {
     await waitFor(() =>
       expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/dismiss')).toHaveLength(1),
     )
+    // A plain dismiss is the request it was before reasons: no body.
+    expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/dismiss')[0]![1]?.body).toBe(
+      undefined,
+    )
     answerDismiss()
     const notice = await screen.findByText(/hidden encode\/httpx/i)
     await userEvent.click(within(notice.parentElement!).getByRole('button', { name: 'Undo' }))
@@ -192,6 +196,63 @@ describe('save and dismiss', () => {
       expect(callsTo(fetchMock, 'DELETE', '/api/v1/dismissed/70')).toHaveLength(1),
     )
     await waitFor(() => expect(screen.queryByText(/hidden encode\/httpx/i)).not.toBeInTheDocument())
+  })
+
+  it('dismisses with a chosen reason, with the same Undo', async () => {
+    const fetchMock = mockFetch({
+      ...WITH_RECOMMENDATION,
+      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    const toggle = within(card).getByRole('button', { name: 'Dismiss with a reason' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const menu = within(card).getByRole('menu', { name: 'Dismiss with a reason' })
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Not my stack', 'Too big', 'Inactive', 'Already know it'])
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Too big' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('article', { name: 'httpx' })).not.toBeInTheDocument(),
+    )
+    const [call] = callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/dismiss')
+    expect(JSON.parse(String(call![1]?.body))).toEqual({ reason: 'too_big' })
+    expect(await screen.findByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+  })
+
+  it('works the reason menu from the keyboard', async () => {
+    const fetchMock = mockFetch({
+      ...WITH_RECOMMENDATION,
+      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    const toggle = within(card).getByRole('button', { name: 'Dismiss with a reason' })
+
+    toggle.focus()
+    await userEvent.keyboard('{Enter}')
+    const items = within(card).getAllByRole('menuitem')
+    expect(items[0]).toHaveFocus()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(items[1]).toHaveFocus()
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}')
+    expect(items[3]).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    expect(within(card).queryByRole('menu')).not.toBeInTheDocument()
+    expect(toggle).toHaveFocus()
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.keyboard('{ArrowDown}')
+    expect(within(card).getAllByRole('menuitem')[0]).toHaveFocus()
+    await userEvent.click(document.body)
+    expect(within(card).queryByRole('menu')).not.toBeInTheDocument()
+    expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/dismiss')).toHaveLength(0)
   })
 
   it('dismisses from the detail page and offers Undo on the dashboard', async () => {
@@ -373,6 +434,13 @@ describe('saved projects page', () => {
                   repository_id: 72,
                   repository: { ...REPOSITORY, full_name: 'meh/thing', name: 'thing' },
                   dismissed_at: '2026-09-29T11:00:00Z',
+                  reason: null,
+                },
+                {
+                  repository_id: 73,
+                  repository: { ...REPOSITORY, full_name: 'big/monorepo', name: 'monorepo' },
+                  dismissed_at: '2026-09-29T09:00:00Z',
+                  reason: 'too_big',
                 },
               ]
             : [],
@@ -395,7 +463,10 @@ describe('saved projects page', () => {
     expect(within(old).queryByText(/match/i)).not.toBeInTheDocument()
 
     const hiddenList = await screen.findByRole('list', { name: 'Hidden projects' })
-    await userEvent.click(within(hiddenList).getByRole('button', { name: 'Restore' }))
+    const [plain, withReason] = within(hiddenList).getAllByRole('listitem')
+    expect(within(withReason!).getByText('Reason: Too big')).toBeInTheDocument()
+    expect(within(plain!).queryByText(/reason/i)).not.toBeInTheDocument()
+    await userEvent.click(within(plain!).getByRole('button', { name: 'Restore' }))
     expect(await screen.findByText('No hidden projects.')).toBeInTheDocument()
     expect(callsTo(fetchMock, 'DELETE', '/api/v1/dismissed/72')).toHaveLength(1)
   })
@@ -418,7 +489,7 @@ describe('saved projects page', () => {
           results: [saved(1)],
         }),
       'GET /api/v1/saved?page_size=50&cursor=c1': () =>
-        json({ count: 2, next: null, previous: '/api/v1/saved?page_size=50', results: [saved(2)] }),
+        json({ count: 2, next: null, previous: null, results: [saved(2)] }),
       'GET /api/v1/dismissed?page_size=50': () => page([]),
     })
     renderRoute('/app/saved')

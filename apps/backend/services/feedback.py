@@ -50,6 +50,7 @@ def _event(
     recommendation: Recommendation | None,
     action: str,
     issue: Issue | None = None,
+    dismiss_reason: str = "",
 ) -> RecommendationFeedback:
     return RecommendationFeedback.objects.create(
         user=user,
@@ -62,6 +63,7 @@ def _event(
         match_label=recommendation.match_label if recommendation else "",
         rank=recommendation.rank if recommendation else None,
         config_version=recommendation.scoring_config.version if recommendation else "",
+        dismiss_reason=dismiss_reason,
     )
 
 
@@ -127,18 +129,21 @@ def unsave(user: User, repository_id: int) -> bool:
     return bool(deleted)
 
 
-def dismiss(user: User, recommendation: Recommendation) -> None:
+def dismiss(user: User, recommendation: Recommendation, reason: str = "") -> None:
     """Hide the repository from this and every later generation, and unsave it (recorded as
-    ``unsaved``)."""
+    ``unsaved``). The optional ``reason`` (a ``DismissReason``) is stored on the hidden entry
+    and its ``dismissed`` event; an already hidden repository keeps its stored reason."""
     repository = recommendation.repository
     with transaction.atomic():
         lock_developer(user.pk)
         # A generation may have dropped it before the lock was ours: the dismissal still
         # holds, but the events must not reference the deleted row.
         current = _current_recommendation(user, repository)
-        _, created = DismissedRepository.objects.get_or_create(user=user, repository=repository)
+        _, created = DismissedRepository.objects.get_or_create(
+            user=user, repository=repository, defaults={"reason": reason}
+        )
         if created:
-            _event(user, repository, current, FeedbackAction.DISMISSED)
+            _event(user, repository, current, FeedbackAction.DISMISSED, dismiss_reason=reason)
         unsaved, _ = SavedRepository.objects.filter(user=user, repository=repository).delete()
         if unsaved:
             _event(user, repository, current, FeedbackAction.UNSAVED)

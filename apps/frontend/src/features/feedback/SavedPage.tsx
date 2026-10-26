@@ -6,6 +6,7 @@ import { ACTIVITY_TEXT } from '@/features/recommendations/messages'
 import { MatchBadge } from '@/features/recommendations/RecommendationCard'
 
 import { useDismissed, useRestore, useSaved, useUnsaveRepository } from './api'
+import { DISMISS_REASON_TEXT } from './messages'
 
 const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
@@ -70,7 +71,14 @@ function HiddenEntry({ entry }: { entry: DismissedRepository }) {
   const restore = useRestore()
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 border-b py-2 text-sm last:border-0">
-      <span className="min-w-0 break-words">{entry.repository.full_name}</span>
+      <span className="min-w-0 break-words">
+        {entry.repository.full_name}
+        {entry.reason && (
+          <span className="text-muted-foreground block text-xs">
+            Reason: {DISMISS_REASON_TEXT[entry.reason]}
+          </span>
+        )}
+      </span>
       <Button
         variant="outline"
         size="sm"

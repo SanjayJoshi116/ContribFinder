@@ -631,11 +631,33 @@ export interface components {
       last_completed_at: string | null
       pool: components['schemas']['PoolCounts']
     }
+    /**
+     * @description * `not_my_stack` - Not my stack
+     *     * `too_big` - Too big
+     *     * `inactive` - Inactive
+     *     * `already_know` - Already know it
+     * @enum {string}
+     */
+    DismissReasonEnum: 'not_my_stack' | 'too_big' | 'inactive' | 'already_know'
+    DismissRequest: {
+      /**
+       * @description Optional: why the project is not for the user. Never used for ranking.
+       *
+       *     * `not_my_stack` - Not my stack
+       *     * `too_big` - Too big
+       *     * `inactive` - Inactive
+       *     * `already_know` - Already know it
+       */
+      reason?: components['schemas']['DismissReasonEnum']
+    }
     DismissedRepository: {
       readonly repository_id: number
       readonly repository: components['schemas']['CandidateRepository']
       /** Format: date-time */
       readonly dismissed_at: string
+      /** @description The reason given, or null when none. */
+      readonly reason:
+        (components['schemas']['DismissReasonEnum'] | components['schemas']['NullEnum']) | null
     }
     /** @description Standard error envelope, referenced by every endpoint's error responses. */
     Error: {
@@ -1548,7 +1570,7 @@ export interface operations {
   dismissed_list: {
     parameters: {
       query?: {
-        /** @description Continue after the entry this opaque value marks (from `next`). */
+        /** @description Continue after the entry this opaque value marks (from `next`). Cannot be combined with `page`. */
         cursor?: string
         /** @description A page number within the paginated result set. */
         page?: number
@@ -1567,6 +1589,14 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['PaginatedDismissedRepositoryList']
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
         }
       }
       401: {
@@ -2527,7 +2557,13 @@ export interface operations {
       }
       cookie?: never
     }
-    requestBody?: never
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['DismissRequest']
+        'application/x-www-form-urlencoded': components['schemas']['DismissRequest']
+        'multipart/form-data': components['schemas']['DismissRequest']
+      }
+    }
     responses: {
       /** @description Done. */
       204: {
@@ -2535,6 +2571,14 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
       }
       401: {
         headers: {
@@ -2740,7 +2784,7 @@ export interface operations {
   saved_list: {
     parameters: {
       query?: {
-        /** @description Continue after the entry this opaque value marks (from `next`). */
+        /** @description Continue after the entry this opaque value marks (from `next`). Cannot be combined with `page`. */
         cursor?: string
         /** @description A page number within the paginated result set. */
         page?: number
@@ -2759,6 +2803,14 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['PaginatedSavedRepositoryList']
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
         }
       }
       401: {

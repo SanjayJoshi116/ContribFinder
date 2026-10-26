@@ -9,12 +9,17 @@ import {
 import { ApiError, apiFetch } from '@/api/client'
 import type {
   DismissedPage,
+  DismissReason,
   FeedbackAction,
   RecommendationDetail,
   RecommendationPage,
   SavedPage,
 } from '@/api/types'
-import { recommendationDetailKey, recommendationListKey } from '@/features/recommendations/api'
+import {
+  recommendationDetailKey,
+  recommendationListKey,
+  recommendationStatusKey,
+} from '@/features/recommendations/api'
 
 // Under ['profile'], so a completed sync refreshes them with everything else.
 export const savedKey = ['profile', 'saved'] as const
@@ -86,14 +91,30 @@ export const useUnsave = () => useSaveToggle(false)
 /** Pending dismissals: until they settle, an emptied list page is only optimistic. */
 export const dismissMutationKey = ['feedback', 'dismiss'] as const
 
+export interface DismissVariables {
+  id: number
+  reason?: DismissReason
+}
+
 /** Removes the recommendation from the cached lists at once; the server excludes its
  * repository from later generations. */
 export function useDismiss() {
   const queryClient = useQueryClient()
-  return useMutation<unknown, ApiError, number, Snapshot>({
+  return useMutation<unknown, ApiError, DismissVariables, Snapshot>({
     mutationKey: dismissMutationKey,
-    mutationFn: (id) => apiFetch(`/recommendations/${id}/dismiss`, { method: 'POST' }),
-    onMutate: async (id) => {
+    // A body only with a reason: a plain dismiss is the same request as before reasons.
+    mutationFn: ({ id, reason }) =>
+      apiFetch(
+        `/recommendations/${id}/dismiss`,
+        reason
+          ? {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reason }),
+            }
+          : { method: 'POST' },
+      ),
+    onMutate: async ({ id }) => {
       const previous = await snapshot(queryClient, id)
       queryClient.setQueriesData<RecommendationPage>({ queryKey: recommendationListKey }, (page) =>
         page && page.results.some((r) => r.id === id)
@@ -102,8 +123,9 @@ export function useDismiss() {
       )
       return previous
     },
-    onError: (_error, id, previous) => rollback(queryClient, id, previous),
-    onSuccess: (_data, id) => queryClient.removeQueries({ queryKey: recommendationDetailKey(id) }),
+    onError: (_error, { id }, previous) => rollback(queryClient, id, previous),
+    onSuccess: (_data, { id }) =>
+      queryClient.removeQueries({ queryKey: recommendationDetailKey(id) }),
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: dismissedKey }),
@@ -121,6 +143,8 @@ export function useRestore() {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: dismissedKey }),
         queryClient.invalidateQueries({ queryKey: ['profile', 'recommendations'] }),
+        // Shows the generation the restore started.
+        queryClient.invalidateQueries({ queryKey: recommendationStatusKey }),
       ]),
   })
 }

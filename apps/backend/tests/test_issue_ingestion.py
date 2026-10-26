@@ -223,12 +223,41 @@ def test_issue_limits_must_be_positive(name: str, value: object) -> None:
         {**settings.ISSUE_DIFFICULTY, "short_body": 5000},
         {**settings.ISSUE_DIFFICULTY, "many_technologies": 1},
         {**settings.ISSUE_DIFFICULTY, "long_discussion": 0},
+        {**settings.ISSUE_DIFFICULTY, "several_technologies": 1},
+        {**settings.ISSUE_DIFFICULTY, "several_technologies": 4},
+        {**settings.ISSUE_DIFFICULTY, "min_votes": 1},
+        {**settings.ISSUE_DIFFICULTY, "min_votes": 5},
     ],
-    ids=["missing", "unknown", "short-above-long", "few-technologies", "no-discussion"],
+    ids=[
+        "missing",
+        "unknown",
+        "short-above-long",
+        "few-technologies",
+        "no-discussion",
+        "several-below-two",
+        "several-above-many",
+        "one-vote",
+        "unreachable-votes",
+    ],
 )
 def test_difficulty_thresholds_checked(thresholds) -> None:
     with override_settings(ISSUE_DIFFICULTY=thresholds):
         assert "core.E040" in ids(issue_config_check())
+
+
+def test_partial_difficulty_override_is_valid() -> None:
+    # base.py spreads the ISSUE_DIFFICULTY JSON over the defaults, so one key is enough.
+    with override_settings(ISSUE_DIFFICULTY={**settings.ISSUE_DIFFICULTY, "long_discussion": 20}):
+        assert issue_config_check() == []
+
+
+@pytest.mark.parametrize("min_votes", [3, 4])
+def test_min_votes_above_intermediate_capacity_warns(min_votes: int) -> None:
+    # Intermediate has two voters (labels, technology count): it could never win.
+    with override_settings(ISSUE_DIFFICULTY={**settings.ISSUE_DIFFICULTY, "min_votes": min_votes}):
+        found = issue_config_check()
+    assert ids(found) == ["core.W004"]
+    assert "intermediate" in found[0].msg and "beginner" not in found[0].msg
 
 
 def test_issue_staleness_age_required() -> None:

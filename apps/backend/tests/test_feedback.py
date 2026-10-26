@@ -295,8 +295,69 @@ def test_dismiss_endpoint(signed_in_client: APIClient, recs) -> None:
     body = signed_in_client.get("/api/v1/dismissed").json()
     assert body["count"] == 1
     entry = body["results"][0]
-    assert entry.keys() == {"repository_id", "repository", "dismissed_at"}
+    assert entry.keys() == {"repository_id", "repository", "dismissed_at", "reason"}
     assert entry["repository"]["full_name"] == "encode/django-tool"
+    assert entry["reason"] is None
+
+
+def test_dismiss_with_a_reason(signed_in_client: APIClient, user, recs) -> None:
+    rec = recs["django"]
+    response = signed_in_client.post(
+        f"{RECS}/{rec.pk}/dismiss", {"reason": "inactive"}, format="json"
+    )
+    assert response.status_code == 204
+    assert DismissedRepository.objects.get(user=user).reason == "inactive"
+    event = events(user, "dismissed").get()
+    assert (event.dismiss_reason, event.rank) == ("inactive", 1)
+    entry = signed_in_client.get("/api/v1/dismissed").json()["results"][0]
+    assert entry["reason"] == "inactive"
+
+
+def test_dismiss_without_a_body_has_no_reason(signed_in_client: APIClient, user, recs) -> None:
+    signed_in_client.post(f"{RECS}/{recs['django'].pk}/dismiss")
+    assert DismissedRepository.objects.get(user=user).reason == ""
+    assert [(e.action, e.dismiss_reason) for e in events(user)] == [("dismissed", "")]
+
+
+@pytest.mark.parametrize("reason", ["boring", "", None, "Too big"])
+def test_dismiss_rejects_an_unknown_reason(signed_in_client: APIClient, user, recs, reason) -> None:
+    rec = recs["django"]
+    response = signed_in_client.post(f"{RECS}/{rec.pk}/dismiss", {"reason": reason}, format="json")
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "validation_error"
+    assert Recommendation.objects.filter(pk=rec.pk).exists()
+    assert not DismissedRepository.objects.exists()
+    assert not events(user).exists()
+
+
+def restore_and_generate(user, repository_id: int, monkeypatch) -> None:
+    """Restore, then regenerate here instead of in the job the restore started."""
+    monkeypatch.setattr("recommendations.tasks.generate_recommendations.delay", lambda pk: None)
+    feedback.restore(user, repository_id)
+    SyncJob.objects.filter(user=user).exclude(status="COMPLETED").delete()
+    generate(user)
+
+
+def test_dismiss_reason_does_not_change_scores(user, recs, pool, monkeypatch) -> None:
+    feedback.dismiss(user, recs["django"], "not_my_stack")
+    generate(user)
+    with_reason = dict(Recommendation.objects.values_list("repository_id", "score"))
+    assert pool["django"].pk not in with_reason
+    restore_and_generate(user, pool["django"].pk, monkeypatch)
+    feedback.dismiss(user, Recommendation.objects.get(repository=pool["django"]))
+    generate(user)
+    assert dict(Recommendation.objects.values_list("repository_id", "score")) == with_reason
+
+
+def test_dismiss_again_after_restore_keeps_no_old_reason(user, recs, pool, monkeypatch) -> None:
+    feedback.dismiss(user, recs["django"], "too_big")
+    restore_and_generate(user, pool["django"].pk, monkeypatch)
+    feedback.dismiss(user, Recommendation.objects.get(repository=pool["django"]))
+    assert DismissedRepository.objects.get(user=user).reason == ""
+    reasons = list(
+        events(user, "dismissed").order_by("pk").values_list("dismiss_reason", flat=True)
+    )
+    assert reasons == ["too_big", ""]
 
 
 def test_restore_endpoint(signed_in_client: APIClient, user, recs, monkeypatch) -> None:

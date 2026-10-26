@@ -5,9 +5,9 @@ import type { DiscoveryStatus } from '@/api/types'
 import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 import { recommendationStatusKey } from '@/features/recommendations/api'
 
-// Under ['profile'], so a completed sync (useSyncStatus) invalidates it: a completed sync
+// Under ['jobs'], so a completed sync (useSyncStatus) invalidates it: a completed sync
 // starts a new discovery run.
-export const discoveryStatusKey = ['profile', 'discovery'] as const
+export const discoveryStatusKey = ['jobs', 'discovery'] as const
 export const DISCOVERY_POLL_INTERVAL_MS = 3000
 
 /** Latest repository discovery job and pool counts. Polls while a run is in progress. A

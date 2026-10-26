@@ -7,6 +7,221 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.23] - 2026-10-26
+
+Dismiss reasons (OpenSpec change `dismiss-reasons`, `ideas.md` §4). No ranking change; OpenAPI
+stays `1.0.0` (additive).
+
+### Added
+
+- Dismiss with a reason: next to Dismiss, a small menu offers "Not my stack", "Too big",
+  "Inactive" and "Already know it" (keyboard: Enter or ArrowDown opens, arrows move, Escape
+  closes). Dismiss itself is unchanged: one click, the same request, the same Undo.
+- `POST /api/v1/recommendations/{id}/dismiss` accepts an optional `{"reason": ...}`
+  (`DismissReasonEnum`); an unknown reason is 400 `validation_error` and dismisses nothing.
+  The reason is stored on the hidden entry and its `dismissed` feedback event (migration
+  `feedback.0004`, no backfill). `GET /api/v1/dismissed` returns `reason` (null when none), and
+  the hidden list shows it.
+- `feedback_report` prints `dismiss reasons: ...` per configuration (`none` = without a
+  reason); the JSON gains `dismiss_reasons`. Shares are unchanged.
+
+### Changed
+
+- Privacy page: hidden projects and feedback events keep the optional dismiss reason.
+
+### Fixed
+
+Code review of the uncommitted 0.12.14–0.12.23 work. No ranking change.
+
+- The reason menu closes while a dismiss is in flight, so it cannot send a second request.
+- `feedback_report` lists the reasons of dismissals without a recommendation snapshot on their
+  own line (JSON `unattributed_dismiss_reasons`), and counts an event with rank 0 as
+  unattributed instead of in `21+`.
+- Issue reasons: an unknown difficulty reads "Difficulty not estimated" (unknown also means
+  signals that disagree, not only too few), and a part whose weight is 0 gets no reason, as
+  repository reasons already did.
+- `ScoringConfig.save` compares the fixed fields as stored JSON: a description edit on a
+  configuration built with tuples no longer raises `ImmutableConfig`.
+- `ISSUE_DIFFICULTY.min_votes` above `classify.MAX_LEVEL_VOTES` (4) fails `core.E040`; such a
+  value left every issue unknown. New warning `core.W004` when it leaves a level unreachable
+  (3 or 4: intermediate has only two voters). Capacities come from `classify.LEVEL_VOTERS`,
+  which a test checks against the classifier.
+
+### Changed (internal)
+
+Cleanups from `/simplify`. No output changes; `evaluate_ranking` prints the same intervals.
+
+- `feedback_report`: one accumulator and row builder for buckets and labels, one table printer
+  in the command; `load` streams events unordered (no sort of the whole event log).
+- Bootstrap: one set of resamples per comparison, shared by its five metrics
+  (`bootstrap.draws`); `Interval.as_dict` replaces the command's own rounding.
+- `DeveloperResult.metrics` is derived from `values`; `KeysetPagination` builds one response
+  for both modes; issue reasons read one per-part contributions dict, and `MatchedIssue`
+  carries `mentions_technology`; `ranking.config.SUM_TOLERANCE`; `ImmutableConfig` lists
+  fields with `join_names`.
+
+## [0.12.22] - 2026-10-24
+
+Documentation and housekeeping. No code, API, UI or ranking change.
+
+### Changed
+
+- `Bug_Backlog.md`: open items, known gaps and the release index come first, then the fix-batch
+  plan (nearly all shipped), the totals and the review history (oldest first). No row changed.
+- `ideas.md`: open ideas grouped by when they can ship: first those that change no ranking, then
+  those that wait for K-1 (†). The priority table lists items in suggested order and drops
+  shipped ones; section numbers §1–§17 are unchanged.
+- `.gitignore`: `reports/` (and `apps/backend/reports/`) for `evaluate_ranking --json` and
+  `feedback_report --json` outputs; feedback reports hold real-use aggregates.
+- README, CLAUDE.md and `features.txt` point to the new layout; the planned list in
+  `features.txt` drops ideas that shipped in 0.12.11–0.12.13 and lists Y-6.
+
+## [0.12.21] - 2026-10-24
+
+Match-label calibration (OpenSpec change `feedback-report-labels`, `ideas.md` §4). No API, UI,
+ranking or data change.
+
+### Added
+
+- `feedback_report` shows, per scoring configuration, one row per match label (Strong, Good,
+  Partial) with counts, users and the positive share, and a calibration verdict: `ordered`,
+  `not ordered` (naming the first pair out of order) or `not enough data`. Label shares are not
+  adjusted for rank. The JSON report gains `labels` and `calibration` per configuration.
+
+## [0.12.20] - 2026-10-24
+
+Feedback report (OpenSpec change `feedback-report`, `ideas.md` §4). No API, UI, ranking or data
+change.
+
+### Added
+
+- `npm run manage -- feedback_report`: how users acted on recommendations, per scoring
+  configuration version and rank bucket (1-5, 6-10, 11-20, 21+), from the stored feedback events.
+  Per group: each action's count, distinct users and the positive share (saved and opened out of
+  those plus dismissed; there is no "shown" event, so not a click-through rate). Per
+  configuration: raw and position-adjusted shares. Groups under `--minimum` (10) decisive actions
+  show no share. `--since`, `--config`, `--json`. Aggregates only.
+
+## [0.12.19] - 2026-10-24
+
+Evaluation confidence (OpenSpec change `evaluation-confidence`, `ideas.md` §3). No API, UI or
+ranking change; `baselines.json` untouched.
+
+### Added
+
+- `evaluate_ranking` prints, for every configuration after the baseline, a paired bootstrap
+  block: per metric the difference from the baseline, its 95% interval over developers and the
+  share of resamples in which it is not better, with `*` when the interval excludes 0.
+  Reproducible (fixed seed); `--resamples` and `--seed` change it; `--json` writes it under
+  `comparisons`.
+- On `benchmark-v1`, v2 vs v1: NDCG@10 +0.0195 [-0.0023, +0.0501] (not better in 8.2% of
+  resamples), Precision@5 -0.0333 [-0.1000, +0.0000]: neither is conclusive with six developers.
+
+### Unchanged
+
+- The improvement rule, `--require-improvement`, activation and the regression baseline do not
+  read the intervals. Whether a ranking change must also be significant is decided with K-1.
+
+## [0.12.18] - 2026-10-24
+
+Activation by command only (OpenSpec change `activation-command-only`): S-6 from the review of
+0.12.13/0.12.14 (batch 18). No API, UI or ranking change.
+
+### Removed
+
+- The Django admin action "Activate the selected configuration". It ran the benchmark
+  comparison inside the web request (S-6). Activate a scoring configuration with
+  `npm run manage -- activate_scoring_config <version>` (`--force --reason "..."` for a
+  deliberate exception); the rule is unchanged.
+
+### Changed
+
+- A configuration's admin page shows the command that activates it, or that it is active.
+- Activation audit entries always record `via: "command"`; entries made by the admin action keep
+  `"admin"`.
+
+## [0.12.17] - 2026-10-24
+
+Saved and hidden list links (OpenSpec change `keyset-paging-links`): S-7 from the review of
+0.12.13/0.12.14 (batch 18). No ranking change; OpenAPI stays `1.0.0`.
+
+### Changed
+
+- `GET /api/v1/saved` and `GET /api/v1/dismissed` page forward only: `previous` is always
+  null. A page-number request (`?page=2`) used to return a page-number `previous` next to a
+  cursor `next`, so a client following both could repeat or skip entries (S-7). The SPA never
+  read `previous`.
+- A request with both `cursor` and `page` is rejected with 400 `cursor_with_page`; `page` used
+  to be ignored silently.
+- The OpenAPI document lists the 400 error for both list operations (`invalid_cursor` has
+  answered 400 since 0.12.12).
+
+## [0.12.16] - 2026-10-24
+
+Signal and explanation accuracy (OpenSpec change `signal-explanation-accuracy`): D-8, D-9, D-15,
+D-16, D-17 and D-18 of batch 8. No API schema change (OpenAPI `1.0.0`); v1 and v2 score and rank
+every benchmark dataset as before (`baselines.json` untouched).
+
+### Changed
+
+- The `issue_availability` reason says how its issues matched: "N open issues mention
+  technologies you use", "N open issues are labeled good first issue or help wanted", or
+  "N relevant open issues, M mentioning technologies you use". It no longer claims a profile
+  match for issues that matched only by label (D-9). Stored reasons change on the next
+  generation; older evidence keeps the technology wording until then.
+- An issue of unknown difficulty whose difficulty fit counts in its score gets the reason
+  "Difficulty not estimated (too few signals)" (D-16). Issue scores are unchanged.
+- The relevance gate needs a relevance signal with a value and a configured weight above 0,
+  for the final cut and for choosing whose issues are matched (D-8). No seeded configuration
+  weights a relevance signal 0.
+- A stored scoring configuration's version, weights and params never change: the admin shows
+  them read-only for every saved row and `ScoringConfig.save` refuses a change; new numbers need
+  a new version (D-15). Activation and description stay editable.
+- `ISSUE_DIFFICULTY` gains `several_technologies` (default 2) and `min_votes` (default 2), with
+  `core.E040` checks; the defaults equal the former fixed values, so analyses are unchanged
+  (D-18).
+
+### Fixed
+
+- Openness points must sum to at most 1; a larger sum used to cap the signal silently (D-17).
+  v1 and v2 sum to exactly 1.
+
+### Documentation
+
+- The specs now state rules shipped earlier without a spec change: reasons only for signals
+  that add to the score (D-7, 0.12.14), description length without HTML comments (D-12) and
+  bracketed label scopes (D-13, both 0.12.15).
+- `Bug_Backlog.md`: batch 8 keeps only B-6 and D-11 (both wait for K-1).
+
+## [0.12.15] - 2026-10-23
+
+Bug fixes that need no spec change: D-12 and D-13 of batch 8, and S-9…S-11 from the review of
+0.12.13/0.12.14 (batch 18). No API change; benchmark numbers are unchanged (`baselines.json`
+untouched).
+
+### Fixed
+
+- Issue difficulty no longer counts issue-template instructions (HTML comments) as description
+  length, so a short issue filled into a long template is not voted advanced (D-12).
+- `[Type] Bug`-style labels map to their category like `Type: Bug` (D-13; issue taxonomy
+  2026.10.3). Both apply when an issue is next fetched.
+
+### Changed
+
+- Job status queries live under `['jobs']` (`['jobs', 'recommendations']`,
+  `['jobs', 'discovery']`), so a finished generation refreshes every profile-derived query with
+  one invalidation and a new one cannot be missed; a finished sync also refreshes `['jobs']`
+  (S-9).
+- Lazy components load through one registry (`src/app/lazyLoaders.ts`) that the test setup
+  preloads entirely, so a new one cannot bring back the random test timeouts of P-3 (S-10).
+- Indexes for the saved and hidden list order (`feedback.0003`, S-11).
+
+### Documentation
+
+- `Bug_Backlog.md`: S-7 needs an OpenSpec change (design D2 of `freshness-paging-seed` keeps the
+  page link as `previous`); S-6 needs a decision (tracked job, or the admin points to the
+  command).
+
 ## [0.12.14] - 2026-10-23
 
 Signal and explanation fixes that need no spec change (`Bug_Backlog.md` B-14, B-15, B-16, D-7,

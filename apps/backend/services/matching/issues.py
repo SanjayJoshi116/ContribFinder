@@ -24,6 +24,8 @@ from .features import DeveloperFeatures
 from .signals import ZERO, Signal, signal_of
 
 APPROACHABILITY_TEXT = {GOOD_FIRST_ISSUE: "good first issue", HELP_WANTED: "help wanted"}
+# Unknown means too few signals or signals that disagree (``classify.difficulty``).
+UNKNOWN_DIFFICULTY_TEXT = "Difficulty not estimated"
 LEVELS = (Difficulty.BEGINNER, Difficulty.INTERMEDIATE, Difficulty.ADVANCED, Difficulty.UNKNOWN)
 
 
@@ -45,6 +47,7 @@ class MatchedIssue:
     issue: IssueFeature
     score: float  # internal ranking value, never serialized
     reasons: tuple[dict[str, Any], ...]
+    mentions_technology: bool = False  # a technology the developer uses
 
 
 @dataclass(frozen=True)
@@ -130,19 +133,20 @@ def score_issue(
         (label for label in (GOOD_FIRST_ISSUE, HELP_WANTED) if label in issue.labels), None
     )
     approach = float(params["approachability"][approach_label]) if approach_label else 0.0
-    score = round(
-        weights["technology"] * tech
-        + weights["difficulty"] * diff_fit
-        + weights["approachability"] * approach,
-        4,
-    )
+    # What each part adds to the score; only a part that adds something gets a reason.
+    contrib = {
+        "technology": weights["technology"] * tech,
+        "difficulty": weights["difficulty"] * diff_fit,
+        "approachability": weights["approachability"] * approach,
+    }
+    score = round(sum(contrib.values()), 4)
 
     parts: list[tuple[float, dict[str, Any]]] = []
-    if tech > 0:
+    if contrib["technology"] > 0:
         names = [_name(slug) for slug in matched]
         parts.append(
             (
-                weights["technology"] * tech,
+                contrib["technology"],
                 {
                     "type": "technology",
                     "text": f"Mentions {join_names(names)}, which you use",
@@ -150,21 +154,25 @@ def score_issue(
                 },
             )
         )
-    if diff_fit > 0 and issue.difficulty != Difficulty.UNKNOWN:
+    if contrib["difficulty"] > 0:
+        # Unknown difficulty still scores the configured neutral fit; the reason says so.
+        known = issue.difficulty != Difficulty.UNKNOWN
         parts.append(
             (
-                weights["difficulty"] * diff_fit,
+                contrib["difficulty"],
                 {
                     "type": "difficulty",
-                    "text": _difficulty_text(issue.difficulty, diff_fit),
-                    "detail": {"difficulty": issue.difficulty, "estimated": True},
+                    "text": _difficulty_text(issue.difficulty, diff_fit)
+                    if known
+                    else UNKNOWN_DIFFICULTY_TEXT,
+                    "detail": {"difficulty": issue.difficulty, "estimated": known},
                 },
             )
         )
-    if approach_label is not None and approach > 0:
+    if approach_label is not None and contrib["approachability"] > 0:
         parts.append(
             (
-                weights["approachability"] * approach,
+                contrib["approachability"],
                 {
                     "type": "approachability",
                     "text": f'Labeled "{APPROACHABILITY_TEXT[approach_label]}"',
@@ -173,7 +181,8 @@ def score_issue(
             )
         )
     parts.sort(key=lambda p: -p[0])
-    return tech, diff_fit, approach, MatchedIssue(issue, score, tuple(r for _, r in parts))
+    reasons = tuple(r for _, r in parts)
+    return tech, diff_fit, approach, MatchedIssue(issue, score, reasons, tech > 0)
 
 
 def match_issues(
@@ -203,7 +212,13 @@ def match_issues(
     by_type = Counter(m.issue.contribution_type for m in kept)
     issue_fit = signal_of(
         sum(m.score for m in kept) / params["saturation"],
-        [{"count": len(kept), "by_type": dict(sorted(by_type.items()))}],
+        [
+            {
+                "count": len(kept),
+                "technology_count": sum(m.mentions_technology for m in kept),
+                "by_type": dict(sorted(by_type.items())),
+            }
+        ],
     )
 
     table = params["difficulty_fit"][dev.experience_level]

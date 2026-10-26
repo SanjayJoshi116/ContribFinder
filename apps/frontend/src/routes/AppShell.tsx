@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Navigate } from 'react-router'
 
 import { isActive } from '@/app/jobTransitions'
+import { lazyLoaders } from '@/app/lazyLoaders'
 import { Button } from '@/components/ui/button'
 import { useMe } from '@/features/auth/api'
 import { DataSection } from '@/features/auth/DataSection'
@@ -16,10 +17,7 @@ import { failureMessage, formatWait } from '@/features/sync/messages'
 import { STAGE_TEXT, usePipelineStage } from '@/features/sync/pipeline'
 import { RepositoryList } from '@/features/sync/RepositoryList'
 
-// Recharts is large; load it only with the profile page's chart.
-const LanguageChart = lazy(() =>
-  import('@/features/profile/LanguageChart').then((m) => ({ default: m.LanguageChart })),
-)
+const LanguageChart = lazy(lazyLoaders.LanguageChart)
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 

@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from recommendations.models import ScoringConfig
-from services.evaluation import baseline
+from services.evaluation import baseline, bootstrap
 from services.evaluation.dataset import DatasetError, load, selection_dataset
 from services.evaluation.metrics import METRICS
 from services.evaluation.runner import (
@@ -21,6 +21,7 @@ from services.evaluation.runner import (
     evaluate,
     file_config,
     stored_config,
+    uncertainty,
 )
 
 
@@ -67,6 +68,18 @@ class Command(BaseCommand):
         )
         parser.add_argument("--top-n", type=int, help="Default: RECOMMENDATIONS_TOP_N.")
         parser.add_argument(
+            "--resamples",
+            type=int,
+            default=bootstrap.DEFAULT_RESAMPLES,
+            help="Bootstrap resamples for each comparison's interval.",
+        )
+        parser.add_argument(
+            "--seed",
+            type=int,
+            default=bootstrap.DEFAULT_SEED,
+            help="Bootstrap seed; the same seed always gives the same intervals.",
+        )
+        parser.add_argument(
             "--write-baseline",
             action="store_true",
             help="Rewrite evaluation/baselines.json from the stored configurations (all of "
@@ -77,6 +90,9 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         pinned = options["write_baseline"]
+        resamples, seed = options["resamples"], options["seed"]
+        if resamples < 1:
+            raise CommandError("--resamples must be at least 1.")
         try:
             if options["dataset"]:
                 paths = [Path(options["dataset"])]
@@ -96,6 +112,7 @@ class Command(BaseCommand):
 
         everything: list[Report] = []
         verdicts: list[Verdict] = []
+        comparisons: list[dict[str, Any]] = []
         for index, dataset in enumerate(datasets):
             if index:
                 self.stdout.write("")
@@ -111,12 +128,26 @@ class Command(BaseCommand):
                 self.stdout.write(f"{prefix}{verdict.config}: {result} over {reports[0].config}")
                 for failure in verdict.failures:
                     self.stdout.write(f"  - {failure}")
+            for report in reports[1:]:
+                intervals = uncertainty(reports[0], report, resamples=resamples, seed=seed)
+                self._print_uncertainty(reports[0].config, report, intervals, resamples, seed)
+                comparisons.append(
+                    {
+                        "dataset": dataset.name,
+                        "baseline": reports[0].config,
+                        "config": report.config,
+                        "resamples": resamples,
+                        "seed": seed,
+                        "metrics": {name: i.as_dict() for name, i in intervals.items()},
+                    }
+                )
             everything += reports
             verdicts += found
 
         if options["json"]:
             out = Path(options["json"])
-            text = json.dumps({"reports": [r.as_dict() for r in everything]}, indent=2) + "\n"
+            body = {"reports": [r.as_dict() for r in everything], "comparisons": comparisons}
+            text = json.dumps(body, indent=2) + "\n"
             try:
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_text(text, encoding="utf-8")
@@ -154,6 +185,26 @@ class Command(BaseCommand):
         specs = [stored_config(v) for v in versions]
         specs += [file_config(p) for p in options["config_file"]]
         return specs or [active_config()]
+
+    def _print_uncertainty(
+        self,
+        baseline: str,
+        report: Report,
+        intervals: dict[str, bootstrap.Interval],
+        resamples: int,
+        seed: int,
+    ) -> None:
+        self.stdout.write(
+            f"{report.config} vs {baseline} (paired bootstrap over developers, "
+            f"{resamples} resamples, seed {seed})"
+        )
+        for name, i in intervals.items():
+            mark = "  *" if i.marked else ""
+            self.stdout.write(
+                f"  {name:<13} {i.diff:+.4f}  [{i.low:+.4f}, {i.high:+.4f}]  "
+                f"not better {i.not_better:6.1%}{mark}"
+            )
+        self.stdout.write("  * the 95% interval excludes 0; unmarked = inconclusive, not zero")
 
     def _print(self, dataset: str, developers: int, reports: list[Report]) -> None:
         first = reports[0]

@@ -126,3 +126,12 @@ def test_min_score_range() -> None:
 def test_size_thresholds(sizes) -> None:
     with override_settings(REPO_SIZE_THRESHOLDS=sizes):
         assert "core.E032" in ids(recommendation_config_check())
+
+
+def test_openness_points_sum_to_at_most_one() -> None:
+    over = {**V2_PARAMS["openness"], "contributing": 0.6, "good_first_issue": 0.6}
+    errors = validate(V2_WEIGHTS, {**V2_PARAMS, "openness": over})
+    assert "openness points must sum to at most 1" in errors
+    # v1 and v2 sum to exactly 1 (0.4 + 0.3 + 0.2 + 0.1).
+    assert validate(V1_WEIGHTS, V1_PARAMS, stored=True) == []
+    assert validate(V2_WEIGHTS, V2_PARAMS, stored=True) == []

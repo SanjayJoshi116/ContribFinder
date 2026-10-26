@@ -191,7 +191,10 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
     # Issue difficulty and the profile's preferred difficulty share one choice set.
-    "ENUM_NAME_OVERRIDES": {"DifficultyEnum": "developers.models.IssueDifficulty"},
+    "ENUM_NAME_OVERRIDES": {
+        "DifficultyEnum": "developers.models.IssueDifficulty",
+        "DismissReasonEnum": "feedback.models.DismissReason",
+    },
 }
 
 # --- Celery ----------------------------------------------------------------
@@ -387,14 +390,17 @@ FEEDBACK_VIEW_DEDUP_MINUTES = env.int("FEEDBACK_VIEW_DEDUP_MINUTES", default=30)
 ISSUES_MAX_PAGES = env.int("ISSUES_MAX_PAGES", default=1)
 ISSUE_BODY_MAX_CHARS = env.int("ISSUE_BODY_MAX_CHARS", default=10_000)
 ISSUE_MAX_AGE_DAYS = env.int("ISSUE_MAX_AGE_DAYS", default=365)
-# Difficulty votes: a body under short_body votes beginner, over long_body advanced; at most
-# one technology votes beginner, many_technologies or more advanced; long_discussion comments
-# or more vote advanced.
+# Difficulty votes: a body under short_body votes beginner, over long_body advanced; one
+# technology votes beginner, several_technologies or more intermediate, many_technologies or
+# more advanced; long_discussion comments or more vote advanced. A level needs min_votes
+# agreeing votes (at least 2) and no vote for another level.
 ISSUE_DIFFICULTY: dict[str, int] = {
     "short_body": 600,
     "long_body": 4000,
+    "several_technologies": 2,
     "many_technologies": 3,
     "long_discussion": 15,
+    "min_votes": 2,
     **env.json("ISSUE_DIFFICULTY", default={}),
 }
 

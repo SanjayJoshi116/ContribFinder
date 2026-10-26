@@ -3,11 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '@/api/client'
 import type { RecommendationDetail, RecommendationPage, RecommendationStatus } from '@/api/types'
 import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
-import { developerProfileKey, interestsKey, skillsKey } from '@/features/profile/api'
 
 // Under ['profile'], so a completed sync (useSyncStatus) invalidates them too.
 const ROOT = ['profile', 'recommendations'] as const
-export const recommendationStatusKey = [...ROOT, 'status'] as const
+// Job status keys live under ['jobs'], never ['profile']: a status fetch invalidates the
+// ['profile'] prefix when its job finishes, and must not invalidate itself.
+export const recommendationStatusKey = ['jobs', 'recommendations'] as const
 export const recommendationListKey = [...ROOT, 'list'] as const
 export const recommendationDetailKey = (id: number) => [...ROOT, 'detail', id] as const
 export const RECOMMENDATION_POLL_INTERVAL_MS = 3000
@@ -39,8 +40,8 @@ export function recommendationsPath(filters: RecommendationFilters): string {
 /** Latest generation job and counts. Polls while a generation runs, and refreshes the list
  * once per newly seen finished job, also one that started and finished between two polls.
  * Every profile analysis ends in a generation, also one no sync started (`reanalyze_profiles`),
- * so the profile keys are refreshed here too. Not all of ['profile']: the status keys live
- * under it, and this runs inside the status fetch. */
+ * so all of ['profile'] is refreshed: the list, details, issues, saved entries (they show the
+ * current recommendation) and the developer profile. The status key is under ['jobs']. */
 export function useRecommendationStatus(enabled = true) {
   const queryClient = useQueryClient()
   return useQuery<RecommendationStatus, ApiError>({
@@ -50,17 +51,7 @@ export function useRecommendationStatus(enabled = true) {
         queryClient,
         recommendationStatusKey,
         () => apiFetch<RecommendationStatus>('/recommendations/status'),
-        () =>
-          Promise.all([
-            queryClient.invalidateQueries({ queryKey: recommendationListKey }),
-            queryClient.invalidateQueries({ queryKey: [...ROOT, 'detail'] }),
-            queryClient.invalidateQueries({ queryKey: ['profile', 'issues'] }),
-            // Saved entries show the current recommendation (features/feedback savedKey).
-            queryClient.invalidateQueries({ queryKey: ['profile', 'saved'] }),
-            queryClient.invalidateQueries({ queryKey: developerProfileKey }),
-            queryClient.invalidateQueries({ queryKey: skillsKey }),
-            queryClient.invalidateQueries({ queryKey: interestsKey }),
-          ]),
+        () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
       ),
     staleTime: 0,
     enabled,

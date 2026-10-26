@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-ISSUE_TAXONOMY_VERSION = "2026.10.2"
+ISSUE_TAXONOMY_VERSION = "2026.10.3"
 
 GOOD_FIRST_ISSUE = "good_first_issue"
 HELP_WANTED = "help_wanted"
@@ -108,8 +108,9 @@ ALIASES: dict[str, str] = {
 
 _SEPARATORS = re.compile(r"[\s_-]+")
 _EDGES = re.compile(r"^[^a-z0-9]+|[^a-z0-9+#]+$")
-# A leading scope such as "type:", "kind/" or "area/" ("good first issue" has none).
-_SCOPE = re.compile(r"^[a-z ]{1,20}[:/]\s*")
+# A leading scope such as "type:", "kind/", "area/" or "[type]" (its "[" is already dropped by
+# ``_EDGES``); "good first issue" has none.
+_SCOPE = re.compile(r"^[a-z ]{1,20}[:/\]]\s*")
 
 
 def normalize(name: str) -> str:

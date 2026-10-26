@@ -114,9 +114,45 @@ def test_page_numbers_still_work_without_a_cursor(
 
     assert body["count"] == 25
     assert repo_ids(body) == ids[::-1][10:20]
-    assert body["previous"] is not None
+    assert body["previous"] is None  # forward only: every link is a cursor link
     third = follow(signed_in_client, next_path(body))  # the cursor continues after page 2
     assert repo_ids(third) == ids[::-1][20:]
+
+
+@pytest.mark.parametrize(("path", "model", "time_field"), LISTS)
+@pytest.mark.parametrize("page", ["1", "3"])
+def test_cursor_with_page_is_rejected(
+    signed_in_client, user, path, model, time_field, page
+) -> None:
+    add(user, model, time_field, 25)
+    first = follow(signed_in_client, f"{path}?page_size=10")
+
+    response = signed_in_client.get(f"{next_path(first)}&page={page}")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "cursor_with_page"
+
+
+@pytest.mark.parametrize(("path", "model", "time_field"), LISTS)
+def test_unreadable_cursor_with_page_is_cursor_with_page(
+    signed_in_client, path, model, time_field
+) -> None:
+    response = signed_in_client.get(f"{path}?cursor=garbage!&page=2")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "cursor_with_page"  # checked before decoding
+
+
+@pytest.mark.parametrize(("path", "model", "time_field"), LISTS)
+def test_page_size_with_a_cursor(signed_in_client, user, path, model, time_field) -> None:
+    ids = add(user, model, time_field, 12)
+    first = follow(signed_in_client, f"{path}?page_size=5")
+    cursor = parse_qs(urlsplit(first["next"]).query)["cursor"][0]
+
+    second = follow(signed_in_client, f"{path}?cursor={cursor}&page_size=3")
+
+    assert repo_ids(second) == ids[::-1][5:8]
+    assert second["previous"] is None
 
 
 def encoded(value: str) -> str:
