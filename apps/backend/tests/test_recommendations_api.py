@@ -55,6 +55,7 @@ def test_list_shape_without_score(signed_in_client: APIClient, generated) -> Non
         "activity_label",
         "size",
         "openness",
+        "setup",
         "saved",
         "relevant_issue_count",
         "generated_at",
@@ -114,6 +115,22 @@ def test_detail(signed_in_client: APIClient, generated) -> None:
     assert body["languages"] == [{"language": "Python", "share": 1.0}]
     assert body["activity_signals"]["contributors"] == 25
     assert "score" not in body
+
+
+def test_setup_facts_found_not_found_and_unknown(signed_in_client: APIClient, generated) -> None:
+    rec = generated["django"]
+    type(rec.repository).objects.filter(pk=rec.repository_id).update(
+        has_ci=True, has_tests=False, has_dev_environment=None, has_docker_compose=True
+    )
+    expected = {"ci": True, "tests": False, "dev_environment": None, "docker_compose": True}
+    listed = next(r for r in signed_in_client.get(LIST).json()["results"] if r["id"] == rec.pk)
+    assert listed["setup"] == expected
+    assert signed_in_client.get(f"{LIST}/{rec.pk}").json()["setup"] == expected
+
+
+def test_setup_facts_unknown_by_default(signed_in_client: APIClient, generated) -> None:
+    body = signed_in_client.get(f"{LIST}/{generated['plain'].pk}").json()
+    assert body["setup"] == dict.fromkeys(("ci", "tests", "dev_environment", "docker_compose"))
 
 
 def test_detail_without_readme(signed_in_client: APIClient, generated) -> None:

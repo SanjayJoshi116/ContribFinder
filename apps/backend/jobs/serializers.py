@@ -38,3 +38,11 @@ class SyncJobSerializer(serializers.ModelSerializer[SyncJob]):
 class SyncStatusSerializer(serializers.Serializer[dict[str, object]]):
     job = SyncJobSerializer(allow_null=True)
     last_synced_at = serializers.DateTimeField(allow_null=True)
+
+
+class DataVersionsSerializer(serializers.Serializer[object]):
+    """When each derived data area last changed; null when the area holds no data."""
+
+    github = serializers.DateTimeField(allow_null=True)
+    profile = serializers.DateTimeField(allow_null=True)
+    recommendations = serializers.DateTimeField(allow_null=True)

@@ -90,6 +90,13 @@ class Repository(models.Model):
     has_good_first_issue_label = models.BooleanField(null=True, blank=True)
     has_help_wanted_label = models.BooleanField(null=True, blank=True)
 
+    # Setup facts from the root listing, refreshed with the dependencies (null = not fetched
+    # yet; False = not found at the root, ``services/repositories/setup.py``). Never scored.
+    has_ci = models.BooleanField(null=True, blank=True)
+    has_tests = models.BooleanField(null=True, blank=True)
+    has_dev_environment = models.BooleanField(null=True, blank=True)
+    has_docker_compose = models.BooleanField(null=True, blank=True)
+
     # Per-data-type fetch times.
     readme_synced_at = models.DateTimeField(null=True, blank=True)
     community_synced_at = models.DateTimeField(null=True, blank=True)

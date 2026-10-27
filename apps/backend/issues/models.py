@@ -83,7 +83,10 @@ class RecommendedIssue(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["recommendation", "issue"], name="unique_recommended_issue"
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rank__gte=1), name="recommended_issue_rank_positive"
+            ),
         ]
 
     def __str__(self) -> str:

@@ -15,6 +15,7 @@ import {
   renderRoute,
   unauthenticated,
 } from '@/test/render'
+import { dataVersionsKey } from '@/app/dataVersions'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
 
@@ -47,6 +48,7 @@ const RECOMMENDATION = {
     good_first_issue: null,
     help_wanted: null,
   },
+  setup: { ci: null, tests: null, dev_environment: null, docker_compose: null },
   saved: false,
   relevant_issue_count: 0,
   generated_at: '2026-09-29T10:00:00Z',
@@ -659,7 +661,8 @@ describe('your data', () => {
         return noContent()
       },
     })
-    const { router } = renderRoute('/app')
+    const { router, queryClient } = renderRoute('/app')
+    const reset = vi.spyOn(queryClient, 'resetQueries')
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: 'Delete GitHub data' }))
@@ -673,6 +676,8 @@ describe('your data', () => {
     const [, init] = callsTo(fetchMock, 'DELETE', '/api/v1/profile/github-data')[0]!
     expect(new Headers(init!.headers).get('X-CSRFToken')).toBe('test-csrf-token')
     expect(await screen.findByRole('button', { name: /sync/i })).toBeInTheDocument()
+    // The next data versions fetch is a first one again, so it refetches nothing.
+    expect(reset).toHaveBeenCalledWith({ queryKey: dataVersionsKey })
   })
 
   it('cancelling the account deletion deletes nothing', async () => {

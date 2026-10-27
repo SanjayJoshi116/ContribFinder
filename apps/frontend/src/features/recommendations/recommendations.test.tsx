@@ -2,7 +2,15 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ME, NEVER_GENERATED, SYNCED_USER, json, mockFetch, renderRoute } from '@/test/render'
+import {
+  ME,
+  NEVER_GENERATED,
+  SYNCED_USER,
+  changingVersions,
+  json,
+  mockFetch,
+  renderRoute,
+} from '@/test/render'
 
 import { recommendationStatusKey, recommendationsPath } from './api'
 
@@ -50,6 +58,7 @@ const RECOMMENDATION = {
   activity_label: 'recently_active',
   size: 'large',
   openness: OPENNESS,
+  setup: { ci: true, tests: true, dev_environment: false, docker_compose: null },
   relevant_issue_count: 0,
   generated_at: '2026-09-29T10:00:00Z',
 }
@@ -123,6 +132,33 @@ describe('recommendation cards', () => {
     )
     const section = screen.getByRole('region', { name: 'Recommended projects' })
     expect(section.textContent).not.toMatch(/%/)
+  })
+
+  it('shows the setup facts found, and nothing when none was found or they are unknown', async () => {
+    const none = { ci: false, tests: false, dev_environment: false, docker_compose: false }
+    const unknown = { ci: null, tests: null, dev_environment: null, docker_compose: null }
+    const other = (id: number, name: string, setup: object) => ({
+      ...RECOMMENDATION,
+      id,
+      repository: { ...REPOSITORY, name, full_name: `encode/${name}` },
+      setup,
+    })
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/recommendations/status': () => json(GENERATED),
+      'GET /api/v1/recommendations': () =>
+        page([RECOMMENDATION, other(8, 'starlette', none), other(9, 'uvicorn', unknown)]),
+    })
+    renderRoute('/app')
+
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    expect(within(card).getByText('CI · tests')).toBeInTheDocument()
+    expect(within(card).queryByText(/dev container|Docker Compose/)).not.toBeInTheDocument()
+    for (const name of ['starlette', 'uvicorn']) {
+      const plain = screen.getByRole('article', { name })
+      expect(within(plain).queryByText(/CI|tests/)).not.toBeInTheDocument()
+    }
   })
 
   it('shows the number of relevant issues', async () => {
@@ -242,14 +278,18 @@ describe('recommendation cards', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let statusCalls = 0
     let listCalls = 0
+    const versions = changingVersions()
     mockFetch({
       ...ME_ROUTE,
       ...SYNCED_USER,
+      ...versions.route,
       'GET /api/v1/recommendations/status': () => {
         statusCalls += 1
-        return statusCalls === 1
-          ? json({ ...NEVER_GENERATED, job: { ...GENERATED.job, status: 'RUNNING' } })
-          : json(GENERATED)
+        if (statusCalls === 1) {
+          return json({ ...NEVER_GENERATED, job: { ...GENERATED.job, status: 'RUNNING' } })
+        }
+        if (statusCalls === 2) versions.change('recommendations')
+        return json(GENERATED)
       },
       'GET /api/v1/recommendations': () => {
         listCalls += 1
@@ -267,12 +307,16 @@ describe('recommendation cards', () => {
   it('shows the list when a generation finishes between two polls', async () => {
     let statusCalls = 0
     let listCalls = 0
+    const versions = changingVersions()
     mockFetch({
       ...ME_ROUTE,
       ...SYNCED_USER,
+      ...versions.route,
       'GET /api/v1/recommendations/status': () => {
         statusCalls += 1
-        return statusCalls === 1 ? json(NEVER_GENERATED) : json(GENERATED)
+        if (statusCalls === 1) return json(NEVER_GENERATED)
+        if (statusCalls === 2) versions.change('recommendations')
+        return json(GENERATED)
       },
       'GET /api/v1/recommendations': () => {
         listCalls += 1
@@ -330,6 +374,21 @@ describe('recommendation detail page', () => {
     expect(within(github).getByText('BSD-3-Clause')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('encode/httpx')
     expect(document.body.textContent).not.toMatch(/%/)
+  })
+
+  it('shows setup facts as found, not found or not available, never "No"', async () => {
+    mockFetch({ ...ME_ROUTE, 'GET /api/v1/recommendations/7': () => json(DETAIL) })
+    renderRoute('/app/recommendations/7')
+
+    const heading = await screen.findByRole('heading', { name: 'Setup' })
+    const facts = heading.parentElement!
+    const value = (term: string) => within(facts).getByText(term).nextElementSibling?.textContent
+    expect(value('CI configuration')).toBe('Found')
+    expect(value('Tests')).toBe('Found')
+    expect(value('Dev container or Gitpod')).toBe('Not found')
+    expect(value('Docker Compose')).toBe('Not available')
+    expect(within(facts).queryByText('No')).not.toBeInTheDocument()
+    expect(within(facts).getByText(/repository root only/)).toBeInTheDocument()
   })
 
   it('shows a missing README and unknown signals as unavailable', async () => {
@@ -442,7 +501,9 @@ describe('recommendation detail page', () => {
       'href',
       '/app',
     )
-    expect(fetchMock).toHaveBeenCalledTimes(1) // /auth/me only
+    // /auth/me only, besides the signed-in layout's data versions.
+    const urls = fetchMock.mock.calls.map(([input]) => String(input))
+    expect(urls.filter((url) => url !== '/api/v1/sync/versions')).toEqual(['/api/v1/auth/me'])
   })
 
   it('says when no relevant issues were found', async () => {

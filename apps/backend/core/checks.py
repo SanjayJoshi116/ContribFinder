@@ -56,6 +56,15 @@ def trusted_proxy_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMes
     return []
 
 
+@register()
+def content_security_policy_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    return [
+        Error(f"{name} must be a non-empty string (core.csp).", id="core.E060")
+        for name in ("CONTENT_SECURITY_POLICY_API", "CONTENT_SECURITY_POLICY_HTML")
+        if not isinstance(value := getattr(settings, name, None), str) or not value.strip()
+    ]
+
+
 def _weight_errors(name: str, weights: object, sources: list[str], code: str) -> list[CheckMessage]:
     if not isinstance(weights, dict):
         return [Error(f"{name} must be a mapping of source to weight.", id=code)]

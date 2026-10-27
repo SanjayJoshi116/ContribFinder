@@ -1,5 +1,38 @@
-import type { ContributionType, Difficulty, MatchLabel, RecommendationStatus } from '@/api/types'
+import type {
+  ContributionType,
+  Difficulty,
+  MatchLabel,
+  Recommendation,
+  RecommendationStatus,
+} from '@/api/types'
 import { isActive } from '@/app/jobTransitions'
+
+type SetupFact = keyof Recommendation['setup']
+
+/** Setup facts seen at the repository root, card wording, in display order. */
+export const SETUP_TEXT: Record<SetupFact, string> = {
+  ci: 'CI',
+  tests: 'tests',
+  dev_environment: 'dev container',
+  docker_compose: 'Docker Compose',
+}
+
+/** The same facts as terms on the detail page. */
+export const SETUP_LABELS: Record<SetupFact, string> = {
+  ci: 'CI configuration',
+  tests: 'Tests',
+  dev_environment: 'Dev container or Gitpod',
+  docker_compose: 'Docker Compose',
+}
+
+/** "CI · tests" from the facts found; empty when none was found or they are unknown. Facts
+ * not found are left out: detection only looks at the root, so absence proves nothing. */
+export function setupLine(setup: Recommendation['setup']): string {
+  return (Object.keys(SETUP_TEXT) as SetupFact[])
+    .filter((fact) => setup[fact] === true)
+    .map((fact) => SETUP_TEXT[fact])
+    .join(' · ')
+}
 
 /** What users see instead of a score: a label backed by reasons. Never a percentage. */
 export const MATCH_TEXT: Record<MatchLabel, string> = {

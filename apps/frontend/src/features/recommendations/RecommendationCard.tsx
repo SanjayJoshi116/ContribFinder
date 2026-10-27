@@ -9,7 +9,7 @@ import {
 } from '@/features/feedback/RecommendationActions'
 import { cn } from '@/lib/utils'
 
-import { ACTIVITY_TEXT, MATCH_TEXT } from './messages'
+import { ACTIVITY_TEXT, MATCH_TEXT, setupLine } from './messages'
 
 const MAX_TECHNOLOGIES = 8
 const MAX_REASONS = 3
@@ -65,6 +65,7 @@ export function RecommendationCard({
 }) {
   const { repository, reasons, activity_label } = recommendation
   const headingId = `recommendation-${recommendation.id}`
+  const setup = setupLine(recommendation.setup)
   return (
     <article aria-labelledby={headingId} className="space-y-3 rounded-md border p-4">
       <header className="flex flex-wrap items-start justify-between gap-2">
@@ -89,6 +90,7 @@ export function RecommendationCard({
       )}
       <footer className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         {activity_label && <span>{ACTIVITY_TEXT[activity_label]}</span>}
+        {setup && <span>{setup}</span>}
         {recommendation.relevant_issue_count > 0 && (
           <Link
             to={`/app/recommendations/${recommendation.id}#relevant-issues`}

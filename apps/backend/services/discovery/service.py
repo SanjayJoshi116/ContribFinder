@@ -39,7 +39,7 @@ from services.github.client import PUBLIC_SCOPE, GitHubClient, GitHubRepo
 from services.github.errors import GitHubValidationError
 from services.github.storage import replace_topics, upsert_repository
 from services.job_guard import heartbeat, job_write, merge_metadata, save_progress
-from services.repositories.analysis import RepositoryAnalysisService
+from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.lifecycle import IN_PROGRESS, recheck_eligibility
 from services.repositories.staleness import stale_parts
 
@@ -135,6 +135,8 @@ class DiscoveryService:
         skipped: list[str] = list(meta.get("queries_skipped", []))
         rejections: Counter[str] = Counter(meta.get("rejections", {}))
         found = int(meta.get("results_found", 0))
+        # Per query key: strategy, band and what its results became (design D2). No query text.
+        yields: dict[str, dict[str, Any]] = dict(meta.get("query_yield", {}))
         owned, login, cfg = self._owned(), self._login(), FilterConfig.from_settings()
         for query in plan:
             if query.key in done or query.key in skipped:
@@ -146,13 +148,16 @@ class DiscoveryService:
                 )
             except GitHubValidationError:
                 skipped.append(query.key)
-                merge_metadata(self.job, {"queries_skipped": skipped})
+                yields[query.key] = {"source": query.source, "band": query.band, "refused": True}
+                merge_metadata(self.job, {"queries_skipped": skipped, "query_yield": yields})
                 continue
+            rejected: Counter[str] = Counter()
+            recorded = 0
             kept: list[tuple[int, GitHubRepo]] = []
             for rank, gh in enumerate(results, start=1):
                 reason = prefilter(gh, login=login, owned=owned, now=self.now, cfg=cfg)
                 if reason:
-                    rejections[reason] += 1
+                    rejected[reason] += 1
                 else:
                     kept.append((rank, gh))
             with job_write(self.job):
@@ -168,14 +173,28 @@ class DiscoveryService:
                         cfg,
                         has_dependencies=stored_has_dependencies(repo),
                     ):
-                        rejections[NOT_CODE] += 1  # an analysis already found it is a list
+                        rejected[NOT_CODE] += 1  # an analysis already found it is a list
                         continue
                     self._record(repo, query.source, query.core, rank)
+                    recorded += 1
                 found += len(results)
+                rejections.update(rejected)
                 done.append(query.key)
+                yields[query.key] = {
+                    "source": query.source,
+                    "band": query.band,
+                    "results": len(results),
+                    "rejections": dict(rejected),
+                    "recorded": recorded,
+                }
                 merge_metadata(
                     self.job,
-                    {"queries_done": done, "rejections": dict(rejections), "results_found": found},
+                    {
+                        "queries_done": done,
+                        "rejections": dict(rejections),
+                        "results_found": found,
+                        "query_yield": yields,
+                    },
                 )
         return Step.DONE
 
@@ -220,11 +239,28 @@ class DiscoveryService:
             )
         done: list[int] = list(self.job.metadata.get("analyzed", []))
         outcomes: Counter[str] = Counter(self.job.metadata.get("analysis_outcomes", {}))
+        # Kept by id so a resumed step still knows which analyses decided something (D1).
+        succeeded: list[int] = list(self.job.metadata.get("analysis_succeeded", []))
         todo = [pk for pk in self.job.metadata["analysis_plan"] if pk not in done]
         for repo_id, outcome in self._analyze(todo):
             outcomes[outcome] += 1
             done.append(repo_id)
-            merge_metadata(self.job, {"analyzed": done, "analysis_outcomes": dict(outcomes)})
+            if outcome == Outcome.ANALYZED:
+                succeeded.append(repo_id)
+            merge_metadata(
+                self.job,
+                {
+                    "analyzed": done,
+                    "analysis_outcomes": dict(outcomes),
+                    "analysis_succeeded": succeeded,
+                },
+            )
+        # A list this run's analysis found not to be code leaves the pool now, not at the next
+        # run's pool step (spec "Candidate pool maintenance"). Fenced like the pool step.
+        with job_write(self.job):
+            pool = RepositoryCandidate.objects.filter(developer=self.profile)
+            removed = self._remove_not_code(pool, succeeded) if succeeded else 0
+        self._record_pool({"analysis_not_code": removed})
         return Step.DONE
 
     def _analyze(self, repo_ids: list[int]) -> Iterator[tuple[int, str]]:
@@ -310,22 +346,30 @@ class DiscoveryService:
                     pool_order(pool).values_list("pk", flat=True)[: settings.DISCOVERY_MAX_POOL]
                 )
                 evicted, _ = pool.exclude(pk__in=keep).delete()
-        stars = list(pool.values_list("repository__stars", flat=True))
-        merge_metadata(
-            self.job,
+        self._record_pool(
             {
                 "pool_pruned_discoveries": pruned,
                 "pool_expired": expired,
                 "pool_not_code": not_code_removed,
                 "pool_eligibility_changed": eligibility_changed,
                 "pool_evicted": evicted,
-                "pool_size": len(stars),
-                "pool_bands": _band_counts(stars),
-            },
+            }
         )
         return Step.DONE
 
     # --- helpers ------------------------------------------------------------------------
+
+    def _record_pool(self, extra: dict[str, Any]) -> None:
+        """Record ``extra`` with the pool's current size and band counts (design D2): after the
+        pool step and again after the cleanup that ends the analysis step."""
+        stars = list(
+            RepositoryCandidate.objects.filter(developer=self.profile).values_list(
+                "repository__stars", flat=True
+            )
+        )
+        merge_metadata(
+            self.job, {**extra, "pool_size": len(stars), "pool_bands": _band_counts(stars)}
+        )
 
     def _prune_discoveries(self) -> int:
         """Delete the developer's discovery records this run did not see again: a rank from a
@@ -361,9 +405,11 @@ class DiscoveryService:
         flagged = [repo.pk for repo in repos if stored_not_code(repo, cfg)]
         if not flagged:
             return 0
-        removed, _ = pool.filter(repository_id__in=flagged).delete()
+        # delete() also counts the cascaded discovery records; report candidates only (U-3).
+        _, per_model = pool.filter(repository_id__in=flagged).delete()
+        removed: int = per_model.get(RepositoryCandidate._meta.label, 0)
         logger.info("Discovery for user %s removed %d not_code candidates", self.user.pk, removed)
-        return len(flagged)
+        return removed
 
     def _input(self) -> DiscoveryInput:
         skills = []

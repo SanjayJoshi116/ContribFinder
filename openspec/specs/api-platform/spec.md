@@ -126,6 +126,25 @@ The system SHALL only accept credentialed cross-origin requests from configured 
 - **WHEN** no trusted proxies are configured and a client sends `X-Forwarded-Proto: https` over plain HTTP
 - **THEN** the request is not treated as secure
 
+### Requirement: Content Security Policy
+The system SHALL send a `Content-Security-Policy` header on every response it serves that does not already carry one. A JSON response SHALL get a policy that allows loading nothing and forbids framing, `<base>` and form submission (`default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`). Any other response (the admin, error pages) SHALL get a policy that allows resources only from the same origin, forbids framing, plugins and `<base>`, and allows form submission only to the same origin. Both policies SHALL be configurable; production startup SHALL refuse an empty policy.
+
+#### Scenario: API response
+- **WHEN** any API endpoint returns JSON, including an error
+- **THEN** the response carries `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`
+
+#### Scenario: Admin page
+- **WHEN** a staff user opens an admin page
+- **THEN** the response carries the HTML policy, which includes `default-src 'self'` and `frame-ancestors 'none'`, and the page's own scripts and styles load
+
+#### Scenario: Response that sets its own policy
+- **WHEN** a view sets a `Content-Security-Policy` header itself
+- **THEN** that header is sent unchanged
+
+#### Scenario: Empty policy in production
+- **WHEN** production settings set either policy to an empty string
+- **THEN** startup fails with a configuration error naming the setting
+
 ### Requirement: Configuration validated at startup
 Every process that serves requests or runs background jobs with production settings SHALL validate the application configuration before it starts work, and SHALL refuse to start when validation reports an error (for example missing token encryption keys or invalid evidence weights). Validation SHALL cover every numeric, interval and structured setting the application reads, including job and sync settings (attempts, cooldown, stale-after and recovery intervals), GitHub request caps and timeouts, OAuth state limits, repository grace and retry windows, analysis concurrency, session lifetime, the Redis socket timeout, and the experience thresholds (known signals, each a pair of non-negative numbers in order), so a value that would loop, never finish or fail every job blocks startup instead. Every serving entry point SHALL default to the same settings module, so the web tier and the workers never run under different settings by accident.
 

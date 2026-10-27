@@ -16,5 +16,11 @@
     "noFallthroughCasesInSwitch": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "e2e"]
+  "include": [
+    "vite.config.ts",
+    "csp.config.ts",
+    "csp.config.test.ts",
+    "playwright.config.ts",
+    "e2e"
+  ]
 }

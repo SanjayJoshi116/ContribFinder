@@ -116,6 +116,21 @@ class OpennessSerializer(serializers.ModelSerializer[Repository]):
         read_only_fields = fields
 
 
+class SetupSerializer(serializers.ModelSerializer[Repository]):
+    """Setup facts seen at the repository root: true found, false not found there, null not
+    yet known. Shown only, never scored."""
+
+    ci = serializers.BooleanField(source="has_ci", allow_null=True)
+    tests = serializers.BooleanField(source="has_tests", allow_null=True)
+    dev_environment = serializers.BooleanField(source="has_dev_environment", allow_null=True)
+    docker_compose = serializers.BooleanField(source="has_docker_compose", allow_null=True)
+
+    class Meta:
+        model = Repository
+        fields = ["ci", "tests", "dev_environment", "docker_compose"]
+        read_only_fields = fields
+
+
 class RecommendationSerializer(serializers.ModelSerializer[Recommendation]):
     repository_id = serializers.IntegerField(
         read_only=True, help_text="For the saved and dismissed endpoints."
@@ -132,6 +147,7 @@ class RecommendationSerializer(serializers.ModelSerializer[Recommendation]):
     )
     size = serializers.ChoiceField(choices=RepositorySize.choices, read_only=True)
     openness = OpennessSerializer(source="repository", read_only=True)
+    setup = SetupSerializer(source="repository", read_only=True)
     saved = serializers.BooleanField(read_only=True, help_text="Whether the user saved it.")
     relevant_issue_count = serializers.IntegerField(read_only=True)
 
@@ -147,6 +163,7 @@ class RecommendationSerializer(serializers.ModelSerializer[Recommendation]):
             "activity_label",
             "size",
             "openness",
+            "setup",
             "saved",
             "relevant_issue_count",
             "generated_at",

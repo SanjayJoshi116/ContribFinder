@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type { GitHubProfile, RepositoryPage, SyncJob, SyncStatus } from '@/api/types'
+import { refreshDataVersions } from '@/app/dataVersions'
 import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 
 // Not under ['jobs']: a finished sync invalidates that prefix and must not invalidate itself.
@@ -12,7 +13,7 @@ export const repositoriesKey = ['profile', 'repositories'] as const
 export const POLL_INTERVAL_MS = 2000
 
 /** Latest sync job and last successful sync. Polls while a job is in progress; a newly
- * finished sync refetches everything derived from GitHub data (all of ['profile']) and the
+ * finished sync asks for the data versions (which refetch the areas it changed) and the
  * discovery and generation statuses (['jobs']), since it starts a new discovery run. */
 export function useSyncStatus() {
   const queryClient = useQueryClient()
@@ -25,7 +26,7 @@ export function useSyncStatus() {
         () => apiFetch<SyncStatus>('/sync/status'),
         () =>
           Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['profile'] }),
+            refreshDataVersions(queryClient),
             queryClient.invalidateQueries({ queryKey: ['jobs'] }),
           ]),
       ),

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.csp.ContentSecurityPolicyMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -145,6 +146,16 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
+# core.csp: the API's JSON loads nothing; HTML (the admin, error pages) only from this origin.
+# The admin sets a few inline style attributes; its scripts are files. The SPA's own policy is
+# written into its build (apps/frontend/csp.config.ts).
+CONTENT_SECURITY_POLICY_API = (
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+)
+CONTENT_SECURITY_POLICY_HTML = (
+    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+    "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+)
 
 # --- Trusted proxies -------------------------------------------------------
 # Number of proxies in front of the app that append to X-Forwarded-For (e.g. 1 for the Vite dev

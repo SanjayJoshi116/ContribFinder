@@ -51,7 +51,7 @@ Thumbs.db
 # Same, when a manage command path skips ../../ (commands run in apps/backend)
 /apps/backend/judging/
 
-# Local report outputs (evaluate_ranking --json, feedback_report --json): feedback reports hold
-# real-use aggregates, so they stay out of the repository like judging exports
+# Local report outputs (evaluate_ranking, feedback_report, discovery_report --json): feedback
+# reports hold real-use aggregates, so they stay out of the repository like judging exports
 /reports/
 /apps/backend/reports/

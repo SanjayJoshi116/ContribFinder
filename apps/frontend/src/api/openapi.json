@@ -1794,6 +1794,40 @@
           }
         }
       }
+    },
+    "/api/v1/sync/versions": {
+      "get": {
+        "operationId": "sync_versions",
+        "description": "When each area of the user's derived data last changed. Read-only.",
+        "tags": ["sync"],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataVersions"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1977,6 +2011,28 @@
         ],
         "type": "string",
         "description": "* `code` - Code\n* `documentation` - Documentation\n* `testing` - Testing\n* `bug_fix` - Bug Fix\n* `feature` - Feature\n* `devops` - Devops\n* `design` - Design\n* `unknown` - Unknown"
+      },
+      "DataVersions": {
+        "type": "object",
+        "description": "When each derived data area last changed; null when the area holds no data.",
+        "properties": {
+          "github": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "profile": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "recommendations": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["github", "profile", "recommendations"]
       },
       "DeveloperInterest": {
         "type": "object",
@@ -3076,6 +3132,14 @@
             ],
             "readOnly": true
           },
+          "setup": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Setup"
+              }
+            ],
+            "readOnly": true
+          },
           "saved": {
             "type": "boolean",
             "readOnly": true,
@@ -3102,6 +3166,7 @@
           "repository",
           "repository_id",
           "saved",
+          "setup",
           "size",
           "technologies"
         ]
@@ -3176,6 +3241,14 @@
             ],
             "readOnly": true
           },
+          "setup": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Setup"
+              }
+            ],
+            "readOnly": true
+          },
           "saved": {
             "type": "boolean",
             "readOnly": true,
@@ -3234,6 +3307,7 @@
           "repository",
           "repository_id",
           "saved",
+          "setup",
           "size",
           "technologies"
         ]
@@ -3616,6 +3690,29 @@
           }
         },
         "required": ["activity_label", "recommendation", "repository", "repository_id", "saved_at"]
+      },
+      "Setup": {
+        "type": "object",
+        "description": "Setup facts seen at the repository root: true found, false not found there, null not\nyet known. Shown only, never scored.",
+        "properties": {
+          "ci": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "tests": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "dev_environment": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "docker_compose": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": ["ci", "dev_environment", "docker_compose", "tests"]
       },
       "SizeEnum": {
         "enum": ["small", "medium", "large", "unknown"],

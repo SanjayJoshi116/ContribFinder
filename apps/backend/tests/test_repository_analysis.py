@@ -583,3 +583,82 @@ def test_error_outside_the_client_propagates(client, respx_mock, monkeypatch) ->
     with pytest.raises(TypeError):
         analyze(client, repo)
     assert Repository.objects.get(pk=repo.pk).lifecycle == Lifecycle.DISCOVERED
+
+
+# --- setup facts (change setup-readiness) -----------------------------------------------------
+
+SETUP_FIELDS = ("has_ci", "has_tests", "has_dev_environment", "has_docker_compose")
+
+
+def setup_facts(repo: Repository) -> tuple[bool | None, ...]:
+    repo.refresh_from_db()
+    return tuple(getattr(repo, f) for f in SETUP_FIELDS)
+
+
+def test_setup_facts_found(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "encode/httpx")
+    routes = mock_repo_api(
+        respx_mock,
+        "encode/httpx",
+        7,
+        root=(".github/", "tests/", ".devcontainer/", "docker-compose.yml"),
+        workflows=("ci.yml",),
+    )
+    assert analyze(client, repo) == Outcome.ANALYZED
+    assert setup_facts(repo) == (True, True, True, True)
+    assert routes["contents"].call_count == 1  # one root listing for manifests and setup
+
+
+def test_nothing_found_makes_no_workflows_request(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "encode/httpx")
+    mock_repo_api(respx_mock, "encode/httpx", 7, root=("README.md", "main.go"))
+    assert analyze(client, repo) == Outcome.ANALYZED
+    assert setup_facts(repo) == (False, False, False, False)
+    assert not [c for c in respx_mock.calls if c.request.url.path.endswith("/workflows")]
+
+
+@pytest.mark.parametrize("workflows", [None, ("README.md",)])
+def test_github_dir_without_workflow_files_is_not_ci(client, respx_mock, workflows) -> None:
+    repo = make_candidate_repo(7, "encode/httpx")
+    routes = mock_repo_api(respx_mock, "encode/httpx", 7, root=(".github/",), workflows=workflows)
+    assert analyze(client, repo) == Outcome.ANALYZED
+    assert setup_facts(repo)[0] is False
+    assert routes["workflows"].called
+
+
+def test_other_ci_skips_the_workflows_request(client, respx_mock) -> None:
+    repo = make_candidate_repo(7, "encode/httpx")
+    routes = mock_repo_api(
+        respx_mock, "encode/httpx", 7, root=(".github/", ".travis.yml"), workflows=()
+    )
+    assert analyze(client, repo) == Outcome.ANALYZED
+    assert setup_facts(repo)[0] is True
+    assert not routes["workflows"].called
+
+
+def test_setup_facts_refresh_only_with_dependencies(client, respx_mock) -> None:
+    from e2e.builders import fresh_repo
+
+    repo = fresh_repo(8, "acme/tool")
+    assert setup_facts(repo) == (None, None, None, None)  # analyzed before setup facts existed
+    mock_repo_api(respx_mock, "acme/tool", 8, root=("tests/",))
+    assert analyze(client, repo, ["activity"]) == Outcome.ANALYZED
+    assert setup_facts(repo) == (None, None, None, None)
+    assert analyze(client, repo, ["dependencies"]) == Outcome.ANALYZED
+    assert setup_facts(repo) == (False, True, False, False)
+
+
+def test_no_scoring_code_reads_setup_facts() -> None:
+    # Spec: setup facts are never used by a signal, reason, filter or evaluation dataset.
+    from pathlib import Path
+
+    import services
+
+    root = Path(services.__file__).parent
+    readers = [
+        str(path.relative_to(root))
+        for folder in ("matching", "ranking", "evaluation", "discovery")
+        for path in (root / folder).rglob("*.py")
+        if any(field in path.read_text(encoding="utf-8") for field in SETUP_FIELDS)
+    ]
+    assert readers == []

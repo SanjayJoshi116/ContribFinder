@@ -363,11 +363,16 @@ class GitHubClient:
         """The repository with this GitHub ID under its current name (renames, transfers)."""
         return GitHubRepo.from_api(self._get(f"/repositories/{int(github_id)}").json())
 
-    @_parses_response
     def list_root_contents(self, full_name: str) -> list[ContentEntry]:
         """Top-level entries of the default branch; ``[]`` for an empty repository."""
+        return self.list_contents(full_name, "")
+
+    @_parses_response
+    def list_contents(self, full_name: str, path: str) -> list[ContentEntry]:
+        """Entries of a directory of the default branch (``""`` = root); ``[]`` when it does
+        not exist or ``path`` is a file."""
         try:
-            data = self._get(f"/repos/{full_name}/contents/").json()
+            data = self._get(f"/repos/{full_name}/contents/{quote(path)}").json()
         except GitHubNotFound:
             return []
         if not isinstance(data, list):

@@ -125,9 +125,18 @@ class PlannedQuery:
     q: str  # full query text sent to GitHub, qualifiers included
     key: str  # stable id of the request within a plan (query and band), for resuming
     core: str  # the query without the qualifiers (band included): stored as provenance
+    # The star band's label with more than one band, "" with one (plans stored before bands
+    # were recorded load with "" too).
+    band: str = ""
 
     def as_json(self) -> dict[str, str]:
-        return {"source": self.source, "q": self.q, "key": self.key, "core": self.core}
+        return {
+            "source": self.source,
+            "q": self.q,
+            "key": self.key,
+            "core": self.core,
+            "band": self.band,
+        }
 
 
 def plan_queries(data: DiscoveryInput, cfg: QueryConfig) -> list[PlannedQuery]:
@@ -190,6 +199,7 @@ def plan_queries(data: DiscoveryInput, cfg: QueryConfig) -> list[PlannedQuery]:
             f"{core} {_qualifiers(data, cfg, band)}",
             f"{key}@{index}" if banded else key,
             core,
+            band_label(band) if banded else "",
         )
         for strategy in STRATEGIES
         for key, core in cores.get(strategy, [])[: quotas[strategy]]

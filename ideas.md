@@ -1,14 +1,18 @@
 # Ideas
 
 Gap analysis from 2026-10-20 (v0.12.4), with later rounds added 2026-10-21 to 2026-10-26
-(v0.12.7–v0.12.23); ordered by when an idea can ship since v0.12.22. Nothing here is planned yet: each idea needs an OpenSpec change before work
+(v0.12.7–v0.12.26). Nothing here is planned yet: each idea needs an OpenSpec change before work
 starts. Ranking-visible items (marked †) must win on the benchmark, so they wait for K-1
 (`Bug_Backlog.md`).
 
-Layout: the priority table, then the open ideas by when they can ship (first those that change
-no ranking and can ship now, then those that wait for K-1), then what has shipped. Section
-numbers (§1–§17) are stable, because other documents cite them, so they are not in numeric
-order.
+Layout: the priority table, then the open ideas by when they can ship, then what has shipped.
+"Can ship now" (no ranking change) runs in the priority table's order: discovery and
+repository data, freshness and client, platform and tooling, then evaluation. "Waits for K-1"
+holds the ranking-visible ideas (including what is left of §11 and §12, whose measurement and
+cleanup shipped) and the follow-ups of §4, whose ideas have shipped. Shipped ideas are listed
+only in "Shipped"; §8, §10 and §17 shipped whole, so they have no section above. Section numbers
+(§1–§18) are stable, because other documents cite them, so they are not in numeric order
+(reordered 2026-10-26, after v0.12.26).
 
 ## Priorities
 
@@ -17,78 +21,19 @@ Open ideas only, in suggested order within each cell. † = changes what users a
 
 | | Cheap | Expensive |
 |---|---|---|
-| **High value** | setup readiness (§8); `no_license` measurement (§12); post-analysis pool cleanup (§11); significance gate for ranking changes (§3, a decision for K-1); labeled-issue fetch† (§7); opportunity qualifiers† (§6) | data versions (§14, closes Y-6); new seeds stored inactive (§15); content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
-| **Lower value** | per-band yield (§12); queue released-name refresh (§13); pip-audit (§5); CSP (§5); route-level ids (§14); production build in CI (§14); JSON report writer (§15); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
+| **High value** | significance gate for ranking changes (§3, a decision for K-1); labeled-issue fetch† (§7); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
+| **Lower value** | queue released-name refresh (§13); pip-audit (§5); route-level ids (§14); production build in CI (§14); JSON report writer (§15); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
 
-Not ranked yet: intervals on the feedback-report shares (§4, needs traffic), time decay on skill
-evidence† (§1), pooling bias (§3), accessibility and observability (§5).
+Not ranked yet: acting on the discovery yield report† (§12, needs runs), intervals on the
+feedback-report shares (§4, needs traffic), dismiss reasons against grades (§4, needs K-1),
+label bands† (§4), time decay on skill evidence† (§1), pooling bias (§3), accessibility and
+observability (§5), interface revamp (§18, owner request; design direction first).
 
 ---
 
 # Can ship now (no ranking change)
 
-## Evaluation and feedback
-
-### 4. Learning from interaction
-
-- **Online report per config.** *(Shipped in v0.12.20: `feedback_report`, positive share of
-  decisive actions per config and rank bucket, position-adjusted by direct standardization.)*
-  Open: intervals on the shares once there is enough traffic, and a by-label view (next item).
-- **Dismiss reasons.** *(Shipped in v0.12.23: optional reason on a dismissal, shown on the
-  hidden list and counted per config in `feedback_report`.)* Open: compare the reasons with K-1
-  grades of 0 once both exist.
-- **Label calibration.** *(Shipped in v0.12.21 as a report: `feedback_report` label rows and a
-  calibration verdict.)* Open: moving the bands if real use says they are out of order; that is a
-  ranking change and waits for K-1.
-
-### 3. Evaluation rigor
-
-- **Significance testing.** With 6–7 developers, NDCG +0.02 (v2 vs v1) is noise. *(v0.12.19:
-  `evaluate_ranking` prints a paired bootstrap interval per metric; v2's NDCG@10 +0.0195 is
-  [-0.0023, +0.0501], inconclusive.)* Open: whether the improvement rule should also require a
-  marked NDCG@10 interval. Decide with K-1, once real developers make the benchmark larger;
-  with six developers a gate would refuse almost every change.
-- **Inter-rater agreement.** Single judge today. A second judge on about 10 rows (Cohen's κ)
-  shows whether the grades mean anything.
-- **Pooling bias.** Only candidates discovery found get judged; unjudged = irrelevant, so a
-  config that surfaces new good repos is penalized.
-- **Discovery recall.** Evaluation starts from a fixed pool, so discovery misses are invisible.
-  Add a stage metric: of the judged-relevant repos, how many did discovery find?
-- **Issue-level evaluation** (K-3, already tracked).
-
 ## Discovery and repository data
-
-### 8. Setup readiness
-
-- No detection of CI workflows, tests, devcontainer or docker-compose in candidate repos.
-  `list_root_contents` exists, so about 1 call per repo. Observable label: "Has CI and tests ·
-  devcontainer". Local setup pain is a top first-PR drop-off cause.
-
-### 12. Search budget
-
-- **`no_license` is the biggest rejection.** The first real run rejected 30 results as
-  `no_license` against 3 `not_code`, out of 20 requests. GitHub search has no "has any license"
-  qualifier, so each rejected result costs a slot of a 30-result page. Measure per strategy;
-  if one query type dominates, a narrower query (or a second page for it) recovers budget.
-- **Uneven band yield.** Bands are counted (`pool_bands`) but not compared to what each band's
-  requests returned. Recording results per band in the job metadata would show whether the
-  20..999 band is worth the same budget as 1000+.
-
-### 11. Code-or-list detection
-
-Round 3 (2026-10-21), from the `discovery-repository-data` change (v0.12.7) and its first real
-discovery run; also §12 and §13.
-
-- **Post-analysis pool cleanup.** The pool step runs before analysis (D7), so a suspected list
-  found `not_code` by this run's analysis keeps its pool slot until the next run (X-9). A
-  second, cheap `not_code` pass after the analysis step would free it now.
-- **`not_code` by content, not only markers.** Today a suspected list (`awesome-*`, list
-  topic) is code when it declares manifest dependencies, and docs repositories without a list
-  marker always pass (K-4). Lists often carry lint or site tooling (`awesome-lint`, mkdocs), so
-  dependencies are weak evidence. Stored data already allows a better signal: share of
-  non-markup bytes in `RepositoryLanguage`, README link density, or source files at the root
-  (`list_root_contents` is already fetched for manifests). Needs a judged sample of lists and
-  tools first, since it decides what users can be shown at all.
 
 ### 13. Repository identity
 
@@ -112,14 +57,6 @@ Round 6 (2026-10-22), from the `performance-cleanup` review and `/simplify` pass
 
 Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 
-- **Data versions instead of job watching.** The SPA refreshes derived data when a sync,
-  discovery or generation job finishes. Data changed by anything else (`reanalyze_profiles`, a
-  backend repository refresh, a failed discovery) stays cached up to 5 minutes (Y-6, open in
-  part). *(v0.12.12: a finished generation refreshes the profile too, and every analysis ends
-  in one; what remains is data with no generation after it.)* One small endpoint returning
-  per-area update times (profile, recommendations, saved) would let the status poll refresh
-  exactly what changed, whatever changed it. Would also narrow S-8 (every generation refetches
-  profile, skills and interests).
 - **Route-level id validation.** Each detail page parses `:id`, passes `0` as a disabled
   sentinel and renders its own dead end. A route wrapper that validates once would hand pages
   a plain number.
@@ -129,6 +66,41 @@ Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
   404, and the client has two recovery paths (404 → page 1, emptied page → previous page).
   Returning the last page (with its number) removes both; with the list refetched after a
   dismissal, the optimistic-page guard goes too.
+
+### 18. Interface revamp
+
+Round 9 (2026-10-27), requested by the owner. The interface grew page by page with phases
+(one `max-w-3xl` column, shadcn/ui defaults); a revamp would give it one design. No ranking
+change, so it can ship now, but it is big: one OpenSpec change per step, starting with the
+design direction.
+
+- **Design direction first.** Tokens (color, type scale, spacing, radius) in one place, dark
+  mode, an empty/loading/error pattern used by every page. Decide before touching pages.
+- **Dashboard layout.** `AppShell` stacks profile summary, language chart, pipeline status,
+  filters and the list in one column. A wider layout (profile and filters beside the list, the
+  pipeline as a compact header bar) would show more recommendations above the fold.
+- **Recommendation cards.** Match label, reasons, technologies, activity, setup facts and
+  issue counts compete on each card. A clearer hierarchy: label and the top reason first, the
+  rest on demand; consistent badges for technologies and difficulty.
+- **Detail pages.** Recommendation and issue details as sections with a sticky summary (match
+  label, GitHub link, save/dismiss) instead of one long scroll; the issue page keeps "from
+  GitHub" and "ContribFinder analysis" visibly apart (spec `issue-matching`).
+- **Onboarding.** The sync steps (`SyncSteps`) and discovery card as one progress view that
+  explains what happens next and roughly how long it takes.
+- **Profile.** Skills with their evidence (`SkillGroups`), interests and languages as one
+  readable profile page instead of dashboard blocks.
+- **Saved and hidden lists.** Same card as the dashboard, with the save/hide reason shown.
+- **Mobile.** Every page usable at phone width (filters in a sheet, actions reachable).
+- **Accessibility audit** (§5): keyboard paths, focus order, contrast in both themes, screen
+  reader names; Playwright plus an axe check per page.
+- **Constraints that stay:** match labels and evidence, never a percentage (CLAUDE.md §2);
+  activity as observable signals, never "healthy"; setup facts shown as found / not found /
+  not available, never "No"; everything under the built app's CSP (no inline scripts, no
+  foreign origins: fonts and icons self-hosted, `csp.config.ts`); no new dependency without a
+  reason (0.12.23 built the dismiss menu by hand for that); browser tests locate elements by
+  role and name, so renamed buttons and headings need the e2e specs updated in the same change.
+- *Tooling:* the `frontend-design` skill (or a shadcn/ui skill, if installed) helps once the
+  direction is set; screenshots of the current pages are the baseline to compare against.
 
 ### 9. Profile freshness
 
@@ -142,10 +114,6 @@ Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 
 Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
-- **New seeds stored inactive.** Seed migrations still decide which configuration is active
-  (Z-1). Now that `activate_scoring_config` exists (v0.12.13: benchmark-gated, `--force
-  --reason`, audited), a future seed could always store its version inactive and leave
-  activation to the operator.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.
@@ -157,23 +125,26 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 ### 5. Platform
 
 - **Dependency scanning in CI.** `pip-audit`, `npm audit`, Dependabot or CodeQL.
-- **Content-Security-Policy.** No CSP in `config/`; README excerpts are rendered, but as text
-  (§10), so this is defense in depth.
 - **GitHub API budget across users.** Search allows 30 requests/min per token and the
   app-credential backlog is shared. Model what many concurrent onboardings do.
 - **Accessibility.** Not covered by any spec or backlog row.
 - **Observability.** Stage latencies, failure-rate trends (post-MVP: Sentry/Prometheus).
 
-### 10. Notes
+## Evaluation
 
-- **CSP (§5) is lower priority than stated:** README excerpts are rendered as text (no
-  `dangerouslySetInnerHTML` or markdown renderer). Still defense in depth.
+### 3. Evaluation rigor
 
-### 17. Review round 7
-
-Round 7 (2026-10-23), from the review and `/simplify` pass of 0.12.13/0.12.14 (`Bug_Backlog.md`
-S-6, S-9…S-11). All shipped: S-9…S-11 in v0.12.15, S-6 in v0.12.18 (see "Shipped"). Kept for
-its section number.
+- **Significance gate.** Whether the improvement rule should also require a marked NDCG@10
+  bootstrap interval (the intervals are printed since v0.12.19; v2's NDCG@10 +0.0195 is
+  [-0.0023, +0.0501]). Decide with K-1, once real developers make the benchmark larger; with six
+  developers a gate would refuse almost every change.
+- **Inter-rater agreement.** Single judge today. A second judge on about 10 rows (Cohen's κ)
+  shows whether the grades mean anything.
+- **Pooling bias.** Only candidates discovery found get judged; unjudged = irrelevant, so a
+  config that surfaces new good repos is penalized.
+- **Discovery recall.** Evaluation starts from a fixed pool, so discovery misses are invisible.
+  Add a stage metric: of the judged-relevant repos, how many did discovery find?
+- **Issue-level evaluation** (K-3, already tracked).
 
 ---
 
@@ -219,6 +190,28 @@ Ranking only reorders what discovery finds. All four strategies (`services/disco
 are keyword search; qualifiers are only `archived/fork/pushed/stars/-user`. Retrieval changes
 need the discovery-recall metric (§3) first, or gains stay invisible. (Round 2, 2026-10-20.)
 
+### 11. Code-or-list detection
+
+Round 3 (2026-10-21), from the `discovery-repository-data` change (v0.12.7) and its first real
+discovery run; also §12 and §13.
+
+- **`not_code` by content, not only markers†.** Today a suspected list (`awesome-*`, list
+  topic) is code when it declares manifest dependencies, and docs repositories without a list
+  marker always pass (K-4). Lists often carry lint or site tooling (`awesome-lint`, mkdocs), so
+  dependencies are weak evidence. Stored data already allows a better signal: share of
+  non-markup bytes in `RepositoryLanguage`, README link density, or source files at the root
+  (the root listing is already fetched for manifests, and the setup facts read from it are
+  stored since v0.12.24). Needs a judged sample of lists and
+  tools first, since it decides what users can be shown at all.
+
+### 12. Search budget
+
+- **Act on the yield report†.** `discovery_report` (v0.12.25) shows, per strategy and star band,
+  how many results each request returns and which rejections eat them (`no_license` first in the
+  first real run). Once enough runs exist: narrow the query type that wastes most of its page,
+  move budget between strategies or bands, or give a high-yield query a second page. Each of these
+  changes what users are recommended, so it waits for K-1 and must show its gain in the report.
+
 ### 6. Retrieval sources
 
 - **Opportunity qualifiers.** GitHub search supports `good-first-issues:>0` and
@@ -240,6 +233,19 @@ need the discovery-recall metric (§3) first, or gains stay invisible. (Round 2,
   fall past the cap, so `issue_fit` underrates repos with the most entry points. Add one fetch
   with `labels=good first issue` (and `help wanted`) and merge.
 
+## Learning from interaction
+
+### 4. Learning from interaction
+
+Follow-ups of the shipped feedback ideas (see "Shipped"); each needs real traffic or K-1 grades.
+
+- **Intervals on the report shares.** `feedback_report` shares have no uncertainty yet; add
+  them once there is enough traffic for them to mean something.
+- **Dismiss reasons against grades.** Compare the reasons users give with K-1 grades of 0: do
+  "not my stack" dismissals match what a judge grades irrelevant?
+- **Move the label bands†.** If real use shows the labels out of order (calibration verdict),
+  change `params.bands`; a ranking change, so it goes through `evaluate_ranking`.
+
 ---
 
 # Shipped
@@ -248,6 +254,12 @@ Newest first.
 
 | Idea | § | Shipped in |
 |---|---|---|
+| Content-Security-Policy (backend header; meta tag in the built SPA) | §5 | v0.12.30 (no reporting endpoint; the SPA host adds `frame-ancestors`) |
+| New seeds stored inactive (`_seeding.store_inactive`, guard test) | §15 | v0.12.28 (v1/v2 seeds unchanged) |
+| Data versions (refetch only the areas that changed, whatever changed them) | §14 | v0.12.27 (Y-6; S-8 narrowed; no timer) |
+| Post-analysis pool cleanup (lists found by the run's own analysis leave the pool) | §11 | v0.12.26 (X-9) |
+| Search yield per strategy and star band (`discovery_report`) | §12 | v0.12.25 (measurement only; acting on it waits for K-1) |
+| Setup readiness (CI, tests, dev container, Docker Compose at the root) | §8 | v0.12.24 (shown, never scored; root only) |
 | Dismiss reasons (optional, reported per config) | §4 | v0.12.23 (never scored) |
 | Match-label calibration in the feedback report | §4 | v0.12.21 (raw shares per label; bands unchanged) |
 | Online feedback report per config (`feedback_report`) | §4 | v0.12.20 (shares of decisive actions; no impressions) |
@@ -257,7 +269,7 @@ Newest first.
 | One registry of lazy components | §17 | v0.12.15 (S-10; still preloaded in every test file) |
 | Keyset index for saved and hidden lists | §17 | v0.12.15 (S-11; plain index, no row-value comparison) |
 | Helper modules fail loudly when run (`refuseRun`) | §15 | v0.12.13 |
-| Activation as an explicit operator action (`activate_scoring_config`) | §15 | v0.12.13 (seeds still activate: §15 "New seeds stored inactive") |
+| Activation as an explicit operator action (`activate_scoring_config`) | §15 | v0.12.13 (later seeds stored inactive in v0.12.28) |
 | Keyset (cursor) pagination for saved and hidden lists | §14 | v0.12.12 (Y-7) |
 | Profile refreshed when a generation finishes (part of "data versions") | §14 | v0.12.12 (Y-6 in part) |
 | Lint and format `scripts/` in CI | §15 | v0.12.11 (P-5) |

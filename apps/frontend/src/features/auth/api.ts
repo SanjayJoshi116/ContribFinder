@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type { DisconnectResult, Me } from '@/api/types'
+import { dataVersionsKey } from '@/app/dataVersions'
 
 export const meQueryKey = ['auth', 'me'] as const
 
@@ -48,6 +49,9 @@ export function useDeleteGitHubData() {
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: ['profile'] })
       queryClient.removeQueries({ queryKey: ['jobs'] })
+      // Reset, not removed: the signed-in layout still observes it. Its data goes undefined,
+      // so useDataVersions forgets the last value and the refetch refetches nothing (U-7).
+      void queryClient.resetQueries({ queryKey: dataVersionsKey })
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: meQueryKey }),
         queryClient.invalidateQueries({ queryKey: ['sync'] }),

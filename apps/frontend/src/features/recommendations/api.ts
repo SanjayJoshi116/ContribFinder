@@ -2,12 +2,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type { RecommendationDetail, RecommendationPage, RecommendationStatus } from '@/api/types'
+import { refreshDataVersions } from '@/app/dataVersions'
 import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 
-// Under ['profile'], so a completed sync (useSyncStatus) invalidates them too.
+// Under ['profile'], so delete-data removes them; the `recommendations` data version
+// refetches them (src/app/dataVersions.ts).
 const ROOT = ['profile', 'recommendations'] as const
-// Job status keys live under ['jobs'], never ['profile']: a status fetch invalidates the
-// ['profile'] prefix when its job finishes, and must not invalidate itself.
+// Job status keys live under ['jobs'], never ['profile']: the data versions invalidate
+// ['profile'] queries, and a status must not be refetched by them.
 export const recommendationStatusKey = ['jobs', 'recommendations'] as const
 export const recommendationListKey = [...ROOT, 'list'] as const
 export const recommendationDetailKey = (id: number) => [...ROOT, 'detail', id] as const
@@ -37,11 +39,10 @@ export function recommendationsPath(filters: RecommendationFilters): string {
   return query ? `/recommendations?${query}` : '/recommendations'
 }
 
-/** Latest generation job and counts. Polls while a generation runs, and refreshes the list
- * once per newly seen finished job, also one that started and finished between two polls.
- * Every profile analysis ends in a generation, also one no sync started (`reanalyze_profiles`),
- * so all of ['profile'] is refreshed: the list, details, issues, saved entries (they show the
- * current recommendation) and the developer profile. The status key is under ['jobs']. */
+/** Latest generation job and counts. Polls while a generation runs, and asks for the data
+ * versions once per newly seen finished job, also one that started and finished between two
+ * polls: they refetch the recommendations, and the developer profile only when it was
+ * re-analyzed. The status key is under ['jobs']. */
 export function useRecommendationStatus(enabled = true) {
   const queryClient = useQueryClient()
   return useQuery<RecommendationStatus, ApiError>({
@@ -51,7 +52,7 @@ export function useRecommendationStatus(enabled = true) {
         queryClient,
         recommendationStatusKey,
         () => apiFetch<RecommendationStatus>('/recommendations/status'),
-        () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
+        () => refreshDataVersions(queryClient),
       ),
     staleTime: 0,
     enabled,

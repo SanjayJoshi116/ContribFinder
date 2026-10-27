@@ -24,12 +24,40 @@ export function renderRoute(path: string) {
 
 type Handler = (init: RequestInit | undefined) => Response | Promise<Response>
 
+/** Data versions that never change, so they refetch nothing unless a test says otherwise. */
+export const DATA_VERSIONS = {
+  github: '2026-09-28T10:00:00Z',
+  profile: '2026-09-28T10:01:00Z',
+  recommendations: '2026-09-28T10:03:00Z',
+}
+
+/** Data versions a test can move forward: spread `route` into `mockFetch`, then `change(...)`
+ * the areas a finished job (or a background refresh) touched. Each change gets a new time. */
+export function changingVersions() {
+  let current = { ...DATA_VERSIONS }
+  let changes = 0
+  return {
+    route: { 'GET /api/v1/sync/versions': () => json(current) } as Record<string, Handler>,
+    change(...areas: (keyof typeof DATA_VERSIONS)[]) {
+      changes += 1
+      const time = new Date(Date.UTC(2026, 9, 27, 12, 0, changes)).toISOString()
+      current = { ...current, ...Object.fromEntries(areas.map((area) => [area, time])) }
+    },
+  }
+}
+
+/** Every signed-in page asks for the data versions; tests that care pass their own handler. */
+const DEFAULT_HANDLERS: Record<string, Handler> = {
+  'GET /api/v1/sync/versions': () => json(DATA_VERSIONS),
+}
+
 /** Stubs global fetch with per-"METHOD path" handlers; unmatched requests fail loudly. */
 export function mockFetch(handlers: Record<string, Handler>) {
+  const all = { ...DEFAULT_HANDLERS, ...handlers }
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString()
     const method = (init?.method ?? 'GET').toUpperCase()
-    const handler = handlers[`${method} ${url}`]
+    const handler = all[`${method} ${url}`]
     if (!handler) throw new Error(`Unexpected fetch: ${method} ${url}`)
     return handler(init)
   })

@@ -50,8 +50,13 @@ def mock_repo_api(
     manifests: dict[str, str] | None = None,
     commits: int = 42,
     issues: list[dict[str, Any]] | None = None,
+    root: tuple[str, ...] = (),
+    workflows: tuple[str, ...] | None = None,
     **payload: Any,
 ) -> dict[str, respx.Route]:
+    """``root``: extra root entries besides the manifests (``name/`` is a directory).
+    ``workflows``: the files of ``.github/workflows`` (None = no such directory, 404); its route
+    exists only when ``root`` holds ``.github/``."""
     base = f"{API}/repos/{full_name}"
     now = timezone.now()
     manifests = {"pyproject.toml": '[project]\ndependencies = ["httpx", "django"]\n'} | (
@@ -85,8 +90,14 @@ def mock_repo_api(
         "contents": router.get(f"{base}/contents/").respond(
             200,
             json=[
-                {"name": name, "type": "file", "size": len(text)}
-                for name, text in manifests.items()
+                *(
+                    {"name": name, "type": "file", "size": len(text)}
+                    for name, text in manifests.items()
+                ),
+                *(
+                    {"name": e.rstrip("/"), "type": "dir" if e.endswith("/") else "file", "size": 0}
+                    for e in root
+                ),
             ],
         ),
         "commits": router.get(f"{base}/commits").respond(
@@ -118,6 +129,15 @@ def mock_repo_api(
     }
     for name, text in manifests.items():
         routes[f"file:{name}"] = router.get(f"{base}/contents/{name}").respond(200, text=text)
+    if ".github/" in root:
+        routes["workflows"] = router.get(f"{base}/contents/.github/workflows").respond(
+            *((404,) if workflows is None else (200,)),
+            json=(
+                {"message": "Not Found"}
+                if workflows is None
+                else [{"name": n, "type": "file", "size": 100} for n in workflows]
+            ),
+        )
     return routes
 
 

@@ -1,5 +1,6 @@
 """Repository discovery job (Phase 4, group 7)."""
 
+import json
 import logging
 import threading
 from datetime import timedelta
@@ -198,6 +199,10 @@ def test_retry_resumes_remaining_queries_only(user, developer, respx_mock, apis)
         "topic:developer-tools language:Python",
         "topic:developer-tools",
     ]
+    # The yield of the query done before the retry is kept; the others are added once.
+    job.refresh_from_db()
+    assert set(job.metadata["query_yield"]) == set(job.metadata["queries_done"])
+    assert [y["results"] for y in job.metadata["query_yield"].values()] == [1, 1, 1]
 
 
 def test_invalid_query_skipped(user, developer, respx_mock, apis) -> None:
@@ -211,6 +216,39 @@ def test_invalid_query_skipped(user, developer, respx_mock, apis) -> None:
     assert job.metadata["queries_skipped"] == ["language:python"]
     assert job.steps["search"] == "done"
     assert RepositoryCandidate.objects.count() == 1
+    # Spec: "Refused query in the yield".
+    assert job.metadata["query_yield"]["language:python"] == {
+        "source": "language_search",
+        "band": "",
+        "refused": True,
+    }
+
+
+def test_yield_per_query(user, developer, respx_mock, apis) -> None:
+    archived = repo_payload("old/archived", 201, archived=True)
+    unlicensed = repo_payload("x/unlicensed", 202, license=None)
+    mock_search(respx_mock, {"language:Python": [archived, unlicensed, HTTPX, RICH]})
+    job = run(user)
+
+    yields = job.metadata["query_yield"]
+    assert yields["language:python"] == {
+        "source": "language_search",
+        "band": "",  # one star band configured (spec: "One star band")
+        "results": 4,
+        "rejections": {"archived": 1, "no_license": 1},
+        "recorded": 2,
+    }
+    assert set(yields) == set(job.metadata["queries_done"])
+    assert all(
+        y["results"] == 0 and y["recorded"] == 0
+        for k, y in yields.items()
+        if k != "language:python"
+    )
+    # The run totals are unchanged by the per-query record.
+    assert job.metadata["rejections"] == {"archived": 1, "no_license": 1}
+    assert job.metadata["results_found"] == sum(y["results"] for y in yields.values())
+    text = json.dumps(yields)
+    assert "archived:false" not in text and "language:Python" not in text  # no query text
 
 
 def test_sparse_profile_skips_search(user, respx_mock) -> None:
@@ -457,6 +495,12 @@ def test_banded_run_keeps_both_sizes(user, developer, respx_mock, settings) -> N
     # One query in both bands: provenance has no star qualifier.
     queries = set(CandidateDiscovery.objects.values_list("query", flat=True))
     assert queries == {"language:Python"}
+    yields = job.metadata["query_yield"]
+    assert (yields["language:python@0"]["band"], yields["language:python@1"]["band"]) == (
+        "20..999",
+        "1000+",
+    )
+    assert yields["language:python@0"]["results"] == 3
 
 
 def test_contributed_list_rejected_as_not_code(user, developer, respx_mock) -> None:

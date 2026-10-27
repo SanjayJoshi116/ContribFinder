@@ -10,7 +10,7 @@ import { DismissButton, SaveButton } from '@/features/feedback/RecommendationAct
 
 import { useRecommendation } from './api'
 import { RelevantIssues } from './RelevantIssues'
-import { ACTIVITY_TEXT, SIZE_TEXT } from './messages'
+import { ACTIVITY_TEXT, SETUP_LABELS, SIZE_TEXT } from './messages'
 import { MatchBadge, TechnologyChips } from './RecommendationCard'
 
 const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
@@ -28,6 +28,12 @@ const OPENNESS_LABELS: [keyof RecommendationDetail['openness'], string][] = [
 function yesNo(value: boolean | null | undefined): string {
   if (value === null || value === undefined) return UNAVAILABLE
   return value ? 'Yes' : 'No'
+}
+
+/** Setup facts: detection only looks at the root, so absence reads "Not found", never "No". */
+function foundOrNot(value: boolean | null | undefined): string {
+  if (value === null || value === undefined) return UNAVAILABLE
+  return value ? 'Found' : 'Not found'
 }
 
 function count(value: number | null | undefined, unit: string): string {
@@ -227,6 +233,17 @@ export function RecommendationDetailPage() {
               <Fact key={key} term={label} value={yesNo(rec.openness[key])} />
             ))}
           </dl>
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Setup</h3>
+          <dl>
+            {(Object.keys(SETUP_LABELS) as (keyof typeof SETUP_LABELS)[]).map((key) => (
+              <Fact key={key} term={SETUP_LABELS[key]} value={foundOrNot(rec.setup[key])} />
+            ))}
+          </dl>
+          <p className="text-muted-foreground text-xs">
+            Looked for at the repository root only: tests kept next to the code are not seen.
+          </p>
         </div>
         <div className="space-y-2">
           <h3 className="text-sm font-medium">README</h3>

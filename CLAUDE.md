@@ -89,10 +89,12 @@ ContribFinder/
 │  │  │                     exceptions.py (error envelope)
 │  │  ├─ core/              health, auth class, CSRF/400/403/404 JSON views, log redaction, checks,
 │  │  │                     startup (production check gate), throttling (cache-outage fallback),
-│  │  │                     backoff (per-process skip after a cache error)
+│  │  │                     backoff (per-process skip after a cache error), csp (Content-Security-
+│  │  │                     Policy middleware)
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
-│  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status API, recover_stale_jobs task
+│  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status and data versions API,
+│  │  │                     recover_stale_jobs task
 │  │  ├─ developers/        DeveloperProfile, Skill, DeveloperSkill, SkillEvidence, Interest,
 │  │  │                     DeveloperInterest, InterestEvidence; profile API; analysis task;
 │  │  │                     reanalyze_profiles command
@@ -100,12 +102,13 @@ ContribFinder/
 │  │  │                     RepositoryDependency, UserRepository (owner | contributor),
 │  │  │                     RepositoryReadme, RepositorySnapshot, RepositoryCandidate,
 │  │  │                     CandidateDiscovery; discovery API; discovery/refresh/beat tasks;
-│  │  │                     queries.py (latest_snapshot prefetch)
+│  │  │                     queries.py (latest_snapshot prefetch); discovery_report command
 │  │  ├─ issues/            Issue (shared, analysis on the row), RecommendedIssue; issue
 │  │  │                     detail API (Phase 7)
 │  │  ├─ recommendations/   ScoringConfig, Recommendation, RecommendationReason; API; generation
 │  │  │                     and freshness tasks; evaluate_ranking, export_benchmark_developer,
-│  │  │                     benchmark_sheet, import_judgments, build_benchmark commands
+│  │  │                     benchmark_sheet, import_judgments, build_benchmark commands;
+│  │  │                     migrations/_seeding.py (frozen helpers: later seeds stored inactive)
 │  │  ├─ feedback/          RecommendationFeedback, SavedRepository, DismissedRepository; feedback,
 │  │  │                     saved and dismissed API (Phase 8a)
 │  │  ├─ e2e/               e2e_seed command (browser-test users and sessions), builders.py (seed
@@ -124,15 +127,17 @@ ContribFinder/
 │  │     │                  locks.py (lock_developer: one lock order for recommendations and
 │  │     │                  feedback), feedback.py (record, save, dismiss, restore), text.py
 │  │     │                  (join_names),
-│  │     │                  data_deletion.py (GitHub data / account deletion)
+│  │     │                  data_deletion.py (GitHub data / account deletion), data_versions.py
+│  │     │                  (when each derived data area last changed)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
 │  │     │                  storage.py (shared repository upserts)
 │  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
 │  │     │                  experience, summary, analysis (Phase 3)
 │  │     ├─ discovery/      queries, filters (prefilter/eligibility), ordering (pool order),
-│  │     │                  DiscoveryService (Phase 4)
+│  │     │                  DiscoveryService (Phase 4), yield_report (search yield per strategy
+│  │     │                  and band)
 │  │     ├─ repositories/   analysis, lifecycle, staleness, backlog (shared repository data,
-│  │     │                  Phase 4)
+│  │     │                  Phase 4), setup (setup facts from the root listing; shown, never scored)
 │  │     ├─ issues/         labels (normalization), classify (type, difficulty),
 │  │     │                  technologies, analysis (Phase 7)
 │  │     ├─ matching/       activity, technologies, features (loading), signals,
@@ -146,8 +151,9 @@ ContribFinder/
 │  │     │                  bootstrap (paired intervals), feedback_report (outcomes per config)
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/           src/{app,components,features,hooks,lib,api,types,routes}; app/ holds
-│                         the query client (retry, stale time, 401) and job-transition refresh;
-│                         e2e/ Playwright specs, playwright.config.ts
+│                         the query client (retry, stale time, 401), job-transition refresh and data versions;
+│                         e2e/ Playwright specs, playwright.config.ts; csp.config.ts (the built
+│                         app's Content-Security-Policy and its build-only Vite plugin)
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
 │                           redis (WSL), child (process-tree runner, .run/ records), stack
 │                           (stop matching), env, wait-port, uv, manage, check-version,
@@ -249,6 +255,9 @@ Local, no Docker (primary on this machine):
   of those + dismissed), a position-adjusted share, per-label rows and a calibration verdict
   (0.12.21). Aggregates only, read-only (0.12.20). `--json` outputs go in the gitignored
   `reports/` (`../../reports/...` from `apps/backend`).
+- `npm run manage -- discovery_report [--since DAYS] [--json OUT]` (0.12.25): discovery search
+  yield per strategy, star band and both, from finished runs' `query_yield`. Aggregates only,
+  read-only; use it before changing queries, shares, bands or the budget.
 - Real judged developers (README "Judging real developers"): `export_benchmark_developer` →
   `benchmark_sheet` (blind CSV) → `import_judgments` → `build_benchmark`. `evaluate_ranking`
   defaults to the selection benchmark: `benchmark-v2` once it holds a `real` developer, else
@@ -272,8 +281,9 @@ Frontend (`apps/frontend`, npm):
 - `npm run e2e`: Playwright (Chromium) against the real backend on :8001 and Vite on :5174
   (database `contribfinder_e2e`, re-seeded every run; one-time `npx playwright install
   chromium`). Mutating specs each own a seeded user. New queries go through the shared client
-  (`src/app/queryClient.ts`): 4xx are never retried, any 401 ends the session, and data derived
-  from a job is refreshed by its status query (`fetchStatusAndRefresh`), not on mount.
+  (`src/app/queryClient.ts`): 4xx are never retried, any 401 ends the session, and derived data
+  is refetched by the data versions (`src/app/dataVersions.ts`, `AREA_KEYS`), not on mount: a
+  new derived query under `['profile', ...]` must be listed in its area.
 
 ### Known issues
 
@@ -1183,20 +1193,150 @@ Archived: `openspec/changes/archive/2026-10-26-dismiss-reasons/`. Specs: deltas 
     storable; needs a constraint).
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Setup readiness** (MVP+)  ✅ shipped in v0.12.24 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-26-setup-readiness/`. Specs: deltas to
+`repository-analysis` ("Repository data collection"), `recommendations-view` (detail endpoint,
+dashboard cards, detail page). `ideas.md` §8.
+- `services/repositories/setup.py` (pure): marker tables, `detect(root, workflows) ->
+  SetupFacts(ci, tests, dev_environment, docker_compose)`, `needs_workflows(root)` (a `.github`
+  dir and no other CI marker). Names match lowercased, by entry type.
+- The analysis' `dependencies` part lists the root once (`read_manifests(client, name, root)`),
+  lists `.github/workflows` only when `needs_workflows` (`GitHubClient.list_contents`), and
+  `_store` writes `Repository.has_ci`, `has_tests`, `has_dev_environment`,
+  `has_docker_compose` (nullable; `repositories.0009`) with `dependencies_synced_at`.
+- `SetupSerializer` as `setup` on list items and the detail. Frontend: `setupLine` and
+  `SETUP_TEXT`/`SETUP_LABELS` (`features/recommendations/messages.ts`); cards list only facts
+  found, the detail page reads Found / Not found / Not available (never "No").
+- A test fails if any file under `services/matching`, `ranking`, `evaluation` or `discovery`
+  reads a setup field: they are shown, never scored. Test fixture: `mock_repo_api(root=...,
+  workflows=...)`.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Discovery yield report** (MVP+)  ✅ shipped in v0.12.25 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-27-discovery-search-yield/`. Spec: delta to
+`repository-discovery` ("Candidate search", new "Discovery yield report"). `ideas.md` §12.
+- `PlannedQuery.band` (label with more than one band, `""` with one; older stored plans load).
+- `_step_search` writes `query_yield[key] = {source, band, results, rejections, recorded}` (or
+  `{source, band, refused: true}` for a 422) in the same `merge_metadata` call as
+  `queries_done` / `queries_skipped`. No query text; totals unchanged.
+- `services/discovery/yield_report.py`: `load(since)` (finished discovery jobs, one query,
+  unordered), `build(runs)` (pure; rows per strategy, band and both; `all` = single band),
+  `as_dict()`. Command `repositories/management/commands/discovery_report.py` (the app's first
+  management command).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search); acting on the
+  report (§12) waits for it.
+
+**Post-analysis pool cleanup** (MVP+)  ✅ shipped in v0.12.26 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-26-post-analysis-pool-cleanup/`. Spec: delta to
+`repository-discovery` ("Candidate pool maintenance"). `ideas.md` §11; `Bug_Backlog.md` X-9.
+- `_step_analysis` keeps `analysis_succeeded` (ids with outcome `analyzed`) and ends, inside
+  `job_write`, with `_remove_not_code(pool, succeeded)`; records `analysis_not_code`.
+- `_record_pool(extra)` records `pool_size` and `pool_bands` from the current pool: the pool
+  step and the cleanup both call it, so the final metadata describes the pool the run leaves.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Data versions** (MVP+)  ✅ shipped in v0.12.27 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-27-data-versions/`. Specs: deltas to `sync-jobs`
+(new "Data versions endpoint"), `web-client`. `ideas.md` §14; `Bug_Backlog.md` Y-6 (S-8
+narrowed).
+- `services/data_versions.versions(user)`: `github` = last completed sync, `profile` =
+  `DeveloperProfile.analyzed_at`, `recommendations` = the latest of the last completed
+  generation and the newest `staleness.PART_FIELDS` time of the user's recommended or saved
+  repositories. Read-only, from stored times (no counter to bump). `GET /api/v1/sync/versions`
+  (`DataVersionsView`, `sync_versions`); OpenAPI stays `1.0.0`.
+- `src/app/dataVersions.ts` (fixed in 0.12.31, below): `dataVersionsKey = ['versions']`, `AREA_KEYS`, `changedAreas`,
+  `useDataVersions` (pure `queryFn`; compares in an effect on `data` against the last value it
+  saw, since 0.12.31; no previous value refetches nothing),
+  `refreshDataVersions`. `SignedInLayout` observes it and refetches it on every route change;
+  `staleTime: 0` covers focus. Status refreshes: sync → versions and `['jobs']`, discovery →
+  versions and the generation status, generation → versions. Delete-data removes the key.
+- Tests: `mockFetch` answers `/sync/versions` with the fixed `DATA_VERSIONS` unless a test
+  passes its own; `changingVersions()` moves areas forward.
+- No timer: a background refresh shows on the next focus, route change or finished job.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**New seeds stored inactive** (MVP+)  ✅ shipped in v0.12.28 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-27-new-seeds-inactive/`. Spec: delta to
+`recommendation-engine` ("Versioned scoring configuration"). `ideas.md` §15.
+- A seed after `v2-deterministic` calls `recommendations/migrations/_seeding.py`
+  (`from . import _seeding`): `store_inactive(apps, *, version, description, weights, params)`
+  forward (a stored version is left as it is), `remove_unused(apps, *, version)` in reverse
+  (deletes only an inactive version without recommendations). The leading `_` keeps it out of
+  the migration loader; it is frozen (new behavior = new function). Numbers stay frozen copies
+  in the migration.
+- `tests/test_seed_migrations.py` `ACTIVATING_SEEDS = {v1, v2}`; the migrated test database must
+  have only `v2-deterministic` active and every stored configuration valid. Activation stays
+  `activate_scoring_config` (README "Evaluating a ranking change" lists the steps).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Rank constraint** (MVP+, fix release)  ✅ shipped in v0.12.29 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-27-rank-constraint/`. Specs: deltas to
+`recommendation-engine` (new "Stored ranks start at 1"), `recommendation-feedback` (new
+"Feedback rank snapshot"). `Bug_Backlog.md` T-12.
+- `CheckConstraint`s `recommendation_rank_positive`, `recommended_issue_rank_positive`
+  (`rank >= 1`) and `feedback_rank_positive` (null or `>= 1`); migrations
+  `recommendations.0005`, `issues.0002`, `feedback.0005` repair first (a developer's or
+  recommendation's group with a rank 0 shifts up by one; an event's rank 0 becomes null),
+  never delete. Generation writes through `bulk_create`, so only the database sees every writer.
+- The repair is tested on the real upgrade path: migrate back before the three migrations,
+  store rank 0 rows, migrate forward (`test_upgrade_repairs_rank_0_and_adds_the_constraints`).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Content Security Policy** (MVP+)  ✅ shipped in v0.12.30 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-27-content-security-policy/`. Specs: deltas to
+`api-platform` (new "Content Security Policy"), `web-client` (new "Content Security Policy in
+the built app"). `ideas.md` §5.
+- `core.csp.ContentSecurityPolicyMiddleware` (after `SecurityMiddleware`) sets the header when
+  absent: JSON media types (`is_json`) get `CONTENT_SECURITY_POLICY_API` (deny-all), anything
+  else `CONTENT_SECURITY_POLICY_HTML` (same-origin, inline styles for the admin). Check
+  `core.E060` refuses an empty or non-string policy.
+- SPA: `apps/frontend/csp.config.ts` holds `CONTENT_SECURITY_POLICY` and the build-only plugin
+  (`apply: 'build'`, meta tag `head-prepend`); `csp.config.test.ts` also checks `dist/index.html`
+  when a build exists. A new script, image or API origin must be added there, or the built
+  app breaks while the dev server (no policy) still works.
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
+**Data versions fixes** (MVP+, fix release)  ✅ shipped in v0.12.31 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-27-data-versions-fixes/`. Specs: deltas to
+`sync-jobs` ("Data versions endpoint"), `web-client` (both refresh requirements).
+`Bug_Backlog.md` batch 20 (review of 0.12.24–0.12.30): U-1…U-3, U-5…U-7 fixed, U-4 accepted,
+U-8 wontfix.
+- `github` = the last *finished* sync (COMPLETED or FAILED; a failed sync may have stored
+  data); `recommendations` still counts completed generations only.
+- `AREA_KEYS.recommendations` includes `['profile', 'dismissed']`. A finished discovery refetches
+  only the generation status. The versions `queryFn` is pure and the comparison runs in an
+  effect on `data` (a cancelled or joined fetch cannot invalidate twice); call
+  `useDataVersions` from one component only. Delete-data `resetQueries` the versions (never
+  `removeQueries` an observed query). `versions()` is three reads (one `SyncJob` aggregate).
+- `DiscoveryService._remove_not_code` returns the `RepositoryCandidate` count from
+  `delete()`'s per-model counts (the total includes cascaded discovery records).
+- Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).
 
 **Ideas** (`ideas.md`, unplanned; each needs an OpenSpec change). Since 0.12.22 ordered by when
-an idea can ship. Can ship now (no ranking change), in suggested order: setup readiness (§8), `no_license` measurement (§12), post-analysis pool cleanup (§11), data
-versions (§14, closes Y-6), new seeds stored inactive (§15), then platform items (CSP,
-dependency scanning, migration round trip). Waits for K-1 (†): IDF weighting, diversity, stated
+an idea can ship. Can ship now (no ranking change), in suggested order:
+platform items
+(dependency scanning, migration round trip), then the interface revamp (§18, owner request:
+design direction first, one OpenSpec change per step). Waits for K-1 (†): IDF weighting, diversity, stated
 preferences, contribution-success signals, labeled-issue fetch, opportunity qualifiers,
 upstream dependencies, `similar_repo`, content-based `not_code`, and moving the label bands;
 whether a ranking change must also be significant is decided with K-1. Shipped from it in this
 series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibration report
-(0.12.21), dismiss reasons (0.12.23).
+(0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
+data versions (0.12.27), new seeds stored inactive (0.12.28),
+rank constraint (0.12.29, T-12), Content Security Policy (0.12.30).
 
 ## 8. Release housekeeping
 

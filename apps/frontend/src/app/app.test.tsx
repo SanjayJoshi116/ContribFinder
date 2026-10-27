@@ -1,4 +1,4 @@
-import type { QueryClient } from '@tanstack/react-query'
+import { focusManager, type QueryClient } from '@tanstack/react-query'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,12 +10,14 @@ import {
   NEVER_GENERATED,
   SYNCED_USER,
   callsTo,
+  changingVersions,
   discoveryJob,
   json,
   mockFetch,
   noContent,
   renderRoute,
   unauthenticated,
+  type FetchMock,
 } from '@/test/render'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
@@ -26,6 +28,13 @@ const generationJob = (status: string) => ({
   status,
   steps: {},
 })
+
+const profileCalls = (fetchMock: FetchMock) =>
+  [
+    '/api/v1/profile',
+    '/api/v1/profile/skills?page_size=200',
+    '/api/v1/profile/interests?page_size=200',
+  ].map((path) => callsTo(fetchMock, 'GET', path).length)
 
 /** Lets pending fetches and their follow-ups settle. */
 const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)))
@@ -84,6 +93,93 @@ describe('retry policy', () => {
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
     await settle()
     expect(callsTo(fetchMock, 'GET', '/api/v1/profile/skills?page_size=200').length).toBe(1)
+  })
+})
+
+describe('refresh by data versions', () => {
+  it('refetches nothing on the first fetch', async () => {
+    const fetchMock = mockFetch({ ...ME_ROUTE, ...SYNCED_USER })
+    renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(1)
+    expect(profileCalls(fetchMock)).toEqual([1, 1, 1])
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(1)
+  })
+
+  it('refetches only the recommendations after a background repository refresh', async () => {
+    const versions = changingVersions()
+    const fetchMock = mockFetch({ ...ME_ROUTE, ...SYNCED_USER, ...versions.route })
+    const { router } = renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+
+    versions.change('recommendations')
+    await act(() => router.navigate('/app#recommendations'))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2))
+    await settle()
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2)
+    expect(profileCalls(fetchMock)).toEqual([1, 1, 1])
+  })
+
+  it('refetches only the profile on focus after an analysis whose discovery failed', async () => {
+    const versions = changingVersions()
+    const fetchMock = mockFetch({ ...ME_ROUTE, ...SYNCED_USER, ...versions.route })
+    renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+
+    versions.change('profile')
+    act(() => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+    try {
+      await waitFor(() => expect(profileCalls(fetchMock)).toEqual([2, 2, 2]))
+      await settle()
+      expect(profileCalls(fetchMock)).toEqual([2, 2, 2])
+      expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(1)
+    } finally {
+      focusManager.setFocused(undefined)
+    }
+  })
+
+  it('refetches nothing when switching pages with unchanged versions', async () => {
+    const fetchMock = mockFetch({ ...ME_ROUTE, ...SYNCED_USER })
+    const { router } = renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+
+    await act(() => router.navigate('/app#recommendations'))
+    await settle()
+    await act(() => router.navigate('/app'))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(3))
+    await settle()
+    expect(profileCalls(fetchMock)).toEqual([1, 1, 1])
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(1)
+  })
+
+  it('refetches nothing when a versions fetch fails', async () => {
+    let fail = false
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/sync/versions': () =>
+        fail
+          ? json({ error: { code: 'server_error', message: 'Down.' } }, 500)
+          : json({ github: null, profile: null, recommendations: null }),
+    })
+    const { router } = renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+
+    fail = true
+    await act(() => router.navigate('/app#recommendations'))
+    // The first fetch plus one failed fetch with its two retries.
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(4))
+    await settle()
+    expect(profileCalls(fetchMock)).toEqual([1, 1, 1])
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(1)
   })
 })
 
@@ -152,85 +248,100 @@ describe('refresh on job transitions', () => {
     expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(list)
   })
 
-  it('refetches profile data once when a sync finishes', async () => {
+  it('refetches what a finished sync changed, once', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let statusCalls = 0
+    const versions = changingVersions()
     const fetchMock = mockFetch({
       ...ME_ROUTE,
       ...SYNCED_USER,
-      'GET /api/v1/sync/status': () =>
-        statusCalls++ === 0
-          ? json({
-              job: { ...COMPLETED_JOB, id: 2, status: 'RUNNING', completed_at: null },
-              last_synced_at: COMPLETED_JOB.completed_at,
-            })
-          : json({
-              job: { ...COMPLETED_JOB, id: 2 },
-              last_synced_at: COMPLETED_JOB.completed_at,
-            }),
+      ...versions.route,
+      'GET /api/v1/sync/status': () => {
+        if (statusCalls++ === 0) {
+          return json({
+            job: { ...COMPLETED_JOB, id: 2, status: 'RUNNING', completed_at: null },
+            last_synced_at: COMPLETED_JOB.completed_at,
+          })
+        }
+        if (statusCalls === 2) versions.change('github', 'profile')
+        return json({
+          job: { ...COMPLETED_JOB, id: 2 },
+          last_synced_at: COMPLETED_JOB.completed_at,
+        })
+      },
     })
     renderRoute('/app')
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
     expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(1)
+    const list = callsTo(fetchMock, 'GET', '/api/v1/recommendations').length
 
     await vi.advanceTimersByTimeAsync(2100)
     await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(2))
     await vi.advanceTimersByTimeAsync(5000)
     expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile/github').length).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(list)
   })
 
   it('refetches the list once per finished generation, however many components show it', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let statusCalls = 0
+    const versions = changingVersions()
     const fetchMock = mockFetch({
       ...ME_ROUTE,
       ...SYNCED_USER,
-      'GET /api/v1/recommendations/status': () =>
-        json({
+      ...versions.route,
+      'GET /api/v1/recommendations/status': () => {
+        if (statusCalls++ === 1) versions.change('recommendations')
+        return json({
           ...NEVER_GENERATED,
-          job: generationJob(statusCalls++ === 0 ? 'RUNNING' : 'COMPLETED'),
-        }),
+          job: generationJob(statusCalls === 1 ? 'RUNNING' : 'COMPLETED'),
+        })
+      },
     })
     renderRoute('/app')
     // The list and the pipeline indicator both observe the generation status.
     expect(await screen.findByText('Preparing recommendations…')).toBeInTheDocument()
+    await settle()
     expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(1)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(1)
 
     await vi.advanceTimersByTimeAsync(3100)
     await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2))
     await vi.advanceTimersByTimeAsync(4000)
     expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(2)
   })
 
-  it('refetches the profile once per finished generation, not the other statuses', async () => {
+  it('leaves the profile alone after a generation without a profile change', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let statusCalls = 0
+    const versions = changingVersions()
     const fetchMock = mockFetch({
       ...ME_ROUTE,
       ...SYNCED_USER,
-      'GET /api/v1/recommendations/status': () =>
-        json({
+      ...versions.route,
+      'GET /api/v1/recommendations/status': () => {
+        if (statusCalls++ === 1) versions.change('recommendations')
+        return json({
           ...NEVER_GENERATED,
-          job: generationJob(statusCalls++ === 0 ? 'RUNNING' : 'COMPLETED'),
-        }),
+          job: generationJob(statusCalls === 1 ? 'RUNNING' : 'COMPLETED'),
+        })
+      },
     })
-    const profileCalls = () =>
-      [
-        '/api/v1/profile',
-        '/api/v1/profile/skills?page_size=200',
-        '/api/v1/profile/interests?page_size=200',
-      ].map((path) => callsTo(fetchMock, 'GET', path).length)
     renderRoute('/app')
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
     await settle()
-    expect(profileCalls()).toEqual([1, 1, 1])
+    expect(profileCalls(fetchMock)).toEqual([1, 1, 1])
     const syncStatus = callsTo(fetchMock, 'GET', '/api/v1/sync/status').length
     const discoveryStatus = callsTo(fetchMock, 'GET', '/api/v1/discovery/status').length
 
     await vi.advanceTimersByTimeAsync(3100)
-    await waitFor(() => expect(profileCalls()).toEqual([2, 2, 2]))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2))
     await vi.advanceTimersByTimeAsync(4000)
-    expect(profileCalls()).toEqual([2, 2, 2])
+    expect(profileCalls(fetchMock)).toEqual([1, 1, 1])
     expect(callsTo(fetchMock, 'GET', '/api/v1/sync/status').length).toBe(syncStatus)
     expect(callsTo(fetchMock, 'GET', '/api/v1/discovery/status').length).toBe(discoveryStatus)
   })
@@ -258,5 +369,48 @@ describe('refresh on job transitions', () => {
     )
     await vi.advanceTimersByTimeAsync(4000)
     expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations/status').length).toBe(2)
+    // Discovery changes no data area: the versions wait for the generation (U-5).
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(1)
+  })
+
+  it('refetches each changed area once when two jobs finish together', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let syncCalls = 0
+    let generationCalls = 0
+    const versions = changingVersions()
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      ...versions.route,
+      'GET /api/v1/sync/status': () => {
+        if (syncCalls++ === 0) {
+          return json({
+            job: { ...COMPLETED_JOB, id: 2, status: 'RUNNING', completed_at: null },
+            last_synced_at: COMPLETED_JOB.completed_at,
+          })
+        }
+        versions.change('github', 'profile', 'recommendations')
+        return json({
+          job: { ...COMPLETED_JOB, id: 2 },
+          last_synced_at: COMPLETED_JOB.completed_at,
+        })
+      },
+      'GET /api/v1/recommendations/status': () =>
+        json({
+          ...NEVER_GENERATED,
+          job: generationJob(generationCalls++ === 0 ? 'RUNNING' : 'COMPLETED'),
+        }),
+    })
+    renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(1)
+
+    // Both statuses poll (2 s and 3 s) and see their job finished before the versions answer.
+    await vi.advanceTimersByTimeAsync(3100)
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(2)
+    expect(profileCalls(fetchMock)).toEqual([2, 2, 2])
   })
 })

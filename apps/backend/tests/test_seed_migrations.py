@@ -11,13 +11,14 @@ from django.utils import timezone
 from developers.models import DeveloperProfile
 from e2e.builders import make_candidate_repo
 from recommendations.models import ScoringConfig
-from services.ranking.config import V2_PARAMS, V2_WEIGHTS
+from services.ranking.config import V2_PARAMS, V2_WEIGHTS, validate
 
 from .shared_fixtures import active_configs as active
 from .test_models_phase5 import make_recommendation
 
 seed_v1 = importlib.import_module("recommendations.migrations.0002_seed_v1_deterministic")
 seed_v2 = importlib.import_module("recommendations.migrations.0003_seed_v2_deterministic")
+seeding = importlib.import_module("recommendations.migrations._seeding")
 
 
 def run(migration, direction: str) -> None:
@@ -126,3 +127,114 @@ def test_real_migrations_round_trip() -> None:
     executor.migrate(latest)
 
     assert active() == ["v2-deterministic"]
+
+
+# --- Seeds after v2-deterministic (change new-seeds-inactive) ----------------------------
+
+LATER = "test-seed-v9"
+LATER_DESCRIPTION = "A later seed (test only)."
+
+
+def seed_later() -> None:
+    seeding.store_inactive(
+        global_apps,
+        version=LATER,
+        description=LATER_DESCRIPTION,
+        weights=V2_WEIGHTS,
+        params=V2_PARAMS,
+    )
+
+
+def unseed_later() -> None:
+    seeding.remove_unused(global_apps, version=LATER)
+
+
+def later() -> ScoringConfig:
+    return ScoringConfig.objects.get(version=LATER)
+
+
+@pytest.mark.django_db
+def test_later_seed_stored_inactive() -> None:
+    seed_later()
+
+    assert not later().is_active
+    assert (later().weights, later().params, later().description) == (
+        V2_WEIGHTS,
+        V2_PARAMS,
+        LATER_DESCRIPTION,
+    )
+    assert active() == ["v2-deterministic"]
+
+
+@pytest.mark.django_db
+def test_later_seed_keeps_an_operator_choice() -> None:
+    ScoringConfig.objects.update(is_active=False)
+    ScoringConfig.objects.create(
+        version="operator-choice", weights=V2_WEIGHTS, params=V2_PARAMS, is_active=True
+    )
+
+    seed_later()
+
+    assert active() == ["operator-choice"]
+    assert not later().is_active
+
+
+@pytest.mark.django_db
+def test_later_seed_reapplied_after_operator_activation_changes_nothing() -> None:
+    seed_later()
+    ScoringConfig.objects.update(is_active=False)
+    ScoringConfig.objects.filter(version=LATER).update(is_active=True)
+    before = ScoringConfig.objects.filter(version=LATER).values().get()
+
+    seed_later()
+
+    assert ScoringConfig.objects.filter(version=LATER).values().get() == before
+    assert active() == [LATER]
+
+
+@pytest.mark.django_db
+def test_later_seed_reversed_when_unused() -> None:
+    seed_later()
+
+    unseed_later()
+
+    assert not ScoringConfig.objects.filter(version=LATER).exists()
+    assert active() == ["v2-deterministic"]
+
+
+@pytest.mark.django_db
+def test_later_seed_reversed_while_active_stays() -> None:
+    seed_later()
+    ScoringConfig.objects.update(is_active=False)
+    ScoringConfig.objects.filter(version=LATER).update(is_active=True)
+
+    unseed_later()
+
+    assert active() == [LATER]
+
+
+@pytest.mark.django_db
+def test_later_seed_reversed_with_recommendations_stays(user) -> None:
+    seed_later()
+    profile = DeveloperProfile.objects.create(user=user, analyzed_at=timezone.now())
+    make_recommendation(profile, make_candidate_repo(1), config=later())
+    ScoringConfig.objects.filter(version=LATER).update(is_active=False)
+
+    unseed_later()
+
+    assert ScoringConfig.objects.filter(version=LATER).exists()
+    assert active() == ["v2-deterministic"]
+
+
+# Seeds allowed to change which configuration is active. Every later seed stores its version
+# inactive (`_seeding.store_inactive`); the operator activates it with activate_scoring_config.
+ACTIVATING_SEEDS = {"v1-deterministic", "v2-deterministic"}
+
+
+@pytest.mark.django_db
+def test_fully_migrated_database_activates_only_v2() -> None:
+    """The test database is migrated from empty: a later seed that activates fails here."""
+    assert active() == ["v2-deterministic"]
+    assert set(active()) <= ACTIVATING_SEEDS
+    for stored in ScoringConfig.objects.all():
+        assert validate(stored.weights, stored.params, stored=True) == [], stored.version

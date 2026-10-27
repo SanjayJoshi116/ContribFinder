@@ -57,6 +57,13 @@ class RecommendationFeedback(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            # Null when there was no recommendation; never 0 (T-12).
+            models.CheckConstraint(
+                condition=models.Q(rank__isnull=True) | models.Q(rank__gte=1),
+                name="feedback_rank_positive",
+            )
+        ]
         indexes = [
             models.Index(
                 fields=["user", "recommendation", "action", "-created_at"],

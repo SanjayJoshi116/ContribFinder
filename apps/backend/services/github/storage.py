@@ -4,7 +4,7 @@ whose name another GitHub ID now has gives the name up (``lifecycle.release_name
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from django.conf import settings
@@ -18,7 +18,7 @@ from repositories.models import (
 from services.profiling.manifests import is_manifest, parse_manifest
 from services.repositories.lifecycle import release_name
 
-from .client import GitHubClient, GitHubRepo
+from .client import ContentEntry, GitHubClient, GitHubRepo
 from .errors import GitHubNotFound
 
 
@@ -71,10 +71,14 @@ def replace_topics(repo_pk: int, topics: Iterable[str]) -> None:
     )
 
 
-def read_manifests(client: GitHubClient, full_name: str) -> dict[tuple[str, str], str]:
-    """``{(ecosystem, name): manifest path}`` from the repository's root manifests."""
+def read_manifests(
+    client: GitHubClient, full_name: str, entries: Sequence[ContentEntry] | None = None
+) -> dict[tuple[str, str], str]:
+    """``{(ecosystem, name): manifest path}`` from the repository's root manifests.
+    ``entries`` is the root listing when the caller already has it."""
     found: dict[tuple[str, str], str] = {}
-    for entry in client.list_root_contents(full_name):
+    root = client.list_root_contents(full_name) if entries is None else entries
+    for entry in root:
         if entry.type != "file" or not is_manifest(entry.name):
             continue
         if entry.size > settings.GITHUB_MANIFEST_MAX_BYTES:

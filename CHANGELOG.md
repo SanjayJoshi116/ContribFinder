@@ -7,6 +7,155 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.31] - 2026-10-27
+
+Data versions fixes (OpenSpec change `data-versions-fixes`, `Bug_Backlog.md` batch 20: review
+of 0.12.24–0.12.30). No ranking, API or interface change; no migration.
+
+### Fixed
+
+- A sync that fails after storing data now moves the `github` data version, so pages refresh
+  the GitHub data it stored (U-1).
+- The hidden list is refreshed with the recommendations when their repositories change (U-2).
+- Discovery records the number of candidates its `not_code` cleanup actually removed, not the
+  number it flagged (U-3).
+- Two jobs finishing together no longer refetch the changed data twice (U-6); a finished
+  discovery no longer asks for the data versions (U-5); deleting GitHub data resets the
+  versions without detaching the page that watches them (U-7).
+
+### Changed (internal)
+
+- `/simplify` pass over 0.12.24–0.12.31: the data versions read the two job times in one
+  query (three reads instead of four), and the web client compares versions when its cached
+  value changes, not inside the fetch. The rank repair is tested on the real upgrade path
+  instead of by dropping constraints, and the data-versions tests reuse
+  `make_recommendation`.
+
+## [0.12.30] - 2026-10-27
+
+Content Security Policy (OpenSpec change `content-security-policy`, `ideas.md` §5). No ranking,
+API or interface change; no migration.
+
+### Security
+
+- Every backend response carries a `Content-Security-Policy` header: API responses allow
+  loading nothing; the admin and error pages allow resources from their own origin only.
+  Both policies are settings, and the startup checks refuse an empty one (`core.E060`).
+- The production build of the web app declares a policy in `index.html`: scripts and API
+  calls from the same origin only, images also from GitHub avatars, no plugins, no `<base>`.
+  The development server is unchanged.
+
+## [0.12.29] - 2026-10-27
+
+Rank constraint (OpenSpec change `rank-constraint`, `Bug_Backlog.md` T-12). No ranking, API or
+interface change.
+
+### Fixed
+
+- The database refuses a rank of 0 for recommendations, their matched issues and feedback
+  events (an event's rank stays empty when it had no recommendation). Ranks were always
+  written from 1, but the columns accepted 0, which only the feedback report read as "no
+  rank".
+
+### Migration
+
+- `recommendations.0005`, `issues.0002`, `feedback.0005` add the constraints after repairing
+  stored rows: a group of recommendations or matched issues with a rank 0 moves up by one
+  (order kept), an event's rank 0 becomes empty. Nothing is deleted.
+
+## [0.12.28] - 2026-10-27
+
+New seeds stored inactive (OpenSpec change `new-seeds-inactive`, `ideas.md` §15). No ranking,
+API or interface change; no migration.
+
+### Added
+
+- `recommendations/migrations/_seeding.py`: `store_inactive` and `remove_unused` for scoring
+  configuration seeds after `v2-deterministic`. A later seed stores its version inactive and
+  never changes which configuration is active; its reversal deletes the version only while it
+  is inactive and produced no recommendations. Activation stays `activate_scoring_config`.
+- A test fails when a migrated database has any configuration other than `v2-deterministic`
+  active, or stores an invalid configuration.
+- README: how to add a configuration (seed inactive, evaluate, activate).
+
+## [0.12.27] - 2026-10-27
+
+Data versions (OpenSpec change `data-versions`, `ideas.md` §14, `Bug_Backlog.md` Y-6). No
+ranking change; no migration. Additive API change (OpenAPI stays `1.0.0`).
+
+### Added
+
+- `GET /api/v1/sync/versions`: when the signed-in user's GitHub data, developer profile and
+  recommendations last changed (the recommendations time includes background refreshes of
+  the repositories they show or that are saved). Read-only, built from stored times.
+
+### Changed
+
+- The web client asks for the data versions when a signed-in page loads, on window focus, on
+  every page change and after a finished job, and refetches only the areas whose time
+  changed. Data changed with no job the page watches (a background repository refresh, an
+  analysis whose discovery failed) no longer stays cached up to 5 minutes (Y-6).
+- A finished generation no longer refetches the profile, skills and interests unless the
+  profile was re-analyzed (S-8 narrowed).
+
+## [0.12.26] - 2026-10-26
+
+Post-analysis pool cleanup (OpenSpec change `post-analysis-pool-cleanup`, `ideas.md` §11,
+`Bug_Backlog.md` X-9). No ranking, API or interface change; no migration.
+
+### Changed
+
+- A discovery run ends its analysis step by removing from the pool every candidate it analyzed
+  that is now not a code project (a suspected list without manifest dependencies), instead of
+  leaving it until the next run's pool step. The job records `analysis_not_code` and the pool
+  size and band counts again; the shared repository row is kept. Fenced like the pool step: a
+  cancelled run removes nothing.
+- The ids analyzed successfully are kept in the job metadata (`analysis_succeeded`), so a
+  resumed analysis step still cleans up.
+
+## [0.12.25] - 2026-10-26
+
+Discovery yield report (OpenSpec change `discovery-search-yield`, `ideas.md` §12). No ranking,
+API or interface change; no migration.
+
+### Added
+
+- Every discovery run records the yield of each search query in its job metadata
+  (`query_yield`, keyed by query key): strategy, star band, results, rejections per reason
+  (pre-filter and `not_code` found while storing), candidates recorded, or `refused` for a 422.
+  No query text. The run totals (`rejections`, `results_found`) are unchanged.
+- `PlannedQuery.band`: the star band's label with more than one band configured (`""` with one;
+  plans stored by older runs load with `""`).
+- `npm run manage -- discovery_report [--since DAYS] [--json OUT]`: per strategy, per star band
+  and per strategy and band over finished runs: requests, refused, results, rejections per
+  reason, recorded, results per request and recorded share. Runs without per-query yield are
+  counted on their own line. Aggregates only, read-only.
+
+## [0.12.24] - 2026-10-26
+
+Setup readiness (OpenSpec change `setup-readiness`, `ideas.md` §8). No ranking change; OpenAPI
+stays `1.0.0` (additive).
+
+### Added
+
+- Repository analysis records four setup facts from the root listing it already fetches for
+  manifests: CI (GitHub Actions workflows, or another service's root configuration), tests (a
+  root test directory or test-runner configuration), dev environment (`.devcontainer`,
+  `.devcontainer.json`, `.gitpod.yml`) and Docker Compose. At most one extra request per
+  repository (`.github/workflows`, only with a `.github` directory and no other CI marker).
+  Refreshed with the dependencies (weekly); repositories analyzed earlier show them as unknown
+  until then. Migration `repositories.0009`, no backfill.
+- Recommendation list items and the detail return `setup` (`ci`, `tests`, `dev_environment`,
+  `docker_compose`: true, false or null).
+- Cards show the facts found ("CI · tests"); the detail page has a "Setup" group with Found /
+  Not found / Not available. Detection looks at the root only, so absence reads "Not found",
+  never "No".
+
+### Changed
+
+- `GitHubClient.list_contents(full_name, path)`; `list_root_contents` delegates to it.
+  `read_manifests` accepts a root listing the caller already has.
+
 ## [0.12.23] - 2026-10-26
 
 Dismiss reasons (OpenSpec change `dismiss-reasons`, `ideas.md` §4). No ranking change; OpenAPI

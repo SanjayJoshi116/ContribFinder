@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.23 (2026-10-26)
+Version: 0.12.31 (2026-10-27)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,6 +439,82 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.31 - Data versions fixes
+============================================================================
+
+Review fixes (Bug_Backlog.md batch 20)
+  [x] A failed sync that stored data still refreshes the GitHub data (U-1)
+  [x] The hidden list follows background refreshes (U-2)
+  [x] Discovery pool cleanup counts the candidates it removed (U-3)
+  [x] No redundant or doubled data-versions refetches (U-5, U-6); delete-data resets them (U-7)
+
+============================================================================
+SHIPPED - v0.12.30 - Content Security Policy
+============================================================================
+
+Platform
+  [x] Content-Security-Policy on every backend response (deny-all for the API, same-origin
+      for the admin and error pages; settings checked at startup, core.E060)
+  [x] The built SPA declares its policy in index.html (scripts and API calls same-origin
+      only; not on the dev server)
+
+============================================================================
+SHIPPED - v0.12.29 - Rank constraint
+============================================================================
+
+Recommendations
+  [x] The database refuses rank 0 for recommendations, matched issues and feedback events
+      (events keep an empty rank when there was no recommendation); the upgrade repairs
+      stored rank 0 without deleting anything (T-12)
+
+============================================================================
+SHIPPED - v0.12.28 - New seeds stored inactive
+============================================================================
+
+Recommendations
+  [x] Scoring configurations seeded after v2-deterministic are stored inactive; only
+      activate_scoring_config activates them (frozen helper _seeding.store_inactive /
+      remove_unused, guard test on the migrated database)
+
+============================================================================
+SHIPPED - v0.12.27 - Data versions
+============================================================================
+
+Web client
+  [x] GET /api/v1/sync/versions: when the GitHub data, profile and recommendations last changed
+  [x] The SPA refetches only the areas whose version changed (mount, focus, route change,
+      finished job), also after a background repository refresh or a failed discovery (Y-6)
+  [x] A finished generation refetches the profile only when it was re-analyzed (S-8 narrowed)
+
+============================================================================
+SHIPPED - v0.12.26 - Post-analysis pool cleanup
+============================================================================
+
+Discovery
+  [x] Lists found by a run's own analysis leave the pool before the run ends (X-9)
+
+============================================================================
+SHIPPED - v0.12.25 - Discovery yield report
+============================================================================
+
+Discovery
+  [x] Per-query yield on every run: strategy, star band, results, rejections per reason,
+      candidates recorded, refused queries (no query text)
+  [x] discovery_report: yield per strategy, per band and per strategy and band (aggregates only)
+
+============================================================================
+SHIPPED - v0.12.24 - Setup readiness
+============================================================================
+
+Repository analysis
+  [x] Setup facts from the root listing: CI, tests, dev container / Gitpod, Docker Compose
+      (one extra request at most; refreshed with the dependencies)
+
+Recommendations
+  [x] Card line with the facts found ("CI · tests"); detail page Setup group
+      (Found / Not found / Not available); never scored
+
+============================================================================
 SHIPPED - v0.12.23 - Dismiss reasons
 ============================================================================
 
@@ -663,18 +739,13 @@ PLANNED - MVP+ / FUTURE
   [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
   [ ] Bug_Backlog.md batch 8  B-6 and D-11 (wait for K-1)
-  [ ] Bug_Backlog.md Y-6  data changed with no generation after it stays cached up to 5 min
-                          (fix when it shows in use; ideas.md §14 data versions)
   [ ] Bug_Backlog.md P-1  keep-alive exit cause
-  [ ] Bug_Backlog.md T-12 rank 0 storable (constraint rank >= 1)
   [ ] Bug_Backlog.md T-11 issue relevance ignores part weights (waits for K-1)
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation
   [ ]          Personalized ranking, notifications, contribution tracking
   [ ] ideas.md  Unplanned, ordered by when they can ship. Now (no ranking change):
-                setup readiness, no_license measurement, post-analysis
-                pool cleanup, data versions, new seeds stored inactive, CSP, dependency
-                scanning. After K-1: IDF weighting, diversity, preferences,
+                dependency scanning, interface revamp (§18). After K-1: IDF weighting, diversity, preferences,
                 contribution-success signals, labeled-issue fetch, retrieval sources,
                 content-based not_code, label bands

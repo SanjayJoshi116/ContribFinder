@@ -120,7 +120,9 @@ class Recommendation(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["developer", "repository"], name="unique_developer_recommendation"
-            )
+            ),
+            # Ranks start at 1; a positive field alone would store 0 (T-12).
+            models.CheckConstraint(condition=Q(rank__gte=1), name="recommendation_rank_positive"),
         ]
         indexes = [models.Index(fields=["developer", "rank"], name="recommendation_rank_idx")]
 

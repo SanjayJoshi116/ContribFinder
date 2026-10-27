@@ -1,5 +1,7 @@
-import { Outlet, useNavigate } from 'react-router'
+import { useEffect, useRef } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 
+import { useDataVersions } from '@/app/dataVersions'
 import { Button } from '@/components/ui/button'
 import { useLogout, useMe } from '@/features/auth/api'
 
@@ -7,6 +9,14 @@ export function SignedInLayout() {
   const { data: me } = useMe()
   const navigate = useNavigate()
   const logout = useLogout()
+  const { refetch: refetchVersions } = useDataVersions(!!me)
+  const { key: locationKey } = useLocation()
+  const firstLocation = useRef(locationKey)
+
+  // Every route change asks which derived data changed; the mount fetch covers the first one.
+  useEffect(() => {
+    if (me && locationKey !== firstLocation.current) void refetchVersions()
+  }, [me, locationKey, refetchVersions])
 
   if (!me) return null
 

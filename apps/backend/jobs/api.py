@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from core.authentication import current_user
 from core.serializers import error_responses
+from services.data_versions import versions
 from services.jobs import (
     SYNC,
     GitHubNotConnected,
@@ -15,7 +16,7 @@ from services.jobs import (
 )
 
 from .models import SyncJob
-from .serializers import SyncJobSerializer, SyncStatusSerializer
+from .serializers import DataVersionsSerializer, SyncJobSerializer, SyncStatusSerializer
 
 
 class GitHubNotConnectedError(APIException):
@@ -64,3 +65,14 @@ class SyncStatusView(APIView):
                 {"job": job, "last_synced_at": done.completed_at if done else None}
             ).data
         )
+
+
+class DataVersionsView(APIView):
+    """When each area of the user's derived data last changed. Read-only."""
+
+    @extend_schema(
+        operation_id="sync_versions",
+        responses={200: DataVersionsSerializer, **error_responses(401)},
+    )
+    def get(self, request: Request) -> Response:
+        return Response(DataVersionsSerializer(versions(current_user(request))).data)

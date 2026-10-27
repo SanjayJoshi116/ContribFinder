@@ -41,6 +41,21 @@ The system SHALL record a feedback event for a user's recommendation interaction
 - **WHEN** two requests record a view of the same recommendation at the same time
 - **THEN** one `viewed` event exists
 
+### Requirement: Feedback rank snapshot
+A feedback event's rank snapshot SHALL be empty when the event had no recommendation, and otherwise a whole number of at least 1; the database SHALL refuse a rank of 0. Upgrading SHALL keep every stored event: an event stored with rank 0 SHALL have its rank emptied, which the feedback report already counts as no rank.
+
+#### Scenario: Rank 0 refused
+- **WHEN** any writer stores a feedback event with rank 0
+- **THEN** the database refuses the row and nothing is stored
+
+#### Scenario: Event without a recommendation
+- **WHEN** a feedback event is stored with no recommendation
+- **THEN** its rank is empty and the event is stored
+
+#### Scenario: Upgrade empties a rank 0
+- **WHEN** the upgrade runs while an event has rank 0
+- **THEN** the event stays stored with an empty rank, and the feedback report counts it as unattributed as before
+
 ### Requirement: Save recommendations
 A user SHALL be able to save and unsave a recommendation's repository (`POST` and `DELETE /api/v1/recommendations/{id}/save`). Saving SHALL be idempotent and store the save time. Every recommendation in the list and detail responses SHALL say whether its repository is saved. A saved repository SHALL stay saved when it is no longer recommended. Saving a recommendation that no longer exists, or whose repository the user has dismissed, SHALL answer 404 and SHALL store no save and no event, also when the save races a dismiss of the same repository.
 

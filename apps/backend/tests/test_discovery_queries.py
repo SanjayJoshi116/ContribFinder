@@ -183,6 +183,21 @@ def test_every_query_in_every_band() -> None:
         "stars:20..999 -user:octocat"
     )
     assert plan[1].q.endswith(" stars:>=1000 -user:octocat")
+    assert [q.band for q in plan] == ["20..999", "1000+", "20..999", "1000+"]
+
+
+def test_one_band_plans_have_no_band_label() -> None:
+    plan = plan_queries(data([skill("python", 0.9)]), CFG)
+    assert [q.band for q in plan] == [""]
+
+
+def test_stored_plan_round_trips_and_older_plans_load() -> None:
+    from services.discovery.queries import PlannedQuery
+
+    plan = plan_queries(data([skill("python", 0.9)]), BANDED)
+    assert [PlannedQuery(**q.as_json()) for q in plan] == plan
+    older = {k: v for k, v in plan[0].as_json().items() if k != "band"}  # stored before 0.12.25
+    assert PlannedQuery(**older).band == ""
 
 
 def test_budget_counts_requests() -> None:

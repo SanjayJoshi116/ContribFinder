@@ -21,7 +21,8 @@ import {
   recommendationStatusKey,
 } from '@/features/recommendations/api'
 
-// Under ['profile'], so a completed sync refreshes them with everything else.
+// Under ['profile'], so delete-data removes them; the `recommendations` data version
+// refetches the saved list (src/app/dataVersions.ts).
 export const savedKey = ['profile', 'saved'] as const
 export const dismissedKey = ['profile', 'dismissed'] as const
 

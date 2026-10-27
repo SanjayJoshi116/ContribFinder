@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.23** (dismiss reasons: say why a project is not for you, counted in the feedback report; MVP+). After signing in with
+**Version 0.12.31** (review fixes for data versions and discovery cleanup; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -12,7 +12,9 @@ label (Strong, Good, Partial) and the reasons behind it, never a percentage. You
 dismiss projects (optionally saying why: not my stack, too big, inactive, already know it),
 refresh everything, and delete your GitHub data or your account at any time
 (see the in-app privacy page). Each recommendation also lists the open issues that fit you, with
-their contribution type and an estimated difficulty (or "Not enough evidence"). Ranking changes
+their contribution type and an estimated difficulty (or "Not enough evidence"), and what was
+found at the project's root to help you set it up (CI, tests, a dev container, Docker Compose;
+shown, never scored). Ranking changes
 are measured offline on a hand-judged benchmark before they count as improvements (see
 "Evaluating a ranking change"). Semantic matching comes later.
 
@@ -236,6 +238,36 @@ whether the rule was overridden, the reason and the failed metrics. Check the ac
 command does not read it. Recommendations regenerate under the new configuration on the next
 freshness run.
 
+To add a configuration, seed it inactive and activate it with the command; a seed never makes a
+configuration active (only the `v1-deterministic` and `v2-deterministic` seeds did, and a test
+fails if another one does):
+
+1. Add a data migration in `apps/backend/recommendations/migrations/` with frozen copies of the
+   weights, parameters and description (never import them from `services/`). Its forward step
+   calls `_seeding.store_inactive(apps, version=..., description=..., weights=..., params=...)`
+   and its reverse step `_seeding.remove_unused(apps, version=...)` (import the module with
+   `from . import _seeding`). Re-applying it never changes a stored version, and reversing it
+   deletes the version only while it is inactive and produced no recommendations.
+2. Evaluate it against the active configuration (`evaluate_ranking --config <active> --config
+   <new>`) and on a fresh acceptance holdout, then record its baseline (`--write-baseline`).
+3. Activate it with `activate_scoring_config <new>`.
+
+### Discovery yield report
+
+```bash
+npm run manage -- discovery_report --since 30
+```
+
+Shows how discovery's search budget was spent, from finished discovery runs: per strategy
+(language, skill, interest, topic search), per star band and per strategy and band, the
+requests (and how many GitHub refused), the results, the rejections per reason (`no_license`,
+`archived`, …), the candidates recorded, results per request and the share of results recorded.
+Use it before changing queries, shares, bands or the budget: such a change alters what users
+are recommended. Runs from before 0.12.25 recorded no per-query yield and are only counted. A
+repository found by two queries counts for both. `--json OUT` writes it (put it in the gitignored
+`reports/`: `--json ../../reports/discovery.json`). Aggregates only: no user, job, repository or
+query text; it changes nothing.
+
 ### Judging real developers
 
 The personas were invented and judged by the same author who designed the ranking, so the
@@ -307,6 +339,18 @@ TLS-terminating load balancer). With `0`, forwarded headers are ignored: every c
 proxy shares one throttle bucket and HTTPS detection fails, so the SSL redirect loops (system
 check `core.W002` warns about this). `/api/v1/health/` is never throttled or redirected, so
 probes can use plain HTTP.
+
+### Content Security Policy
+
+Every Django response carries a `Content-Security-Policy` header: API responses (JSON) allow
+loading nothing, and the admin and error pages allow resources from their own origin only
+(`CONTENT_SECURITY_POLICY_API` and `CONTENT_SECURITY_POLICY_HTML` in
+`config/settings/base.py`; system check `core.E060` refuses an empty one). The built SPA
+(`npm run build`) declares its own policy in a `<meta>` tag in `dist/index.html`
+(`apps/frontend/csp.config.ts`); the Vite dev server does not, because hot reload needs an
+inline script. Whatever serves `dist/` in production should send the same policy as a
+`Content-Security-Policy` header with `frame-ancestors 'none'` added, which a meta tag cannot
+set.
 
 ## Secrets
 

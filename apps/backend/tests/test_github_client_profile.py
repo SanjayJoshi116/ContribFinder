@@ -8,6 +8,7 @@ from django.test import override_settings
 
 from services.github.client import ContentEntry, GitHubClient
 from services.github.errors import GitHubRateLimited, GitHubValidationError
+from services.github.storage import read_manifests
 
 from .test_github_client import API, TOKEN, repo_json
 
@@ -44,6 +45,39 @@ def test_root_contents(client) -> None:
 def test_root_contents_of_empty_repository(client) -> None:
     respx.get(f"{API}/repos/octocat/empty/contents/").respond(404)
     assert client.list_root_contents("octocat/empty") == []
+
+
+@respx.mock
+def test_contents_of_a_subdirectory(client) -> None:
+    route = respx.get(f"{API}/repos/octocat/r1/contents/.github/workflows").respond(
+        200, json=[{"name": "ci.yml", "type": "file", "size": 640}]
+    )
+    assert client.list_contents("octocat/r1", ".github/workflows") == [
+        ContentEntry("ci.yml", "file", 640)
+    ]
+    assert route.called
+
+
+@respx.mock
+def test_contents_of_a_missing_directory_or_a_file(client) -> None:
+    respx.get(f"{API}/repos/octocat/r1/contents/.github/workflows").respond(404)
+    respx.get(f"{API}/repos/octocat/r1/contents/.github").respond(
+        200,
+        json={"name": ".github", "type": "file", "size": 3},  # a file: an object, not a list
+    )
+    assert client.list_contents("octocat/r1", ".github/workflows") == []
+    assert client.list_contents("octocat/r1", ".github") == []
+
+
+@respx.mock
+def test_read_manifests_reuses_a_given_root_listing(client) -> None:
+    listing = respx.get(f"{API}/repos/octocat/r1/contents/").respond(200, json=[])
+    respx.get(f"{API}/repos/octocat/r1/contents/go.mod").respond(
+        200, text="module x\n\nrequire github.com/spf13/cobra v1.8.0\n"
+    )
+    found = read_manifests(client, "octocat/r1", [ContentEntry("go.mod", "file", 50)])
+    assert found == {("go", "github.com/spf13/cobra"): "go.mod"}
+    assert not listing.called
 
 
 @respx.mock

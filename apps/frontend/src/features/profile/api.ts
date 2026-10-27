@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '@/api/client'
 import type { DeveloperProfile, InterestPage, SkillPage } from '@/api/types'
 
-// Under ['profile'], so a completed sync (useSyncStatus) invalidates these too.
+// Under ['profile'], so delete-data removes them; the `profile` data version refetches them
+// (src/app/dataVersions.ts).
 export const developerProfileKey = ['profile', 'developer'] as const
 export const skillsKey = ['profile', 'skills'] as const
 export const interestsKey = ['profile', 'interests'] as const

@@ -317,10 +317,12 @@ def test_tool_named_like_a_list_is_analyzed_and_eligible(user, developer, respx_
         language="JavaScript",
         manifests={"package.json": '{"dependencies": {"remark-lint": "^9"}}'},
     )
-    run(user)
+    job = run(user)
     repo = Repository.objects.get(github_id=401)
     assert RepositoryCandidate.objects.filter(repository=repo).exists()
     assert (repo.is_eligible, repo.lifecycle) == (True, "recommendable")
+    # Spec "Code project analyzed": the cleanup after analysis keeps it.
+    assert (job.metadata["analysis_not_code"], job.metadata["pool_size"]) == (0, 1)
 
 
 def test_list_without_dependencies_is_decided_once(user, developer, respx_mock) -> None:
@@ -339,6 +341,9 @@ def test_list_without_dependencies_is_decided_once(user, developer, respx_mock) 
     assert not RepositoryCandidate.objects.filter(repository=repo).exists()
     assert job.metadata["rejections"].get("not_code") == 1
     assert routes["metadata"].call_count == calls
+    # Rejected while storing, so counted in that query's yield too.
+    found = job.metadata["query_yield"]["language:python"]
+    assert (found["results"], found["rejections"], found["recorded"]) == (1, {"not_code": 1}, 0)
 
 
 def test_results_stored_in_github_id_order(user, developer, respx_mock, monkeypatch) -> None:
@@ -582,3 +587,113 @@ def test_budget_not_a_multiple_of_the_bands_warns(settings) -> None:
     settings.DISCOVERY_STAR_BANDS = [[20, 999], [1000, None]]
     settings.DISCOVERY_MAX_QUERIES = 20
     assert discovery_config_check() == []
+
+
+# --- cleanup after analysis (change post-analysis-pool-cleanup) --------------------------------
+
+
+def test_list_found_by_this_runs_analysis_leaves_the_pool(user, developer, respx_mock) -> None:
+    # Spec "List found by this run's analysis": kept by the pool step (not yet analyzed),
+    # found not_code by the analysis, gone when the run ends.
+    lst = repo_payload("vinta/awesome-python", 402)
+    httpx_repo = repo_payload("encode/httpx", 403)
+    mock_search(respx_mock, {"language:Python": [lst, httpx_repo]})
+    mock_repo_api(
+        respx_mock, "vinta/awesome-python", 402, manifests={"pyproject.toml": "[project]\n"}
+    )
+    mock_repo_api(respx_mock, "encode/httpx", 403)
+
+    job = run(user)
+
+    pooled = set(RepositoryCandidate.objects.values_list("repository__full_name", flat=True))
+    assert pooled == {"encode/httpx"}
+    assert job.metadata["pool_not_code"] == 0  # the pool step could not know yet
+    assert job.metadata["analysis_not_code"] == 1
+    assert job.metadata["pool_size"] == 1
+    assert sum(job.metadata["pool_bands"].values()) == 1
+    shared = Repository.objects.get(github_id=402)  # shared data is kept
+    assert (shared.is_eligible, shared.ineligible_reason) == (False, "not_code")
+
+
+def test_failed_analysis_removes_nothing(user, developer, respx_mock) -> None:
+    lst = repo_payload("acme/awesome-gone", 404)
+    mock_search(respx_mock, {"language:Python": [lst]})
+    respx_mock.get(f"{API}/repos/acme/awesome-gone").respond(404)
+    respx_mock.get(f"{API}/repositories/404").respond(404)
+
+    job = run(user)
+
+    assert job.metadata["analysis_outcomes"] == {"failed": 1}
+    assert job.metadata["analysis_succeeded"] == []
+    assert job.metadata["analysis_not_code"] == 0
+    assert RepositoryCandidate.objects.filter(repository__github_id=404).exists()
+
+
+def test_cancelled_run_removes_nothing_after_analysis(
+    user, developer, respx_mock, monkeypatch
+) -> None:
+    lst = repo_payload("vinta/awesome-python", 402)
+    mock_search(respx_mock, {"language:Python": [lst]})
+    mock_repo_api(
+        respx_mock, "vinta/awesome-python", 402, manifests={"pyproject.toml": "[project]\n"}
+    )
+    original = DiscoveryService._analyze
+
+    def analyze_then_cancel(self, repo_ids):
+        yield from original(self, repo_ids)
+        type(self.job).objects.filter(pk=self.job.pk).update(status="CANCELLED")
+
+    monkeypatch.setattr(DiscoveryService, "_analyze", analyze_then_cancel)
+    job = new_job(user)
+    with pytest.raises(JobCancelled):
+        DiscoveryService(job).run()
+    assert RepositoryCandidate.objects.filter(repository__github_id=402).exists()
+
+
+def test_resumed_analysis_step_still_cleans_up(user, developer, respx_mock) -> None:
+    # A crash after the last analysis and before the cleanup: the retried step analyzes
+    # nothing and still removes the list, from the recorded ids.
+    lst = make_candidate_repo(
+        402,
+        "vinta/awesome-python",
+        lifecycle="indexed",
+        is_eligible=False,
+        ineligible_reason="not_code",
+        dependencies_synced_at=timezone.now(),
+    )
+    RepositoryTopic.objects.create(repository=lst, topic="awesome")
+    add_candidate(developer, lst)
+    done = {step: "done" for step in jobs.DISCOVERY_STEPS}
+    job = new_job(
+        user,
+        steps={**done, "analysis": "pending"},
+        metadata={
+            "analysis_plan": [lst.pk],
+            "analyzed": [lst.pk],
+            "analysis_outcomes": {"analyzed": 1},
+            "analysis_succeeded": [lst.pk],
+        },
+    )
+
+    DiscoveryService(job).run()
+
+    job.refresh_from_db()
+    assert not RepositoryCandidate.objects.filter(repository=lst).exists()
+    assert job.metadata["analysis_not_code"] == 1
+    assert job.metadata["pool_size"] == 0
+
+
+def test_not_code_removal_counts_candidates_not_records(user, developer) -> None:
+    """U-3: two discovery records cascade with one candidate; a flagged repository that is no
+    longer a candidate removes nothing."""
+    listed = make_candidate_repo(960, "o/no-language", primary_language="")
+    gone = make_candidate_repo(961, "o/also-no-language", primary_language="")
+    add_candidate(developer, listed, query="language:Python")
+    add_candidate(developer, listed, source="topic_search", query="topic:cli")
+    service = DiscoveryService(new_job(user))
+    service.profile, service.now = developer, timezone.now()
+    pool = RepositoryCandidate.objects.filter(developer=developer)
+
+    assert service._remove_not_code(pool, [listed.pk, gone.pk]) == 1
+    assert service._remove_not_code(pool, [listed.pk, gone.pk]) == 0
+    assert not pool.exists()

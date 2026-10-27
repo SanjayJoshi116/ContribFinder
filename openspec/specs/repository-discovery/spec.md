@@ -44,7 +44,7 @@ Skills whose only evidence is a README mention SHALL NOT generate queries. Each 
 - **THEN** the application starts with a configuration warning that 1 request of the budget is unused
 
 ### Requirement: Candidate search
-The system SHALL run the generated queries against GitHub repository search with the developer's own token. It SHALL keep at most the configured number of results per query (default 30), and store the metadata of each result as a shared repository. It SHALL NOT index repositories that no query or interaction produced. A query that GitHub rejects as invalid SHALL be skipped and recorded, without failing the run. Rate limits and transient failures SHALL be handled as for sync requests, and a retried run SHALL NOT repeat queries it already completed.
+The system SHALL run the generated queries against GitHub repository search with the developer's own token. It SHALL keep at most the configured number of results per query (default 30), and store the metadata of each result as a shared repository. It SHALL NOT index repositories that no query or interaction produced. A query that GitHub rejects as invalid SHALL be skipped and recorded, without failing the run. Rate limits and transient failures SHALL be handled as for sync requests, and a retried run SHALL NOT repeat queries it already completed. Each query SHALL run in one configured star band; with more than one band, the band SHALL be part of the query. For every query it runs or GitHub refuses, a run SHALL record on its job the query's strategy and star band, the results returned, the rejections per reason (pre-filtering, and `not_code` found when storing) and the number of candidates recorded, or that GitHub refused it; the run's totals SHALL stay recorded as before. The recorded query yield SHALL NOT contain the query text.
 
 Storing a search result SHALL update the stored repository's metadata fields and topics but SHALL NOT count as a metadata fetch: the time its metadata was last fetched, which decides when languages and metadata are refreshed, SHALL be set only by an analysis or by the developer's own profile sync. Storing a search result SHALL NOT delete any stored repository: when another stored repository holds the result's name under a different GitHub ID, that repository SHALL keep its data and links and SHALL be resolved by its next analysis (see `repository-analysis`). Concurrent discovery runs storing overlapping results SHALL NOT fail on a database deadlock.
 
@@ -71,6 +71,37 @@ Storing a search result SHALL update the stored repository's metadata fields and
 #### Scenario: Concurrent runs
 - **WHEN** two developers' discovery runs store result sets that share 20 repositories at the same time
 - **THEN** both runs complete
+
+#### Scenario: Yield per query
+- **WHEN** a language query in the `20..999` band returns 30 results, of which 9 are rejected as `no_license` and 1 as `archived`
+- **THEN** the job records for that query: strategy `language_search`, band `20..999`, 30 results, rejections `no_license` 9 and `archived` 1, and 20 candidates recorded
+
+#### Scenario: Refused query in the yield
+- **WHEN** GitHub answers a skill query in the `1000+` band with 422
+- **THEN** the job records that query as refused, with its strategy and band and no results
+
+#### Scenario: One star band
+- **WHEN** only one star band is configured
+- **THEN** each query's yield has an empty band
+
+### Requirement: Discovery yield report
+A management command SHALL report how discovery's search requests were spent, from the query yield recorded on finished discovery jobs (completed, failed or cancelled), without changing any stored data. It SHALL accept a time window in days (by job start; default all time) and a JSON output file. Per strategy, per star band, and per strategy and band together, it SHALL give: the number of requests, the number refused by GitHub, the results returned, the rejections per reason, the candidates recorded, the results per request, and the share of results recorded. It SHALL give the same figures for all requests together, and the number of runs, and SHALL count runs that recorded no query yield on their own line. The report SHALL contain aggregates only: no user, job, repository or query-text identifiers. It SHALL NOT change any ranking, query plan or budget.
+
+#### Scenario: Rejections per strategy
+- **WHEN** finished runs recorded 10 language requests with 300 results, 90 rejected as `no_license` and 150 recorded, and 10 interest requests with 200 results, 20 rejected as `no_license` and 170 recorded
+- **THEN** the report shows `no_license` 90 for language and 20 for interest, and a recorded share of 0.50 for language and 0.85 for interest
+
+#### Scenario: Yield per band
+- **WHEN** runs recorded requests in the `20..999` and `1000+` bands
+- **THEN** the report gives the results per request and the recorded share for each band
+
+#### Scenario: Runs from before the yield was recorded
+- **WHEN** some finished discovery runs have no recorded query yield
+- **THEN** they are counted as runs without yield and enter no figure
+
+#### Scenario: Aggregates only
+- **WHEN** the report is written as JSON
+- **THEN** it contains no user, job or repository identifier and no query text, and no stored row changes
 
 ### Requirement: Previously interacted repositories
 Repositories the developer is linked to as a contributor SHALL be added to their pool with the source `previously_interacted`, without a search. The minimum-stars rule SHALL NOT apply to them. Repositories the developer owns SHALL never be candidates.
@@ -165,6 +196,8 @@ A candidate that no discovery run has found for the configured retention period 
 - a candidate whose stored repository data shows it is not a code project (the `not_code` rule of "Candidate eligibility" for an analyzed repository, of "Candidate pre-filtering" otherwise) SHALL be removed from the pool, and the job SHALL record how many were removed;
 - every eligibility rule of "Candidate eligibility" SHALL be re-checked on the stored data of the pool's analyzed repositories, with the current settings and time, without waiting for their next analysis. A repository whose eligibility changes SHALL get the new eligibility and reason, and SHALL be RECOMMENDABLE when eligible and INDEXED when not (a STALE repository keeps STALE and returns to the matching state after its refresh). A repository that an analysis currently holds, a FAILED repository and a repository never analyzed SHALL be left unchanged, and an existing reason SHALL be replaced only by the reason the rules give now.
 
+After a run's analysis step has analyzed the repositories it planned, the run SHALL remove from the pool every candidate whose repository it analyzed and whose stored data now shows it is not a code project (the same `not_code` rule), SHALL record how many it removed, and SHALL record the pool size and band counts again. A cancelled or reclaimed run SHALL remove nothing at that point. Shared repository data SHALL NOT be deleted by this removal.
+
 The pool SHALL NOT exceed the configured size (default 300). When it would, the system SHALL keep the candidates first in the pool order (previously interacted, then best search rank, then most recently found, then repository name) and remove the rest. The cap SHALL apply before the run analyzes anything, so the run analyzes only kept candidates, in the same order. Because search ranks are counted per band, the kept pool SHALL contain candidates from every band that returned results. The discovery job SHALL record the number of pool candidates in each star band, counting a repository in the band whose range holds its current stars, under `below` when it has fewer stars than the lowest band, and under `other` when no band holds it. Deleting the developer profile SHALL delete its candidates and discovery records. Shared repository data SHALL NOT be deleted when a candidate is removed.
 
 #### Scenario: Expired candidate
@@ -202,6 +235,18 @@ The pool SHALL NOT exceed the configured size (default 300). When it would, the 
 #### Scenario: Band with a gap
 - **WHEN** the bands are 20–99 and 200–999 and the pool holds repositories with 150 and 5000 stars
 - **THEN** both are counted under `other`, not in a band
+
+#### Scenario: List found by this run's analysis
+- **WHEN** a run's search finds `vinta/awesome-python` for the first time, the pool step keeps it (not yet analyzed), and the run's analysis finds no manifest dependency
+- **THEN** at the end of the run it is no longer in the pool, the job records one removal after analysis, and the recorded pool size and band counts no longer include it
+
+#### Scenario: Code project analyzed
+- **WHEN** a run's analysis finds a suspected list that declares manifest dependencies
+- **THEN** it stays in the pool after the run
+
+#### Scenario: Candidate not analyzed this run
+- **WHEN** a pool candidate was not in the run's analysis plan
+- **THEN** the removal after analysis leaves it to the next run's pool step
 
 ### Requirement: Discovery job
 Discovery SHALL run as a background job per user, tracked like a sync job: at most one active job per user, a status (PENDING, RUNNING, RETRYING, COMPLETED, FAILED or CANCELLED), attempts, a machine-readable error code on failure, and per-step status for the steps queries, search, interactions, pool and analysis, in that order. A retried job SHALL resume after its completed steps and completed per-item work. The repositories a run analyzes SHALL be chosen once, when its analysis step first starts, capped at the configured number per run (default 60); a resumed analysis step SHALL analyze only the rest of that choice and SHALL keep its recorded total. A discovery job SHALL NOT start for a user without an analyzed developer profile or without a connected GitHub account. HTTP requests SHALL NOT wait for discovery.

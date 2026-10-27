@@ -54,7 +54,8 @@ from services.github.storage import (
 from services.issues.analysis import IssueInput, analyze
 from services.matching.activity import WINDOW_DAYS, ActivityData, compute_activity
 
-from . import lifecycle
+from . import lifecycle, setup
+from .setup import SetupFacts
 from .staleness import PARTS, is_released_name, stale_parts
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,7 @@ class _Fetched:
     community: CommunityProfile | None = None
     labels: list[str] | None = None
     dependencies: dict[tuple[str, str], str] | None = None
+    setup: SetupFacts | None = None  # fetched with the dependencies
     activity: ActivityData | None = None
     issues: IssuePage | None = None
 
@@ -198,7 +200,13 @@ class RepositoryAnalysisService:
             out.labels = c.list_label_names(name)
         if "dependencies" in parts:
             self._between_parts(repo)
-            out.dependencies = read_manifests(c, name)
+            # One root listing serves the manifests and the setup facts.
+            root = c.list_root_contents(name)
+            out.dependencies = read_manifests(c, name, root)
+            workflows = (
+                c.list_contents(name, setup.WORKFLOWS_PATH) if setup.needs_workflows(root) else None
+            )
+            out.setup = setup.detect(root, workflows)
         if "activity" in parts:
             self._between_parts(repo)
             since = now - timedelta(days=WINDOW_DAYS)
@@ -282,6 +290,12 @@ class RepositoryAnalysisService:
             has_dependencies = bool(f.dependencies)
             repo.dependencies_synced_at = now
             fields.append("dependencies_synced_at")
+        if f.setup is not None:
+            repo.has_ci = f.setup.ci
+            repo.has_tests = f.setup.tests
+            repo.has_dev_environment = f.setup.dev_environment
+            repo.has_docker_compose = f.setup.docker_compose
+            fields += ["has_ci", "has_tests", "has_dev_environment", "has_docker_compose"]
         if f.activity is not None:
             self._store_snapshot(repo, f.activity, now)
             repo.activity_synced_at = now
