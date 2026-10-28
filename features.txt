@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.31 (2026-10-27)
+Version: 0.12.34 (2026-10-28)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,6 +439,40 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.34 - Dependency audit
+============================================================================
+
+Platform (ideas.md section 5)
+  [x] npm run audit:deps: pip-audit on uv.lock, npm audit on both npm lockfiles
+  [x] Fails on any Python advisory and npm high/critical; lower npm severities listed
+  [x] Accepted advisories in audit-accepted.json (reason and date; strict)
+  [x] CI workflow on pull requests, main, weekly and on demand
+  [x] First audit: vulnerable backend, root and frontend packages upgraded
+  [x] Review fixes (Bug_Backlog.md M-1..M-3, M-9..M-11): Windows-only packages audited on
+      Linux, a skipped package fails, clean errors for missing uv or a malformed report
+
+============================================================================
+SHIPPED - v0.12.33 - JSON report writer
+============================================================================
+
+Cleanup (Bug_Backlog.md T-14; ideas.md section 15)
+  [x] One helper (core/reports.py) writes every command's JSON file
+  [x] Every JSON file keeps non-ASCII text and ends with a newline
+  [x] e2e_seed reports a failed write as a command error; one error wording
+
+============================================================================
+SHIPPED - v0.12.32 - Signal fixes
+============================================================================
+
+Fixes (Bug_Backlog.md B-6, D-11, T-11; baselines unchanged)
+  [x] Experience level is the rounded mean of its signal scores (B-6)
+  [x] The earliest title keyword decides an issue's type: "[Bug]: docs ..." is a bug fix (D-11)
+  [x] A part with issue weight 0 no longer makes an issue relevant (T-11)
+Process
+  [x] Ranking changes no longer wait for judged real developers (K-1 optional)
+  [~] P-1 WSL keep-alive exit cause: accepted (restart covers it)
+
+============================================================================
 SHIPPED - v0.12.31 - Data versions fixes
 ============================================================================
 
@@ -737,15 +771,11 @@ PLANNED - MVP+ / FUTURE
 ============================================================================
 
   [ ] Docker Compose verification (needs a machine with Docker)
-  [ ] Judge real-a-v2 (K-1), build benchmark-v2, evaluate v1/v2, write its baseline
-  [ ] Bug_Backlog.md batch 8  B-6 and D-11 (wait for K-1)
-  [ ] Bug_Backlog.md P-1  keep-alive exit cause
-  [ ] Bug_Backlog.md T-11 issue relevance ignores part weights (waits for K-1)
+  [ ] Judge real-a-v2 (K-1, optional since 2026-10-28), build benchmark-v2, evaluate v1/v2, write its baseline
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
-  [ ]          Finish real judgments, build benchmark-v2, then any further ranking tuning
   [ ]          Issue-level evaluation
   [ ]          Personalized ranking, notifications, contribution tracking
   [ ] ideas.md  Unplanned, ordered by when they can ship. Now (no ranking change):
-                dependency scanning, interface revamp (§18). After K-1: IDF weighting, diversity, preferences,
+                interface revamp (§18). Ranking-visible (win on the benchmark): IDF weighting, diversity, preferences,
                 contribution-success signals, labeled-issue fetch, retrieval sources,
                 content-based not_code, label bands

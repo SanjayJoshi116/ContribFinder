@@ -185,6 +185,28 @@ def test_zero_weight_part_gives_no_reason(part: str) -> None:
         assert part not in [r["type"] for r in scored.reasons]
 
 
+@pytest.mark.parametrize(
+    ("part", "labels"),
+    [("technology", ()), ("approachability", ("good_first_issue",))],
+)
+def test_zero_weight_part_does_not_make_an_issue_relevant(part: str, labels) -> None:
+    # T-11: relevance, like the reasons, counts only parts that add to the score.
+    params = {**copy.deepcopy(PARAMS), "min_score": 0.0}
+    params["weights"] = {**params["weights"], part: 0.0}
+    only_that_part = issue(labels=labels, techs=() if labels else ("django",))
+    assert match_issues([only_that_part], dev(), params) == NO_MATCH
+
+
+def test_zero_technology_weight_is_not_counted_as_mentioning() -> None:
+    params = copy.deepcopy(PARAMS)
+    params["weights"] = {**params["weights"], "technology": 0.0}
+    match = match_issues(
+        [issue(labels=("good_first_issue",), difficulty="beginner")], dev(), params
+    )
+    assert not match.issues[0].mentions_technology
+    assert match.issue_fit.evidence[0]["technology_count"] == 0
+
+
 def test_unknown_difficulty_reason() -> None:
     _, fit, _, scored = score_issue(issue(difficulty="unknown"), dev("beginner"), PARAMS)
     assert fit == 0.3

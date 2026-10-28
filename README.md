@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.31** (review fixes for data versions and discovery cleanup; MVP+). After signing in with
+**Version 0.12.34** (dependency audit in CI; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -365,6 +365,40 @@ Never commit `.env`.
 schedule name, version check) with Node's built-in test runner.
 All commands are in `CLAUDE.md` §6.
 
+### Dependency audit
+
+`npm run audit:deps` at the root checks every lockfile for known vulnerabilities: the backend's
+`uv.lock` with `pip-audit` (run through `uv`, nothing installed into the project) and both npm
+lockfiles (`apps/frontend`, root) with `npm audit`. It reads only the locked versions. Any Python
+advisory and any high or critical npm advisory fails it (exit 1); low and moderate npm advisories
+are listed only, and a Python package pip-audit could not check fails too. Every locked
+package is audited on every platform (environment markers are ignored). Exit 2 means an audit
+could not run. CI runs it on every pull request and push
+to `main`, every Monday and on demand (`.github/workflows/audit.yml`), so a new advisory turns
+it red without a commit.
+
+Fix a finding by upgrading (`uv lock --upgrade-package NAME` in `apps/backend`;
+`npm audit fix --package-lock-only` in the folder named), then run the tests. If your npm config
+has `allow-remote=none`, the frontend needs `--allow-remote=all` for that one command (a
+Tailwind WebAssembly package is fetched by URL). When no fixed version exists yet, accept the
+advisory in `audit-accepted.json`:
+
+```json
+[
+  {
+    "ecosystem": "npm",
+    "id": "GHSA-xxxx-xxxx-xxxx",
+    "package": "example",
+    "reason": "Build-time only; no fixed version yet.",
+    "accepted_on": "2026-10-28"
+  }
+]
+```
+
+`ecosystem` is `pypi` or `npm`; `id` is the advisory id the audit prints (a PyPI alias works
+too). Every field is required and unknown fields are refused. The audit lists entries that no
+longer match anything: remove them.
+
 ### End-to-end tests
 
 Playwright runs the main flows (sign-in start, onboarding, dashboard, save, dismiss and undo,
@@ -394,8 +428,7 @@ review (rows Z-1…Z-10, batch 15; Z-1 in 0.12.12), and batch 11 (performance an
 0.12.10 (A-18 wontfix), and batch 16 (tooling and data hygiene) in 0.12.11. B-14…B-16 and D-7
 of batch 8 shipped in 0.12.14 with S-1…S-5 from the review of 0.12.13/0.12.14 (batch 18), and
 D-12, D-13 and S-9…S-11 in 0.12.15, D-8, D-9, D-15…D-18 of batch 8 in 0.12.16, and S-7 in
-0.12.17, S-6 in 0.12.18. B-6 and D-11 of batch 8 (OpenSpec changes, ranking-visible, wait for
-K-1) remain.
+0.12.17, S-6 in 0.12.18. B-6 and D-11, the rest of batch 8, and T-11 shipped in 0.12.32, T-14 in 0.12.33.
 
 ## Versioning
 

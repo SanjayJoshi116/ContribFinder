@@ -1,11 +1,10 @@
-import json
 from argparse import ArgumentParser
-from pathlib import Path
 from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from core.reports import json_text, write_json
 from services.evaluation.export import NotAnalyzed, export_developer
 
 
@@ -44,18 +43,12 @@ class Command(BaseCommand):
                 f"Left out {dropped} repositories the user interacted with "
                 "(--include-interacted keeps them)."
             )
-        text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
         if options["out"]:
-            out = Path(options["out"])
-            try:
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_text(text, encoding="utf-8")
-            except OSError as exc:
-                raise CommandError(f"Cannot write the export: {exc}") from exc
+            write_json(options["out"], data, what="Export")
             candidates = len(data["developers"][0]["candidates"])
             self.stdout.write(
                 f"Exported {options['developer_id']} ({candidates} candidates) to "
                 f"{options['out']}. Add judgments by hand."
             )
         else:
-            self.stdout.write(text)
+            self.stdout.write(json_text(data))

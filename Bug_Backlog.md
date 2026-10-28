@@ -1,7 +1,7 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since. Order: open items and known gaps, the release index, the fix-batch plan
+each fix release since; current through 0.12.34. Order: open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
 Status: `open` · `confirmed` / `partial` (verified, not fixed) · `fixed in part` · `fixed` ·
@@ -9,38 +9,20 @@ Status: `open` · `confirmed` / `partial` (verified, not fixed) · `fixed in par
 
 ## Open items
 
-Every row not yet closed, as of 0.12.23 (6 rows). Known gaps (K) are in the next section.
-Details are in the row's history section. Ordered by what can be done next, then most severe
-first.
-
-**Not blocked** (no ranking change, so no wait for K-1):
-
-| ID | Type | Item | Batch | Needs | Status |
-|---|---|---|---|---|---|
-| P-1 | bug | Why the WSL keep-alive once exited (`0xC000013A`); the runner now restarts it | 16 | Investigation: reproduce in an interactive console (CLAUDE.md §6 testing note) | fixed in part |
-
-**Wait for K-1** (change v2's scores; must be evaluated on the benchmark):
-
-| ID | Type | Item | Batch | Needs | Status |
-|---|---|---|---|---|---|
-| B-6 | bug | Experience-level cutoffs 0.67/1.34 are not the documented rounded mean | 8 | OpenSpec change (pick the correct cutoffs first; feeds `difficulty_fit`) | confirmed |
-| D-11 | bug | Issue title keyword order puts docs/test/CI before bug | 8 | OpenSpec change (title keyword order) | confirmed |
-| T-11 | bug | With an issue weight of 0, issues still count as relevant through that part (reasons already skip it) | 19 | OpenSpec change (`issue-matching` relevance by contribution; changes `issue_fit`) | confirmed |
-
-Order: P-1 needs an interactive console to reproduce. Behind K-1, B-6 matters most (a
-wrong experience level shifts every `difficulty_fit`); T-11 bites only a configuration with an
-issue weight of 0, which none has. T-11 is the 0.12.23 review's remaining skip (batch 19; T-12 fixed in 0.12.29);
-batch 8 keeps B-6 and D-11.
+None as of 2026-10-28: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; the review of
+0.12.32–0.12.34 (batch 21) fixed or closed in 0.12.34. Known gaps (K) are
+in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
+a fresh holdout; they no longer wait for K-1 (since 2026-10-28).
 
 ## Known gaps (already tracked elsewhere)
 
 | ID | Item | Source | Status |
 |---|---|---|---|
-| K-1 | Judge `real-a-v2`, build `benchmark-v2`, evaluate v1/v2 (all/persona/real), `--write-baseline`. Blocks any further ranking search. | features.txt:664, CLAUDE.md §7 | open |
+| K-1 | Judge `real-a-v2`, build `benchmark-v2`, evaluate v1/v2 (all/persona/real), `--write-baseline`. Optional since 2026-10-28 (owner decision): no longer blocks ranking changes, which are judged on the selection benchmark (`benchmark-v1` until `benchmark-v2` exists) and a fresh holdout. | features.txt:664, CLAUDE.md §7 | open (optional) |
 | K-2 | Docker Compose verification from a fresh `.env` (no Docker on dev machine). | features.txt:663 | open |
 | K-3 | Issue-level evaluation (benchmark covers repositories only). | features.txt:673 | open |
 | K-4 | Docs-style repositories with a code language and no list topic (`system-design-primer`, `developer-roadmap`) pass `not_code`. Since 0.12.7 a suspected list (`awesome-*`, list topic) that declares manifest dependencies (lint or site tooling) passes too. | CHANGELOG 0.12.0, 0.12.7 | open (known limit; `ideas.md` §11) |
-| K-5 | Active config v2 is not an improvement over v1 on `benchmark-v1` (NDCG@10 +0.0195, P@5 −0.0333). | CLAUDE.md Phase 8b | open (needs K-1) |
+| K-5 | Active config v2 is not an improvement over v1 on `benchmark-v1` (NDCG@10 +0.0195, P@5 −0.0333). | CLAUDE.md Phase 8b | open (a later config must win on `benchmark-v1`) |
 
 ## Fixed by release
 
@@ -49,11 +31,14 @@ must match it. Newest first. Counts are fixed rows.
 
 | Version | Change | Fixed | In part, accepted or wontfix |
 |---|---|---|---|
+| 0.12.34 | `dependency-scanning` (with its review) | 6: M-1, M-2, M-3, M-9, M-10, M-11 | M-4, M-5, M-6, M-12…M-15 accepted; M-7, M-8 wontfix |
+| 0.12.33 | `json-report-writer` | 1: T-14 | — |
+| 0.12.32 | (no OpenSpec change) | 3: B-6, D-11, T-11 | P-1 accepted |
 | 0.12.31 | `data-versions-fixes` | 6: U-1, U-2, U-3, U-5, U-6, U-7 | U-4 accepted, U-8 wontfix |
 | 0.12.29 | `rank-constraint` | 1: T-12 | — |
 | 0.12.27 | `data-versions` | 1: Y-6 | S-8 narrowed |
 | 0.12.26 | `post-analysis-pool-cleanup` | 1: X-9 | — |
-| 0.12.23 | `dismiss-reasons` (with its review) | 10: T-1, T-2, T-3, T-4, T-5, T-6, T-7, T-8, T-9, T-10 | T-13 wontfix; T-14 accepted (`ideas.md` §15) |
+| 0.12.23 | `dismiss-reasons` (with its review) | 10: T-1, T-2, T-3, T-4, T-5, T-6, T-7, T-8, T-9, T-10 | T-13 wontfix; T-14 accepted (fixed in 0.12.33) |
 | 0.12.18 | `activation-command-only` | 1: S-6 | — |
 | 0.12.17 | `keyset-paging-links` | 1: S-7 | — |
 | 0.12.16 | `signal-explanation-accuracy` | 6: D-8, D-9, D-15, D-16, D-17, D-18 | — |
@@ -61,7 +46,7 @@ must match it. Newest first. Counts are fixed rows.
 | 0.12.14 | (no OpenSpec change) | 9: B-14, B-15, B-16, D-7, S-1, S-2, S-3, S-4, S-5 | S-8 accepted |
 | 0.12.13 | `config-activation-loose-ends` | 1: P-3 | Q-10 accepted; D-15 in part (activation validates) |
 | 0.12.12 | `freshness-paging-seed` | 2: Y-7, Z-1 | Y-6 in part |
-| 0.12.11 | `tooling-data-hygiene` | 5: P-2, P-4, P-5, Q-11, Q-12 | P-1 in part (restart; cause unknown), Q-10 in part |
+| 0.12.11 | `tooling-data-hygiene` | 5: P-2, P-4, P-5, Q-11, Q-12 | P-1 in part (restart; cause unknown; accepted 2026-10-28), Q-10 in part |
 | 0.12.10 | `performance-cleanup` | 30: DOC-1, DOC-2, A-16, A-17, A-20, B-17, B-20, C-20, C-21, C-23, D-19, D-20, D-21, E-10, X-11, X-12, Y-9, Y-10, Z-4, Z-5, Z-8, Z-9, Z-10, Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 | A-18 wontfix; Q-3, Q-6 accepted |
 | 0.12.9 | `dev-scripts-checks` | 17: G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20, Z-2, Z-3, Z-6, Z-7 | — |
 | 0.12.8 | `frontend-correctness` | 17: F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18, Y-1, Y-2, Y-3, Y-4, Y-5, Y-8 | — |
@@ -73,13 +58,13 @@ must match it. Newest first. Counts are fixed rows.
 | 0.12.2 | `privacy-deletion-finality` | 10: A-1, A-7, A-8, A-9, A-12, A-19, B-4, E-3, H-8, H-9 | — |
 | 0.12.1 | `security-hardening` | 12: A-15, G-5, G-6, H-2, H-3, H-4, H-6, H-12, H-13, H-14, H-15, H-16 | — |
 
-Total fixed: 224. Never in a release: A-10 (false positive, in no batch).
+Total fixed: 234. Never in a release: A-10 (false positive, in no batch).
 
 ## Fix batches
 
 Each batch fits one OpenSpec change. Numbered in the order planned on 2026-10-19 (12–19 added by
-later reviews). Every verified row is in exactly one batch (A-10 dropped). All shipped except
-batches 8 and 19 (in part); "Open items" above holds the order for what is left.
+later reviews). Every verified row is in exactly one batch (A-10 dropped). All shipped
+(batches 8 and 19 finished in 0.12.32, batch 21 in 0.12.34).
 
 | # | Batch | Rows | Why together |
 |---|---|---|---|
@@ -90,7 +75,7 @@ batches 8 and 19 (in part); "Open items" above holds the order for what is left.
 | 5 | **GitHub error handling and resilience** | A-2, A-3, A-4, A-5, A-6, A-11, A-13, A-14, B-13, C-1, C-6, C-9, H-1 | Classify 301, secondary 403, 451 and decryption errors correctly; one bad repository or manifest never fails a whole job; a Redis outage never breaks reads. |
 | 6 | **Recommendation consistency** | D-1, D-2, D-3, D-4, D-5, D-6, D-10, D-14, E-4, E-5, E-6, E-7, F-4 | Stale ≠ gone; one lock order and one dismissal check for save, dismiss and persist; freshness sees restores and new candidates. |
 | 7 | **Discovery and repository data** | C-2, C-5, C-7, C-8, C-11, C-12, C-13, C-14, C-15, C-16, C-17, C-18, R-3, R-4, R-5, R-6, R-9, R-10, R-11, R-12 | Eligibility re-check via lifecycle, provenance pruning, not_code false positives, search upsert side effects, one shared ordering helper. |
-| 8 | **Signal and explanation accuracy** | B-6, B-14, B-15, B-16, D-7, D-8, D-9, D-11, D-12, D-13, D-15, D-16, D-17, D-18 | Wrong experience level, missed README badges, misclassified issues, reasons not backed by scoring. Ranking-visible: evaluate on the benchmark. B-14, B-15, B-16, D-7 shipped in 0.12.14, D-12, D-13 in 0.12.15 (no spec change; baselines unchanged), D-8, D-9, D-15, D-16, D-17, D-18 in 0.12.16 (`signal-explanation-accuracy`; baselines unchanged). B-6 and D-11 wait for K-1. |
+| 8 | **Signal and explanation accuracy** | B-6, B-14, B-15, B-16, D-7, D-8, D-9, D-11, D-12, D-13, D-15, D-16, D-17, D-18 | Wrong experience level, missed README badges, misclassified issues, reasons not backed by scoring. Ranking-visible: evaluate on the benchmark. B-14, B-15, B-16, D-7 shipped in 0.12.14, D-12, D-13 in 0.12.15 (no spec change; baselines unchanged), D-8, D-9, D-15, D-16, D-17, D-18 in 0.12.16 (`signal-explanation-accuracy`; baselines unchanged). B-6 and D-11 fixed in 0.12.32. |
 | 9 | **Frontend correctness** | F-1, F-2, F-3, F-5, F-6, F-7, F-8, F-9, H-5, H-17, H-18 | Query invalidation churn, no 4xx retry, pagination gaps, 401 handling; add Playwright for the main flows. |
 | 10 | **Dev scripts, checks and migrations** | G-1, G-2, G-3, G-4, G-7, G-8, G-9, G-10, H-7, H-10, H-11, H-19, H-20 | `npm run stop` kills only this repo; config checks for unchecked settings; safe seed migrations; tests for those paths. |
 | 11 | **Performance and cleanup** | A-16, A-17, A-18, A-20, B-17, B-20, C-20, C-21, C-22, C-23, D-19, D-20, D-21, E-10, DOC-1, DOC-2, X-11, X-12, Y-9, Y-10, Z-4, Z-5, Z-8, Z-9, Z-10 | No behavior change; do alongside nearby batches or as one sweep. C-22 already fixed in batch 4. |
@@ -98,11 +83,12 @@ batches 8 and 19 (in part); "Open items" above holds the order for what is left.
 | 13 | **Batch 7 follow-ups** | X-1…X-10 | Review of `discovery-repository-data`. X-1…X-6 fixed in the same release (0.12.7); X-7, X-8 accepted, X-9 fixed in 0.12.26, X-10 false positive. X-11 and X-12 went to batch 11. |
 | 14 | **Batch 9 follow-ups** | Y-1…Y-10 | Review of `frontend-correctness`. Y-1…Y-5 and Y-8 fixed in the same release (0.12.8); Y-6 (in part) and Y-7 fixed in 0.12.12 (`freshness-paging-seed`), the rest of Y-6 in 0.12.27 (`data-versions`); Y-9 and Y-10 went to batch 11. |
 | 15 | **Batch 10 follow-ups** | Z-1…Z-10 | Review and `/simplify` pass of `dev-scripts-checks`. Z-2, Z-3, Z-6, Z-7 fixed in the same release (0.12.9); Z-1 fixed in 0.12.12 (spec change, `freshness-paging-seed`); Z-4, Z-5, Z-8, Z-9, Z-10 went to batch 11. |
-| 16 | **Batch 11 follow-ups** | P-1…P-5 | Found while implementing `performance-cleanup` (0.12.10). Shipped with Q-10…Q-12 in 0.12.11 (`tooling-data-hygiene`): P-2, P-4, P-5 fixed, P-1 fixed in part (restart; cause unknown), P-3 open (not reproduced). |
+| 16 | **Batch 11 follow-ups** | P-1…P-5 | Found while implementing `performance-cleanup` (0.12.10). Shipped with Q-10…Q-12 in 0.12.11 (`tooling-data-hygiene`): P-2, P-4, P-5 fixed, P-1 fixed in part (restart; cause unknown; accepted 2026-10-28), P-3 open (not reproduced; fixed in 0.12.13). |
 | 17 | **Batch 11 review** | Q-1…Q-12 | Review and `/simplify` pass of `performance-cleanup`. Q-1, Q-2, Q-4, Q-5, Q-7, Q-8, Q-9 fixed in the same release (0.12.10); Q-3, Q-6 accepted; Q-10…Q-12 went to batch 16 (0.12.11; Q-10 in part). |
 | 18 | **0.12.13/0.12.14 review** | S-1…S-11 | Review and `/simplify` pass of `config-activation-loose-ends` and the batch 8 fixes. S-1…S-5 fixed in 0.12.14 before commit, S-9…S-11 in 0.12.15, S-7 in 0.12.17 (`keyset-paging-links`), S-6 in 0.12.18 (`activation-command-only`); S-8 accepted, narrowed in 0.12.27 (`data-versions`). |
-| 19 | **0.12.23 review** | T-1…T-14 | `code-review` and `/simplify` pass of the uncommitted 0.12.14–0.12.23 work. T-1…T-10 fixed in 0.12.23 before commit; T-11 waits for K-1, T-12 fixed in 0.12.29 (`rank-constraint`), T-13 wontfix, T-14 accepted. The security review found nothing. |
+| 19 | **0.12.23 review** | T-1…T-14 | `code-review` and `/simplify` pass of the uncommitted 0.12.14–0.12.23 work. T-1…T-10 fixed in 0.12.23 before commit; T-11 fixed in 0.12.32, T-12 fixed in 0.12.29 (`rank-constraint`), T-13 wontfix, T-14 fixed in 0.12.33 (`json-report-writer`). The security review found nothing. |
 | 20 | **0.12.24–0.12.30 review** | U-1…U-8 | `code-review` of the uncommitted 0.12.24–0.12.30 work. U-1, U-2, U-3, U-5, U-6, U-7 fixed in 0.12.31 (`data-versions-fixes`) before commit; U-4 accepted, U-8 wontfix. |
+| 21 | **0.12.32–0.12.34 review** | M-1…M-15 | `code-review` (M-1…M-8) and `/simplify` (M-9…M-15) of the uncommitted 0.12.32–0.12.34 work. M-1, M-2, M-3, M-9, M-10, M-11 fixed in 0.12.34 before commit; the rest accepted or wontfix. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -111,8 +97,10 @@ Y-6 (in part), Y-7 and Z-1 in 0.12.12, P-3 (and Q-10 accepted) in 0.12.13, B-14,
 and D-7 of batch 8 in 0.12.14 (the code follows the existing specs, so no OpenSpec change), with
 S-1…S-5 of batch 18; D-12, D-13 and S-9…S-11 in 0.12.15; D-8, D-9, D-15, D-16, D-17, D-18 of
 batch 8 in 0.12.16 (`signal-explanation-accuracy`); S-7 of batch 18 in 0.12.17
-(`keyset-paging-links`); S-6 in 0.12.18 (`activation-command-only`); T-1…T-10 of batch 19 in 0.12.23; X-9 in 0.12.26 (`post-analysis-pool-cleanup`); Y-6 in 0.12.27 (`data-versions`); T-12 in 0.12.29 (`rank-constraint`); U-1…U-3, U-5…U-7 in 0.12.31 (`data-versions-fixes`).
-Next: P-1 (see "Open items"); B-6 and D-11 of batch 8 and T-11 wait for K-1.
+(`keyset-paging-links`); S-6 in 0.12.18 (`activation-command-only`); T-1…T-10 of batch 19 in 0.12.23; X-9 in 0.12.26 (`post-analysis-pool-cleanup`); Y-6 in 0.12.27 (`data-versions`); T-12 in 0.12.29 (`rank-constraint`); U-1…U-3, U-5…U-7 in 0.12.31 (`data-versions-fixes`); B-6, D-11 (the rest of batch 8) and T-11
+in 0.12.32 (no OpenSpec change: B-6 follows its documented rounded mean, the spec does not order
+title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 accepted.
+Next: nothing open; the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
 3, E-3) shipped in 0.12.2 and 0.12.3.
@@ -144,7 +132,8 @@ scenario or severity is narrower; `false-positive` = not a defect.
 | Q batch 11 review | 12 | 12 | 0 | 0 |
 | S 0.12.13/0.12.14 review | 11 | 10 | 1 | 0 |
 | T 0.12.23 review | 14 | 12 | 2 | 0 |
-| **Total** | **247** | **195** | **42** | **3** |
+| U 0.12.24–0.12.30 review | 8 | 7 | 1 | 0 |
+| **Total** | **255** | **202** | **43** | **3** |
 
 ## Review history
 
@@ -224,7 +213,7 @@ the repository root (G). Within each area, rows are ordered most severe first. T
 | B-3 | bug | `services/profiling/analysis.py:218` | Shared Skill and Interest rows upserted (`ON CONFLICT DO UPDATE`) in confidence order inside per-user transactions → concurrent analyses deadlock → `analysis_failed`, not retried. Sort slugs, or upsert outside the transaction. | fixed (job-claim-fencing) |
 | B-4 | bug | `services/profiling/analysis.py:257` | `_persist` uses `get_or_create`; an analysis running during delete-data recreates DeveloperProfile and README evidence (see A-1). | fixed (privacy-deletion-finality) |
 | B-5 | bug | `services/profiling/analysis.py:249` | Input snapshot read without a lock and `_persist` overwrites unconditionally → overlapping sync analysis and standalone `profile_analysis` can let the older snapshot win. | fixed (job-claim-fencing) |
-| B-6 | bug | `services/profiling/experience.py:58` | Cutoffs 0.67/1.34 are not the documented rounded mean: (1,1,0) mean 0.667 → beginner (should be intermediate); 1.4 → experienced. Feeds `difficulty_fit`. | confirmed |
+| B-6 | bug | `services/profiling/experience.py:58` | Cutoffs 0.67/1.34 are not the documented rounded mean: (1,1,0) mean 0.667 → beginner (should be intermediate); 1.4 → experienced. Feeds `difficulty_fit`. | fixed (0.12.32; no spec change: the level is the rounded mean with halves up, computed in integers (`2·total < n` beginner, `2·total < 3n` intermediate). Benchmarks store each developer's level, so baselines cannot move; stored profiles change on their next analysis or `reanalyze_profiles`) |
 | B-7 | bug | `services/jobs.py:250` | `start_profile_analysis` treats stale RUNNING jobs as active (no stale exclusion or `_expire_stale`, unlike the other start_*) → `reanalyze_profiles` skips users for up to about 15 min after a crash. | fixed (job-claim-fencing) |
 | B-8 | bug | `services/jobs.py:240` | IntegrityError fallback re-queries the active job, which may have finished meanwhile → `.get()` raises DoesNotExist (500 on POST /profile/sync); `.first()` returns None, read as "no profile". | fixed (job-claim-fencing) |
 | B-9 | bug | `services/jobs.py:119` | Eager mode (`REDIS_URL` empty): `task.retry(countdown)` re-runs inline, ignoring the countdown → 5 back-to-back GitHub calls on 5xx or 429, a hot loop. | fixed (job-claim-fencing) |
@@ -284,7 +273,7 @@ Two runs, merged.
 | D-8 | bug | `services/ranking/score.py:99` | Relevance gate checks raw signal values, not weights → a weight-0 relevance signal still admits a candidate. | fixed (signal-explanation-accuracy: the gate needs value and weight above 0, also for issue preselection) |
 | D-9 | bug | `services/matching/issues.py:193` | Issue with only technologies the developer lacks still counts via approachability + difficulty (score 0.40 ≥ 0.3) → "matches your profile" for a Rust issue shown to a Python dev. | fixed (signal-explanation-accuracy: the text says whether issues matched by technology, by label only, or both) |
 | D-10 | bug | `services/ranking/service.py:156` | Dismissals during a run removed after the `top_n` cut → fewer than N stored although next candidates exist. | fixed (recommendation-consistency) |
-| D-11 | bug | `services/issues/classify.py:336` | Title keyword order puts docs, test and CI before bug → "[Bug]: docs build crashes" becomes documentation → beginner vote. Undoes the `[Bug]:` fix. | confirmed |
+| D-11 | bug | `services/issues/classify.py:336` | Title keyword order puts docs, test and CI before bug → "[Bug]: docs build crashes" becomes documentation → beginner vote. Undoes the `[Bug]:` fix. | fixed (0.12.32; no spec change: the keyword earliest in the title wins, list order breaks a tie at the same position; `ISSUE_TAXONOMY_VERSION` 2026.10.4. Trade-off: "Fix broken link in README" now reads bug_fix (was documentation), since `broken` comes first. Benchmarks store each issue's type and difficulty, so baselines cannot move; stored issues change on their next fetch) |
 | D-12 | bug | `services/issues/classify.py:412` | `body_length` vote uses raw markdown (template HTML comments included) → wrong or unknown difficulty. | fixed (0.12.15: HTML comments, which issue templates leave as instructions, are dropped before measuring) |
 | D-13 | bug | `services/issues/labels.py:110` | `[Type] Bug`-style labels never normalized (`_EDGES` strips only `[`) → no category, filter misses, documentation vote lost. | fixed (0.12.15: `_SCOPE` also takes a `[type]` prefix; `ISSUE_TAXONOMY_VERSION` 2026.10.3) |
 | D-14 | bug | `services/ranking/freshness.py:34` | `due_profiles` requires candidates → profile with an emptied pool keeps old recommendations forever. | fixed (recommendation-consistency) |
@@ -563,7 +552,7 @@ fixed there: outside the batch's rows.
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| P-1 | bug | `scripts/redis.mjs` (WSL keep-alive) | First `npm start` from Claude Code's Git Bash: keep-alive `wsl.exe` exited `3221225786` (`0xC000013A`, Ctrl+C exit) ~8 s after start → `concurrently` stopped the whole stack ("WSL keep-alive session ended … Redis may stop"). Second run stayed up 90 s; not reproduced. Maybe the shell's inherited Ctrl+C handling (CLAUDE.md §6 testing note), maybe a real stray console event. Check in an interactive console; decide whether a keep-alive exit must end the stack or be restarted. | fixed in part (tooling-data-hygiene: the runner restarts the keep-alive and logs the code in hex; the cause is still unknown) |
+| P-1 | bug | `scripts/redis.mjs` (WSL keep-alive) | First `npm start` from Claude Code's Git Bash: keep-alive `wsl.exe` exited `3221225786` (`0xC000013A`, Ctrl+C exit) ~8 s after start → `concurrently` stopped the whole stack ("WSL keep-alive session ended … Redis may stop"). Second run stayed up 90 s; not reproduced. Maybe the shell's inherited Ctrl+C handling (CLAUDE.md §6 testing note), maybe a real stray console event. Check in an interactive console; decide whether a keep-alive exit must end the stack or be restarted. | accepted (2026-10-28). Fixed in part in tooling-data-hygiene: the runner restarts the keep-alive and logs the code in hex. Cause unknown: `0xC000013A` is the default handler's exit for Ctrl+C, Ctrl+Break or console close, and the new process group stops only Ctrl+C. Retest on 2026-10-28 (distro stopped, spawned as `redis.mjs` does from Claude Code's Git Bash) stayed up 60 s; the keep-alive `wsl.exe` starts a second `wsl.exe` and neither has a `conhost.exe`. Reopen if the restart message shows in use, then probe which event reaches either `wsl.exe` (CLAUDE.md §6 testing note). |
 | P-2 | tooling | `apps/frontend` (`format:check`), `.gitattributes` | With `core.autocrlf=true` (Windows default) files check out CRLF; prettier wants LF → `npm run format:check` fails on untouched files (HEAD too). CI (Linux) unaffected. `prettier --check --end-of-line auto` passes. Fix: `.gitattributes` `* text=auto eol=lf`, or `endOfLine: "auto"`. | fixed (tooling-data-hygiene) |
 | P-3 | test | `src/app/app.test.tsx`, `src/features/feedback/feedback.test.tsx` | Under load (other suites running, 82 s duration) 2 of 35 tests failed; rerun alone passed in 12 s. Likely `waitFor` default timeout. Flaky locally; not seen in CI. Find the two tests, raise their timeout or wait on the right signal. | fixed (config-activation-loose-ends: cause was AppShell's lazy `LanguageChart` (Recharts), whose first import blocks the event loop ~1 s inside whichever test is running; the test setup now preloads it. `does not retry a 429` 1.2–1.3 s → ~0.36 s; both files 5/5 under backend-suite load) |
 | P-4 | tooling | `apps/frontend/package.json` (`api:export`) | Runs bare `uv`, not `scripts/uv.mjs` → `npm run api:sync` fails ("'uv' is not recognized") where uv is not on PATH, though `npm run manage` etc. find it. Route through `scripts/uv.mjs`. | fixed (tooling-data-hygiene) |
@@ -608,15 +597,15 @@ intervals and `baselines.json` did not move. A security review of the same diff 
 | T-8 | cleanup | `services/matching/issues.py` | A `by_technology` id set kept beside the relevant issues to recount `technology_count`. `MatchedIssue.mentions_technology` instead. | fixed (0.12.23) |
 | T-9 | cleanup | `services/ranking/score.py` | `has_relevance` ran twice per candidate. The `/simplify` pass kept the second call (a `relevant=` override was a second way to set one field) and removed `is_relevant`. | fixed (0.12.23) |
 | T-10 | cleanup | `services/evaluation/feedback_report.py` | The adjusted share filtered `share is not None` twice. Sums `(bucket, share)` pairs. | fixed (0.12.23) |
-| T-11 | bug | `services/matching/issues.py` (`match_issues`) | Relevance still reads raw values (`tech > 0 or approach > 0`): with a technology weight of 0 an issue counts as relevant (and in `technology_count`) through a part that adds nothing, while its reasons skip that part. Changes `issue_fit`, so it waits for K-1. | confirmed |
+| T-11 | bug | `services/matching/issues.py` (`match_issues`) | Relevance still reads raw values (`tech > 0 or approach > 0`): with a technology weight of 0 an issue counts as relevant (and in `technology_count`) through a part that adds nothing, while its reasons skip that part. Changes `issue_fit`, so it must win on the benchmark (waited for K-1 until 2026-10-28). | fixed (0.12.32: `MatchedIssue.relevant` and `mentions_technology` come from the per-part contributions, as the reasons do; `issue-matching` spec "Issue relevance" edited directly, scenario "Part with weight 0". Every stored config has issue weights and approachability values above 0, so baselines did not move) |
 | T-12 | design | `recommendations/models.py`, `feedback/models.py` (`rank`) | `PositiveIntegerField` stores 0; only the feedback report knows 0 is no rank. Add `CheckConstraint(rank__gte=1)` (null allowed on events). No rank 0 is written today. | fixed (0.12.29, `rank-constraint`: check constraints `recommendation_rank_positive`, `recommended_issue_rank_positive`, `feedback_rank_positive`; the migrations shift a group with a rank 0 up by one and empty an event's rank 0) |
 | T-13 | design | `RecommendationActions.tsx` | Hand-built dropdown (~100 lines of focus and keyboard handling) instead of shadcn `dropdown-menu`. Design D3 of `dismiss-reasons` chose no new dependency for one menu. | wontfix (design D3; revisit with a second menu) |
-| T-14 | cleanup | management commands | The "write JSON report" block (`mkdir`, `json.dumps`, `OSError` → `CommandError`) is copied in seven commands. Outside the diff. | accepted (`ideas.md` §15) |
+| T-14 | cleanup | management commands | The "write JSON report" block (`mkdir`, `json.dumps`, `OSError` → `CommandError`) is copied in seven commands. Outside the diff. | fixed (0.12.33, `json-report-writer`: `core/reports.write_json`) |
 
 ## 0.12.24–0.12.30 review (2026-10-27)
 
-Source: `code-review` over the uncommitted 0.12.24–0.12.30 diff (setup readiness through the
-Content Security Policy). U-1, U-2, U-3, U-5, U-6, U-7 fixed in 0.12.31 (`data-versions-fixes`)
+Source: `code-review` over the then-uncommitted 0.12.24–0.12.30 diff (setup readiness through the
+Content Security Policy), all committed with 0.12.31 in `43d3458`. U-1, U-2, U-3, U-5, U-6, U-7 fixed in 0.12.31 (`data-versions-fixes`)
 before commit, with tests; `baselines.json` did not move. A `/simplify` pass of the same diff
 followed (CHANGELOG 0.12.31 "Changed (internal)"; U-6 now fixed by a pure `queryFn`), and a
 security review of the result found nothing (versions endpoint scoped per user, CSP only adds
@@ -632,3 +621,29 @@ headers, GitHub listings at fixed paths on the API origin, discovery metadata in
 | U-6 | bug | `src/app/dataVersions.ts` (`refreshDataVersions`) | Two jobs finishing together cancelled the first versions fetch after it had started its invalidations; the second repeated them, so each area was fetched twice. | fixed (0.12.31: pure `queryFn`, comparison in an effect on the cached value; a test covers it) |
 | U-7 | bug | `features/auth/api.ts` (`useDeleteGitHubData`) | `removeQueries` on the versions query while the signed-in layout still observed it. | fixed (0.12.31: `resetQueries`) |
 | U-8 | design | `recommendations/migrations/0005_rank_positive.py` | The rank repair shifts a developer's ranks but not the feedback snapshots taken at them. | wontfix (no rank 0 was ever written, so nothing is shifted in practice) |
+
+## 0.12.32–0.12.34 review (2026-10-28)
+
+Source: `code-review` (M-1…M-8) and a `/simplify` pass (M-9…M-15, four reviewers on one diff)
+over the then-uncommitted 0.12.32–0.12.34 diff (signal fixes, JSON report writer, dependency
+audit). Fixes went into 0.12.34 before commit, with tests; `baselines.json` did not move. A
+security review of the result found nothing (audit spawns fixed arguments, the workflow runs on
+`pull_request` with a read-only token, report paths come from command flags only).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| M-1 | bug | `scripts/audit.mjs` (`auditPython`) | pip-audit drops a requirement whose environment marker is false on the host (verified: `requests==2.0.0 ; sys_platform == 'linux'` vanished on Windows), so Linux CI never audited Windows-only packages (`colorama`). | fixed (0.12.34: `withoutMarkers` strips markers from the export) |
+| M-2 | bug | `scripts/audit.mjs` (`pythonFindings`, `failing`) | A package pip-audit skipped had no `fails`, so an unaudited dependency passed with exit 0. | fixed (0.12.34: skipped fails, printed `FAIL skipped`) |
+| M-3 | bug | `scripts/audit.mjs` (`auditPython`) | `uvCommand()` throws a plain `Error`, so a missing uv printed a stack instead of uv.mjs's install advice. | fixed (0.12.34: wrapped as `AuditError`) |
+| M-4 | design | `services/issues/classify.py` (`contribution_type`) | Earliest keyword wins: "Error in README example" is `bug_fix`, not `documentation`. | accepted (the D-11 trade-off, recorded with D-11) |
+| M-5 | design | `core/reports.py` | `write_json` raises `CommandError`, so service code (`baseline.write`) cannot use it. | accepted (design D1 of `json-report-writer`) |
+| M-6 | cleanup | `export_benchmark_developer`, `import_judgments`, `build_benchmark` | Write-error wording changed ("Cannot write the export" → "Export not written to …"). | accepted (intended; nothing quotes the old text) |
+| M-7 | cleanup | four report commands | `out = options[...]` temporary before `write_json`; `/simplify` suggested returning the path. | wontfix (the name is used twice; returning it only moves the call into a print) |
+| M-8 | design | `services/matching/issues.py` (`MatchedIssue`) | `relevant` and `mentions_technology` default to False, so one built outside `score_issue` is silently irrelevant. | wontfix (only `score_issue` builds one) |
+| M-9 | cleanup | `scripts/audit.mjs` | A malformed npm report became an `AuditError`, a malformed pip-audit report a stack trace. | fixed (0.12.34: one `asAuditError` for both) |
+| M-10 | cleanup | `services/issues/classify.py` | The enumerate index only broke ties that `min` already breaks by list order. | fixed (0.12.34: removed) |
+| M-11 | cleanup | `import_judgments.py` | `Path()` around a path `write_json` takes as a string. | fixed (0.12.34) |
+| M-12 | perf | `scripts/audit.mjs` (main) | The three audits run one after another. | accepted (seconds per CI run; would need an async runner) |
+| M-13 | perf | `services/issues/classify.py` | Every keyword pattern runs on each title (about 6 searches per issue fetch). | accepted (negligible) |
+| M-14 | reuse | `services/evaluation/baseline.py:69` | Writes JSON by hand without `ensure_ascii=False`. | accepted (`baselines.json` out of scope, design of `json-report-writer`) |
+| M-15 | reuse | `scripts/audit.mjs` (`run`) | Second way to start the npm `.cmd` shim on Windows (`setup.mjs` is the first). | accepted (two call sites) |

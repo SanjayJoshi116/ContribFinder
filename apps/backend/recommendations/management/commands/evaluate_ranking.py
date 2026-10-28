@@ -1,4 +1,3 @@
-import json
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
@@ -6,6 +5,7 @@ from typing import Any
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from core.reports import write_json
 from recommendations.models import ScoringConfig
 from services.evaluation import baseline, bootstrap
 from services.evaluation.dataset import DatasetError, load, selection_dataset
@@ -145,14 +145,9 @@ class Command(BaseCommand):
             verdicts += found
 
         if options["json"]:
-            out = Path(options["json"])
+            out = options["json"]
             body = {"reports": [r.as_dict() for r in everything], "comparisons": comparisons}
-            text = json.dumps(body, indent=2) + "\n"
-            try:
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_text(text, encoding="utf-8")
-            except OSError as exc:
-                raise CommandError(f"Report not written to {out}: {exc}") from exc
+            write_json(out, body, what="Report")
             self.stdout.write(f"Report written to {out}")
         if pinned:
             try:

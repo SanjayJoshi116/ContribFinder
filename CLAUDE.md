@@ -90,7 +90,7 @@ ContribFinder/
 │  │  ├─ core/              health, auth class, CSRF/400/403/404 JSON views, log redaction, checks,
 │  │  │                     startup (production check gate), throttling (cache-outage fallback),
 │  │  │                     backoff (per-process skip after a cache error), csp (Content-Security-
-│  │  │                     Policy middleware)
+│  │  │                     Policy middleware), reports (JSON files written by commands)
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
 │  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status and data versions API,
@@ -158,16 +158,17 @@ ContribFinder/
 │                           redis (WSL), child (process-tree runner, .run/ records), stack
 │                           (stop matching), env, wait-port, uv, manage, check-version,
 │                           restarts (keep-alive restart budget), e2e-backend (seed + Django for
-│                           Playwright); *.test.mjs (node --test)
+│                           Playwright), audit (dependency audit); *.test.mjs (node --test)
 ├─ package.json             root runner: npm run setup / npm start / stop / manage / check:version
-│                           / lint:scripts / format:scripts; eslint.config.mjs (scripts only),
+│                           / lint:scripts / format:scripts / audit:deps; audit-accepted.json
+│                           (accepted advisories); eslint.config.mjs (scripts only),
 │                           .prettierrc.json (shared with apps/frontend), .gitattributes (LF)
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
 │  ideas.md (unplanned gap analysis by when it can ship: no ranking change first, then
-│  what waits for K-1; each idea needs an OpenSpec change first); reports/ (gitignored --json
+│  ranking-visible ideas; each idea needs an OpenSpec change first); reports/ (gitignored --json
 │  outputs)
-└─ .github/workflows/ci.yml
+└─ .github/workflows/ci.yml, audit.yml (dependency audit: PRs, main, weekly, on demand)
 ```
 
 ## 5. Conventions
@@ -222,6 +223,12 @@ Local, no Docker (primary on this machine):
   its working files once (README).
   `npm run setup` uses `npm ci` (never rewrites a lockfile); `npm run check:version` also checks
   `packages[""].version` of both npm lockfiles.
+- `npm run audit:deps` (`scripts/audit.mjs`, CI workflow `audit.yml`): `pip-audit` (pinned,
+  through `uv tool run` on `uv export --frozen`) and `npm audit` for `apps/frontend` and the
+  root. Fails on any Python advisory and npm high/critical, unless accepted in
+  `audit-accepted.json` (ecosystem, id, package, reason, accepted_on; strict). Exit 0/1/2
+  (clean / findings / could not run). The user's npm has `allow-remote=none`: a frontend
+  `npm install`/`ci`/`audit fix` needs `--allow-remote=all`, which only the user runs.
 - Redis: on Windows, `npm start` starts the `redis-server` service in WSL Ubuntu and keeps the
   distro awake (`scripts/redis.mjs`; a keep-alive that ends is restarted, at most 3 times in 5
   minutes, and logged with its exit code in hex), then a Celery worker with `--pool=threads --concurrency=4`
@@ -1320,6 +1327,54 @@ U-8 wontfix.
   `delete()`'s per-model counts (the total includes cascaded discovery records).
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
 
+**Signal fixes** (MVP+, fix release)  ✅ shipped in v0.12.32 (no ranking change)
+
+No OpenSpec change. `Bug_Backlog.md` B-6, D-11 (rest of batch 8), T-11 (batch 19); P-1 accepted.
+- `experience.estimate_experience`: the level is the rounded mean with halves up, in integers
+  (`2·total < n` beginner, `2·total < 3n` intermediate), as the docstring says (B-6).
+- `classify.contribution_type`: the title keyword earliest in the title wins; `KEYWORD_TYPES`
+  order only breaks a tie (D-11). `ISSUE_TAXONOMY_VERSION` 2026.10.4.
+- `MatchedIssue.relevant` and `mentions_technology` come from the per-part contributions, as
+  the reasons do (T-11); `issue-matching` spec "Issue relevance" edited directly.
+- Benchmarks store experience levels and issue types/difficulties, so none of these move the
+  baselines; stored profiles and issues change on their next analysis or fetch.
+- Open items: none. Known gaps K-1…K-5 remain.
+
+**JSON report writer** (MVP+, cleanup)  ✅ shipped in v0.12.33 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-28-json-report-writer/` (no spec change,
+`skip_specs`). `Bug_Backlog.md` T-14, `ideas.md` §15.
+- `core/reports.py`: `json_text(data)` (indent 2, `ensure_ascii=False`, trailing newline) and
+  `write_json(out, data, *, what)` (creates folders, UTF-8, `OSError` →
+  `CommandError("<what> not written to <out>: ...")`). Every management command that writes
+  JSON uses it (`evaluate_ranking`, `feedback_report`, `discovery_report`,
+  `export_benchmark_developer`, `import_judgments`, `build_benchmark`, `e2e_seed`); a new one
+  must too. Not used for `benchmark_sheet` (CSV) or `baselines.json` (`services/evaluation/baseline.py`).
+
+**Dependency audit** (MVP+, platform)  ✅ shipped in v0.12.34 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-28-dependency-scanning/`. Spec: delta to
+`developer-tooling` (new "Dependencies are audited for known vulnerabilities"). `ideas.md` §5.
+- `scripts/audit.mjs` (pure parts tested in `audit.test.mjs`): `pythonFindings`, `npmFindings`,
+  `validateAccepted`, `unusedAccepted`, `failing`. pip-audit repeats an advisory once per fixed
+  version; findings are keyed by advisory id. npm severities below high are reported only.
+  Environment markers are stripped from the export (`withoutMarkers`: pip-audit drops a
+  requirement whose marker is false on the host, so Linux CI skipped Windows-only packages); a
+  package pip-audit skips fails.
+- Workflow `audit.yml` installs nothing; its concurrency group includes the event, so the
+  weekly run never replaces a push run.
+- First audit: certifi, djangorestframework 3.18.3, shell-quote (via concurrently), vite 8.3.5,
+  zod 4.6.7, undici 8.12.3, source-map-js 1.2.2 upgraded; nothing accepted.
+- Review of 0.12.32–0.12.34 (`Bug_Backlog.md` batch 21): M-1…M-3, M-9…M-11 fixed here; the
+  rest accepted or wontfix. A malformed report goes through `asAuditError` (exit 2, no stack).
+
+**K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
+building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
+OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
+`benchmark-v2` holds a judged real developer), must not regress on a fresh holdout (add
+`holdout-v3` first), and ends with `--write-baseline`. The "Carry-over: K-1 unchanged" lines
+above are history.
+
 **Future scope**: verify `docker compose up` from a fresh `.env` (needs a machine with Docker).
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
@@ -1328,15 +1383,17 @@ contribution plans, similar repositories, observability dashboards (Sentry, Prom
 **Ideas** (`ideas.md`, unplanned; each needs an OpenSpec change). Since 0.12.22 ordered by when
 an idea can ship. Can ship now (no ranking change), in suggested order:
 platform items
-(dependency scanning, migration round trip), then the interface revamp (§18, owner request:
-design direction first, one OpenSpec change per step). Waits for K-1 (†): IDF weighting, diversity, stated
+(migration round trip), then the interface revamp (§18, owner request:
+design direction first, one OpenSpec change per step). Ranking-visible (†, must win on the
+selection benchmark and not regress on a fresh holdout): IDF weighting, diversity, stated
 preferences, contribution-success signals, labeled-issue fetch, opportunity qualifiers,
 upstream dependencies, `similar_repo`, content-based `not_code`, and moving the label bands;
-whether a ranking change must also be significant is decided with K-1. Shipped from it in this
+whether a ranking change must also be significant is decided once real developers enlarge the
+benchmark. Shipped from it in this
 series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibration report
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
-rank constraint (0.12.29, T-12), Content Security Policy (0.12.30).
+rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34).
 
 ## 8. Release housekeeping
 

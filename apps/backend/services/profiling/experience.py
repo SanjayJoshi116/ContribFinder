@@ -61,10 +61,11 @@ def estimate_experience(
     audit: dict[str, Any] = {"signals": dict(signals), "scores": scores}
     if len(scores) < MIN_SIGNALS:
         return "unknown", audit
-    mean = sum(scores.values()) / len(scores)
-    audit["mean"] = round(mean, 3)
-    if mean < 0.67:
+    total, count = sum(scores.values()), len(scores)
+    audit["mean"] = round(total / count, 3)
+    # Rounded mean with halves up, in integers: mean < 0.5 is beginner, mean < 1.5 intermediate.
+    if 2 * total < count:
         return "beginner", audit
-    if mean < 1.34:
+    if 2 * total < 3 * count:
         return "intermediate", audit
     return "experienced", audit

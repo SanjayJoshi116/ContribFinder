@@ -14,7 +14,7 @@ An issue SHALL be eligible for matching only when it is open, not locked, has no
 - **THEN** it is not recommended
 
 ### Requirement: Issue relevance
-For each recommendation, the system SHALL score the repository's eligible issues for the developer from 0.0 to 1.0 using: technology match (the issue's technologies the developer has demonstrated, weighted by confidence), difficulty fit (the issue's difficulty against the developer's internal experience level, from a configured table, with `unknown` difficulty given a configured neutral value), and approachability (`good_first_issue` and `help_wanted` labels). The weights and table SHALL belong to the active scoring configuration. An issue SHALL be relevant only when its score reaches the configured minimum and it has a technology match or an approachability label. The system SHALL keep the best relevant issues per recommendation, up to a configured number (default 5), ranked by score, then most recently updated. Scoring SHALL use stored data only and SHALL be deterministic.
+For each recommendation, the system SHALL score the repository's eligible issues for the developer from 0.0 to 1.0 using: technology match (the issue's technologies the developer has demonstrated, weighted by confidence), difficulty fit (the issue's difficulty against the developer's internal experience level, from a configured table, with `unknown` difficulty given a configured neutral value), and approachability (`good_first_issue` and `help_wanted` labels). The weights and table SHALL belong to the active scoring configuration. An issue SHALL be relevant only when its score reaches the configured minimum and its technology match or its approachability adds to its score; a part whose weight is 0 adds nothing, so it neither makes an issue relevant nor counts the issue as mentioning the developer's technologies. The system SHALL keep the best relevant issues per recommendation, up to a configured number (default 5), ranked by score, then most recently updated. Scoring SHALL use stored data only and SHALL be deterministic.
 
 #### Scenario: Matching issue kept
 - **WHEN** a recommended Django repository has an eligible beginner issue mentioning Django and the developer has Django skills
@@ -22,6 +22,10 @@ For each recommendation, the system SHALL score the repository's eligible issues
 
 #### Scenario: Unrelated issue
 - **WHEN** an eligible issue mentions none of the developer's technologies and has no approachability label
+- **THEN** it is not a relevant issue
+
+#### Scenario: Part with weight 0
+- **WHEN** the configuration's issue technology weight is 0 and an eligible issue mentions the developer's technologies but has no approachability label
 - **THEN** it is not a relevant issue
 
 #### Scenario: Cap

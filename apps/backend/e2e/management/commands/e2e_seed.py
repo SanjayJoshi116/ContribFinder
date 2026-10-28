@@ -1,11 +1,9 @@
 """Seed the browser-test database: users, their GitHub-derived data and a signed-in session
 each (end-to-end settings only)."""
 
-import json
 from argparse import ArgumentParser
 from collections.abc import Callable
 from datetime import timedelta
-from pathlib import Path
 from typing import Any
 
 from django.conf import settings
@@ -16,6 +14,7 @@ from django.test import Client
 from django.utils import timezone
 
 from accounts.models import User
+from core.reports import write_json
 from developers.models import DeveloperProfile, Interest, Skill
 from e2e.builders import add_candidate, fresh_repo, make_issue
 from github.models import GitHubAccount, GitHubProfile
@@ -62,9 +61,8 @@ class Command(BaseCommand):
             name: _session(_synced_user(index, name)) for index, name in enumerate(SYNCED_USERS)
         }
         sessions[UNSYNCED_USER] = _session(_user(len(SYNCED_USERS), UNSYNCED_USER))
-        out = Path(options["out"])
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(sessions, indent=2), encoding="utf-8")
+        out = options["out"]
+        write_json(out, sessions, what="Sessions")
         self.stdout.write(f"Seeded {len(sessions)} users; sessions in {out}")
 
 

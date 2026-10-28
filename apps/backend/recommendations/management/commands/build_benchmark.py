@@ -5,6 +5,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
+from core.reports import write_json
 from services.evaluation.build import ERROR, ON_CONFLICT, BuildError, build
 
 
@@ -34,13 +35,7 @@ class Command(BaseCommand):
             )
         except (OSError, ValueError, BuildError) as exc:
             raise CommandError(f"Benchmark not built: {exc}") from exc
-        out = Path(options["out"])
-        text = json.dumps(result, indent=2, ensure_ascii=False) + "\n"
-        try:
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(text, encoding="utf-8")
-        except OSError as exc:
-            raise CommandError(f"Benchmark not written: {exc}") from exc
+        write_json(options["out"], result, what="Benchmark")
         kinds: dict[str, int] = {}
         for developer in result["developers"]:
             kind = developer.get("kind", "persona")

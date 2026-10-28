@@ -1,12 +1,11 @@
-import json
 from argparse import ArgumentParser
 from datetime import timedelta
-from pathlib import Path
 from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from core.reports import write_json
 from services.evaluation import feedback_report
 from services.evaluation.feedback_report import (
     ACTIONS,
@@ -52,12 +51,8 @@ class Command(BaseCommand):
         report = feedback_report.build(events, minimum=options["minimum"], since_days=since_days)
         self._print(report)
         if options["json"]:
-            out = Path(options["json"])
-            try:
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_text(json.dumps(report.as_dict(), indent=2) + "\n", encoding="utf-8")
-            except OSError as exc:
-                raise CommandError(f"Report not written to {out}: {exc}") from exc
+            out = options["json"]
+            write_json(out, report.as_dict(), what="Report")
             self.stdout.write(f"Report written to {out}")
 
     def _print(self, report: FeedbackReport) -> None:

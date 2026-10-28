@@ -1,8 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from django.conf import settings
 
-from services.profiling.experience import estimate_experience, experience_signals
+from services.profiling.experience import SIGNALS, estimate_experience, experience_signals
 from services.profiling.languages import aggregate_languages
 from services.profiling.summary import SPARSE, build_summary
 
@@ -49,6 +50,25 @@ def test_beginner_and_intermediate() -> None:
         contributions=(contribution(prs=2),),
     )
     assert level(middle, skills=4) == "intermediate"
+
+
+@pytest.mark.parametrize(
+    ("scores", "expected"),
+    [
+        ((1, 0, 0), "beginner"),  # mean 0.33
+        ((1, 0), "intermediate"),  # 0.5 rounds up
+        ((1, 1, 0), "intermediate"),  # 0.67, was beginner under the old 0.67 cutoff (B-6)
+        ((2, 2, 1, 1, 1), "intermediate"),  # 1.4, was experienced under the old 1.34 cutoff
+        ((2, 1), "experienced"),  # 1.5 rounds up
+    ],
+)
+def test_level_is_the_rounded_mean(scores: tuple[int, ...], expected: str) -> None:
+    # Bounds (1, 2) make each signal's value its score.
+    signals = {name: float(score) for name, score in zip(SIGNALS, scores, strict=False)}
+    thresholds = {name: (1, 2) for name in SIGNALS}
+    level_, audit = estimate_experience(signals, thresholds)
+    assert audit["scores"] == dict(zip(SIGNALS, scores, strict=False))
+    assert level_ == expected
 
 
 def test_inactive_repositories_do_not_count() -> None:

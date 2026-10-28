@@ -100,6 +100,10 @@ def test_approachability_labels_do_not_decide_type() -> None:
         ("App crashes on startup", "bug_fix", "crashes"),
         ("[Bug]: Avatar flashes during transition", "bug_fix", "bug"),
         ("Import fails with unicode paths", "bug_fix", "fails"),
+        # The earliest keyword wins (D-11): a [Bug]: prefix beats a later "docs".
+        ("[Bug]: docs build crashes", "bug_fix", "bug"),
+        ("Add tests for error handling", "testing", "tests"),
+        ("Docs: explain error codes", "documentation", "docs"),
     ],
 )
 def test_keyword_rules(title: str, expected: str, keyword: str) -> None:

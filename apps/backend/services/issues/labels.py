@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-ISSUE_TAXONOMY_VERSION = "2026.10.3"
+ISSUE_TAXONOMY_VERSION = "2026.10.4"
 
 GOOD_FIRST_ISSUE = "good_first_issue"
 HELP_WANTED = "help_wanted"

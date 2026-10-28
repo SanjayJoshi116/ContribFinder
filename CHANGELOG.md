@@ -7,6 +7,81 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.34] - 2026-10-28
+
+Dependency audit (`openspec/changes/archive/2026-10-28-dependency-scanning/`; spec
+`developer-tooling`; `ideas.md` §5). No API, interface, data or migration change; baselines
+unchanged.
+
+### Added
+
+- `npm run audit:deps` (`scripts/audit.mjs`): audits `apps/backend/uv.lock` with `pip-audit`
+  2.10.1 and the frontend and root npm lockfiles with `npm audit`, from the locked versions
+  only. Any Python advisory and any high or critical npm advisory fails; low and moderate npm
+  advisories are listed. A package pip-audit skips fails; environment markers are ignored, so
+  Windows-only packages are audited on Linux CI too. Exit 2 when an audit cannot run.
+- `audit-accepted.json`: advisories accepted with a reason and a date (empty).
+- CI workflow `audit.yml`: on pull requests, pushes to `main`, weekly (Monday) and on demand.
+
+### Security
+
+- Backend: certifi 2026.10.23 (PYSEC-2026-4320), djangorestframework 3.18.3
+  (CVE-2026-114136, CVE-2026-114137, CVE-2026-114138).
+- Root runners: concurrently 10.0.6 with shell-quote 1.12.0 (GHSA-pqg4-j6r4-53mv, critical).
+- Frontend: vite 8.3.5 (GHSA-587h-7wmj-h5pm), zod 4.6.7 (GHSA-mrhx-c7xc-m3w5), undici 8.12.3
+  (GHSA-xjj6-f33q-929c, GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx, GHSA-qrxm-fqhp-jwvm),
+  source-map-js 1.2.2 (GHSA-68fv-2mgg-jv7q), with vitest 5.0.5, postcss 8.5.32 and rolldown
+  1.2.15. Every audit now reports no findings.
+
+### Changed (internal)
+
+- Review of 0.12.32–0.12.34 (`Bug_Backlog.md` batch 21, M-1…M-15): a malformed pip-audit
+  report is a clean audit error like a malformed npm report; `contribution_type` drops a
+  redundant tie-break index; `import_judgments` passes its path to `write_json` as given.
+
+## [0.12.33] - 2026-10-28
+
+JSON report writer (`openspec/changes/archive/2026-10-28-json-report-writer/`;
+`Bug_Backlog.md` T-14, `ideas.md` §15). No API, interface, data or migration change; baselines
+unchanged.
+
+### Changed
+
+- Management commands write JSON through one helper, `core/reports.py` (`json_text`,
+  `write_json`): `evaluate_ranking`, `feedback_report` and `discovery_report` (`--json`),
+  `export_benchmark_developer`, `import_judgments`, `build_benchmark` and `e2e_seed`.
+- Every JSON file they write keeps non-ASCII text unescaped and ends with a newline (the
+  reports and the e2e sessions file escaped it before; data unchanged).
+- A failed write reads "<what> not written to <path>: <reason>" in every command; `e2e_seed`
+  reports it as a command error instead of a traceback.
+
+## [0.12.32] - 2026-10-28
+
+Signal fixes (`Bug_Backlog.md` B-6, D-11 of batch 8 and T-11 of batch 19; no OpenSpec change,
+the `issue-matching` spec edited directly for T-11). No API, interface or migration change;
+baselines unchanged.
+
+### Fixed
+
+- The internal experience level is now the rounded mean of its signal scores, as documented:
+  scores (1, 1, 0) are intermediate, not beginner, and a mean of 1.4 is intermediate, not
+  experienced (B-6). It feeds issue difficulty fit only. Benchmarks store each developer's
+  level, so baselines do not move; stored profiles change on their next analysis (or run
+  `npm run manage -- reanalyze_profiles`).
+- An issue's contribution type from its title now follows the keyword that comes first, so
+  "[Bug]: docs build crashes" is a bug fix, not documentation (D-11). `ISSUE_TAXONOMY_VERSION`
+  2026.10.4; stored issues change on their next fetch, and baselines do not move.
+- An issue is relevant, and counts as mentioning the developer's technologies, only through a
+  part that adds to its score: with an issue weight of 0, that part no longer makes it relevant
+  (T-11; spec `issue-matching`). No stored configuration has a weight of 0, so nothing moves.
+
+### Changed
+
+- Ranking changes no longer wait for judged real developers (K-1 is optional). They still must
+  win on the selection benchmark and not regress on a fresh holdout.
+- `Bug_Backlog.md` P-1 (why the WSL keep-alive once exited `0xC000013A`) accepted: the runner's
+  restart covers it; a retest from a cold distro stayed up.
+
 ## [0.12.31] - 2026-10-27
 
 Data versions fixes (OpenSpec change `data-versions-fixes`, `Bug_Backlog.md` batch 20: review

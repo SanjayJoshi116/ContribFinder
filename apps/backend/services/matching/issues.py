@@ -47,7 +47,8 @@ class MatchedIssue:
     issue: IssueFeature
     score: float  # internal ranking value, never serialized
     reasons: tuple[dict[str, Any], ...]
-    mentions_technology: bool = False  # a technology the developer uses
+    mentions_technology: bool = False  # a technology the developer uses adds to the score
+    relevant: bool = False  # a technology or approachability part adds to the score
 
 
 @dataclass(frozen=True)
@@ -182,7 +183,10 @@ def score_issue(
         )
     parts.sort(key=lambda p: -p[0])
     reasons = tuple(r for _, r in parts)
-    return tech, diff_fit, approach, MatchedIssue(issue, score, reasons, tech > 0)
+    # Like the reasons, relevance counts only parts that add to the score (a weight of 0 adds none).
+    mentions = contrib["technology"] > 0
+    relevant = mentions or contrib["approachability"] > 0
+    return tech, diff_fit, approach, MatchedIssue(issue, score, reasons, mentions, relevant)
 
 
 def match_issues(
@@ -195,8 +199,8 @@ def match_issues(
         return NO_MATCH
     relevant: list[MatchedIssue] = []
     for issue in issues:
-        tech, _, approach, scored = score_issue(issue, dev, params)
-        if scored.score >= params["min_score"] and (tech > 0 or approach > 0):
+        scored = score_issue(issue, dev, params)[3]
+        if scored.relevant and scored.score >= params["min_score"]:
             relevant.append(scored)
     relevant.sort(
         key=lambda m: (

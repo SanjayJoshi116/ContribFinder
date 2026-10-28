@@ -1,13 +1,14 @@
 # Ideas
 
-Gap analysis from 2026-10-20 (v0.12.4), with later rounds added 2026-10-21 to 2026-10-26
-(v0.12.7–v0.12.26). Nothing here is planned yet: each idea needs an OpenSpec change before work
-starts. Ranking-visible items (marked †) must win on the benchmark, so they wait for K-1
-(`Bug_Backlog.md`).
+Gap analysis from 2026-10-20 (v0.12.4), with later rounds added 2026-10-21 to 2026-10-27
+(v0.12.7–v0.12.34). Nothing here is planned yet: each idea needs an OpenSpec change before work
+starts. Ranking-visible items (marked †) must win on the selection benchmark and not regress on
+a fresh holdout. Since 2026-10-28 they no longer wait for K-1 (judging real developers is
+optional; `Bug_Backlog.md`).
 
 Layout: the priority table, then the open ideas by when they can ship, then what has shipped.
 "Can ship now" (no ranking change) runs in the priority table's order: discovery and
-repository data, freshness and client, platform and tooling, then evaluation. "Waits for K-1"
+repository data, freshness and client, platform and tooling, then evaluation. "Ranking-visible"
 holds the ranking-visible ideas (including what is left of §11 and §12, whose measurement and
 cleanup shipped) and the follow-ups of §4, whose ideas have shipped. Shipped ideas are listed
 only in "Shipped"; §8, §10 and §17 shipped whole, so they have no section above. Section numbers
@@ -17,15 +18,15 @@ only in "Shipped"; §8, §10 and §17 shipped whole, so they have no section abo
 ## Priorities
 
 Open ideas only, in suggested order within each cell. † = changes what users are recommended
-(waits for K-1).
+(must win on the benchmark).
 
 | | Cheap | Expensive |
 |---|---|---|
-| **High value** | significance gate for ranking changes (§3, a decision for K-1); labeled-issue fetch† (§7); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
-| **Lower value** | queue released-name refresh (§13); pip-audit (§5); route-level ids (§14); production build in CI (§14); JSON report writer (§15); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
+| **High value** | significance gate for ranking changes (§3); labeled-issue fetch† (§7); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
+| **Lower value** | queue released-name refresh (§13); route-level ids (§14); production build in CI (§14); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
 
 Not ranked yet: acting on the discovery yield report† (§12, needs runs), intervals on the
-feedback-report shares (§4, needs traffic), dismiss reasons against grades (§4, needs K-1),
+feedback-report shares (§4, needs traffic), dismiss reasons against grades (§4, needs real-developer grades),
 label bands† (§4), time decay on skill evidence† (§1), pooling bias (§3), accessibility and
 observability (§5), interface revamp (§18, owner request; design direction first).
 
@@ -99,8 +100,28 @@ design direction.
   foreign origins: fonts and icons self-hosted, `csp.config.ts`); no new dependency without a
   reason (0.12.23 built the dismiss menu by hand for that); browser tests locate elements by
   role and name, so renamed buttons and headings need the e2e specs updated in the same change.
-- *Tooling:* the `frontend-design` skill (or a shadcn/ui skill, if installed) helps once the
-  direction is set; screenshots of the current pages are the baseline to compare against.
+- *Tooling:* the `frontend-design` skill helps once the direction is set; screenshots of the
+  current pages are the baseline to compare against.
+- *shadcn skill* (checked 2026-10-27). Authentic: documented at `ui.shadcn.com/docs/skills`, the
+  skill is `skills/shadcn/SKILL.md` in the official `shadcn-ui/ui` repository, and the `skills`
+  CLI (npm `skills`, `vercel-labs/skills`) is Vercel Labs'. Install only with the exact
+  `npx skills add shadcn/ui`: copies elsewhere differ (`vercel-labs/vercel-plugin`, third-party
+  registries; one copy rated "Critical" in a Tessl scan). Nothing malicious in the SKILL.md, but:
+  - it runs `` !`npx shadcn@latest info --json` `` every time it loads (latest, unpinned npm
+    package, network);
+  - `allowed-tools: Bash(npx shadcn@latest *)` pre-approves every shadcn command, including
+    `add --all -y` and `init ... --force` (overwrites `components.json` and CSS);
+  - it can pull code from third-party registries (`@magicui`, `@tailark`, `@bundui`,
+    `owner/repo`);
+  - it references files not yet read (`rules/*.md`, `cli.md`, `design-system.md`,
+    `scripts/showcase-coverage.mjs`).
+  Against this repository's rules: `add` brings Radix dependencies (no dependency without a
+  reason), presets and `apply --only theme,font` may add foreign web fonts that the built app's
+  CSP blocks (self-host or extend `csp.config.ts` on purpose), and it does not know the product
+  rules above. If used, at the start of the design-direction change: install project-level (not
+  `-g`), read every installed file, narrow or remove `allowed-tools` so each command asks,
+  consider dropping the load-time command, and add a CLAUDE.md rule (components only through a
+  reviewed `add`; never `--all`, `-y` or `--force`).
 
 ### 9. Profile freshness
 
@@ -117,14 +138,9 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.
-- **One JSON report writer for commands.** (Round 8, 2026-10-26, `Bug_Backlog.md` T-14.)
-  Seven management commands copy the same block: create the folder, `json.dumps(...,
-  indent=2)`, write UTF-8, turn `OSError` into `CommandError`. One `write_json_report(out,
-  data)` helper would replace them.
 
 ### 5. Platform
 
-- **Dependency scanning in CI.** `pip-audit`, `npm audit`, Dependabot or CodeQL.
 - **GitHub API budget across users.** Search allows 30 requests/min per token and the
   app-credential backlog is shared. Model what many concurrent onboardings do.
 - **Accessibility.** Not covered by any spec or backlog row.
@@ -136,8 +152,8 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
 - **Significance gate.** Whether the improvement rule should also require a marked NDCG@10
   bootstrap interval (the intervals are printed since v0.12.19; v2's NDCG@10 +0.0195 is
-  [-0.0023, +0.0501]). Decide with K-1, once real developers make the benchmark larger; with six
-  developers a gate would refuse almost every change.
+  [-0.0023, +0.0501]). Decide once real developers make the benchmark larger (K-1, optional); with
+  six developers a gate would refuse almost every change.
 - **Inter-rater agreement.** Single judge today. A second judge on about 10 rows (Cohen's κ)
   shows whether the grades mean anything.
 - **Pooling bias.** Only candidates discovery found get judged; unjudged = irrelevant, so a
@@ -148,7 +164,7 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
 ---
 
-# Waits for K-1 (ranking-visible)
+# Ranking-visible (must win on the benchmark)
 
 ## Ranking and matching
 
@@ -210,7 +226,8 @@ discovery run; also §12 and §13.
   how many results each request returns and which rejections eat them (`no_license` first in the
   first real run). Once enough runs exist: narrow the query type that wastes most of its page,
   move budget between strategies or bands, or give a high-yield query a second page. Each of these
-  changes what users are recommended, so it waits for K-1 and must show its gain in the report.
+  changes what users are recommended, so it must win on the benchmark and show its gain in the
+  report.
 
 ### 6. Retrieval sources
 
@@ -237,7 +254,7 @@ discovery run; also §12 and §13.
 
 ### 4. Learning from interaction
 
-Follow-ups of the shipped feedback ideas (see "Shipped"); each needs real traffic or K-1 grades.
+Follow-ups of the shipped feedback ideas (see "Shipped"); each needs real traffic or real-developer grades (K-1, optional).
 
 - **Intervals on the report shares.** `feedback_report` shares have no uncertainty yet; add
   them once there is enough traffic for them to mean something.
@@ -254,11 +271,13 @@ Newest first.
 
 | Idea | § | Shipped in |
 |---|---|---|
+| Dependency audit in CI (`pip-audit`, `npm audit`, accepted list, weekly run) | §5 | v0.12.34 (no Dependabot or CodeQL) |
+| One JSON writer for management commands (`core/reports.py`) | §15 | v0.12.33 (T-14; non-ASCII kept in every file) |
 | Content-Security-Policy (backend header; meta tag in the built SPA) | §5 | v0.12.30 (no reporting endpoint; the SPA host adds `frame-ancestors`) |
 | New seeds stored inactive (`_seeding.store_inactive`, guard test) | §15 | v0.12.28 (v1/v2 seeds unchanged) |
 | Data versions (refetch only the areas that changed, whatever changed them) | §14 | v0.12.27 (Y-6; S-8 narrowed; no timer) |
 | Post-analysis pool cleanup (lists found by the run's own analysis leave the pool) | §11 | v0.12.26 (X-9) |
-| Search yield per strategy and star band (`discovery_report`) | §12 | v0.12.25 (measurement only; acting on it waits for K-1) |
+| Search yield per strategy and star band (`discovery_report`) | §12 | v0.12.25 (measurement only; acting on it is ranking-visible) |
 | Setup readiness (CI, tests, dev container, Docker Compose at the root) | §8 | v0.12.24 (shown, never scored; root only) |
 | Dismiss reasons (optional, reported per config) | §4 | v0.12.23 (never scored) |
 | Match-label calibration in the feedback report | §4 | v0.12.21 (raw shares per label; bands unchanged) |

@@ -1,7 +1,8 @@
 """Contribution type and difficulty of an issue (spec: issue-analysis; design D4). Pure.
 
 Contribution type: canonical labels decide first, in a fixed priority order; title keywords
-only when no label applies; otherwise ``unknown``.
+only when no label applies, the earliest in the title winning (so a ``[Bug]:`` prefix beats a
+later "docs"); otherwise ``unknown``.
 
 Difficulty: every signal votes for a level or abstains. A level wins only with at least
 ``min_votes`` votes (configured, never fewer than two) and no vote for another level, so a
@@ -38,7 +39,8 @@ LABEL_TYPES: tuple[tuple[str, str], ...] = (
     (L.BACKEND, CT.CODE),
 )
 
-# Title keywords per contribution type, tried in this order when no label decides.
+# Title keywords per contribution type, used when no label decides. The keyword earliest in the
+# title wins; this order only breaks a tie at the same position.
 KEYWORD_TYPES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (CT.DOCUMENTATION, ("docs", "doc", "documentation", "readme", "typo", "typos", "docstring")),
     (CT.TESTING, ("test", "tests", "testing", "coverage")),
@@ -74,9 +76,11 @@ def contribution_type(canonical: Sequence[str], title: str) -> tuple[str, dict[s
     for label, ctype in LABEL_TYPES:
         if label in present:
             return str(ctype), {"by": "label", "value": label}
-    for ctype, pattern in _KEYWORDS:
-        if match := pattern.search(title):
-            return str(ctype), {"by": "keyword", "value": match.group(0).lower()}
+    found = [(m.start(), ctype, m) for ctype, p in _KEYWORDS if (m := p.search(title))]
+    if found:
+        # min keeps the first of equal starts, so _KEYWORDS order breaks a tie.
+        _, ctype, match = min(found, key=lambda f: f[0])
+        return str(ctype), {"by": "keyword", "value": match.group(0).lower()}
     return str(CT.UNKNOWN), {}
 
 
