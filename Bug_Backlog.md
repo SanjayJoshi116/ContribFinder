@@ -1,7 +1,7 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since; current through 0.12.34. Order: open items and known gaps, the release index, the fix-batch plan
+each fix release since; current through 0.12.35. Order: open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
 Status: `open` · `confirmed` / `partial` (verified, not fixed) · `fixed in part` · `fixed` ·
@@ -10,7 +10,7 @@ Status: `open` · `confirmed` / `partial` (verified, not fixed) · `fixed in par
 ## Open items
 
 None as of 2026-10-28: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; the review of
-0.12.32–0.12.34 (batch 21) fixed or closed in 0.12.34. Known gaps (K) are
+0.12.32–0.12.34 (batch 21) fixed or closed in 0.12.34, and of 0.12.35 (batch 22) in 0.12.35. Known gaps (K) are
 in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
 a fresh holdout; they no longer wait for K-1 (since 2026-10-28).
 
@@ -31,6 +31,7 @@ must match it. Newest first. Counts are fixed rows.
 
 | Version | Change | Fixed | In part, accepted or wontfix |
 |---|---|---|---|
+| 0.12.35 | `labeled-issue-fetch` (with its review) | 5: N-1, N-2, N-3, N-8, N-9 | N-4…N-7 accepted; N-10 accepted |
 | 0.12.34 | `dependency-scanning` (with its review) | 6: M-1, M-2, M-3, M-9, M-10, M-11 | M-4, M-5, M-6, M-12…M-15 accepted; M-7, M-8 wontfix |
 | 0.12.33 | `json-report-writer` | 1: T-14 | — |
 | 0.12.32 | (no OpenSpec change) | 3: B-6, D-11, T-11 | P-1 accepted |
@@ -58,13 +59,13 @@ must match it. Newest first. Counts are fixed rows.
 | 0.12.2 | `privacy-deletion-finality` | 10: A-1, A-7, A-8, A-9, A-12, A-19, B-4, E-3, H-8, H-9 | — |
 | 0.12.1 | `security-hardening` | 12: A-15, G-5, G-6, H-2, H-3, H-4, H-6, H-12, H-13, H-14, H-15, H-16 | — |
 
-Total fixed: 234. Never in a release: A-10 (false positive, in no batch).
+Total fixed: 239. Never in a release: A-10 (false positive, in no batch).
 
 ## Fix batches
 
 Each batch fits one OpenSpec change. Numbered in the order planned on 2026-10-19 (12–19 added by
 later reviews). Every verified row is in exactly one batch (A-10 dropped). All shipped
-(batches 8 and 19 finished in 0.12.32, batch 21 in 0.12.34).
+(batches 8 and 19 finished in 0.12.32, batch 21 in 0.12.34, batch 22 in 0.12.35).
 
 | # | Batch | Rows | Why together |
 |---|---|---|---|
@@ -89,6 +90,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 19 | **0.12.23 review** | T-1…T-14 | `code-review` and `/simplify` pass of the uncommitted 0.12.14–0.12.23 work. T-1…T-10 fixed in 0.12.23 before commit; T-11 fixed in 0.12.32, T-12 fixed in 0.12.29 (`rank-constraint`), T-13 wontfix, T-14 fixed in 0.12.33 (`json-report-writer`). The security review found nothing. |
 | 20 | **0.12.24–0.12.30 review** | U-1…U-8 | `code-review` of the uncommitted 0.12.24–0.12.30 work. U-1, U-2, U-3, U-5, U-6, U-7 fixed in 0.12.31 (`data-versions-fixes`) before commit; U-4 accepted, U-8 wontfix. |
 | 21 | **0.12.32–0.12.34 review** | M-1…M-15 | `code-review` (M-1…M-8) and `/simplify` (M-9…M-15) of the uncommitted 0.12.32–0.12.34 work. M-1, M-2, M-3, M-9, M-10, M-11 fixed in 0.12.34 before commit; the rest accepted or wontfix. |
+| 22 | **0.12.35 review** | N-1…N-10 | `code-review` (N-1…N-7) and `/simplify` (N-8…N-10) of the uncommitted labeled-issue fetch. N-1, N-2, N-3, N-8, N-9 fixed in 0.12.35 before commit; the rest accepted. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -647,3 +649,23 @@ security review of the result found nothing (audit spawns fixed arguments, the w
 | M-13 | perf | `services/issues/classify.py` | Every keyword pattern runs on each title (about 6 searches per issue fetch). | accepted (negligible) |
 | M-14 | reuse | `services/evaluation/baseline.py:69` | Writes JSON by hand without `ensure_ascii=False`. | accepted (`baselines.json` out of scope, design of `json-report-writer`) |
 | M-15 | reuse | `scripts/audit.mjs` (`run`) | Second way to start the npm `.cmd` shim on Windows (`setup.mjs` is the first). | accepted (two call sites) |
+
+## 0.12.35 review (2026-10-28)
+
+Source: `code-review` (N-1…N-7) and a `/simplify` pass (N-8…N-10, four reviewers on one diff)
+over the then-uncommitted labeled-issue fetch (0.12.35). N-1…N-3, N-8, N-9 fixed in 0.12.35
+before commit, with tests; `baselines.json` did not move. A security review found nothing (labels
+are `urlencode`d into the query; the host is fixed).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| N-1 | bug | `config/settings/base.py` (`ISSUES_ENTRY_LABELS`) | `env.list` keeps spaces after commas (verified), so `good first issue, help wanted` requested `labels= help wanted`, matched nothing, and `core.E041` passed. | fixed (0.12.35: names trimmed; E041 refuses surrounding spaces) |
+| N-2 | bug | `services/repositories/analysis.py` (`_fetch`, `issues`) | The labeled listings ran without `_between_parts`, so a slow GitHub could miss a cancel or outlive the claim (result thrown away). | fixed (0.12.35: before each labeled listing) |
+| N-3 | cleanup | `services/repositories/analysis.py` (`__all__`) | `merge_issue_pages` missing from the public names. | fixed (0.12.35) |
+| N-4 | process | CLAUDE.md §7 ranking rule | A † idea shipped without a benchmark win or holdout. | accepted (design D6: the benchmark stores issues as data and cannot measure it; a read-only measurement is recorded instead) |
+| N-5 | design | `services/github/client.py` (`label=`) | Exact label names only: `good-first-issue`, `E-easy` gain nothing. | accepted (non-goal; per-repository label discovery is a later idea) |
+| N-6 | design | `services/repositories/analysis.py` | One failed labeled listing fails the whole issues part. | accepted (design D4: a partial set would delete the labeled issues stored last time) |
+| N-7 | observability | `merge_issue_pages` | A labeled page that hits its cap is not recorded as truncated. | accepted (coverage only; `issues_truncated` describes the recent listing by spec) |
+| N-8 | altitude | `config/settings/base.py` | N-1's trim covered one setting; `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS` and `TOKEN_ENCRYPTION_KEYS` kept the space in `a, b` too. | fixed (0.12.35: one `env_list` helper trims and drops empty items for every list setting) |
+| N-9 | cleanup | `analysis.py`, `tests/test_issue_ingestion.py` | Condition inside the loop's iterable; a one-line `labeled()` test helper. | fixed (0.12.35: plain `if`; params inline) |
+| N-10 | reuse | tests | The "next page" `Link` header is written in four tests across two files. | accepted (test-only) |

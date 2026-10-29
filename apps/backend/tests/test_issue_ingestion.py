@@ -3,6 +3,7 @@
 from datetime import timedelta
 from typing import Any, cast
 
+import httpx
 import pytest
 from django.conf import settings
 from django.test import override_settings
@@ -15,8 +16,9 @@ from e2e.builders import add_candidate, fresh_repo, make_candidate_repo
 from issues.models import Issue
 from repositories import tasks
 from repositories.models import Repository
+from services.github.client import IssueData, IssuePage
 from services.github.errors import GitHubTransientError
-from services.repositories.analysis import Outcome
+from services.repositories.analysis import Outcome, merge_issue_pages
 from services.repositories.staleness import stale_parts
 
 from .checks_helpers import ids
@@ -264,3 +266,133 @@ def test_issue_staleness_age_required() -> None:
     ages = {k: v for k, v in settings.REPO_STALE_AFTER.items() if k != "issues"}
     with override_settings(REPO_STALE_AFTER=ages):
         assert "core.E023" in ids(discovery_config_check())
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        "good first issue",
+        ["good first issue", ""],
+        ["help wanted", "Help Wanted"],
+        [3],
+        ["good first issue", " help wanted"],
+        ["good first issue, help wanted"],
+    ],
+)
+def test_entry_labels_checked(labels: object) -> None:
+    with override_settings(ISSUES_ENTRY_LABELS=labels):
+        assert "core.E041" in ids(issue_config_check())
+
+
+@pytest.mark.parametrize("labels", [[], ["good first issue"], ["good first issue", "help wanted"]])
+def test_entry_labels_valid(labels: list[str]) -> None:
+    with override_settings(ISSUES_ENTRY_LABELS=labels):
+        assert issue_config_check() == []
+
+
+# --- entry labels (labeled-issue-fetch) ----------------------------------------------------
+
+
+def capped_recent(respx_mock, issues: list[dict[str, Any]]):
+    return respx_mock.get(ISSUES).respond(
+        200, json=issues, headers={"Link": f'<{ISSUES}?page=2>; rel="next"'}
+    )
+
+
+def gfi(number: int, *names: str) -> dict[str, Any]:
+    return issue_payload(number, labels=[{"name": n} for n in names or ("good first issue",)])
+
+
+def test_capped_listing_adds_older_entry_issues_once(client, respx_mock) -> None:
+    repo = fresh_repo()
+    first = respx_mock.get(ISSUES, params={"labels": "good first issue"}).respond(
+        200, json=[gfi(2), gfi(50, "good first issue", "help wanted")]
+    )
+    help_wanted = respx_mock.get(ISSUES, params={"labels": "help wanted"}).respond(
+        200, json=[gfi(50, "good first issue", "help wanted"), gfi(60, "help wanted")]
+    )
+    capped_recent(respx_mock, [issue_payload(1), gfi(2)])
+
+    analyze(client, repo, ["issues"])
+
+    numbers = sorted(Issue.objects.filter(repository=repo).values_list("number", flat=True))
+    assert numbers == [1, 2, 50, 60]  # #2 and #50 came twice, stored once
+    assert first.call_count == help_wanted.call_count == 1
+    repo.refresh_from_db()
+    assert repo.issues_truncated is True  # the recent listing's cap, unchanged by labels
+
+
+def test_untruncated_listing_fetches_no_labels(client, respx_mock) -> None:
+    repo = fresh_repo()
+    entry = respx_mock.get(ISSUES, params={"labels": "good first issue"}).respond(200, json=[])
+    respx_mock.get(ISSUES).respond(200, json=[issue_payload(1), gfi(2)])
+    analyze(client, repo, ["issues"])
+    assert entry.call_count == 0
+    assert Issue.objects.filter(repository=repo).count() == 2
+
+
+@override_settings(ISSUES_ENTRY_LABELS=[])
+def test_no_entry_labels_configured(client, respx_mock) -> None:
+    repo = fresh_repo()
+    recent = capped_recent(respx_mock, [issue_payload(1)])
+    analyze(client, repo, ["issues"])
+    assert len(respx_mock.calls) == recent.call_count == 1
+
+
+def test_failed_labeled_listing_keeps_the_stored_issues(client, respx_mock) -> None:
+    stamp = timezone.now() - timedelta(hours=7)
+    repo = fresh_repo()
+    # Labeled routes first: respx matches in registration order.
+    respx_mock.get(ISSUES, params={"labels": "good first issue"}).respond(200, json=[gfi(9)])
+    respx_mock.get(ISSUES, params={"labels": "help wanted"}).respond(502)
+    respx_mock.get(ISSUES).side_effect = [
+        httpx.Response(200, json=[issue_payload(1)]),  # first analysis: not capped
+        httpx.Response(
+            200, json=[issue_payload(2)], headers={"Link": f'<{ISSUES}?page=2>; rel="next"'}
+        ),
+    ]
+    analyze(client, repo, ["issues"])
+    Repository.objects.filter(pk=repo.pk).update(lifecycle="stale", issues_synced_at=stamp)
+
+    with pytest.raises(GitHubTransientError):
+        analyze(client, repo, ["issues"])
+
+    repo.refresh_from_db()
+    assert list(Issue.objects.filter(repository=repo).values_list("number", flat=True)) == [1]
+    assert (repo.lifecycle, repo.issues_synced_at) == ("stale", stamp)
+
+
+def test_merge_keeps_recent_order_and_truncation() -> None:
+    def page(*numbers: int, truncated: bool = False) -> IssuePage:
+        return IssuePage([IssueData.from_api(issue_payload(n)) for n in numbers], truncated)
+
+    merged = merge_issue_pages(page(3, 1, truncated=True), [page(1, 7), page(7, 5)])
+    assert [i.number for i in merged.issues] == [3, 1, 7, 5]
+    assert merged.truncated is True
+    assert [i.number for i in merge_issue_pages(page(2), []).issues] == [2]
+
+
+def test_list_settings_are_trimmed(monkeypatch) -> None:
+    from config.settings.base import env_list
+
+    monkeypatch.setenv("CF_TEST_LIST", "good first issue, help wanted,,")
+    assert env_list("CF_TEST_LIST", default=[]) == ["good first issue", "help wanted"]
+
+
+def test_labeled_listings_renew_the_claim(client, respx_mock, monkeypatch) -> None:
+    from services.repositories.analysis import RepositoryAnalysisService
+
+    repo = fresh_repo()
+    respx_mock.get(ISSUES, params={"labels": "good first issue"}).respond(200, json=[])
+    respx_mock.get(ISSUES, params={"labels": "help wanted"}).respond(200, json=[])
+    capped_recent(respx_mock, [issue_payload(1)])
+    calls: list[int] = []
+    original = RepositoryAnalysisService._between_parts
+
+    def counting(self, r):
+        calls.append(len(respx_mock.calls))
+        return original(self, r)
+
+    monkeypatch.setattr(RepositoryAnalysisService, "_between_parts", counting)
+    analyze(client, repo, ["issues"])
+    assert calls == [0, 1, 2]  # before the recent listing and before each labeled one

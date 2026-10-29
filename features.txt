@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.34 (2026-10-28)
+Version: 0.12.35 (2026-10-28)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,6 +439,17 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.35 - Labeled-issue fetch
+============================================================================
+
+Issues (ideas.md section 7)
+  [x] Capped repositories also fetch one page per entry label (good first issue, help wanted)
+  [x] Merged with the recent issues, each once; ISSUES_ENTRY_LABELS setting, check core.E041
+  [x] A failed labeled listing keeps the stored issues
+  [x] Review fixes (Bug_Backlog.md N-1..N-3, N-8, N-9): label names trimmed, claim renewed per
+      request; every comma-separated setting (ALLOWED_HOSTS, origins, keys) read trimmed
+
+============================================================================
 SHIPPED - v0.12.34 - Dependency audit
 ============================================================================
 
@@ -777,5 +788,5 @@ PLANNED - MVP+ / FUTURE
   [ ]          Personalized ranking, notifications, contribution tracking
   [ ] ideas.md  Unplanned, ordered by when they can ship. Now (no ranking change):
                 interface revamp (§18). Ranking-visible (win on the benchmark): IDF weighting, diversity, preferences,
-                contribution-success signals, labeled-issue fetch, retrieval sources,
+                contribution-success signals, retrieval sources,
                 content-based not_code, label bands

@@ -323,10 +323,11 @@ def feedback_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckM
 
 @register()
 def issue_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
-    """Issue fetch budget, body cap, age limit and difficulty thresholds (Phase 7)."""
+    """Issue fetch budget, entry labels, body cap, age limit and difficulty thresholds."""
     errors = _rule_errors(
         ("ISSUES_MAX_PAGES", "ISSUE_BODY_MAX_CHARS", "ISSUE_MAX_AGE_DAYS"), POSITIVE_INT
     )
+    errors += _entry_label_errors(settings.ISSUES_ENTRY_LABELS)
     thresholds = settings.ISSUE_DIFFICULTY
     difficulty_errors = _keys_errors(
         "ISSUE_DIFFICULTY", thresholds, ISSUE_DIFFICULTY_KEYS, "core.E040"
@@ -377,6 +378,19 @@ def issue_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMess
                 )
             )
     return errors
+
+
+def _entry_label_errors(labels: object) -> list[CheckMessage]:
+    """A list of distinct (case-insensitive) label names, non-empty, without surrounding
+    spaces (GitHub matches names exactly) and without commas (``labels=a,b`` asks for issues
+    carrying both); empty fetches none."""
+    if not isinstance(labels, list) or not all(
+        isinstance(x, str) and x and x == x.strip() and "," not in x for x in labels
+    ):
+        return [Error("ISSUES_ENTRY_LABELS must be a list of label names.", id="core.E041")]
+    if len({x.lower() for x in labels}) < len(labels):
+        return [Error("ISSUES_ENTRY_LABELS names a label twice.", id="core.E041")]
+    return []
 
 
 # Integer settings where 0 would loop, never finish or never fetch anything.

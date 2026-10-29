@@ -16,9 +16,16 @@ env = environ.Env()
 if env.bool("DJANGO_READ_DOTENV", default=True) and (REPO_ROOT / ".env").exists():
     env.read_env(REPO_ROOT / ".env")
 
+
+def env_list(name: str, default: list[str]) -> list[str]:
+    """A comma-separated setting, items trimmed and empty ones dropped: ``env.list`` keeps the
+    space in ``a, b``, so " b" would match no host, origin, key or label."""
+    return [item.strip() for item in env.list(name, default=default) if item.strip()]
+
+
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -134,10 +141,10 @@ SESSION_COOKIE_AGE = env.int("SESSION_COOKIE_AGE", default=int(timedelta(days=14
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = False
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", default=[])
 CSRF_FAILURE_VIEW = "core.views.csrf_failure"
 
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", default=[])
 CORS_ALLOW_CREDENTIALS = True
 CORS_URLS_REGEX = r"^/api/.*$"
 
@@ -399,6 +406,9 @@ FEEDBACK_VIEW_DEDUP_MINUTES = env.int("FEEDBACK_VIEW_DEDUP_MINUTES", default=30)
 # --- Issues (Phase 7) ---
 # Issue matching weights, thresholds and the difficulty fit table are ScoringConfig params.
 ISSUES_MAX_PAGES = env.int("ISSUES_MAX_PAGES", default=1)
+# Entry labels (GitHub's default names): one page of open issues per label is fetched besides
+# the most recent ones, so older entry issues of big repositories are not cut off. Empty: none.
+ISSUES_ENTRY_LABELS = env_list("ISSUES_ENTRY_LABELS", default=["good first issue", "help wanted"])
 ISSUE_BODY_MAX_CHARS = env.int("ISSUE_BODY_MAX_CHARS", default=10_000)
 ISSUE_MAX_AGE_DAYS = env.int("ISSUE_MAX_AGE_DAYS", default=365)
 # Difficulty votes: a body under short_body votes beginner, over long_body advanced; one
@@ -435,7 +445,7 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 # Comma-separated Fernet keys, newest first.
-TOKEN_ENCRYPTION_KEYS = env.list("TOKEN_ENCRYPTION_KEYS", default=[])
+TOKEN_ENCRYPTION_KEYS = env_list("TOKEN_ENCRYPTION_KEYS", default=[])
 
 # --- Logging ---------------------------------------------------------------
 LOGGING = {

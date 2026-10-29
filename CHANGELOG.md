@@ -7,6 +7,30 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.35] - 2026-10-28
+
+Labeled-issue fetch (`openspec/changes/archive/2026-10-28-labeled-issue-fetch/`; spec
+`issue-ingestion`; `ideas.md` §7). No API, model, migration or scoring-config change;
+baselines unchanged (the benchmark stores issues as data).
+
+### Changed
+
+- A repository with more open issues than the fetch budget (`ISSUES_MAX_PAGES`, one page of
+  100) now also fetches one page of open issues per entry label, `good first issue` and
+  `help wanted` by default (`ISSUES_ENTRY_LABELS`; empty turns it off; check `core.E041`).
+  Older entry issues of big repositories are no longer cut off, so their issue fit and relevant
+  issues can rise. Two more conditional requests per capped repository; none for smaller ones.
+  A failed labeled listing fails the issue fetch and keeps the stored issues.
+- Local measurement before release (read-only): 50 of 473 pooled repositories were capped and
+  held 84 entry issues; 24 of them gain 550 more (390 updated within the 365-day limit). Stored
+  issues change on each repository's next issue refresh (6 h).
+- Review fixes (`Bug_Backlog.md` batch 22): label names are trimmed (`good first issue, help
+  wanted` in `.env` no longer requests ` help wanted`; `core.E041` refuses surrounding spaces),
+  and each labeled request checks for cancellation and renews the analysis claim first.
+- Every comma-separated setting (`ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`,
+  `TOKEN_ENCRYPTION_KEYS`, `ISSUES_ENTRY_LABELS`) is read trimmed, with empty items dropped:
+  `localhost, 127.0.0.1` no longer yields a host " 127.0.0.1" that matches nothing.
+
 ## [0.12.34] - 2026-10-28
 
 Dependency audit (`openspec/changes/archive/2026-10-28-dependency-scanning/`; spec

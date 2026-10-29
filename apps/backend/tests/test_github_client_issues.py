@@ -126,3 +126,30 @@ def test_server_error_is_transient(client) -> None:
     respx.get(ISSUES).respond(502)
     with pytest.raises(GitHubTransientError):
         client.list_open_issues("encode/httpx")
+
+
+@respx.mock
+@override_settings(ISSUES_MAX_PAGES=3)
+def test_labeled_listing_reads_one_page(client) -> None:
+    route = respx.get(ISSUES, params={"labels": "good first issue"}).respond(
+        200,
+        json=[issue_payload(7), pull_request(8)],
+        headers={"Link": f'<{ISSUES}?labels=good+first+issue&page=2>; rel="next"'},
+    )
+    page = client.list_open_issues("encode/httpx", label="good first issue")
+    assert [i.number for i in page.issues] == [7]
+    assert page.truncated is True
+    assert route.call_count == 1 and len(respx.calls) == 1
+    params = route.calls.last.request.url.params
+    assert (params["state"], params["sort"], params["labels"]) == (
+        "open",
+        "updated",
+        "good first issue",
+    )
+
+
+@respx.mock
+def test_labeled_listing_issues_disabled_is_empty(client) -> None:
+    respx.get(ISSUES).respond(410, json={"message": "Issues are disabled for this repo"})
+    page = client.list_open_issues("encode/httpx", label="help wanted")
+    assert page.issues == [] and page.truncated is False

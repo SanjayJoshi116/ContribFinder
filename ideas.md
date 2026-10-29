@@ -1,7 +1,7 @@
 # Ideas
 
 Gap analysis from 2026-10-20 (v0.12.4), with later rounds added 2026-10-21 to 2026-10-27
-(v0.12.7–v0.12.34). Nothing here is planned yet: each idea needs an OpenSpec change before work
+(v0.12.7–v0.12.35). Nothing here is planned yet: each idea needs an OpenSpec change before work
 starts. Ranking-visible items (marked †) must win on the selection benchmark and not regress on
 a fresh holdout. Since 2026-10-28 they no longer wait for K-1 (judging real developers is
 optional; `Bug_Backlog.md`).
@@ -11,7 +11,7 @@ Layout: the priority table, then the open ideas by when they can ship, then what
 repository data, freshness and client, platform and tooling, then evaluation. "Ranking-visible"
 holds the ranking-visible ideas (including what is left of §11 and §12, whose measurement and
 cleanup shipped) and the follow-ups of §4, whose ideas have shipped. Shipped ideas are listed
-only in "Shipped"; §8, §10 and §17 shipped whole, so they have no section above. Section numbers
+only in "Shipped"; §7, §8, §10 and §17 shipped whole, so they have no section above. Section numbers
 (§1–§18) are stable, because other documents cite them, so they are not in numeric order
 (reordered 2026-10-26, after v0.12.26).
 
@@ -22,7 +22,7 @@ Open ideas only, in suggested order within each cell. † = changes what users a
 
 | | Cheap | Expensive |
 |---|---|---|
-| **High value** | significance gate for ranking changes (§3); labeled-issue fetch† (§7); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
+| **High value** | significance gate for ranking changes (§3); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
 | **Lower value** | queue released-name refresh (§13); route-level ids (§14); production build in CI (§14); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
 
 Not ranked yet: acting on the discovery yield report† (§12, needs runs), intervals on the
@@ -243,13 +243,6 @@ discovery run; also §12 and §13.
 - **Starred repos.** `GET /users/{u}/starred`, public, no scope. Candidates plus a strong
   interest signal. Disclose on the privacy page.
 
-### 7. Issue coverage
-
-- `list_open_issues` (`services/github/client.py`) fetches the most recently updated issues,
-  capped at `ISSUES_MAX_PAGES`. In big repos, older `good first issue` / `help wanted` issues
-  fall past the cap, so `issue_fit` underrates repos with the most entry points. Add one fetch
-  with `labels=good first issue` (and `help wanted`) and merge.
-
 ## Learning from interaction
 
 ### 4. Learning from interaction
@@ -271,6 +264,7 @@ Newest first.
 
 | Idea | § | Shipped in |
 |---|---|---|
+| Labeled-issue fetch (entry-labeled issues beyond the recent cap) | §7 | v0.12.35 (only for capped repositories; default label names only) |
 | Dependency audit in CI (`pip-audit`, `npm audit`, accepted list, weekly run) | §5 | v0.12.34 (no Dependabot or CodeQL) |
 | One JSON writer for management commands (`core/reports.py`) | §15 | v0.12.33 (T-14; non-ASCII kept in every file) |
 | Content-Security-Policy (backend header; meta tag in the built SPA) | §5 | v0.12.30 (no reporting endpoint; the SPA host adds `frame-ancestors`) |

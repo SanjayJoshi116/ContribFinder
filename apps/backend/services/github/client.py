@@ -458,15 +458,19 @@ class GitHubClient:
         return [str(label.get("name", "")) for label in page.items]
 
     @_parses_response
-    def list_open_issues(self, full_name: str) -> IssuePage:
-        """Open issues, most recently updated first, up to ``ISSUES_MAX_PAGES`` pages. Pull
-        requests (which the issues listing includes) are dropped. A repository with issues
-        disabled (410) has none."""
+    def list_open_issues(self, full_name: str, *, label: str | None = None) -> IssuePage:
+        """Open issues, most recently updated first, up to ``ISSUES_MAX_PAGES`` pages. With
+        ``label``, only issues carrying it, one page (GitHub's ``labels=a,b`` requires every
+        label, so each entry label is its own request). Pull requests (which the issues listing
+        includes) are dropped. A repository with issues disabled (410) has none."""
+        params = {"state": "open", "sort": "updated", "direction": "desc"}
+        if label is not None:
+            params["labels"] = label
         try:
             page = self._paginate(
                 f"/repos/{full_name}/issues",
-                {"state": "open", "sort": "updated", "direction": "desc"},
-                max_pages=settings.ISSUES_MAX_PAGES,
+                params,
+                max_pages=settings.ISSUES_MAX_PAGES if label is None else 1,
             )
         except GitHubGone:
             return IssuePage(issues=[], truncated=False)

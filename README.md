@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.34** (dependency audit in CI; MVP+). After signing in with
+**Version 0.12.35** (older entry issues of big repositories fetched; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -132,7 +132,9 @@ A completed sync or re-analysis starts a discovery run automatically, and a comp
 starts a recommendation generation. Ranking limits and sizes (`RECOMMENDATION_*`,
 `RECOMMENDATIONS_TOP_N`, `REPO_SIZE_THRESHOLDS`) and the view de-duplication window
 (`FEEDBACK_VIEW_DEDUP_MINUTES`) are in `.env.example` too, as are the issue fetch budget and
-difficulty thresholds (`ISSUES_MAX_PAGES`, `ISSUE_*`). Scoring weights and issue matching
+difficulty thresholds (`ISSUES_MAX_PAGES`, `ISSUE_*`). When a repository has more open issues
+than that budget, one page per entry label (`ISSUES_ENTRY_LABELS`, default `good first issue`
+and `help wanted`) is fetched as well, so its older entry issues are not cut off. Scoring weights and issue matching
 parameters live in the active `ScoringConfig` (Django admin); `v2-deterministic` is active.
 
 ## Evaluating a ranking change

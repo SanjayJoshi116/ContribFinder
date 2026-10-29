@@ -117,6 +117,19 @@ class _Fetched:
     issues: IssuePage | None = None
 
 
+def merge_issue_pages(recent: IssuePage, labeled: list[IssuePage]) -> IssuePage:
+    """The recent issues, then each labeled page's issues not already seen (by GitHub ID).
+    ``truncated`` describes the recent listing only."""
+    seen = {issue.github_id for issue in recent.issues}
+    merged = list(recent.issues)
+    for page in labeled:
+        for issue in page.issues:
+            if issue.github_id not in seen:
+                seen.add(issue.github_id)
+                merged.append(issue)
+    return IssuePage(issues=merged, truncated=recent.truncated)
+
+
 def normalize_label(name: str) -> str:
     return re.sub(r"[\s_-]+", " ", name.lower()).strip()
 
@@ -229,7 +242,15 @@ class RepositoryAnalysisService:
             )
         if "issues" in parts:
             self._between_parts(repo)
-            out.issues = c.list_open_issues(name)
+            recent = c.list_open_issues(name)
+            # An untruncated listing holds every open issue; only a capped one can miss older
+            # entry issues (issues disabled reads as empty, not truncated).
+            labeled: list[IssuePage] = []
+            if recent.truncated:
+                for label in settings.ISSUES_ENTRY_LABELS:
+                    self._between_parts(repo)  # cancel check and claim renewal per request
+                    labeled.append(c.list_open_issues(name, label=label))
+            out.issues = merge_issue_pages(recent, labeled)
         return out
 
     def _metadata(self, repo: Repository) -> GitHubRepo:
@@ -383,4 +404,4 @@ class RepositoryAnalysisService:
         Issue.objects.bulk_create(to_create)
 
 
-__all__ = ["PARTS", "Outcome", "RepositoryAnalysisService", "normalize_label"]
+__all__ = ["PARTS", "Outcome", "RepositoryAnalysisService", "merge_issue_pages", "normalize_label"]

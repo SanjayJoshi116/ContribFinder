@@ -1368,6 +1368,26 @@ Archived: `openspec/changes/archive/2026-10-28-dependency-scanning/`. Spec: delt
 - Review of 0.12.32–0.12.34 (`Bug_Backlog.md` batch 21): M-1…M-3, M-9…M-11 fixed here; the
   rest accepted or wontfix. A malformed report goes through `asAuditError` (exit 2, no stack).
 
+**Labeled-issue fetch** (MVP+, ranking-visible through data)  ✅ shipped in v0.12.35
+
+Archived: `openspec/changes/archive/2026-10-28-labeled-issue-fetch/`. Spec: delta to
+`issue-ingestion` ("Issue collection"). `ideas.md` §7.
+- `list_open_issues(full_name, *, label=None)`: with a label, `labels=<label>` and one page
+  (`labels=a,b` would require both). The `issues` part reads the recent listing, then one
+  labeled listing per `ISSUES_ENTRY_LABELS` entry (default `good first issue`, `help wanted`;
+  check `core.E041`) **only when the recent listing is truncated** (an untruncated one holds
+  every open issue; 410 reads as empty). `merge_issue_pages` (analysis.py): recent first, then
+  unseen by GitHub ID; `issues_truncated` describes the recent listing only. Any listing
+  failing fails the part and keeps the stored issues.
+- No scoring or config change; the benchmark stores issues, so baselines cannot move (design
+  D6). Local measurement (read-only): 50 of 473 pooled repositories capped; 84 entry issues
+  stored before; 24 repositories gain 550 more (390 updated within `ISSUE_MAX_AGE_DAYS`).
+- Tests register labeled `respx` routes before the generic issues route (first match wins).
+- Review (`Bug_Backlog.md` batch 22): names trimmed in `base.py` (`env.list` keeps spaces after
+  commas); `_between_parts` before each labeled listing; N-4…N-7 accepted.
+- Comma-separated settings go through `env_list(name, default)` in `base.py` (trimmed, empty
+  items dropped), never bare `env.list` (N-8).
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1386,14 +1406,15 @@ platform items
 (migration round trip), then the interface revamp (§18, owner request:
 design direction first, one OpenSpec change per step). Ranking-visible (†, must win on the
 selection benchmark and not regress on a fresh holdout): IDF weighting, diversity, stated
-preferences, contribution-success signals, labeled-issue fetch, opportunity qualifiers,
+preferences, contribution-success signals, opportunity qualifiers,
 upstream dependencies, `similar_repo`, content-based `not_code`, and moving the label bands;
 whether a ranking change must also be significant is decided once real developers enlarge the
 benchmark. Shipped from it in this
 series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibration report
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
-rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34).
+rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
+(0.12.35).
 
 ## 8. Release housekeeping
 
