@@ -2172,7 +2172,7 @@
                 "$ref": "#/components/schemas/RevocationEnum"
               }
             ],
-            "description": "Whether GitHub confirmed revocation. Local credentials are deleted either way.\n\n* `revoked` - revoked\n* `failed` - failed\n* `not_connected` - not_connected"
+            "description": "Whether a GitHub revocation was queued. Local credentials are deleted at once.\n\n* `queued` - queued\n* `not_connected` - not_connected\n* `revoked` - revoked\n* `failed` - failed"
           }
         },
         "required": ["revocation"]
@@ -3608,9 +3608,9 @@
         "required": ["bytes", "language"]
       },
       "RevocationEnum": {
-        "enum": ["revoked", "failed", "not_connected"],
+        "enum": ["queued", "not_connected", "revoked", "failed"],
         "type": "string",
-        "description": "* `revoked` - revoked\n* `failed` - failed\n* `not_connected` - not_connected"
+        "description": "* `queued` - queued\n* `not_connected` - not_connected\n* `revoked` - revoked\n* `failed` - failed"
       },
       "SaveResult": {
         "type": "object",

@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 import respx
+from celery.exceptions import Retry
 from django.conf import settings
 from django.test import Client
 from django.utils import timezone
@@ -15,6 +16,7 @@ from rest_framework.test import APIClient
 from accounts.models import AuditEvent, User
 from accounts.views import OAUTH_STATES_SESSION_KEY
 from github.models import GitHubAccount
+from github.tasks import revoke_later
 from services.crypto import decrypt_token
 
 pytestmark = pytest.mark.django_db
@@ -368,23 +370,35 @@ def test_logout_without_csrf_rejected(csrf_client: APIClient, user: User) -> Non
 
 
 @respx.mock
-def test_disconnect_revokes_deletes_and_logs_out(user: User) -> None:
+def test_disconnect_deletes_logs_out_and_revokes_in_the_background(
+    user: User, django_capture_on_commit_callbacks
+) -> None:
     grant = respx.mock.delete(GRANT_URL).respond(204)
     client, csrf = _csrf_signed_in_client(user)
 
-    response = client.post("/api/v1/auth/github/disconnect", HTTP_X_CSRFTOKEN=csrf)
+    with django_capture_on_commit_callbacks() as callbacks:
+        response = client.post("/api/v1/auth/github/disconnect", HTTP_X_CSRFTOKEN=csrf)
 
     assert response.status_code == 200
-    assert response.json() == {"revocation": "revoked"}
-    assert grant.called
-    request = grant.calls.last.request
-    assert request.headers["Authorization"].startswith("Basic ")
+    assert response.json() == {"revocation": "queued"}
+    assert not grant.called  # never inside the request
     assert not GitHubAccount.objects.filter(user=user).exists()
     assert User.objects.filter(pk=user.pk).exists()
     assert client.get("/api/v1/auth/me").status_code == 401
     event = AuditEvent.objects.get(action="github_disconnect")
-    assert event.metadata["revocation"] == "revoked"
+    assert event.metadata["revocation"] == "queued"
     assert set(event.metadata) == {"revocation", "deleted"}
+
+    for run in callbacks:  # the queued task, after commit
+        run()
+    assert grant.calls.last.request.headers["Authorization"].startswith("Basic ")
+
+
+def test_disconnect_without_github_connection(user: User) -> None:
+    GitHubAccount.objects.filter(user=user).delete()
+    client, csrf = _csrf_signed_in_client(user)
+    response = client.post("/api/v1/auth/github/disconnect", HTTP_X_CSRFTOKEN=csrf)
+    assert response.json() == {"revocation": "not_connected"}
 
 
 @respx.mock
@@ -393,7 +407,7 @@ def test_disconnect_revokes_deletes_and_logs_out(user: User) -> None:
     [httpx.Response(500), httpx.ConnectTimeout("timed out")],
     ids=["http-500", "timeout"],
 )
-def test_disconnect_when_github_revocation_fails(
+def test_background_revocation_is_retried_and_never_logs_the_token(
     user: User, failure: httpx.Response | Exception, caplog: pytest.LogCaptureFixture
 ) -> None:
     route = respx.mock.delete(GRANT_URL)
@@ -401,17 +415,17 @@ def test_disconnect_when_github_revocation_fails(
         route.mock(return_value=failure)
     else:
         route.mock(side_effect=failure)
-    client, csrf = _csrf_signed_in_client(user)
+    encrypted = GitHubAccount.objects.get(user=user).access_token_encrypted
 
-    with caplog.at_level(logging.DEBUG):
-        response = client.post("/api/v1/auth/github/disconnect", HTTP_X_CSRFTOKEN=csrf)
+    with caplog.at_level(logging.DEBUG), pytest.raises(Retry):  # scheduled again, with backoff
+        revoke_later.apply(args=(encrypted, None, True), throw=True)
 
-    assert response.status_code == 200
-    assert response.json() == {"revocation": "failed"}
-    assert not GitHubAccount.objects.filter(user=user).exists()
-    assert client.get("/api/v1/auth/me").status_code == 401
-    assert AuditEvent.objects.get(action="github_disconnect").metadata["revocation"] == "failed"
+    assert route.call_count == 1
     assert_no_secrets(caplog.text)
+
+
+def test_background_revocation_skips_a_token_under_a_removed_key() -> None:
+    revoke_later.apply(args=("not-a-fernet-token", None, True), throw=True)  # nothing to use
 
 
 def test_disconnect_without_csrf_rejected(csrf_client: APIClient, user: User) -> None:
@@ -488,7 +502,8 @@ def test_failed_revocation_still_signs_in(
     respx.mock.delete(APP_TOKEN_URL).mock(side_effect=httpx.ConnectTimeout("timed out"))
     with caplog.at_level(logging.DEBUG):
         _sign_in_twice(client, respx.mock, django_capture_on_commit_callbacks)
-    assert "Revoking the replaced GitHub token failed" in caplog.text
+    assert "_auth_user_id" in client.session  # signed in with the new token
+    assert "Retry in" in caplog.text  # the revocation is scheduled again, never fatal
     assert TOKEN not in caplog.text and NEW_TOKEN not in caplog.text
 
 

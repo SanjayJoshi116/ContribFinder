@@ -223,12 +223,15 @@ def test_sync_available_again_after_data_deletion(user, everything, monkeypatch)
 
 
 @respx.mock
-def test_account_deletion(user, everything, caplog) -> None:
+def test_account_deletion(user, everything, caplog, django_capture_on_commit_callbacks) -> None:
     grant = respx.mock.delete(GRANT_URL).respond(204)
     client, csrf = csrf_client(user)
-    with caplog.at_level(logging.DEBUG):
+    with caplog.at_level(logging.DEBUG), django_capture_on_commit_callbacks() as callbacks:
         response = client.delete("/api/v1/auth/account", HTTP_X_CSRFTOKEN=csrf)
     assert response.status_code == 204
+    assert not grant.called  # queued, never inside the request
+    for run in callbacks:
+        run()
     assert grant.called
     assert not User.objects.filter(pk=user.pk).exists()
     assert not GitHubAccount.objects.exists()
@@ -236,30 +239,36 @@ def test_account_deletion(user, everything, caplog) -> None:
     assert client.get("/api/v1/auth/me").status_code == 401
     event = AuditEvent.objects.get(action="account_deleted")
     assert event.user is None and event.outcome == "success"
-    assert event.metadata["revocation"] == "revoked"
+    assert event.metadata["revocation"] == "queued"
     assert FACTORY_TOKEN not in caplog.text and FACTORY_TOKEN not in str(event.metadata)
 
 
 @respx.mock
-@pytest.mark.parametrize(
-    "failure",
-    [httpx.Response(500), httpx.ConnectTimeout("timed out")],
-    ids=["http-500", "timeout"],
-)
-def test_account_deletion_when_revocation_fails(user, everything, failure, caplog) -> None:
-    route = respx.mock.delete(GRANT_URL)
-    if isinstance(failure, httpx.Response):
-        route.mock(return_value=failure)
-    else:
-        route.mock(side_effect=failure)
+def test_account_deletion_never_waits_for_github(user, everything) -> None:
+    route = respx.mock.delete(GRANT_URL).mock(side_effect=httpx.ConnectTimeout("timed out"))
     client, csrf = csrf_client(user)
-    with caplog.at_level(logging.DEBUG):
-        response = client.delete("/api/v1/auth/account", HTTP_X_CSRFTOKEN=csrf)
+    response = client.delete("/api/v1/auth/account", HTTP_X_CSRFTOKEN=csrf)
     assert response.status_code == 204
+    assert not route.called
     assert not User.objects.filter(pk=user.pk).exists()
     assert_no_user_data()
-    assert AuditEvent.objects.get(action="account_deleted").metadata["revocation"] == "failed"
-    assert FACTORY_TOKEN not in caplog.text
+
+
+def test_a_failing_user_delete_keeps_no_deleted_entry_and_the_trail(user, monkeypatch) -> None:
+    client, csrf = csrf_client(user)
+    AuditEvent.objects.create(
+        action="sign_in", outcome="success", user=user, metadata={"github_username": "octo"}
+    )
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("delete failed")
+
+    monkeypatch.setattr(User, "delete", fail)
+    response = client.delete("/api/v1/auth/account", HTTP_X_CSRFTOKEN=csrf)
+    assert response.status_code == 500
+    assert User.objects.filter(pk=user.pk).exists()
+    assert not AuditEvent.objects.filter(action="account_deleted").exists()
+    assert AuditEvent.objects.get(action="sign_in").metadata["github_username"] == "octo"
 
 
 @respx.mock
@@ -357,7 +366,7 @@ def test_account_deletion_anonymizes_earlier_audit_entries(client: Client) -> No
     sign_in.refresh_from_db()
     assert sign_in.outcome == "success" and sign_in.created_at
     assert "created_user" in sign_in.metadata
-    assert AuditEvent.objects.get(action="account_deleted").metadata["revocation"] == "revoked"
+    assert AuditEvent.objects.get(action="account_deleted").metadata["revocation"] == "queued"
 
 
 @respx.mock

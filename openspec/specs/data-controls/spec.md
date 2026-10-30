@@ -37,7 +37,7 @@ A signed-in user SHALL be able to delete all GitHub-derived data (`DELETE /api/v
 - **THEN** the step writes nothing, the job ends as cancelled, and the user's GitHub profile, developer profile, repository links, candidates and recommendations still do not exist
 
 ### Requirement: Delete account
-A signed-in user SHALL be able to delete their ContribFinder account (`DELETE /api/v1/auth/account`, CSRF-protected). The system SHALL cancel the user's jobs, ask GitHub to revoke the authorization when connected, delete the stored credential and all GitHub-derived data as above, delete the user, and end the session. A failed revocation SHALL NOT stop the deletion and SHALL be recorded. After deletion, signing in with the same GitHub account SHALL create a new, empty account.
+A signed-in user SHALL be able to delete their ContribFinder account (`DELETE /api/v1/auth/account`, CSRF-protected). The system SHALL cancel the user's jobs, delete the stored credential and all GitHub-derived data as above, delete the user, and end the session. When connected, it SHALL ask GitHub to revoke the authorization in the background, never inside the request, holding the token only encrypted; a failed revocation SHALL NOT stop the deletion and SHALL be recorded without the token. The deletion audit entry, the anonymization of the user's audit entries and the deletion of the user SHALL happen together or not at all. After deletion, signing in with the same GitHub account SHALL create a new, empty account.
 
 #### Scenario: Account deleted
 - **WHEN** a user deletes their account
@@ -46,6 +46,10 @@ A signed-in user SHALL be able to delete their ContribFinder account (`DELETE /a
 #### Scenario: Revocation fails
 - **WHEN** GitHub revocation fails during account deletion
 - **THEN** the account and data are still deleted and the failure is recorded without the token
+
+#### Scenario: Deleting the user fails
+- **WHEN** deleting the user row fails after the GitHub data was deleted
+- **THEN** no `account_deleted` audit entry exists and the user's earlier audit entries keep their values
 
 ### Requirement: Audit of data deletion
 The system SHALL record an audit entry for every GitHub data deletion and account deletion, with the action, the outcome, the time and counts of what was deleted, and never any credential or deleted content. Audit entries SHALL be kept when the account is deleted, with the user reference removed. When an account is deleted, its audit entries SHALL also lose every value that identifies the person: GitHub user ID, GitHub username and client address hash. Their action, outcome, time, reason codes and counts SHALL be kept.

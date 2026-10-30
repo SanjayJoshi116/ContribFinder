@@ -1460,6 +1460,53 @@ sweep (workflow in `Bug_Backlog.md`). Also `LICENSE` (MIT), `SECURITY.md`, SRS f
 - CFG-7 (500s bypass `got_request_exception`) and CFG-8 (production re-reads `REDIS_URL`)
   accepted.
 
+**Core fixes, review sweep: core** (MVP+, fix release)  ✅ shipped in v0.12.40 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-30-core-review-fixes/`. Spec: delta to
+`api-platform` ("Configuration validated at startup"). `Bug_Backlog.md` batch 27 (CORE-1…CORE-10),
+the second sweep module. `/simplify` and the fix-diff `/code-review` were skipped (owner).
+- `core.startup.run_startup_checks`: `checks.run_checks(include_deployment_checks=True)`;
+  silenced messages dropped first, serious ones block, the rest are logged.
+- `core/checks.py`: `NUM_PROXIES` in `NON_NEGATIVE_INT_SETTINGS`; query shares need a positive
+  total (`core.E022`); CSP values without control characters (`core.E060`); `REPO_STALE_AFTER`
+  items positive (`core.E023`); `_between(value, low, high)` for ranged numbers, so a wrong type
+  is an error, never a `TypeError`. Strategy and part keys come from `queries.STRATEGIES` and
+  `staleness.PARTS`, imported inside the check (they import models).
+- `core/logging.py`: keys match at the end of a longer name (`_NAME`); keys include `secret`,
+  `password`, `sessionid`, `csrftoken`, `encryption_keys`; `key=value` stops at `;` (cookies).
+- `core.reports.write_json`: serialize first, temporary file in the target folder, `os.replace`.
+
+**Account fixes, review sweep: accounts** (MVP+, fix release)  ✅ shipped in v0.12.41 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-30-accounts-review-fixes/`. Specs: deltas to
+`github-authentication` ("Handle the authorization callback", "Disconnect GitHub", "Audit trail
+for sensitive account actions"), `data-controls` ("Delete account"). `Bug_Backlog.md` batch 28
+(ACC-1…ACC-20; ACC-4 accepted, ACC-17 in part). ACC-11…ACC-20 came from a `/code-review` that
+narrowed to the uncommitted diff and were fixed before commit.
+- `services/accounts.py`: `disconnect_github(user, request) -> "queued" | "not_connected"` and
+  `delete_account(user, request)`, each one `@transaction.atomic` around the shared `_leave` (data deletion, audit,
+  anonymization and `user.delete()` all or nothing); views add only `logout`.
+- `services.github.accounts`: `queue_revocation(encrypted, github_id, *, grant)` (the one way to
+  revoke: `transaction.on_commit(..., robust=True)`, so a broker error is logged, never raised)
+  and `revoke(encrypted, github_id, *, grant)`: a token still stored for `github_id` is never
+  revoked, and once the user signed in again only the old token goes (never the grant); a token
+  under a removed key is logged and skipped. Disconnect/deletion queue `grant=True` with the
+  GitHub ID, a replaced token `grant=False`, a refused sign-in `refuse_token` (`grant=True`, no ID).
+- Task `github.revoke_later(encrypted, github_id, grant)`: retries through
+  `services/github/retry.decide_retry` (`REVOCATION_ATTEMPTS = 4`; `oauth._revoke` raises
+  `GitHubTransientError` for network, 5xx and 429, `OAuthError` otherwise); a final failure
+  records `AuditEvent.Action.GITHUB_REVOCATION_FAILED` (reason only, no user, `accounts.0005`).
+  `github.revoke_replaced_token` only forwards messages queued before 0.12.41.
+  Nothing on the request path calls GitHub (invariant 3).
+- `link_github_account` raises `AccountInactive` for a deactivated user before writing anything;
+  the callback maps it to `refuse_token`, audit `account_inactive`, `failed`; any other exception
+  while linking or logging in → audit `internal_error`, `failed`. No
+  `throttle_scope` on the callback.
+- `AuditEventAdmin`: no add/delete, `list_select_related`; index `auditevent_created_idx`
+  (`accounts.0004`). Beat `clear-expired-sessions` (daily) → `accounts.clear_expired_sessions`.
+- Disconnect response `revocation`: `queued` | `not_connected` (`revoked`, `failed` kept in the
+  enum, unused; OpenAPI `1.0.0`).
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1486,7 +1533,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41).
 
 ## 8. Release housekeeping
 

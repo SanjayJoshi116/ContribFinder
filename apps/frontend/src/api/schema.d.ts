@@ -643,11 +643,12 @@ export interface components {
     DifficultyEnum: 'beginner' | 'intermediate' | 'advanced' | 'unknown'
     DisconnectResult: {
       /**
-       * @description Whether GitHub confirmed revocation. Local credentials are deleted either way.
+       * @description Whether a GitHub revocation was queued. Local credentials are deleted at once.
        *
+       *     * `queued` - queued
+       *     * `not_connected` - not_connected
        *     * `revoked` - revoked
        *     * `failed` - failed
-       *     * `not_connected` - not_connected
        */
       revocation: components['schemas']['RevocationEnum']
     }
@@ -1200,12 +1201,13 @@ export interface components {
       readonly bytes: number
     }
     /**
-     * @description * `revoked` - revoked
-     *     * `failed` - failed
+     * @description * `queued` - queued
      *     * `not_connected` - not_connected
+     *     * `revoked` - revoked
+     *     * `failed` - failed
      * @enum {string}
      */
-    RevocationEnum: 'revoked' | 'failed' | 'not_connected'
+    RevocationEnum: 'queued' | 'not_connected' | 'revoked' | 'failed'
     SaveResult: {
       saved: boolean
     }

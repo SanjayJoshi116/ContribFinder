@@ -3,12 +3,17 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
-from accounts.models import User
+from accounts.models import AuditEvent, User
 from github.models import GitHubAccount
+from services import audit
 from services.crypto import TokenDecryptionError, decrypt_token, encrypt_token
-from services.github.oauth import GitHubIdentity, TokenResult, revoke_token
+from services.github.oauth import GitHubIdentity, TokenResult, revoke_grant, revoke_token
 
 logger = logging.getLogger(__name__)
+
+
+class AccountInactive(Exception):
+    """The GitHub user's account was deactivated: sign-in is refused, nothing is stored."""
 
 
 @dataclass(frozen=True)
@@ -22,12 +27,15 @@ def link_github_account(identity: GitHubIdentity, token: TokenResult) -> LinkRes
     """Create or update the user and GitHub account for a successful sign-in.
 
     The user is keyed by GitHub ID (``gh_<id>``), so a user who disconnected and signs in
-    again is re-linked to their existing account rather than duplicated.
+    again is re-linked to their existing account rather than duplicated. A deactivated user
+    raises ``AccountInactive`` before anything is written.
     """
     user, created_user = User.objects.select_for_update().get_or_create(
         username=f"gh_{identity.github_id}",
         defaults={"display_name": identity.name},
     )
+    if not user.is_active:
+        raise AccountInactive()
     if created_user:
         user.set_unusable_password()
         user.save(update_fields=["password"])
@@ -47,28 +55,47 @@ def link_github_account(identity: GitHubIdentity, token: TokenResult) -> LinkRes
         },
     )
     if previous and _plaintext(previous) not in (None, token.access_token):
-        from github.tasks import revoke_replaced_token  # avoid import cycle
-
-        # Off the request path: sign-in never waits on GitHub. Only ciphertext is queued.
-        github_id = identity.github_id
-        transaction.on_commit(lambda: revoke_replaced_token.delay(github_id, previous))
+        queue_revocation(previous, identity.github_id, grant=False)
     return LinkResult(user=user, created_user=created_user)
 
 
-def revoke_replaced(github_id: int, previous_encrypted: str) -> None:
-    """Best effort: revoke the token a sign-in replaced (spec: github-authentication
-    "Replaced token is revoked"), unless it is still the stored one. Never raises; logs the
-    failure type only."""
-    previous = _plaintext(previous_encrypted)
-    if previous is None:
-        return  # encrypted with a removed key: unusable for us, nothing to revoke with
-    current = _stored_token(github_id)
-    if current and _plaintext(current) == previous:
-        return  # a later sign-in stored the same token again
-    try:
-        revoke_token(previous)
-    except Exception as exc:
-        logger.warning("Revoking the replaced GitHub token failed: %s", type(exc).__name__)
+def queue_revocation(encrypted: str, github_id: int | None, *, grant: bool) -> None:
+    """Revoke a token off the request path, once the caller's transaction commits. Only
+    ciphertext is queued. A broker failure is logged, never raised into the caller (robust)."""
+    from github.tasks import revoke_later  # avoid import cycle
+
+    transaction.on_commit(lambda: revoke_later.delay(encrypted, github_id, grant), robust=True)
+
+
+def revoke(encrypted: str, github_id: int | None, *, grant: bool) -> None:
+    """Revoke the grant (``grant``) or this one token. With ``github_id``, the account's current
+    link decides: a token still stored is never revoked, and once the user has signed in again
+    the grant is in use, so only this token goes. Raises for the task's retry policy."""
+    token = _plaintext(encrypted)
+    if token is None:
+        logger.warning("GitHub revocation skipped: the token's encryption key was removed")
+        return
+    current = _stored_token(github_id) if github_id is not None else None
+    if current is not None:
+        if _plaintext(current) == token:
+            return
+        grant = False
+    (revoke_grant if grant else revoke_token)(token)
+
+
+def record_revocation_failure(code: str) -> None:
+    """The final failure of a queued revocation, without the token or who it was for."""
+    logger.warning("GitHub revocation failed for good: %s", code)
+    audit.record(
+        AuditEvent.Action.GITHUB_REVOCATION_FAILED,
+        AuditEvent.Outcome.FAILURE,
+        metadata={"reason": code},
+    )
+
+
+def refuse_token(access_token: str) -> None:
+    """Revoke the grant of a refused sign-in (deactivated user) in the background."""
+    queue_revocation(encrypt_token(access_token), None, grant=True)
 
 
 def _stored_token(github_id: int) -> str | None:

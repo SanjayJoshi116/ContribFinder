@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.39 (2026-10-30)
+Version: 0.12.41 (2026-10-30)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,27 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.41 - Account fixes (review sweep: accounts)
+============================================================================
+
+Accounts (Bug_Backlog.md batch 28)
+  [x] GitHub revocation on disconnect and account deletion runs in the background
+  [x] Deactivated users cannot sign in; sign-in errors redirect instead of a raw 500
+  [x] Account deletion and its audit entry are atomic; audit entries read-only in the admin
+  [x] Expired sessions removed daily; sign-in callback never throttled
+
+============================================================================
+SHIPPED - v0.12.40 - Core fixes (review sweep: core)
+============================================================================
+
+Platform (Bug_Backlog.md batch 27)
+  [x] Silenced checks never block production startup; deployment checks logged
+  [x] Startup rejects a negative NUM_PROXIES, zero query shares, a multi-line CSP, zero stale-after
+  [x] Wrongly typed settings reported, never a crash; check keys read from the services
+  [x] Log redaction covers prefixed secret names, cookies and passwords
+  [x] JSON reports written atomically
 
 ============================================================================
 SHIPPED - v0.12.39 - Settings fixes (review sweep: config)

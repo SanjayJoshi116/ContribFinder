@@ -16,11 +16,9 @@ from rest_framework.views import APIView
 
 from core.authentication import current_user
 from core.serializers import error_responses
-from github.models import GitHubAccount
-from services import audit, data_deletion, jobs
-from services.crypto import decrypt_token
+from services import accounts, audit, jobs
 from services.github import oauth
-from services.github.accounts import link_github_account
+from services.github.accounts import AccountInactive, link_github_account, refuse_token
 
 from .models import AuditEvent, User
 from .serializers import DisconnectResultSerializer, MeSerializer
@@ -90,9 +88,10 @@ class GitHubLoginView(APIView):
 
 
 class GitHubCallbackView(APIView):
+    # Not throttled: it needs a single-use state that only the throttled start view issues, and
+    # a 429 here would show as a raw JSON page on the browser's navigation.
     authentication_classes = []
     permission_classes = [AllowAny]
-    throttle_scope = "auth"
 
     @extend_schema(
         operation_id="auth_github_callback",
@@ -131,8 +130,16 @@ class GitHubCallbackView(APIView):
             logger.warning("GitHub sign-in failed: %s", exc.code)
             return _auth_error(request, ERROR_FAILED, exc.code)
 
-        result = link_github_account(identity, token)
-        login(request, result.user, backend="django.contrib.auth.backends.ModelBackend")
+        try:
+            result = link_github_account(identity, token)
+            login(request, result.user, backend="django.contrib.auth.backends.ModelBackend")
+        except AccountInactive:
+            refuse_token(token.access_token)
+            return _auth_error(request, ERROR_FAILED, "account_inactive")
+        except Exception as exc:
+            # A page the browser navigated to: redirect, never a JSON 500. Type only (no token).
+            logger.warning("GitHub sign-in failed while linking: %s", type(exc).__name__)
+            return _auth_error(request, ERROR_FAILED, "internal_error")
         audit.record(
             AuditEvent.Action.SIGN_IN,
             AuditEvent.Outcome.SUCCESS,
@@ -187,24 +194,6 @@ class LogoutView(APIView):
         return Response(status=204)
 
 
-def _revoke_and_unlink(user: User) -> str:
-    """Ask GitHub to revoke the grant and delete the stored credential. Returns the revocation
-    outcome; a failed revocation never keeps the credential. Jobs are cancelled by the data
-    deletion that follows; a job still running meanwhile can write nothing (job_write)."""
-    account = GitHubAccount.objects.filter(user=user).first()
-    if account is None:
-        return "not_connected"
-    try:
-        oauth.revoke_grant(decrypt_token(account.access_token_encrypted))
-        return "revoked"
-    except Exception as exc:
-        # Local credentials are deleted regardless; only the failure type is logged.
-        logger.warning("GitHub grant revocation failed: %s", type(exc).__name__)
-        return "failed"
-    finally:
-        account.delete()
-
-
 class GitHubDisconnectView(APIView):
     @extend_schema(
         operation_id="auth_github_disconnect",
@@ -212,20 +201,7 @@ class GitHubDisconnectView(APIView):
         responses={200: DisconnectResultSerializer, **error_responses(401, 403)},
     )
     def post(self, request: Request) -> Response:
-        user = current_user(request)
-        revocation = _revoke_and_unlink(user)
-        deleted = data_deletion.delete_github_data(user)
-        audit.record(
-            AuditEvent.Action.GITHUB_DISCONNECT,
-            AuditEvent.Outcome.SUCCESS,
-            user=user,
-            request=request,
-            metadata={"revocation": revocation, "deleted": deleted},
-        )
-        # A new (unusable) password value changes the session auth hash, so the user's other
-        # sessions, on any device, stop authenticating; this one ends now.
-        user.set_unusable_password()
-        user.save(update_fields=["password"])
+        revocation = accounts.disconnect_github(current_user(request), request)
         logout(request)
         return Response(DisconnectResultSerializer({"revocation": revocation}).data)
 
@@ -239,18 +215,6 @@ class AccountView(APIView):
         },
     )
     def delete(self, request: Request) -> Response:
-        user = current_user(request)
-        revocation = _revoke_and_unlink(user)
-        deleted = data_deletion.delete_github_data(user)
-        # Recorded while the user still exists; the entry loses its user link (SET_NULL).
-        audit.record(
-            AuditEvent.Action.ACCOUNT_DELETED,
-            AuditEvent.Outcome.SUCCESS,
-            user=user,
-            request=request,
-            metadata={"revocation": revocation, "deleted": deleted},
-        )
-        audit.anonymize_user_entries(user)
+        accounts.delete_account(current_user(request), request)
         logout(request)
-        user.delete()
         return Response(status=204)

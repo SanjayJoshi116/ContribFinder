@@ -29,6 +29,7 @@ class MeSerializer(serializers.Serializer[User]):
 
 class DisconnectResultSerializer(serializers.Serializer[dict[str, str]]):
     revocation = serializers.ChoiceField(
-        choices=["revoked", "failed", "not_connected"],
-        help_text="Whether GitHub confirmed revocation. Local credentials are deleted either way.",
+        # "revoked" and "failed" are no longer returned (revocation is queued since 0.12.41).
+        choices=["queued", "not_connected", "revoked", "failed"],
+        help_text="Whether a GitHub revocation was queued. Local credentials are deleted at once.",
     )

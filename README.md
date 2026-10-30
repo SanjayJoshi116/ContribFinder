@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.39** (settings fixes from the review sweep; MIT licence; MVP+). After signing in with
+**Version 0.12.41** (disconnect never waits on GitHub; account fixes from the review sweep; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -319,9 +319,11 @@ separately. Committing it is the judge's decision; if it stays local, the baseli
 The dashboard's "Your data" section and the public `/privacy` page cover what is stored.
 **Delete GitHub data** removes everything derived from GitHub (profile, skills, recommendations,
 saved and hidden projects, feedback, job history) and keeps your account, so you can sync again.
-**Disconnect GitHub** revokes ContribFinder's authorization and deletes the same data.
-**Delete account** does both and removes the account. None of these touch your GitHub account
-itself.
+**Disconnect GitHub** deletes the stored credential and the same data at once, and revokes
+ContribFinder's authorization on GitHub in the background (a worker job, retried if GitHub is
+unreachable; the request never waits for GitHub). **Delete account** does both and removes the
+account. None of these touch your GitHub account itself. Expired sign-in sessions are removed
+daily.
 
 ## 2b. Run with Docker
 

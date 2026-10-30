@@ -10,6 +10,8 @@ from urllib.parse import urlencode
 import httpx
 from django.conf import settings
 
+from services.github.errors import GitHubTransientError
+
 API_VERSION = "2022-11-28"
 
 
@@ -127,12 +129,14 @@ def fetch_identity(access_token: str) -> GitHubIdentity:
 
 
 def revoke_grant(access_token: str) -> None:
-    """Revoke the OAuth grant (all tokens for this app/user pair). Raises OAuthError."""
+    """Revoke the OAuth grant (all tokens for this app/user pair). Raises
+    ``GitHubTransientError`` for a temporary failure, ``OAuthError`` otherwise."""
     _revoke("grant", access_token)
 
 
 def revoke_token(access_token: str) -> None:
-    """Revoke this one token; other tokens of the grant stay valid. Raises OAuthError."""
+    """Revoke this one token; other tokens of the grant stay valid. Raises as
+    ``revoke_grant``."""
     _revoke("token", access_token)
 
 
@@ -150,7 +154,9 @@ def _revoke(kind: str, access_token: str) -> None:
                 json={"access_token": access_token},
             )
     except httpx.HTTPError as exc:
-        raise OAuthError("github_unavailable", f"Revocation failed: {type(exc).__name__}") from None
+        raise GitHubTransientError(f"Revocation failed: {type(exc).__name__}") from None
+    if response.status_code >= 500 or response.status_code == 429:
+        raise GitHubTransientError(f"Revocation returned {response.status_code}")
     # 404 means it is already gone, which is the state we want.
     if response.status_code not in (204, 404):
         raise OAuthError("revocation_failed", f"Revocation returned {response.status_code}")

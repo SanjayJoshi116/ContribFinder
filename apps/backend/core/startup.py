@@ -18,10 +18,14 @@ def run_startup_checks() -> None:
     if not settings.RUN_STARTUP_CHECKS:
         return
     errors = []
-    for message in checks.run_checks():
+    # As `manage.py check`: a silenced message is dropped whatever its level; Django's
+    # deployment checks (warnings) are logged, never blocking.
+    for message in checks.run_checks(include_deployment_checks=True):
+        if message.is_silenced():
+            continue
         if message.is_serious():
             errors.append(str(message))
-        elif not message.is_silenced():
+        else:
             logger.warning("System check %s", message)
     if errors:
         raise SystemCheckError("Configuration errors, refusing to start:\n" + "\n".join(errors))

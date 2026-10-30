@@ -7,6 +7,71 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.41] - 2026-10-30
+
+Account fixes from the review sweep (`openspec/changes/archive/2026-10-30-accounts-review-fixes/`;
+specs `github-authentication`, `data-controls`; `Bug_Backlog.md` batch 28). Migrations
+`accounts.0004`, `accounts.0005`. OpenAPI stays `1.0.0`; baselines unchanged.
+
+### Changed
+
+- Disconnect and account deletion no longer wait on GitHub: the stored token is deleted at once
+  and the revocation runs in the background after the transaction commits (`github.revoke_later`,
+  token encrypted only). Temporary failures are retried by the shared GitHub retry policy; a final
+  failure is audited (`github_revocation_failed`, no token). A user who signs in again before
+  the revocation runs keeps the new token: only the old one is revoked. A broker outage never
+  stops a disconnect, an account deletion or a sign-in. The disconnect response's `revocation` is
+  now `queued` (or `not_connected`); `revoked` and `failed` stay in the schema but are no longer
+  returned (ACC-9, ACC-11…ACC-20).
+
+### Fixed
+
+- A deactivated user can no longer sign in with GitHub: nothing is stored, no sync starts, the
+  user's GitHub grant is revoked in the background, and the refusal is audited (ACC-1, ACC-16).
+- An unexpected error after the GitHub code exchange redirects to the sign-in error page
+  (`failed`) and is audited, instead of showing a raw JSON 500 (ACC-2).
+- Account deletion records its audit entry, anonymizes the trail and deletes the user in one
+  transaction (ACC-3).
+- Audit entries are read-only in the admin: no adding or deleting (ACC-5).
+- The sign-in callback is no longer throttled, so a busy network never shows a raw 429 page
+  there (the start of sign-in stays throttled) (ACC-6).
+- Expired sessions are removed daily (`accounts.clear_expired_sessions`) (ACC-7).
+- The audit admin list loads users in one query; `AuditEvent` has an index on `-created_at`
+  (ACC-10). Migrations `accounts.0004` (index), `accounts.0005` (audit action choice).
+
+### Changed (internal)
+
+- Disconnect and account deletion live in `services/accounts.py` (`disconnect_github`,
+  `delete_account`, sharing `_leave`); the views only call them and end the session (ACC-8).
+  ACC-4 accepted.
+- `/simplify` of the 0.12.40–0.12.41 diff: the deactivated-user check moved into
+  `link_github_account` (`AccountInactive`, one query fewer per sign-in); tests reuse the shared
+  helpers. Two broader ideas went to `ideas.md` §15.
+
+## [0.12.40] - 2026-10-30
+
+Core fixes from the review sweep (`openspec/changes/archive/2026-10-30-core-review-fixes/`; spec
+`api-platform` ("Configuration validated at startup"); `Bug_Backlog.md` batch 27). No API,
+model, migration or frontend change; baselines unchanged.
+
+### Fixed
+
+- The production startup gate ignores checks listed in `SILENCED_SYSTEM_CHECKS` at every level,
+  as `manage.py check` does, and also runs Django's deployment checks (their warnings are logged,
+  never blocking) (CORE-1, CORE-5).
+- New startup rules: `NUM_PROXIES` must be a non-negative integer (a negative count broke or
+  spoofed client-IP detection), `DISCOVERY_QUERY_SHARES` must add up to more than 0, Content
+  Security Policy values may not contain control characters (Django refused them on every
+  response), and `REPO_STALE_AFTER` values must be positive (CORE-2, CORE-4, CORE-6, CORE-8).
+- A wrongly typed setting is reported as a configuration error instead of crashing the checks
+  (CORE-7). The checks read the discovery strategies and repository parts from the services
+  instead of copies (CORE-10).
+- The log redaction backstop also masks prefixed names (`GITHUB_CLIENT_SECRET=`,
+  `encrypted_access_token=`), session and CSRF cookies, `password`, `secret` and
+  `TOKEN_ENCRYPTION_KEYS` values (CORE-3).
+- Management commands write JSON through a temporary file swapped in atomically: an interrupted
+  write keeps the old file, and unserializable data fails before any file is touched (CORE-9).
+
 ## [0.12.39] - 2026-10-30
 
 Settings fixes from the review sweep (`openspec/changes/archive/2026-10-30-config-review-fixes/`,

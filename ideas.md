@@ -228,6 +228,14 @@ design direction.
 
 Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
+- **One "dispatch after commit" helper** (from the 0.12.41 `/simplify` review). Only
+  `queue_revocation` dispatches with `transaction.on_commit(..., robust=True)`; `services/jobs.py`,
+  `services/repositories/backlog.py` and `services/data_deletion.py` call `.delay()` directly, so
+  a broker outage raises there but is logged here. A `services/dispatch.after_commit(task, *args)`
+  used everywhere would give one policy.
+- **Error handling for views the browser navigates to** (same review). The OAuth callback catches
+  `Exception` itself to redirect instead of a JSON 500; a small redirect-on-error wrapper for
+  navigation views would replace that one-off catch-all.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.

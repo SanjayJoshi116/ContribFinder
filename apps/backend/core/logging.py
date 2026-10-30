@@ -9,16 +9,21 @@ import logging
 import re
 
 _REDACTED = "[REDACTED]"
-_KEYS = r"access_token|refresh_token|client_secret|code|state"
+_KEYS = (
+    r"access_token|refresh_token|client_secret|code|state|secret|password|sessionid|csrftoken"
+    r"|encryption_keys"
+)
+# A key also matches at the end of a longer name: GITHUB_CLIENT_SECRET=, encrypted_access_token=.
+_NAME = rf"\b(\w*?(?:{_KEYS}))"
 
 _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # key='value' / key="value" (reprs, keyword arguments)
-    (re.compile(rf"(?i)\b({_KEYS})=(['\"])[^'\"]*\2"), rf"\1=\2{_REDACTED}\2"),
-    # key=value (query strings, form bodies)
-    (re.compile(rf"(?i)\b({_KEYS})=([^&\s'\",]+)"), rf"\1={_REDACTED}"),
+    (re.compile(rf"(?i){_NAME}=(['\"])[^'\"]*\2"), rf"\1=\2{_REDACTED}\2"),
+    # key=value (query strings, form bodies, cookies)
+    (re.compile(rf"(?i){_NAME}=([^&;\s'\",]+)"), rf"\1={_REDACTED}"),
     # "key": "value" (JSON / dict reprs)
     (
-        re.compile(rf"(?i)(['\"](?:{_KEYS}|authorization)['\"]\s*:\s*)(['\"])[^'\"]*\2"),
+        re.compile(rf"(?i)(['\"]\w*?(?:{_KEYS}|authorization)['\"]\s*:\s*)(['\"])[^'\"]*\2"),
         rf"\1\2{_REDACTED}\2",
     ),
     # Authorization header, whatever the scheme (token, Bearer, Basic) or value format

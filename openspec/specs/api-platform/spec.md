@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the shared API behaviour every ContribFinder capability relies on: a versioned base path, a machine-readable schema, health reporting, a single error format, and baseline protection (authentication, CSRF, throttling, security headers).
+Defines the shared API behaviour every ContribFinder capability relies on: a versioned base path, a machine-readable schema, health reporting, a single error format, and baseline protection (authentication, CSRF, throttling, security headers)
 
 ## Requirements
 
@@ -146,7 +146,7 @@ The system SHALL send a `Content-Security-Policy` header on every response it se
 - **THEN** startup fails with a configuration error naming the setting
 
 ### Requirement: Configuration validated at startup
-Every process that serves requests or runs background jobs with production settings SHALL validate the application configuration before it starts work, and SHALL refuse to start when validation reports an error (for example missing token encryption keys or invalid evidence weights). Validation SHALL cover every numeric, interval and structured setting the application reads, including job and sync settings (attempts, cooldown, stale-after and recovery intervals), GitHub request caps and timeouts, OAuth state limits, repository grace and retry windows, analysis concurrency, session lifetime, the Redis socket timeout, and the experience thresholds (known signals, each a pair of non-negative numbers in order), so a value that would loop, never finish or fail every job blocks startup instead. Every serving entry point SHALL default to the same settings module, so the web tier and the workers never run under different settings by accident.
+Every process that serves requests or runs background jobs with production settings SHALL validate the application configuration before it starts work, and SHALL refuse to start when validation reports an error (for example missing token encryption keys or invalid evidence weights). A check the operator has silenced (`SILENCED_SYSTEM_CHECKS`) SHALL NOT block startup, whatever its level. Validation SHALL also run the framework's deployment checks, whose warnings SHALL be logged without blocking. Validation SHALL cover every numeric, interval and structured setting the application reads, including job and sync settings (attempts, cooldown, stale-after and recovery intervals), GitHub request caps and timeouts, OAuth state limits, repository grace and retry windows, repository stale-after windows (each positive), discovery query shares (with a positive total), the number of trusted proxies (a non-negative integer), the Content Security Policy values (single-line text), analysis concurrency, session lifetime, the Redis socket timeout, and the experience thresholds (known signals, each a pair of non-negative numbers in order), so a value that would loop, never finish or fail every job blocks startup instead. A setting of the wrong type SHALL be reported as a configuration error, never crash validation. Every serving entry point SHALL default to the same settings module, so the web tier and the workers never run under different settings by accident.
 
 #### Scenario: Invalid configuration blocks the web server
 - **WHEN** the production web server starts with an invalid required setting (for example empty token encryption keys)
@@ -167,6 +167,18 @@ Every process that serves requests or runs background jobs with production setti
 #### Scenario: Settings module not set
 - **WHEN** the web server, worker or scheduler starts without an explicit settings module
 - **THEN** all of them use the production settings
+
+#### Scenario: Silenced check
+- **WHEN** a process starts with production settings, a check reports an error, and that check's id is in `SILENCED_SYSTEM_CHECKS`
+- **THEN** the process starts
+
+#### Scenario: Negative proxy count
+- **WHEN** a process starts with production settings and `NUM_PROXIES` set to -1
+- **THEN** it exits with an error naming the setting, instead of failing or trusting a client-chosen address on forwarded requests
+
+#### Scenario: Discovery without searches
+- **WHEN** a process starts with production settings and every `DISCOVERY_QUERY_SHARES` value set to 0
+- **THEN** it exits with an error naming the setting
 
 ### Requirement: API availability without the cache
 Requests that read or write only PostgreSQL SHALL keep working when the cache (Redis) is unavailable. Sessions SHALL be stored in and read from PostgreSQL, without depending on the cache. When request throttling cannot reach the cache, the problem SHALL be logged as a warning without request data, and throttle checks in the same process SHALL count in local process memory instead for a configured backoff (default 30 seconds): requests stay limited per process and do not each wait for the cache's connection timeout. Throttling SHALL return to the shared cache on its own once the cache is reachable again.

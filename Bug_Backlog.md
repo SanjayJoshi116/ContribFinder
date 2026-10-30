@@ -1,7 +1,7 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since; current through 0.12.39. Order: the full review sweep (top priority),
+each fix release since; current through 0.12.41. Order: the full review sweep (top priority),
 open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
@@ -49,8 +49,8 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | Priority | Module | Contents | code-review | security-review |
 |---|---|---|---|---|
 | High | `apps/backend/config/` | settings, urls, celery, error envelope | [x] batch 26 | [x] no findings |
-| High | `apps/backend/core/` | health, auth class, JSON errors, log redaction, checks, throttling, CSP | [ ] | [ ] |
-| High | `apps/backend/accounts/` | User, AuditEvent, auth views, session, account deletion | [ ] | [ ] |
+| High | `apps/backend/core/` | health, auth class, JSON errors, log redaction, checks, throttling, CSP | [x] batch 27 | [x] no findings |
+| High | `apps/backend/accounts/` | User, AuditEvent, auth views, session, account deletion | [x] batch 28 | [x] no findings |
 | High | `apps/backend/github/` | GitHubAccount/Profile, sync task, profile API | [ ] | [ ] |
 | High | `apps/backend/e2e/` | seed command; must stay out of production | [ ] | [ ] |
 | High | `apps/backend/services/*.py` | crypto, audit, jobs, job_guard, locks, feedback, data_deletion, data_versions | [ ] | [ ] |
@@ -85,8 +85,8 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 
 ## Open items
 
-The full review sweep above: started 2026-10-30; `config/` reviewed (batch 26,
-no security findings), 33 modules to go. Batch 26 fixed in 0.12.39 (`config-review-fixes`) (CFG-7, CFG-8 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+The full review sweep above: started 2026-10-30; `config/`, `core/` and `accounts/` reviewed and
+fixed (batches 26–28; no security findings), 31 modules to go. Batches 26–28 fixed in 0.12.39–0.12.41 (CFG-7, CFG-8, ACC-4 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
 their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
@@ -173,6 +173,8 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 24 | **Route-id validation review** | RT-1…RT-6 | `code-review` of the uncommitted `route-id-validation` (0.12.37). RT-1, RT-2, RT-6 fixed in 0.12.37 before commit; RT-3, RT-4, RT-5 open. |
 | 25 | **E2E production-build review** | E2E-1…E2E-13 | `code-review` (E2E-1…E2E-9) and `/simplify` (E2E-10…E2E-13) of the uncommitted `e2e-production-build` (0.12.38). E2E-1, E2E-2, E2E-5, E2E-7, E2E-10…E2E-12 fixed in 0.12.38 before commit, E2E-6 documented; E2E-3, E2E-4, E2E-8, E2E-9, E2E-13 accepted. |
 | 26 | **Sweep: `config/`** | CFG-1…CFG-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/config/`, verified, fixed in 0.12.39 (`config-review-fixes`) except CFG-7, CFG-8 (accepted); its fix-diff review CFG-11…CFG-20 fixed; `/security-review` of the module found nothing. |
+| 27 | **Sweep: `core/`** | CORE-1…CORE-10 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/core/`, verified; fixed in 0.12.40 (`core-review-fixes`). `/security-review` of the module found nothing. |
+| 28 | **Sweep: `accounts/`** | ACC-1…ACC-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/accounts/`, verified; fixed in 0.12.41 (`accounts-review-fixes`), ACC-4 accepted; its fix-diff review ACC-11…ACC-20 fixed before commit (ACC-17 in part). `/security-review` of the module found nothing. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -186,7 +188,8 @@ in 0.12.32 (no OpenSpec change: B-6 follows its documented rounded mean, the spe
 title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 accepted. L-5 of batch 23 in 0.12.35; L-1, L-2, L-4 in 0.12.36
 (`released-name-refresh`); RT-1, RT-2, RT-6 of batch 24 in 0.12.37 (`route-id-validation`); E2E-1, E2E-2, E2E-5, E2E-7
 (and E2E-6 documented) of batch 25 in 0.12.38 (`e2e-production-build`); batch 26 (CFG-1…CFG-20,
-CFG-7 and CFG-8 accepted) in 0.12.39 (`config-review-fixes`).
+CFG-7 and CFG-8 accepted) in 0.12.39 (`config-review-fixes`); batch 27 (CORE-1…CORE-10) in 0.12.40
+(`core-review-fixes`); batch 28 (ACC-1…ACC-10, ACC-4 accepted) in 0.12.41 (`accounts-review-fixes`).
 Next: the full review sweep; RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
@@ -847,3 +850,75 @@ Review of the fix diff (`/code-review`, workflow step 7), recorded as CFG-11…C
 | CFG-18 | docs | change `tasks.md` | Task 1.1 said `DJANGO_READ_DOTENV=0`. | fixed |
 | CFG-19 | api | `config/exceptions.py` | A list detail went to `details`, documented as an object; untested. | fixed (a list becomes the message; tested) |
 | CFG-20 | cleanup | `settings/base.py` | `_DotenvValues` kept a process-global class dict. | fixed (`_dotenv_value(path, key)` builds a local class per call) |
+
+## Sweep: `core/` (2026-10-30)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of every file in
+`apps/backend/core/`. Each row checked against the code. Fixed in 0.12.40 by the OpenSpec change `core-review-fixes` (`/simplify` and the fix-diff
+`/code-review` skipped on the owner's decision). `/security-review` of the whole module found no high- or
+medium-confidence vulnerability (401 without CSRF changes, no `csrf_exempt`, OAuth state
+session-bound and single-use, health returns status words only, fixed error bodies, deny-all CSP
+on JSON, no code path logs a token, secret or session id, report paths only from CLI flags).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CORE-1 | bug | `startup.py:22` | `run_startup_checks` collects every serious message, silenced or not (Django's `check` drops silenced ones at every level): an id in `SILENCED_SYSTEM_CHECKS` still stops gunicorn and Celery in production while `manage.py check` passes. | confirmed (skip `is_silenced()` before `is_serious()`); fixed (0.12.40, `core-review-fixes`) |
+| CORE-2 | config | `checks.py:46` | `NUM_PROXIES` has no check; W002 tests only `== 0`. A negative value makes DRF's `get_ident` index wrongly: one forwarded entry → `IndexError` (500 on throttled and audited requests), two → a client-chosen IP. | confirmed (operator setting; add to `NON_NEGATIVE_INT_SETTINGS`); fixed (0.12.40, `core-review-fixes`) |
+| CORE-3 | security | `logging.py:12` | Redaction keys are anchored with ``, so `GITHUB_CLIENT_SECRET=…`, `encrypted_access_token=…` or `oauth_state=…` pass (no boundary after `_`); cookies (`sessionid`, `csrftoken`), `password` and `TOKEN_ENCRYPTION_KEYS` are not covered. | confirmed (backstop gap; primary rule is never logging secrets); fixed (0.12.40, `core-review-fixes`) |
+| CORE-4 | config | `checks.py:247` | `DISCOVERY_QUERY_SHARES` with every share 0 passes; `allocate` then returns zero quotas, so discovery never searches. | confirmed (require a positive total); fixed (0.12.40, `core-review-fixes`) |
+| CORE-5 | config | `startup.py:21` | The production gate runs checks without `include_deployment_checks=True`, so Django's `--deploy` checks (`SECRET_KEY` strength, …) never run at startup. | partial (production settings already force `DEBUG = False` and secure cookies; `SECRET_KEY` strength is unchecked); fixed (0.12.40, `core-review-fixes`) |
+| CORE-6 | config | `checks.py:64` | E060 accepts a CSP containing a newline or control character; Django then raises `BadHeaderError` on every response. | confirmed; fixed (0.12.40, `core-review-fixes`) |
+| CORE-7 | bug | `checks.py:239`, `97`, `100`, `243`, `299` | Numeric comparisons run after a non-numeric value was reported, so the check crashes with `TypeError` instead of returning its errors. | partial (only through a settings override: `env.int`/`env.float` already type them); fixed (0.12.40, `core-review-fixes`) |
+| CORE-8 | config | `checks.py:271` | `REPO_STALE_AFTER` values may be 0, making every part stale on fetch: every sweep re-queues every repository. | confirmed (positive-integer rule); fixed (0.12.40, `core-review-fixes`) |
+| CORE-9 | robustness | `reports.py:21` | `write_json` overwrites in place and converts only `OSError`: an interrupted write truncates the target (e.g. `benchmark-v2.json`); unserializable data raises after folders are created. | partial (committed files are recoverable from git; atomic temp file + `os.replace` is cheap); fixed (0.12.40, `core-review-fixes`) |
+| CORE-10 | reuse | `checks.py:127` | `QUERY_STRATEGIES`, `STALE_PARTS` copy `queries.STRATEGIES` and `staleness.PARTS`; a new strategy or part means two edits. | confirmed (import lazily inside the check, as `configured_star_bands` already is); fixed (0.12.40, `core-review-fixes`) |
+
+## Sweep: `accounts/` (2026-10-30)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/accounts/`
+(migrations skipped), reading `services/audit.py`, `services/github/accounts.py`, the OAuth
+helpers, `services/data_deletion.py` and `core/authentication.py` for context. Each row checked
+against the code. Fixed in 0.12.41 by the OpenSpec change `accounts-review-fixes` (ACC-9 queued on the
+owner's decision; `/simplify` applied while writing, fix-diff `/code-review` skipped), ACC-4 accepted. `/security-review` of the whole module found no high- or
+medium-confidence vulnerability (256-bit single-use session-bound OAuth state, users keyed by
+immutable GitHub id, fixed redirect destinations, session key cycled on login and flushed on
+logout, no id parameters on account endpoints, CSRF enforced on POST/DELETE, no token in any
+response, allowlisted audit metadata with HMAC-hashed IPs).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| ACC-1 | bug | `views.py:135` | The callback signs in a deactivated user (`is_active=False`): it stores a fresh token, audits `SIGN_IN` success and queues a sync; the next request is 401 (`ModelBackend` refuses inactive users), so the user lands signed out with no error. | confirmed (`link_github_account` never checks `is_active`; refuse before storing the token, audit a failure); fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-2 | bug | `views.py:134` | Only `OAuthError` is caught: a failure in `link_github_account` (bad `TOKEN_ENCRYPTION_KEYS`, DB or lock error) or `login()` shows the raw JSON 500 on the browser's callback navigation, with no redirect and no `SIGN_IN_FAILED` audit. | confirmed; fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-3 | bug | `views.py:243` | Account deletion records `ACCOUNT_DELETED` and anonymizes the audit trail before `user.delete()`, outside one transaction: a failing delete leaves a "deleted" entry for an account that still exists, session already flushed. | partial (needs `user.delete()` to fail; one transaction for audit, anonymize and delete fixes it); fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-4 | race | `views.py:216` | Disconnect deletes the `GitHubAccount` outside a lock; a sign-in callback finishing in another tab afterwards re-creates it with a live, unrevoked token and queues a sync. | accepted (a sign-in the user completes on GitHub after a disconnect is a new sign-in; spec "Sign in again after disconnect") |
+| ACC-5 | security | `admin.py:9` | `AuditEventAdmin` keeps add and delete permissions: staff can delete audit rows (bulk action) or add blank ones. | confirmed (`has_add_permission`, `has_delete_permission` → False); fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-6 | ux | `views.py:95` | The callback shares the 10/min `auth` throttle with the sign-in start and is checked before the view: a throttled callback shows raw 429 JSON on a browser navigation. | partial (NAT or many tabs; redirect to `auth_error=throttled` instead); fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-7 | ops | `views.py:88` | Every anonymous `GET /auth/github` writes a session row, and expired sessions are never purged (no `clearsessions` task anywhere). | confirmed (beat task running `clearsessions`); fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-8 | convention | `views.py:190` | Disconnect and account-deletion logic (revoke, unlink, delete data, audit, password rotation, logout order) lives in views and is copied between two views (CLAUDE.md §5). | confirmed (one service, e.g. `services/accounts.py`, used by both); fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-9 | convention | `views.py:198` | Disconnect and account deletion call GitHub (`oauth.revoke_grant`) inside the request, against invariant 3; the replaced-token revoke at sign-in is queued. | partial (the disconnect response reported the revocation outcome; owner chose to queue it, the response now says `queued`); fixed (0.12.41, `accounts-review-fixes`) |
+| ACC-10 | efficiency | `admin.py:11` | The audit changelist shows `user` without `list_select_related` (one query per row), and no index on `-created_at` alone for its default order. | confirmed (minor); fixed (0.12.41, `accounts-review-fixes`) |
+
+Review of the fix diff (`/code-review high apps/backend/github` on 2026-10-30 reviewed only the
+uncommitted 0.12.41 changes in that folder and their callers; it is batch 28's skipped fix-diff
+review, not the `github/` module review), recorded as ACC-11…ACC-20. Each checked against the
+code. Fixed before the 0.12.41 commit (ACC-17 accepted in part).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| ACC-11 | bug | `github/tasks.py` `revoke_grant` | The queued task revokes the whole grant later; a user who disconnects and signs straight back in gets a token on the same grant, which the late revocation then kills (every sync fails with `GitHubAuthError`). The task is not given the GitHub ID, so it cannot see the re-link. | fixed (0.12.41: `revoke` sees a re-linked account and revokes only the old token) |
+| ACC-12 | bug | `services/accounts.py` `_unlink` | No transaction around it, so `on_commit` dispatches at once; with the broker down `.delay` raises after `account.delete()`: data deletion, audit, password rotation and logout never run (500), and the ciphertext is lost. | fixed (0.12.41: services are `@transaction.atomic`; `queue_revocation` uses `on_commit(robust=True)`) |
+| ACC-13 | bug | `accounts/views.py:138` | `queue_unused_token_revocation` runs outside the new `try`: a broker error on the deactivated-user path shows a raw 500 on the browser's navigation. | fixed (0.12.41: `refuse_token` queues through the same robust `on_commit`) |
+| ACC-14 | convention | `github/tasks.py` | `autoretry_for=(OAuthError,)` retries permanent errors too (401, 422), ignores `Retry-After`, and bypasses the pure retry policy (`services/github/retry.py`, CLAUDE.md §5). | fixed (0.12.41: `revoke_later` uses `decide_retry`; `_revoke` raises `GitHubTransientError` for network, 5xx and 429) |
+| ACC-15 | spec | `github/tasks.py` | A final failure after the retries is only Celery's log; the spec says it "SHALL be recorded without the token", and the audit entry stays `queued`. | fixed (0.12.41: audit `github_revocation_failed`, reason only) |
+| ACC-16 | bug | `services/github/accounts.py` `queue_unused_token_revocation` | Reuses `revoke_replaced_token`, which skips when the token equals the stored one and never retries: a refused sign-in's token may never be revoked. | fixed (0.12.41: a refused sign-in revokes the deactivated user's whole grant, no stored-token check) |
+| ACC-17 | config | `github/tasks.py` | Without Redis (eager), revocation runs inside the request and autoretry repeats it inline up to 4 times, against "GitHub is slow". | partial; accepted (without Redis one attempt runs inline; the retry is scheduled and the robust `on_commit` logs it, never fails the request) |
+| ACC-18 | bug | `services/github/accounts.py:54` | The replaced-token dispatch in `link_github_account`'s `on_commit` can raise into the view's new `except Exception` after the token is stored: `failed` redirect with a stored token, old token never revoked. | fixed (0.12.41: the replaced-token dispatch is robust too) |
+| ACC-19 | robustness | `services/github/accounts.py:77` | `revoke_encrypted_grant` skips a token under a removed key silently. | fixed (0.12.41: logged) |
+| ACC-20 | cleanup | `github/tasks.py` | Task `revoke_grant` shares its name with `oauth.revoke_grant` (plaintext): a wrong import sends ciphertext to GitHub or plaintext to the broker. | fixed (0.12.41: task renamed `github.revoke_later`) |
+
+`/simplify` of the uncommitted 0.12.40–0.12.41 backend diff (2026-10-30): the deactivated-user
+check moved into `link_github_account` (`AccountInactive`), disconnect and deletion share `_leave`,
+tests reuse `_assert_auth_error_redirect`, `encrypt_token` and `UserFactory`. Skipped: one
+after-commit dispatch helper and a navigation-view error wrapper (both `ideas.md` §15), a pure
+grant/token decision function, a direct call in the `revoke_replaced_token` forwarder, a
+redaction pre-check and a `strict` flag on `_between`.

@@ -514,6 +514,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "repositories.process_repository_backlog",
         "schedule": 15 * 60.0,
     },
+    "clear-expired-sessions": {
+        "task": "accounts.clear_expired_sessions",
+        "schedule": 24 * 60 * 60.0,
+    },
     "refresh-recommendations": {
         "task": "recommendations.refresh_recommendations",
         "schedule": float(RECOMMENDATION_REFRESH_INTERVAL_SECONDS),

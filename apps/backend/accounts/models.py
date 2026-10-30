@@ -22,6 +22,7 @@ class AuditEvent(models.Model):
         GITHUB_DATA_DELETED = "github_data_deleted"
         ACCOUNT_DELETED = "account_deleted"
         SCORING_CONFIG_ACTIVATED = "scoring_config_activated"
+        GITHUB_REVOCATION_FAILED = "github_revocation_failed"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success"
@@ -42,7 +43,10 @@ class AuditEvent(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["user", "-created_at"])]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["-created_at"], name="auditevent_created_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.action}:{self.outcome}@{self.created_at:%Y-%m-%dT%H:%M:%S}"

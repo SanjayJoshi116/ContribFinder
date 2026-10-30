@@ -59,9 +59,12 @@ def trusted_proxy_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMes
 @register()
 def content_security_policy_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
     return [
-        Error(f"{name} must be a non-empty string (core.csp).", id="core.E060")
+        Error(f"{name} must be a non-empty single-line string (core.csp).", id="core.E060")
         for name in ("CONTENT_SECURITY_POLICY_API", "CONTENT_SECURITY_POLICY_HTML")
-        if not isinstance(value := getattr(settings, name, None), str) or not value.strip()
+        if not isinstance(value := getattr(settings, name, None), str)
+        or not value.strip()
+        # Django refuses header values with control characters (BadHeaderError).
+        or any(ord(char) < 32 or ord(char) == 127 for char in value)
     ]
 
 
@@ -94,10 +97,11 @@ def profiling_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
         "core.E011",
     )
     for name in ("EVIDENCE_REPEAT_DECAY", "CONFIDENCE_CAP"):
-        if not 0 < getattr(settings, name) < 1:
+        value = getattr(settings, name)
+        if not _is_number(value) or not 0 < value < 1:
             errors.append(Error(f"{name} must be strictly between 0 and 1.", id="core.E012"))
     for name in ("LANGUAGE_MIN_SHARE", "INTEREST_MIN_STRENGTH"):
-        if not 0 <= getattr(settings, name) <= 1:
+        if not _between(getattr(settings, name), 0, 1):
             errors.append(Error(f"{name} must be between 0 and 1.", id="core.E013"))
     return errors + _experience_errors(settings.EXPERIENCE_THRESHOLDS)
 
@@ -124,8 +128,6 @@ def _experience_errors(thresholds: object) -> list[CheckMessage]:
     )
 
 
-QUERY_STRATEGIES = ("language", "skill", "interest", "topic")
-STALE_PARTS = ("metadata", "readme", "community", "dependencies", "activity", "issues")
 ISSUE_DIFFICULTY_KEYS = (
     "short_body",
     "long_body",
@@ -150,6 +152,11 @@ def _is_int(value: object) -> TypeGuard[int]:
 
 def _is_number(value: object) -> TypeGuard[int | float]:
     return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _between(value: object, low: float, high: float) -> bool:
+    """A number in [low, high]; anything else (None, a string) is out of range."""
+    return _is_number(value) and low <= value <= high
 
 
 # Scalar rules: (predicate, what the value must be, check id).
@@ -236,18 +243,24 @@ def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
     )
     if not _is_int(settings.DISCOVERY_MIN_STARS) or settings.DISCOVERY_MIN_STARS < 0:
         errors.append(Error("DISCOVERY_MIN_STARS must be a non-negative integer.", id="core.E020"))
-    if settings.DISCOVERY_RESULTS_PER_QUERY > 100:
+    per_query = settings.DISCOVERY_RESULTS_PER_QUERY
+    if _is_int(per_query) and per_query > 100:
         errors.append(
             Error("DISCOVERY_RESULTS_PER_QUERY cannot exceed 100 (one page).", id="core.E021")
         )
-    if not 0 <= settings.DISCOVERY_MIN_SKILL_CONFIDENCE <= 1:
+    if not _between(settings.DISCOVERY_MIN_SKILL_CONFIDENCE, 0, 1):
         errors.append(
             Error("DISCOVERY_MIN_SKILL_CONFIDENCE must be between 0 and 1.", id="core.E013")
         )
-    errors += _keys_errors(
-        "DISCOVERY_QUERY_SHARES", settings.DISCOVERY_QUERY_SHARES, QUERY_STRATEGIES, "core.E022"
-    )
-    from services.discovery.queries import configured_star_bands  # needs the app registry
+    # Imported here: these modules need the app registry.
+    from services.discovery.queries import STRATEGIES, configured_star_bands
+    from services.repositories.staleness import PARTS
+
+    shares = settings.DISCOVERY_QUERY_SHARES
+    share_errors = _keys_errors("DISCOVERY_QUERY_SHARES", shares, STRATEGIES, "core.E022")
+    errors += share_errors
+    if not share_errors and sum(shares.values()) <= 0:
+        errors.append(Error("DISCOVERY_QUERY_SHARES must have a positive total.", id="core.E022"))
 
     bands = configured_star_bands()
     band_errors = _star_band_errors(bands)
@@ -268,7 +281,14 @@ def discovery_config_check(app_configs: Any = None, **kwargs: Any) -> list[Check
         errors.append(
             Error("DISCOVERY_EXCLUDED_TOPICS must be a list of topic names.", id="core.E026")
         )
-    errors += _keys_errors("REPO_STALE_AFTER", settings.REPO_STALE_AFTER, STALE_PARTS, "core.E023")
+    errors += _keys_errors(
+        "REPO_STALE_AFTER",
+        settings.REPO_STALE_AFTER,
+        PARTS,
+        "core.E023",
+        item_ok=POSITIVE_INT[0],
+        item_rule="a positive integer",
+    )
     thresholds = settings.ACTIVITY_THRESHOLDS
     activity_errors = _keys_errors("ACTIVITY_THRESHOLDS", thresholds, ACTIVITY_KEYS, "core.E024")
     errors += activity_errors
@@ -296,7 +316,7 @@ def recommendation_config_check(app_configs: Any = None, **kwargs: Any) -> list[
         errors.append(
             Error("RECOMMENDATIONS_TOP_N must be an integer of at least 20.", id="core.E030")
         )
-    if not 0 <= settings.RECOMMENDATION_MIN_SCORE <= 1:
+    if not _between(settings.RECOMMENDATION_MIN_SCORE, 0, 1):
         errors.append(Error("RECOMMENDATION_MIN_SCORE must be between 0 and 1.", id="core.E031"))
     errors += _rule_errors(
         ("RECOMMENDATION_REFRESH_INTERVAL_SECONDS", "RECOMMENDATION_README_EXCERPT_CHARS"),
@@ -415,7 +435,13 @@ POSITIVE_INT_SETTINGS = (
     "SESSION_COOKIE_AGE",
 )
 # 0 is meaningful: no cooldown, no grace period.
-NON_NEGATIVE_INT_SETTINGS = ("SYNC_COOLDOWN_SECONDS", "REPO_DISCOVERED_GRACE_MINUTES")
+# NUM_PROXIES: 0 trusts no forwarded header; a negative count would index forwarded addresses
+# wrongly (500s, or a client-chosen address).
+NON_NEGATIVE_INT_SETTINGS = (
+    "SYNC_COOLDOWN_SECONDS",
+    "REPO_DISCOVERED_GRACE_MINUTES",
+    "NUM_PROXIES",
+)
 POSITIVE_NUMBER_SETTINGS = ("GITHUB_HTTP_TIMEOUT", "REDIS_SOCKET_TIMEOUT")
 
 
