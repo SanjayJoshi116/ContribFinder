@@ -7,6 +7,29 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.36] - 2026-10-30
+
+Released-name refresh (`openspec/changes/archive/2026-10-29-released-name-refresh/`; spec
+`repository-analysis` ("Background refresh"); `ideas.md` §13). No API, model, migration,
+setting or scoring-config change; baselines unchanged.
+
+### Changed
+
+- A repository that gives up its name to another GitHub ID (renamed away, or deleted and
+  recreated) and is in a developer's pool now has its refresh queued as soon as the storing
+  transaction commits (`backlog.queue_released`), instead of waiting for the hourly stale sweep
+  and the 15-minute backlog. It drops out of recommendations (`name_released`) for minutes, not
+  over an hour. Stamped as queued, so the backlog does not queue it twice; a rolled-back
+  transaction queues nothing.
+- Holders that are FAILED, already queued or in no pool keep the existing paths. Without app
+  client credentials, or when tasks run inline (no worker), nothing is queued: the periodic
+  refresh stays the fallback, and storing a repository never runs another repository's analysis.
+- Review fixes (`Bug_Backlog.md` batch 23): an analysis that loses the name while fetching
+  (`lifecycle.NameChanged`, a `ClaimLost`) queues the holder again instead of leaving it for the
+  sweep (L-1); rejected app credentials (`backlog.AUTH_INVALID`) within
+  `REPO_REFRESH_RETRY_MINUTES` hold the immediate refresh back (L-2); `queue_batch` and
+  `queue_released` share one locked pick (L-4).
+
 ## [0.12.35] - 2026-10-28
 
 Labeled-issue fetch (`openspec/changes/archive/2026-10-28-labeled-issue-fetch/`; spec

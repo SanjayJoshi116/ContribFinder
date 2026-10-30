@@ -54,7 +54,7 @@ def _refresh(task: Any, repo_id: int, parts: list[str] | None) -> None:
             outcome = RepositoryAnalysisService(client).run(repo_id, parts)
     except GitHubAuthError:
         logger.warning("Repository %s not refreshed: app credentials rejected", repo_id)
-        record_refresh_failure(repo_id, "github_auth_invalid", since=started)
+        record_refresh_failure(repo_id, backlog.AUTH_INVALID, since=started)
         return
     except Exception as exc:
         decision = decide_retry(

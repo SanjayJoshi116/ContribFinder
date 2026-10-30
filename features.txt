@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.35 (2026-10-28)
+Version: 0.12.36 (2026-10-30)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,17 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.36 - Released-name refresh
+============================================================================
+
+Repository data (ideas.md section 13)
+  [x] A pooled repository that gives up its name is refreshed right after the commit, not
+      after the hourly sweep; stamped so the backlog does not queue it twice
+  [x] FAILED, queued, unpooled holders, no app credentials and inline tasks keep the old paths
+  [x] Review fixes (Bug_Backlog.md L-1, L-2, L-4): renamed during its own analysis is queued
+      again, rejected app credentials hold it back, one shared backlog pick
 
 ============================================================================
 SHIPPED - v0.12.35 - Labeled-issue fetch

@@ -11,7 +11,7 @@ Layout: the priority table, then the open ideas by when they can ship, then what
 repository data, freshness and client, platform and tooling, then evaluation. "Ranking-visible"
 holds the ranking-visible ideas (including what is left of §11 and §12, whose measurement and
 cleanup shipped) and the follow-ups of §4, whose ideas have shipped. Shipped ideas are listed
-only in "Shipped"; §7, §8, §10 and §17 shipped whole, so they have no section above. Section numbers
+only in "Shipped"; §7, §8, §10, §13 and §17 shipped whole, so they have no section above. Section numbers
 (§1–§18) are stable, because other documents cite them, so they are not in numeric order
 (reordered 2026-10-26, after v0.12.26).
 
@@ -23,7 +23,7 @@ Open ideas only, in suggested order within each cell. † = changes what users a
 | | Cheap | Expensive |
 |---|---|---|
 | **High value** | significance gate for ranking changes (§3); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
-| **Lower value** | queue released-name refresh (§13); route-level ids (§14); production build in CI (§14); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
+| **Lower value** | route-level ids (§14); production build in CI (§14); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
 
 Not ranked yet: acting on the discovery yield report† (§12, needs runs), intervals on the
 feedback-report shares (§4, needs traffic), dismiss reasons against grades (§4, needs real-developer grades),
@@ -35,12 +35,6 @@ observability (§5), interface revamp (§18, owner request; design direction fir
 # Can ship now (no ranking change)
 
 ## Discovery and repository data
-
-### 13. Repository identity
-
-- **Released names are resolved lazily.** A repository that gave up its name stays
-  `name_released` (not recommended) until the hourly sweep and backlog resolve it by GitHub ID.
-  Queuing that refresh directly when the name is released would close the gap to minutes.
 
 ### 16. Data access and repository hygiene
 
@@ -100,7 +94,9 @@ design direction.
   foreign origins: fonts and icons self-hosted, `csp.config.ts`); no new dependency without a
   reason (0.12.23 built the dismiss menu by hand for that); browser tests locate elements by
   role and name, so renamed buttons and headings need the e2e specs updated in the same change.
-- *Tooling:* the `frontend-design` skill helps once the direction is set; screenshots of the
+- *Tooling:* the `frontend-design` skill helps once the direction is set (design direction and
+  a detector: the Impeccable note below; motion: the transitions.dev note, and
+  why not GSAP skills or React Bits; app-screen references: the Taste Skill note); screenshots of the
   current pages are the baseline to compare against.
 - *shadcn skill* (checked 2026-10-27). Authentic: documented at `ui.shadcn.com/docs/skills`, the
   skill is `skills/shadcn/SKILL.md` in the official `shadcn-ui/ui` repository, and the `skills`
@@ -122,6 +118,108 @@ design direction.
   `-g`), read every installed file, narrow or remove `allowed-tools` so each command asks,
   consider dropping the load-time command, and add a CLAUDE.md rule (components only through a
   reviewed `add`; never `--all`, `-y` or `--force`).
+- *transitions.dev skill* (checked 2026-10-30, not installed; from the repository page only,
+  `SKILL.md` not read). `npx skills add Jakubantalik/transitions.dev`: a third-party library of
+  UI transitions as plain CSS snippets (`:root` custom properties, `t-*` classes, a
+  `prefers-reduced-motion` guard), 18 reference files (`01-card-resize.md` …
+  `18-texts-reveal.md`) plus `transitions-ui-generation` (skeleton reveals, dependency-free
+  runtime). No Framer Motion or View Transitions API. Candidate for a motion step after the
+  design direction, and for loading states (dashboard cards, profile, onboarding progress).
+  Against this repository's rules:
+  - motion before tokens is backwards: its `:root` variables and `t-*` classes must fit the
+    tokens the design direction defines (and shadcn's theme variables);
+  - never `transitions-refine` (injects a `<script>` into the running app and starts a local
+    relay: the built app's CSP blocks it, and it should) or the `transitions-dev` CLI's Pro
+    recipes (browser sign-in);
+  - the README is inconsistent (12 transitions listed, 18 files, "43+" claimed).
+  If used: install only the `transitions-dev` skill folder, project-level, after reading every
+  file; snippets copied in through a reviewed change, kept under the reduced-motion guard.
+- *Impeccable* (checked 2026-10-30, not installed; from npm metadata and the repository README,
+  skill files not read). `npx impeccable install`: npm `impeccable` 4.8.0 by Paul Bakaus
+  (`github.com/pbakaus/impeccable`, `impeccable.style`; first published 2026-03-30). No npm
+  install scripts; optional per-platform CLI binaries (`@impeccable/cli-windows-x64`, ...).
+  Better fit than transitions.dev, for the design-direction step itself:
+  - 24 commands: plan (`init`, `shape`, `document`, `extract`), steer (`typeset`, `colorize`,
+    `layout`, `animate`, `quieter`, ...), review (`critique`, `audit`), finish (`polish`,
+    `harden`, `adapt`, `optimize`, `onboard`). `PRODUCT.md` and `DESIGN.md` are committed:
+    the written direction and tokens §18 asks for before touching pages.
+  - A detector, 62 deterministic rules, no LLM or key: `npx impeccable detect <dir>` (JSON,
+    GitHub Actions annotations, exit 2 on findings), usable as a CI check. On `.tsx` source
+    only pattern rules run; contrast and tiny text need a rendered page.
+  Against this repository's rules:
+  - the installer adds a design hook that scans every UI file the agent edits, and installed
+    hooks run even when the model's commands are denied (outside the permission prompts);
+  - an engine binary downloads on first use to `~/.impeccable/bin/`: outside the repo and
+    outside `npm run audit:deps`;
+  - a new design fetches the impeccable.style catalog and sends an anonymous record of the
+    directions shown and chosen (`npx impeccable telemetry off` / `DO_NOT_TRACK=1` stops the
+    record, not the fetch);
+  - it writes subagents and `.impeccable/` (`config.json`, `design.json`); the README does not
+    list every file it puts under `.claude/`;
+  - it flags Inter as overused and steers toward another font: any web font must be self-hosted
+    or the built app's CSP blocks it (`csp.config.ts`).
+  If used, at the start of the design-direction change: `--providers=claude --scope=project`,
+  decline the hook, telemetry off, read every installed file before the first run, commit
+  `DESIGN.md` as the source of the tokens. Smallest footprint: no skill, only a pinned
+  `npx impeccable@4.8.0 detect apps/frontend/src` in CI.
+- *Taste Skill* (checked 2026-10-30, not installed; read the marketplace manifest, file tree,
+  `SKILL.md` and a scan of the scripts). `/plugin marketplace add Leonxlnx/taste-skill`: plugin
+  2.1.5, MIT, one skill `design-taste-frontend`. It deals one of 20 researched directions,
+  builds with credited photos from open collections, checks the page in a real browser at 1440,
+  768 and 390 px and fixes the worst problems from screenshots (up to three rounds); v2.1 adds
+  app screens (`inspect.mjs --app`). Footprint is small: the manifest declares only the skill
+  folder (no hooks, commands, MCP servers, `allowed-tools` or telemetry seen); scripts need
+  Node 22+ and a local Chrome/Edge/Chromium and install nothing; `inspect.mjs` serves files on
+  `127.0.0.1` and drives the browser over CDP; only `assets.mjs` uses the network (Openverse,
+  Wikimedia Commons, Art Institute of Chicago, the Met, archive.org, NASA; no keys); working
+  files in `.taste-skill/`. Weakest fit of the three:
+  - built for landing pages and award-style sites; this app has one landing page and is
+    otherwise app screens;
+  - 30-45 minutes and "a few hundred thousand tokens" per build (README);
+  - its description triggers on almost any page work, so installed it would take over ordinary
+    frontend edits;
+  - its house style and directions would compete with the design direction §18 decides first;
+  - photos must be downloaded into the repo (remote images are blocked by the CSP);
+  - a plugin marketplace follows the author's repository, so later versions arrive unreviewed.
+  Not to install. Worth reading as input to the design-direction change:
+  `references/app-screens.md`, `layout.md`, `type.md`; `inspect.mjs --app` could check the
+  redesigned pages at three widths if Playwright does not already.
+- *GSAP skills* (checked 2026-10-30, not installed; read the file tree, plugin manifest,
+  README and skill front matter). `greensock/gsap-skills`: official, MIT, about 17.5k stars;
+  eight skills (core, timeline, ScrollTrigger, plugins, utils, React, frameworks, performance).
+  Markdown only: the manifest points at `./skills/`; no scripts, hooks, MCP servers,
+  `allowed-tools` or network. Install `/plugin marketplace add greensock/gsap-skills` or
+  `npx skills add https://github.com/greensock/gsap-skills`; only the `greensock` repository
+  (forks and mirrors exist). Against this repository's rules:
+  - useful only with GSAP, and the frontend has no animation library: `gsap` plus `@gsap/react`
+    would be a new dependency for a data-heavy app where CSS transitions suffice;
+  - the README and skill descriptions tell agents to recommend GSAP for any animation request
+    without a named library, so installed it pushes `npm install gsap` (which only the owner
+    runs: `allow-remote=none`);
+  - its strengths (ScrollTrigger, SplitText, MorphSVG) suit marketing pages, not the dashboard.
+  Good parts if GSAP is ever chosen: `gsap.matchMedia()` for reduced motion, `useGSAP` cleanup
+  on unmount. Not now; only if the motion step chooses GSAP on purpose (reason recorded), then
+  with this official skill.
+- *React Bits* (checked 2026-10-30, not installed; read repository metadata, licence, README
+  and `public/r/registry.json`). `DavidHDev/react-bits`: about 50k stars; 215+ animated
+  components and backgrounds, each in JS/TS and CSS/Tailwind flavors. Not a skill: the free
+  agent route is the shadcn MCP server plus a third-party registry
+  (`"@react-bits": "https://reactbits.dev/r/{name}.json"` in `components.json`,
+  `npx shadcn@latest mcp init --client claude`); the agent skills ("Agent Kit", 20) are Pro,
+  paid. Licence MIT + Commons Clause: use in an app is fine, selling or redistributing the
+  components is not. Against this repository's rules:
+  - dependencies: across 1,274 registry entries, `motion` 112, `@hugeicons/*` 112 (duplicates
+    lucide), `gsap` 72, `ogl` 40, `three` 24, `matter-js` 8, `@react-three/*` a few; most
+    components bring one;
+  - the style is WebGL showpieces for landing pages (Ballpit, Liquid Chrome, Laser Flow); only
+    a few fit app screens (count-up, text reveal, animated lists);
+  - the MCP route is the third-party-registry pull the shadcn note warns against, and an added
+    component brings its dependencies;
+  - WebGL and canvas components may need CSP changes (not checked; test against the built
+    app's policy, `csp.config.ts`);
+  - the README is largely a Pro upsell.
+  Not to install; no registry, no MCP. At most, in the motion step, one dependency-free CSS or
+  Tailwind flavor copied by hand through a reviewed change, under the reduced-motion guard.
 
 ### 9. Profile freshness
 
@@ -264,6 +362,7 @@ Newest first.
 
 | Idea | § | Shipped in |
 |---|---|---|
+| Released-name refresh queued at commit (`backlog.queue_released`) | §13 | v0.12.36 (pooled holders only, not inline) |
 | Labeled-issue fetch (entry-labeled issues beyond the recent cap) | §7 | v0.12.35 (only for capped repositories; default label names only) |
 | Dependency audit in CI (`pip-audit`, `npm audit`, accepted list, weekly run) | §5 | v0.12.34 (no Dependabot or CodeQL) |
 | One JSON writer for management commands (`core/reports.py`) | §15 | v0.12.33 (T-14; non-ASCII kept in every file) |

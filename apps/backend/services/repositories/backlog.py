@@ -6,24 +6,30 @@ A queued refresh is stamped (``refresh_queued_at``) and not queued again while i
 still claim and finish, retries included: ``job_guard.lost_before``, the window a job's
 requeue uses too. A completed or failed analysis clears the stamp; recovering an
 abandoned claim never waits for it.
+
+A repository that gave up its name is queued when the name is released
+(``queue_released``), not an hour later by ``mark_stale`` and ``queue_batch``.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Exists, F, OuterRef, Q, QuerySet
 
 from repositories.models import Lifecycle, Repository, RepositoryCandidate
+from services.github.oauth import has_app_credentials
 from services.job_guard import lost_before
 
-from .lifecycle import abandoned_claims
+from .lifecycle import IN_PROGRESS, abandoned_claims
 from .staleness import stale_parts
 
 Kind = Literal["all", "readme", "issues"]
+# Recorded when GitHub rejects the app's client credentials during a refresh.
+AUTH_INVALID = "github_auth_invalid"
 
 
 def pooled() -> QuerySet[Repository]:
@@ -58,27 +64,78 @@ def queue_batch(now: datetime) -> list[tuple[int, Kind]]:
     that is all that is stale, else of every stale part."""
     grace = now - timedelta(minutes=settings.REPO_DISCOVERED_GRACE_MINUTES)
     retry = now - timedelta(hours=settings.REPO_FAILED_RETRY_HOURS)
-    refresh_retry = now - timedelta(minutes=settings.REPO_REFRESH_RETRY_MINUTES)
     refresh = Q(lifecycle=Lifecycle.STALE) | Q(
         lifecycle=Lifecycle.DISCOVERED, lifecycle_changed_at__lt=grace
     )
     # A failed refresh waits its delay; FAILED retries and dead-worker claims don't.
-    refresh &= ~Q(refresh_failed_at__gte=refresh_retry)
+    refresh &= ~_refresh_failed(now)
     waiting = refresh | Q(lifecycle=Lifecycle.FAILED, lifecycle_changed_at__lt=retry)
-    # A queued task that can still run is not queued twice.
-    waiting &= ~Q(refresh_queued_at__gte=lost_before(now))
-    # Picked and stamped in one transaction, skipping rows another backlog run is picking:
-    # overlapping runs never queue the same repository twice.
-    with transaction.atomic():
-        batch = list(
-            pooled()
-            .filter(waiting | abandoned_claims(now))
-            .order_by(F("lifecycle_changed_at").asc(), "pk")
-            .select_for_update(skip_locked=True)
-            .values_list("pk", "stale_parts")[: settings.REPO_REFRESH_BATCH]
-        )
-        Repository.objects.filter(pk__in=[pk for pk, _ in batch]).update(refresh_queued_at=now)
+    batch = _pick(
+        (waiting & _not_queued(now)) | abandoned_claims(now),
+        now,
+        order=(F("lifecycle_changed_at").asc(), "pk"),
+        limit=settings.REPO_REFRESH_BATCH,
+    )
     return [(pk, _kind(parts)) for pk, parts in batch]
+
+
+def queue_released(pks: list[int], now: datetime, *, requeue: bool = False) -> list[int]:
+    """Queue the refresh of pooled repositories that just gave up their name
+    (``lifecycle.release_name``), inside the caller's transaction: the stamp rolls back with
+    it, and the tasks are sent only once it commits. Holders another analysis holds (it ends
+    in ``NameChanged`` and calls this with ``requeue``: its own stamp no longer counts),
+    FAILED ones (their retry fetches everything) and already queued ones are left to those
+    paths. A recent refresh failure does not hold it back, unless the app credentials were
+    rejected (the refresh would fail the same way). Without app credentials or a worker
+    (tasks run inline) nothing is queued: storing a repository never runs another
+    repository's analysis, and the periodic task catches up."""
+    if not pks or not has_app_credentials() or settings.CELERY_TASK_ALWAYS_EAGER:
+        return []
+    due = Q(pk__in=pks) & ~Q(lifecycle__in=[*IN_PROGRESS, Lifecycle.FAILED])
+    due &= ~_refresh_failed(now, codes=[AUTH_INVALID])
+    if not requeue:
+        due &= _not_queued(now)
+    picked = [pk for pk, _ in _pick(due, now, order=("pk",), limit=None)]
+    if picked:
+
+        def send() -> None:
+            from repositories.tasks import sync_repository  # avoid import cycle
+
+            for pk in picked:
+                sync_repository.delay(pk)
+
+        transaction.on_commit(send)
+    return picked
+
+
+def _not_queued(now: datetime) -> Q:
+    """A queued task that can still run is not queued twice."""
+    return ~Q(refresh_queued_at__gte=lost_before(now))
+
+
+def _refresh_failed(now: datetime, *, codes: list[str] | None = None) -> Q:
+    """A refresh failure recorded within its retry delay (``codes`` narrows the error)."""
+    failed = Q(refresh_failed_at__gte=now - timedelta(minutes=settings.REPO_REFRESH_RETRY_MINUTES))
+    return failed & Q(lifecycle_error__in=codes) if codes is not None else failed
+
+
+def _pick(
+    condition: Q, now: datetime, *, order: tuple[Any, ...], limit: int | None
+) -> list[tuple[int, list[str]]]:
+    """Lock, pick and stamp pooled repositories matching ``condition`` in one transaction,
+    skipping rows another run is picking: overlapping runs never queue the same repository
+    twice."""
+    with transaction.atomic():
+        rows = (
+            pooled()
+            .filter(condition)
+            .order_by(*order)
+            .select_for_update(skip_locked=True)
+            .values_list("pk", "stale_parts")
+        )
+        batch = list(rows if limit is None else rows[:limit])
+        Repository.objects.filter(pk__in=[pk for pk, _ in batch]).update(refresh_queued_at=now)
+    return batch
 
 
 def _kind(parts: list[str]) -> Kind:

@@ -1,6 +1,7 @@
 """Storing normalized GitHub repository data (shared by the profile sync, discovery and
 repository analysis). Callers own the transaction. Rows are never deleted here: a repository
-whose name another GitHub ID now has gives the name up (``lifecycle.release_name``)."""
+whose name another GitHub ID now has gives the name up (``lifecycle.release_name``), and its
+refresh is queued once the caller commits (``backlog.queue_released``)."""
 
 from __future__ import annotations
 
@@ -8,6 +9,7 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 from django.conf import settings
+from django.utils import timezone
 
 from repositories.models import (
     Repository,
@@ -16,6 +18,7 @@ from repositories.models import (
     RepositoryTopic,
 )
 from services.profiling.manifests import is_manifest, parse_manifest
+from services.repositories.backlog import queue_released
 from services.repositories.lifecycle import release_name
 
 from .client import ContentEntry, GitHubClient, GitHubRepo
@@ -28,7 +31,8 @@ def upsert_repository(gh: GitHubRepo, now: Any, *, metadata_fetched: bool = True
     still goes stale on schedule."""
     # Another repository that had this name (renamed away, or deleted and recreated) keeps its
     # row and links; its next analysis finds it by GitHub ID.
-    release_name(gh.full_name, gh.github_id)
+    # Stamped with the wall clock: ``now`` may be a long job's reference time.
+    queue_released(release_name(gh.full_name, gh.github_id), timezone.now())
     fields: dict[str, Any] = {
         "owner_login": gh.owner_login,
         "name": gh.name,

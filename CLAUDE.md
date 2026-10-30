@@ -1388,6 +1388,20 @@ Archived: `openspec/changes/archive/2026-10-28-labeled-issue-fetch/`. Spec: delt
 - Comma-separated settings go through `env_list(name, default)` in `base.py` (trimmed, empty
   items dropped), never bare `env.list` (N-8).
 
+**Released-name refresh** (MVP+)  ✅ shipped in v0.12.36 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-29-released-name-refresh/`. Spec: delta to
+`repository-analysis` ("Background refresh"; edited directly after the review). `ideas.md` §13.
+- `lifecycle.release_name` returns the holder pks; `storage.upsert_repository` passes them to
+  `backlog.queue_released(pks, timezone.now())`: pooled rows not IN_PROGRESS/FAILED/queued are
+  stamped `refresh_queued_at` in the caller's transaction, and `sync_repository.delay` is sent
+  `on_commit`. Nothing without app credentials or under `CELERY_TASK_ALWAYS_EAGER`.
+- `lifecycle.NameChanged(ClaimLost)`: `hold(fetched_name=...)` raises it; the analysis releases
+  and calls `queue_released([pk], ..., requeue=True)` (its own stamp no longer counts) (L-1).
+- `backlog.AUTH_INVALID` (`github_auth_invalid`) within `REPO_REFRESH_RETRY_MINUTES` holds the
+  immediate refresh back; other refresh failures do not (L-2). `_pick`, `_not_queued`,
+  `_refresh_failed` are shared with `queue_batch` (L-4). Review: `Bug_Backlog.md` batch 23.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1414,7 +1428,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35).
+(0.12.35), released-name refresh (0.12.36).
 
 ## 8. Release housekeeping
 

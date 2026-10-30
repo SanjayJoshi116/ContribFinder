@@ -54,7 +54,7 @@ from services.github.storage import (
 from services.issues.analysis import IssueInput, analyze
 from services.matching.activity import WINDOW_DAYS, ActivityData, compute_activity
 
-from . import lifecycle, setup
+from . import backlog, lifecycle, setup
 from .setup import SetupFacts
 from .staleness import PARTS, is_released_name, stale_parts
 
@@ -181,9 +181,14 @@ class RepositoryAnalysisService:
                 lifecycle.hold(repo, fetched_name=fetched_name)
                 topics, has_dependencies = self._store(repo, fetched, now)
                 lifecycle.complete(repo, now=now, topics=topics, has_dependencies=has_dependencies)
+        except lifecycle.NameChanged:
+            # Renamed meanwhile: the fetched data is discarded and the restored row is queued
+            # again (its queued task is this one, which ends here).
+            lifecycle.release(repo)
+            backlog.queue_released([repo.pk], timezone.now(), requeue=True)
+            return Outcome.SKIPPED
         except lifecycle.ClaimLost:
-            # Reclaimed by another analysis, which owns the state now; or renamed meanwhile,
-            # so the fetched data is discarded and the restored row stays due.
+            # Reclaimed by another analysis, which owns the state now.
             lifecycle.release(repo)
             return Outcome.SKIPPED
         except BaseException:

@@ -91,6 +91,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 20 | **0.12.24–0.12.30 review** | U-1…U-8 | `code-review` of the uncommitted 0.12.24–0.12.30 work. U-1, U-2, U-3, U-5, U-6, U-7 fixed in 0.12.31 (`data-versions-fixes`) before commit; U-4 accepted, U-8 wontfix. |
 | 21 | **0.12.32–0.12.34 review** | M-1…M-15 | `code-review` (M-1…M-8) and `/simplify` (M-9…M-15) of the uncommitted 0.12.32–0.12.34 work. M-1, M-2, M-3, M-9, M-10, M-11 fixed in 0.12.34 before commit; the rest accepted or wontfix. |
 | 22 | **0.12.35 review** | N-1…N-10 | `code-review` (N-1…N-7) and `/simplify` (N-8…N-10) of the uncommitted labeled-issue fetch. N-1, N-2, N-3, N-8, N-9 fixed in 0.12.35 before commit; the rest accepted. |
+| 23 | **Released-name refresh review** | L-1…L-7 | `code-review` of the uncommitted `released-name-refresh` (plus 0.12.35). L-5 fixed in 0.12.35, L-1, L-2, L-4 in 0.12.36 before commit; L-3, L-6, L-7 accepted. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -101,7 +102,8 @@ S-1…S-5 of batch 18; D-12, D-13 and S-9…S-11 in 0.12.15; D-8, D-9, D-15, D-1
 batch 8 in 0.12.16 (`signal-explanation-accuracy`); S-7 of batch 18 in 0.12.17
 (`keyset-paging-links`); S-6 in 0.12.18 (`activation-command-only`); T-1…T-10 of batch 19 in 0.12.23; X-9 in 0.12.26 (`post-analysis-pool-cleanup`); Y-6 in 0.12.27 (`data-versions`); T-12 in 0.12.29 (`rank-constraint`); U-1…U-3, U-5…U-7 in 0.12.31 (`data-versions-fixes`); B-6, D-11 (the rest of batch 8) and T-11
 in 0.12.32 (no OpenSpec change: B-6 follows its documented rounded mean, the spec does not order
-title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 accepted.
+title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 accepted. L-5 of batch 23 in 0.12.35; L-1, L-2, L-4 in 0.12.36
+(`released-name-refresh`).
 Next: nothing open; the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
@@ -669,3 +671,20 @@ are `urlencode`d into the query; the host is fixed).
 | N-8 | altitude | `config/settings/base.py` | N-1's trim covered one setting; `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS` and `TOKEN_ENCRYPTION_KEYS` kept the space in `a, b` too. | fixed (0.12.35: one `env_list` helper trims and drops empty items for every list setting) |
 | N-9 | cleanup | `analysis.py`, `tests/test_issue_ingestion.py` | Condition inside the loop's iterable; a one-line `labeled()` test helper. | fixed (0.12.35: plain `if`; params inline) |
 | N-10 | reuse | tests | The "next page" `Link` header is written in four tests across two files. | accepted (test-only) |
+
+## Released-name refresh review (2026-10-29)
+
+Source: `code-review` over the uncommitted `released-name-refresh` change (archived
+2026-10-29) together with the uncommitted 0.12.35. L-1, L-2, L-4, L-5 fixed before commit, with
+tests; the `repository-analysis` spec ("Background refresh") was edited directly (the archived
+delta predates the fixes).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| L-1 | bug | `services/repositories/backlog.py` (`queue_released`) | A holder under analysis is skipped, and that analysis ends in `ClaimLost` without queuing it again (its own stamp still set): it waited about 75 minutes, the delay the change removes. | fixed (`lifecycle.NameChanged`; the analysis releases and calls `queue_released(..., requeue=True)`) |
+| L-2 | design | `queue_released` | Ignored the refresh-failure delay, so rejected app credentials sent one doomed task per released name. | fixed (held back only for `github_auth_invalid` within `REPO_REFRESH_RETRY_MINUTES`; `backlog.AUTH_INVALID`) |
+| L-3 | altitude | `services/github/storage.py` | The storage helper now queues tasks as a side effect; an autocommit caller would send at once. | accepted (design D1; marking STALE instead would still wait for the 15-minute backlog; every caller owns a transaction) |
+| L-4 | reuse | `backlog.py` | `queue_released` copied part of `queue_batch`'s selection, without the `skip_locked` pick. | fixed (`_pick`, `_not_queued`, `_refresh_failed` shared) |
+| L-5 | bug | `core/checks.py` (`core.E041`) | A label name with a comma passed; `labels=a,b` asks for issues with both. | fixed (E041 refuses commas) |
+| L-6 | design | `analysis.py` labeled listings | Exact names only; `good-first-issue` variants missed. | accepted (same as N-5) |
+| L-7 | cost | `analysis.py` labeled listings | Two more requests per capped repository every 6 hours. | accepted (measured in 0.12.35; revisit if rate limits show) |

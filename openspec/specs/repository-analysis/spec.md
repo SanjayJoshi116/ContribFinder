@@ -3,9 +3,7 @@
 ## Purpose
 
 Collects and keeps fresh the public data about candidate repositories that matching needs, shared across developers, with an explicit processing lifecycle so that failures and stale data are visible as state rather than silently treated as missing.
-
 ## Requirements
-
 ### Requirement: Repository data collection
 For each candidate repository the system SHALL collect and store:
 - metadata: owner, name, description, URL, default branch, stars, forks, open issues, primary language, license, creation, update and push dates, archived and fork flags;
@@ -170,6 +168,8 @@ A periodic background task SHALL refresh, in batches of a configured size (defau
 
 A repository queued for a refresh SHALL NOT be queued again while that refresh can still run: until the configured stale-job time plus the maximum retry delay has passed since it was queued, or until an analysis completes or fails it. Overlapping background runs SHALL NOT queue the same repository twice. The recovery of an analysis abandoned by a dead worker SHALL NOT wait for this. A refresh that finds nothing stale on a repository that is not STALE (another analysis refreshed it after it was queued) SHALL change nothing, not even the time of the last transition.
 
+A repository that gives up its name and is in at least one developer's pool SHALL have its refresh queued once the change that released the name is committed, without waiting for the periodic task, and SHALL count as queued from then on. This SHALL NOT apply to a repository that is FAILED or whose queued refresh can still run; those keep the paths above. A repository that another analysis holds SHALL NOT be queued then; that analysis, which discards what it fetched under the old name, SHALL queue its refresh again when it ends. It SHALL NOT apply when the application's client credentials are not configured or when background tasks run inline: the periodic task stays the fallback, and storing a repository SHALL NOT run another repository's analysis. A recorded refresh failure SHALL NOT hold this refresh back, unless GitHub rejected the application's client credentials within the configured delay.
+
 A refresh that ends without being retried and without marking the repository FAILED (for example a rate-limit wait beyond the maximum, transient failures that used up the attempts, or rejected client credentials) SHALL record its error code and time on the repository, SHALL keep the repository's state and its stored data, and SHALL NOT be queued again by the background task until a configured delay (default 60 minutes) has passed. The failure SHALL NOT be recorded on a repository that another analysis holds, or that another analysis completed or failed after this refresh started. The delay SHALL NOT hold back a FAILED repository's retry or the recovery of an analysis abandoned by a dead worker. A later completed analysis SHALL clear the recorded error.
 
 #### Scenario: Only stale parts fetched
@@ -195,6 +195,30 @@ A refresh that ends without being retried and without marking the repository FAI
 #### Scenario: Orphan repository not refreshed
 - **WHEN** a STALE repository is in no developer's pool
 - **THEN** the background task does not refresh it
+
+#### Scenario: Released name refreshed right away
+- **WHEN** a discovery search stores `org/tool` with GitHub ID 2 while the pooled RECOMMENDABLE repository with GitHub ID 1 holds that name
+- **THEN** after the search's transaction commits, a refresh of the repository with GitHub ID 1 is queued and stamped as queued, the next periodic run does not queue it again, and its analysis looks it up by GitHub ID
+
+#### Scenario: Released name rolled back
+- **WHEN** the transaction that released a name rolls back
+- **THEN** no refresh is queued for the holder
+
+#### Scenario: Released name of a repository in no pool
+- **WHEN** a repository in no developer's pool gives up its name
+- **THEN** no refresh is queued for it
+
+#### Scenario: Released name while analyzed
+- **WHEN** a pooled repository gives up its name while its README refresh, fetched by the old name, is running
+- **THEN** no refresh is queued while that analysis holds it; the analysis discards the README, restores the repository and queues its refresh again
+
+#### Scenario: Released name after rejected credentials
+- **WHEN** a pooled repository gives up its name within the configured delay after a refresh recorded `github_auth_invalid`
+- **THEN** no refresh is queued for it, and the periodic task refreshes it after the delay
+
+#### Scenario: Released name without a worker
+- **WHEN** a pooled repository gives up its name while background tasks run inline
+- **THEN** no refresh runs, it is not stamped as queued, and the periodic task refreshes it later
 
 #### Scenario: Refresh fails without a retry
 - **WHEN** a STALE repository's refresh keeps getting 503 until its attempts are used up
@@ -222,3 +246,4 @@ Analysis during a developer's discovery run SHALL use that developer's token. Ba
 #### Scenario: No secrets stored or logged
 - **WHEN** any repository analysis or refresh runs, succeeds or fails
 - **THEN** stored repository fields, queued task arguments and log output contain no access token and no client secret
+

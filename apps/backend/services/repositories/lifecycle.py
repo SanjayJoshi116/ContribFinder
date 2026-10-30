@@ -49,6 +49,11 @@ class ClaimLost(Exception):
     """Another analysis reclaimed the repository: stop without writing."""
 
 
+class NameChanged(ClaimLost):
+    """The repository gave up its name while its data was fetched by that name: stop without
+    writing. Unlike a reclaim, no other analysis owns it, so it is due for a new refresh."""
+
+
 def abandoned_claims(now: datetime) -> Q:
     """In-progress repositories whose analysis stopped renewing its claim."""
     return Q(lifecycle__in=IN_PROGRESS) & (
@@ -102,22 +107,23 @@ def hold(repo: Repository, *, fetched_name: str | None = None) -> None:
     except Repository.DoesNotExist:
         raise ClaimLost() from None
     if fetched_name is not None and repo.full_name != fetched_name:
-        raise ClaimLost()
+        raise NameChanged()
 
 
-def release_name(full_name: str, github_id: int) -> None:
+def release_name(full_name: str, github_id: int) -> list[int]:
     """Free ``full_name`` for ``github_id``: another row holding it (renamed away on GitHub,
     or deleted and recreated) becomes ``{full_name}~{its github_id}`` and keeps its data and
     links. Its stale metadata (staleness.is_released_name) makes the next analysis look it up
     by GitHub ID. Until then its name and URL are wrong, so an eligible holder becomes
-    ineligible (``name_released``) and INDEXED; that analysis decides eligibility again."""
+    ineligible (``name_released``) and INDEXED; that analysis decides eligibility again.
+    Returns the pks of the holders (``backlog.queue_released`` queues that analysis)."""
     holders = list(
         Repository.objects.filter(full_name=full_name)
         .exclude(github_id=github_id)
         .values_list("pk", flat=True)
     )
     if not holders:
-        return
+        return []
     rows = Repository.objects.filter(pk__in=holders)
     rows.update(
         full_name=Concat(
@@ -132,6 +138,7 @@ def release_name(full_name: str, github_id: int) -> None:
     rows.filter(previous_lifecycle=Lifecycle.RECOMMENDABLE).update(
         previous_lifecycle=Lifecycle.INDEXED
     )
+    return holders
 
 
 def release(repo: Repository) -> None:
