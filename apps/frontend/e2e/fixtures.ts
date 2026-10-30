@@ -14,7 +14,38 @@ function sessionId(user: SeededUser): string {
   return id
 }
 
-export const test = base.extend<{ signInAs: (user: SeededUser) => Promise<void> }>({
+/** Content Security Policy violations seen so far; `take()` returns and clears them, for a
+ * test that causes one on purpose. */
+export type PolicyViolations = { readonly seen: readonly string[]; take(): string[] }
+
+export const test = base.extend<{
+  signInAs: (user: SeededUser) => Promise<void>
+  policyViolations: PolicyViolations
+}>({
+  // Fails the test on any CSP violation in its context (Chromium logs each as a console
+  // error); `policy.spec.ts` guards the wording.
+  policyViolations: [
+    async ({ context }, use) => {
+      let seen: string[] = []
+      context.on('console', (message) => {
+        if (message.type() === 'error' && message.text().includes('Content Security Policy')) {
+          seen.push(message.text())
+        }
+      })
+      await use({
+        get seen() {
+          return seen
+        },
+        take() {
+          const taken = seen
+          seen = []
+          return taken
+        },
+      })
+      expect(seen, 'Content Security Policy violations').toEqual([])
+    },
+    { auto: true },
+  ],
   signInAs: async ({ context, baseURL }, use) => {
     await use(async (user) => {
       await context.addCookies([

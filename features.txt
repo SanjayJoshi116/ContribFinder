@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.37 (2026-10-30)
+Version: 0.12.38 (2026-10-30)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,17 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.38 - Browser tests on the production build
+============================================================================
+
+Web client (ideas.md section 14)
+  [x] npm run e2e builds the SPA and serves it with vite preview (what ships, CSP included)
+  [x] Any Content Security Policy violation fails a browser test
+  [x] E2E_DEV_SERVER=1 keeps the dev server for local runs; CI never uses it
+  [x] A canary test proves policy violations are still detected
+  [~] CI e2e job duration compared after the push (local: about 45 s build+preview)
 
 ============================================================================
 SHIPPED - v0.12.37 - Route-level id validation

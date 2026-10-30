@@ -7,6 +7,33 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.38] - 2026-10-30
+
+Browser tests on the production build (`openspec/changes/archive/2026-10-30-e2e-production-build/`;
+spec `web-client` ("End-to-end coverage of the main flows"); `ideas.md` §14). No app, API,
+backend or dependency change; baselines unchanged.
+
+### Changed (internal)
+
+- `npm run e2e` (and CI's `e2e` job) now builds the SPA (`vite build --outDir dist-e2e`) and
+  serves it with `vite preview` on :5174, instead of the Vite dev server: the tests run what
+  ships, with its Content Security Policy, bundling and lazy chunks. `dist-e2e/` is gitignored
+  and a local `dist/` is left alone. `E2E_DEV_SERVER=1` keeps the dev server for local runs
+  (no policy); CI never sets it.
+- New auto fixture `policyViolations` (`e2e/fixtures.ts`): any Content Security Policy
+  violation reported by any page of the test fails it, naming the directive and the blocked
+  URL. A canary test (`e2e/policy.spec.ts`) blocks a foreign image and asserts it is recorded,
+  so a change in Chromium's wording fails instead of going silent.
+- `vite.config.ts` shares one `/api` proxy between the dev server and `vite preview`; the e2e
+  preview listens on `localhost` only (`--host localhost`). The build's output shows in the e2e log.
+- Review fixes (`Bug_Backlog.md` batch 25): E2E-1, E2E-2, E2E-5, E2E-7; E2E-6 documented.
+- `/simplify` (E2E-10…E2E-13): port and output folder written once in `playwright.config.ts`;
+  `--host localhost` on the e2e preview command instead of `vite.config.ts`; the fixture yields
+  `{ seen, take() }` and the canary takes its expected `img-src` from `CONTENT_SECURITY_POLICY`.
+- Local runs: 9 passed in about 45 s on the production build (build under 5 s), 8 passed and
+  the canary skipped in about 42 s on the dev server. The CI
+  `e2e` duration is still to be compared after the push.
+
 ## [0.12.37] - 2026-10-30
 
 Route-level id validation (`openspec/changes/archive/2026-10-30-route-id-validation/`; no spec

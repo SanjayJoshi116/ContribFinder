@@ -285,9 +285,12 @@ Frontend (`apps/frontend`, npm):
 - `npm run dev`, `npm test`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build`
 - `npm run api:sync`: re-export the OpenAPI schema from Django and regenerate
   `src/api/schema.d.ts`. Run it after any API change and commit both files; CI fails on drift.
-- `npm run e2e`: Playwright (Chromium) against the real backend on :8001 and Vite on :5174
-  (database `contribfinder_e2e`, re-seeded every run; one-time `npx playwright install
-  chromium`). Mutating specs each own a seeded user. New queries go through the shared client
+- `npm run e2e`: Playwright (Chromium) against the real backend on :8001 and the production
+  build (`vite build` into `dist-e2e`, `vite preview`) on :5174 (database `contribfinder_e2e`,
+  re-seeded every run; one-time `npx playwright install chromium`). The auto fixture
+  `policyViolations` (`e2e/fixtures.ts`) fails a test on any Content Security Policy console
+  error in its context (canary `e2e/policy.spec.ts`); specs import `test` from `fixtures.ts`. `E2E_DEV_SERVER=1` runs the dev server (local
+  only, no policy). Mutating specs each own a seeded user. New queries go through the shared client
   (`src/app/queryClient.ts`): 4xx are never retried, any 401 ends the session, and derived data
   is refetched by the data versions (`src/app/dataVersions.ts`, `AREA_KEYS`), not on mount: a
   new derived query under `['profile', ...]` must be listed in its area.
@@ -1414,6 +1417,25 @@ Archived: `openspec/changes/archive/2026-10-30-route-id-validation/` (no spec ch
 - Detail pages take `{ id: number }`; `useRecommendation`/`useIssue` trust their argument (no
   `enabled` guard). Review: `Bug_Backlog.md` batch 24 (R-3…R-5 open).
 
+**Browser tests on the production build** (MVP+, platform)  ✅ shipped in v0.12.38 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-30-e2e-production-build/`. Spec: delta to
+`web-client` ("End-to-end coverage of the main flows"). `ideas.md` §14.
+- `playwright.config.ts`: the frontend server runs `vite build --outDir dist-e2e --emptyOutDir`
+  then `vite preview --outDir dist-e2e --port 5174 --strictPort` (timeout 180 s);
+  `E2E_DEV_SERVER=1` runs the dev server (local only, no policy). `dist-e2e` is in
+  `.gitignore`, the ESLint ignores and `.prettierignore`.
+- `vite.config.ts`: one `proxy` constant for `server.proxy` and `preview.proxy`.
+- `e2e/fixtures.ts`: auto fixture `policyViolations` collects, on `context.on('console')`,
+  errors containing `Content Security Policy`, yields `{ seen, take() }` and fails the test with
+  any not taken;
+  every spec imports `test` from `fixtures.ts`. Canary `e2e/policy.spec.ts` (skipped under
+  `E2E_DEV_SERVER=1`) blocks a foreign image and `take()`s the violation (expected `img-src` from
+  `CONTENT_SECURITY_POLICY`). The preview runs with `--host localhost` (e2e command, not
+  `vite.config.ts`); the frontend server pipes stdout. Review: batch 25. A new script, image or API origin missing from `csp.config.ts` now fails CI.
+- Carry-over: task 3.3 (CI `e2e` job green, duration against the previous run) is checked after
+  the owner pushes `main`.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1440,7 +1462,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38).
 
 ## 8. Release housekeeping
 

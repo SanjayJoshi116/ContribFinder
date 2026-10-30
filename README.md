@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.37** (detail-route ids validated in one place; MVP+). After signing in with
+**Version 0.12.38** (browser tests run the production build; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -410,10 +410,16 @@ PostgreSQL. Nothing calls GitHub: sign-in uses sessions created by a seed comman
 
 - One-time: `npx playwright install chromium` in `apps/frontend`. The `contribfinder` role
   needs `CREATEDB`, as for `pytest`: the seed creates the `contribfinder_e2e` database.
-- `npm run e2e` in `apps/frontend`. It re-seeds the database on every run and starts Django on
-  `127.0.0.1:8001` and Vite on `5174`, so it runs alongside `npm start`.
+- `npm run e2e` in `apps/frontend`. It re-seeds the database on every run, starts Django on
+  `127.0.0.1:8001`, builds the SPA into `dist-e2e/` (gitignored; your `dist/` is left alone) and
+  serves that build with `vite preview` on `5174`, so it runs alongside `npm start`. The tests
+  see what ships, Content Security Policy included: any policy violation the page reports fails
+  the test.
+- `E2E_DEV_SERVER=1 npm run e2e` uses the Vite dev server instead (no build, no policy): quicker
+  while writing a spec. CI never sets it.
 - Of your `.env` only `DATABASE_URL` is used (`DJANGO_READ_DOTENV=0` for Django), so local runs
-  see the same settings as CI.
+  see the same settings as CI. The SPA build does read `apps/frontend/.env*` files (Vite), so
+  keep `VITE_*` overrides out of them when comparing with CI, which has none.
 
 ## Known issues
 

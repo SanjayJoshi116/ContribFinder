@@ -93,6 +93,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 22 | **0.12.35 review** | N-1…N-10 | `code-review` (N-1…N-7) and `/simplify` (N-8…N-10) of the uncommitted labeled-issue fetch. N-1, N-2, N-3, N-8, N-9 fixed in 0.12.35 before commit; the rest accepted. |
 | 23 | **Released-name refresh review** | L-1…L-7 | `code-review` of the uncommitted `released-name-refresh` (plus 0.12.35). L-5 fixed in 0.12.35, L-1, L-2, L-4 in 0.12.36 before commit; L-3, L-6, L-7 accepted. |
 | 24 | **Route-id validation review** | R-1…R-6 | `code-review` of the uncommitted `route-id-validation` (0.12.37). R-1, R-2, R-6 fixed in 0.12.37 before commit; R-3, R-4, R-5 open. |
+| 25 | **E2E production-build review** | E2E-1…E2E-13 | `code-review` (E2E-1…E2E-9) and `/simplify` (E2E-10…E2E-13) of the uncommitted `e2e-production-build` (0.12.38). E2E-1, E2E-2, E2E-5, E2E-7, E2E-10…E2E-12 fixed in 0.12.38 before commit, E2E-6 documented; E2E-3, E2E-4, E2E-8, E2E-9, E2E-13 accepted. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -104,7 +105,8 @@ batch 8 in 0.12.16 (`signal-explanation-accuracy`); S-7 of batch 18 in 0.12.17
 (`keyset-paging-links`); S-6 in 0.12.18 (`activation-command-only`); T-1…T-10 of batch 19 in 0.12.23; X-9 in 0.12.26 (`post-analysis-pool-cleanup`); Y-6 in 0.12.27 (`data-versions`); T-12 in 0.12.29 (`rank-constraint`); U-1…U-3, U-5…U-7 in 0.12.31 (`data-versions-fixes`); B-6, D-11 (the rest of batch 8) and T-11
 in 0.12.32 (no OpenSpec change: B-6 follows its documented rounded mean, the spec does not order
 title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 accepted. L-5 of batch 23 in 0.12.35; L-1, L-2, L-4 in 0.12.36
-(`released-name-refresh`); R-1, R-2, R-6 of batch 24 in 0.12.37 (`route-id-validation`).
+(`released-name-refresh`); R-1, R-2, R-6 of batch 24 in 0.12.37 (`route-id-validation`); E2E-1, E2E-2, E2E-5, E2E-7
+(and E2E-6 documented) of batch 25 in 0.12.38 (`e2e-production-build`).
 Next: R-3…R-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
@@ -704,3 +706,25 @@ go against design decisions D3 and D1, so fixing them means revisiting the desig
 | R-4 | cleanup | `RecommendationDetailPage.tsx` (`viewed` ref) | The id comparison is redundant with the remount. | open (the ref still stops StrictMode's double effect; could become a boolean) |
 | R-5 | altitude | `RouteId.tsx` render prop | `page={Component}` would be shorter in `routes.tsx`. | open (design D1 chose the render prop: page props type-checked, message beside the route) |
 | R-6 | docs | CHANGELOG, `RouteId.test.tsx` | CHANGELOG lists ` 7`; the test passes `%207`. | fixed (both say `%207`, decoded to ` 7`) |
+
+## E2E production-build review (2026-10-30)
+
+Source: `code-review` (E2E-1…E2E-9) and `/simplify` (E2E-10…E2E-13) over the uncommitted
+`e2e-production-build` change (archived 2026-10-30). Unverified recall findings, checked
+against Vite and Playwright behavior before fixing.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| E2E-1 | test | `e2e/fixtures.ts` | The check matches Chromium's "Content Security Policy" wording, proven only once by hand: a wording change would silence every policy check. | fixed (`policyViolations` yields `{ seen, take() }`; canary `e2e/policy.spec.ts` blocks a foreign image and asserts it is recorded; fails when the match breaks) |
+| E2E-2 | test | `e2e/fixtures.ts` | Listened on the test's `page` only: a popup or second tab could break the policy unseen. | fixed (`context.on('console')`) |
+| E2E-3 | test | `e2e/fixtures.ts` | A violation after the test's last awaited step arrives after the check. | accepted (waiting for network idle after every test costs every test) |
+| E2E-4 | cleanup | `vite.config.ts` | `preview.proxy` repeats Vite's fallback to `server.proxy`. | accepted (design D3: explicit, one shared constant) |
+| E2E-5 | security | `vite.config.ts` | `vite preview` inherits `server.host: true`: the e2e preview (proxying to the seeded backend) listened on every interface. | fixed (`--host localhost` on the e2e preview command; E2E-11) |
+| E2E-6 | config | `playwright.config.ts` | `vite build` reads `apps/frontend/.env*`, so local `VITE_*` values reach the e2e build; the README said local runs match CI. | documented (README "End-to-end tests") |
+| E2E-7 | ops | `playwright.config.ts` | The frontend server's stdout was ignored: a slow or hung build showed nothing before the timeout. | fixed (`stdout: 'pipe'`) |
+| E2E-8 | cost | `e2e/fixtures.ts` | The auto fixture gives every test a browser context, even an API-only one. | accepted (no API-only spec exists) |
+| E2E-9 | test | `csp.config.test.ts` | Reads `dist/`, not `dist-e2e/`. | accepted (the browser now checks the policy of the build that runs) |
+| E2E-10 | cleanup | `playwright.config.ts` | Port 5174 three times and `dist-e2e` twice: a change in one place leaves the URL and the server out of step. | fixed (`PORT`, `BASE_URL`, `SERVE`, `OUT`; comment says why not `npm run build`) |
+| E2E-11 | altitude | `vite.config.ts` | `preview.host` (an e2e concern) sat in config every `vite preview` reads. | fixed (`--host localhost` on the e2e preview command; E2E-11) |
+| E2E-12 | altitude | `e2e/policy.spec.ts` | The canary emptied the fixture's array (`length = 0`) and hard-coded `img-src 'self'`. | fixed (fixture yields `{ seen, take() }`; directive from `CONTENT_SECURITY_POLICY`) |
+| E2E-13 | cleanup | `playwright.config.ts`, `policy.spec.ts` | `E2E_DEV_SERVER === '1'` read twice; a full build on every local run. | accepted (two reads, no shared module; design D1: no stale-build skip) |
