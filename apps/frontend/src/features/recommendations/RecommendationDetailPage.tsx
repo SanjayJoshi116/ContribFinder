@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 
 import type { RecommendationDetail } from '@/api/types'
 import { DeadEnd } from '@/components/DeadEnd'
 import { recordFeedback } from '@/features/feedback/api'
 import { useScrollToHash } from '@/lib/useScrollToHash'
-import { positiveId } from '@/lib/utils'
 import { DismissButton, SaveButton } from '@/features/feedback/RecommendationActions'
 
 import { useRecommendation } from './api'
@@ -101,12 +100,9 @@ function LanguageBar({ languages }: { languages: RecommendationDetail['languages
 }
 
 /** One recommendation: GitHub's facts kept visibly apart from ContribFinder's analysis. */
-export function RecommendationDetailPage() {
-  const { id: param } = useParams()
-  const id = positiveId(param)
+export function RecommendationDetailPage({ id }: { id: number }) {
   const navigate = useNavigate()
-  // Disabled for an invalid id (0): nothing is requested.
-  const recommendation = useRecommendation(id ?? 0)
+  const recommendation = useRecommendation(id)
   const loadedId = recommendation.data?.id
   const viewed = useRef<number | null>(null)
   useScrollToHash(recommendation.isSuccess)
@@ -119,7 +115,6 @@ export function RecommendationDetailPage() {
     }
   }, [loadedId])
 
-  if (id === null) return <DeadEnd message="This link doesn't point to a recommendation." />
   if (recommendation.isPending) return <p className="text-muted-foreground">Loading…</p>
   if (recommendation.isError) {
     return (

@@ -92,6 +92,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 21 | **0.12.32–0.12.34 review** | M-1…M-15 | `code-review` (M-1…M-8) and `/simplify` (M-9…M-15) of the uncommitted 0.12.32–0.12.34 work. M-1, M-2, M-3, M-9, M-10, M-11 fixed in 0.12.34 before commit; the rest accepted or wontfix. |
 | 22 | **0.12.35 review** | N-1…N-10 | `code-review` (N-1…N-7) and `/simplify` (N-8…N-10) of the uncommitted labeled-issue fetch. N-1, N-2, N-3, N-8, N-9 fixed in 0.12.35 before commit; the rest accepted. |
 | 23 | **Released-name refresh review** | L-1…L-7 | `code-review` of the uncommitted `released-name-refresh` (plus 0.12.35). L-5 fixed in 0.12.35, L-1, L-2, L-4 in 0.12.36 before commit; L-3, L-6, L-7 accepted. |
+| 24 | **Route-id validation review** | R-1…R-6 | `code-review` of the uncommitted `route-id-validation` (0.12.37). R-1, R-2, R-6 fixed in 0.12.37 before commit; R-3, R-4, R-5 open. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -103,8 +104,8 @@ batch 8 in 0.12.16 (`signal-explanation-accuracy`); S-7 of batch 18 in 0.12.17
 (`keyset-paging-links`); S-6 in 0.12.18 (`activation-command-only`); T-1…T-10 of batch 19 in 0.12.23; X-9 in 0.12.26 (`post-analysis-pool-cleanup`); Y-6 in 0.12.27 (`data-versions`); T-12 in 0.12.29 (`rank-constraint`); U-1…U-3, U-5…U-7 in 0.12.31 (`data-versions-fixes`); B-6, D-11 (the rest of batch 8) and T-11
 in 0.12.32 (no OpenSpec change: B-6 follows its documented rounded mean, the spec does not order
 title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 accepted. L-5 of batch 23 in 0.12.35; L-1, L-2, L-4 in 0.12.36
-(`released-name-refresh`).
-Next: nothing open; the known gaps K-1…K-5 remain.
+(`released-name-refresh`); R-1, R-2, R-6 of batch 24 in 0.12.37 (`route-id-validation`).
+Next: R-3…R-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
 3, E-3) shipped in 0.12.2 and 0.12.3.
@@ -688,3 +689,18 @@ delta predates the fixes).
 | L-5 | bug | `core/checks.py` (`core.E041`) | A label name with a comma passed; `labels=a,b` asks for issues with both. | fixed (E041 refuses commas) |
 | L-6 | design | `analysis.py` labeled listings | Exact names only; `good-first-issue` variants missed. | accepted (same as N-5) |
 | L-7 | cost | `analysis.py` labeled listings | Two more requests per capped repository every 6 hours. | accepted (measured in 0.12.35; revisit if rate limits show) |
+
+## Route-id validation review (2026-10-30)
+
+Source: `code-review` over the uncommitted `route-id-validation` change (archived 2026-10-30).
+R-1, R-2, R-6 fixed before commit; R-3, R-4, R-5 open (kept for a later look; R-3 and R-5
+go against design decisions D3 and D1, so fixing them means revisiting the design).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| R-1 | test | `feedback.test.tsx` (one view per id) | The page's `viewed` ref already records one view per id, so the test passed without `key={id}`: nothing guarded the remount per id. | fixed (`RouteId.test.tsx` navigates 1 → 2 and asserts two mounts; fails without the key) |
+| R-2 | docs | CHANGELOG, `features.txt`, CLAUDE.md, `ideas.md` | "No behavior change", but keying by id remounts the page on an id change (design D2): scroll-to-hash and local state reset, a pending mutation's per-call callbacks are skipped. | fixed (release notes say the page remounts per id) |
+| R-3 | design | `useRecommendation`, `useIssue` | Without the `enabled` guard a future unchecked caller sends `/recommendations/NaN`. | open (design D3 chose no guard: it would hide the caller bug as a page that loads forever; a 404 shows a dead end) |
+| R-4 | cleanup | `RecommendationDetailPage.tsx` (`viewed` ref) | The id comparison is redundant with the remount. | open (the ref still stops StrictMode's double effect; could become a boolean) |
+| R-5 | altitude | `RouteId.tsx` render prop | `page={Component}` would be shorter in `routes.tsx`. | open (design D1 chose the render prop: page props type-checked, message beside the route) |
+| R-6 | docs | CHANGELOG, `RouteId.test.tsx` | CHANGELOG lists ` 7`; the test passes `%207`. | fixed (both say `%207`, decoded to ` 7`) |

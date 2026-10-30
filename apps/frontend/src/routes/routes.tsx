@@ -9,6 +9,7 @@ import { AppShell } from './AppShell'
 import { LandingPage } from './LandingPage'
 import { OnboardingPage } from './OnboardingPage'
 import { PrivacyPage } from './PrivacyPage'
+import { RouteId } from './RouteId'
 import { SignedInLayout } from './SignedInLayout'
 
 export const routes: RouteObject[] = [
@@ -21,8 +22,22 @@ export const routes: RouteObject[] = [
         element: <SignedInLayout />,
         children: [
           { path: '/app', element: <AppShell /> },
-          { path: '/app/recommendations/:id', element: <RecommendationDetailPage /> },
-          { path: '/app/issues/:id', element: <IssueDetailPage /> },
+          {
+            path: '/app/recommendations/:id',
+            element: (
+              <RouteId invalid="This link doesn't point to a recommendation.">
+                {(id) => <RecommendationDetailPage id={id} />}
+              </RouteId>
+            ),
+          },
+          {
+            path: '/app/issues/:id',
+            element: (
+              <RouteId invalid="This link doesn't point to an issue.">
+                {(id) => <IssueDetailPage id={id} />}
+              </RouteId>
+            ),
+          },
           { path: '/app/saved', element: <SavedPage /> },
           { path: '/onboarding', element: <OnboardingPage /> },
         ],

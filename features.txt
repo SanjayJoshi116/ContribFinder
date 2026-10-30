@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.36 (2026-10-30)
+Version: 0.12.37 (2026-10-30)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,15 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.37 - Route-level id validation
+============================================================================
+
+Web client (ideas.md section 14)
+  [x] One route wrapper (RouteId) validates detail-route ids; pages take a plain number
+  [x] Same dead ends, no request for an invalid id; one view recorded per recommendation
+  [x] The detail page remounts when the route moves to another id (as a full navigation)
 
 ============================================================================
 SHIPPED - v0.12.36 - Released-name refresh

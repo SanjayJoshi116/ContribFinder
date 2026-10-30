@@ -1402,6 +1402,18 @@ Archived: `openspec/changes/archive/2026-10-29-released-name-refresh/`. Spec: de
   immediate refresh back; other refresh failures do not (L-2). `_pick`, `_not_queued`,
   `_refresh_failed` are shared with `queue_batch` (L-4). Review: `Bug_Backlog.md` batch 23.
 
+**Route-level id validation** (MVP+, refactor)  ✅ shipped in v0.12.37 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-30-route-id-validation/` (no spec change,
+`skip_specs`). `ideas.md` §14.
+- `RouteId({ invalid, children: (id) => ReactNode })` (`src/routes/RouteId.tsx`) is the one
+  place a detail route's `:id` is validated (`positiveId`, private to it since `/simplify`): invalid → `DeadEnd` with `invalid`,
+  no request; valid → `children(id)` in a `Fragment` keyed by the id (remount per id: scroll-to-hash and
+  page state reset; `RouteId.test.tsx` guards it). A new
+  detail route wraps its page the same way in `routes.tsx`.
+- Detail pages take `{ id: number }`; `useRecommendation`/`useIssue` trust their argument (no
+  `enabled` guard). Review: `Bug_Backlog.md` batch 24 (R-3…R-5 open).
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1428,7 +1440,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37).
 
 ## 8. Release housekeeping
 

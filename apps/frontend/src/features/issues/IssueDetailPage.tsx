@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router'
+import { Link } from 'react-router'
 
 import { DeadEnd } from '@/components/DeadEnd'
 import { recordFeedback } from '@/features/feedback/api'
@@ -8,7 +8,7 @@ import {
   difficultyText,
 } from '@/features/recommendations/messages'
 import { MatchBadge } from '@/features/recommendations/RecommendationCard'
-import { cn, positiveId } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 import { useIssue } from './api'
 import { contributionBasis, difficultyBasis } from './evidence'
@@ -29,13 +29,9 @@ function Fact({ term, value, note }: { term: string; value: string; note?: strin
 
 /** One relevant issue: GitHub's data kept visibly apart from ContribFinder's analysis. The
  * description is shown as plain text (React escapes it), never rendered as HTML. */
-export function IssueDetailPage() {
-  const { id: param } = useParams()
-  const id = positiveId(param)
-  // Disabled for an invalid id (0): nothing is requested.
-  const issue = useIssue(id ?? 0)
+export function IssueDetailPage({ id }: { id: number }) {
+  const issue = useIssue(id)
 
-  if (id === null) return <DeadEnd message="This link doesn't point to an issue." />
   if (issue.isPending) return <p className="text-muted-foreground">Loading…</p>
   if (issue.isError) {
     return (

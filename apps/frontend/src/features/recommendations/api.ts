@@ -75,6 +75,5 @@ export function useRecommendation(id: number) {
   return useQuery<RecommendationDetail, ApiError>({
     queryKey: recommendationDetailKey(id),
     queryFn: () => apiFetch<RecommendationDetail>(`/recommendations/${id}`),
-    enabled: Number.isInteger(id) && id > 0,
   })
 }

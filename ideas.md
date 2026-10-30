@@ -23,7 +23,7 @@ Open ideas only, in suggested order within each cell. † = changes what users a
 | | Cheap | Expensive |
 |---|---|---|
 | **High value** | significance gate for ranking changes (§3); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
-| **Lower value** | route-level ids (§14); production build in CI (§14); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
+| **Lower value** | production build in CI (§14); IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
 
 Not ranked yet: acting on the discovery yield report† (§12, needs runs), intervals on the
 feedback-report shares (§4, needs traffic), dismiss reasons against grades (§4, needs real-developer grades),
@@ -52,9 +52,6 @@ Round 6 (2026-10-22), from the `performance-cleanup` review and `/simplify` pass
 
 Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 
-- **Route-level id validation.** Each detail page parses `:id`, passes `0` as a disabled
-  sentinel and renders its own dead end. A route wrapper that validates once would hand pages
-  a plain number.
 - **Browser tests on a production build in CI.** The e2e suite drives the Vite dev server;
   `vite build && vite preview` would test what ships and load faster per page.
 - **Clamp past-the-end pages on the server.** `/recommendations?page=N` past the end returns
@@ -362,6 +359,7 @@ Newest first.
 
 | Idea | § | Shipped in |
 |---|---|---|
+| Route-level id validation (`RouteId` wrapper for detail routes) | §14 | v0.12.37 (same dead ends; the page remounts per id) |
 | Released-name refresh queued at commit (`backlog.queue_released`) | §13 | v0.12.36 (pooled holders only, not inline) |
 | Labeled-issue fetch (entry-labeled issues beyond the recent cap) | §7 | v0.12.35 (only for capped repositories; default label names only) |
 | Dependency audit in CI (`pip-audit`, `npm audit`, accepted list, weekly run) | §5 | v0.12.34 (no Dependabot or CodeQL) |

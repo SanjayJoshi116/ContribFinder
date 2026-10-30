@@ -7,6 +7,26 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.37] - 2026-10-30
+
+Route-level id validation (`openspec/changes/archive/2026-10-30-route-id-validation/`; no spec
+change, `skip_specs`; `ideas.md` §14). Frontend refactor: same messages and dead ends; the
+detail page now remounts when the route moves to another id. No API, backend or dependency
+change; baselines unchanged.
+
+### Changed (internal)
+
+- `RouteId` (`src/routes/RouteId.tsx`) validates a detail route's `:id` once with `positiveId`:
+  an invalid id gets the route's dead end and no request, a valid one renders the page with a
+  plain number, remounted per id (scroll-to-hash and page state reset, as on a full navigation). `/app/recommendations/:id` and `/app/issues/:id` use it.
+- `RecommendationDetailPage({ id })` and `IssueDetailPage({ id })` take the id as a prop (no
+  `useParams`, no `id ?? 0` sentinel, no invalid-id branch); `useRecommendation` and `useIssue`
+  drop their `enabled` guard.
+- Tests: a `RouteId` unit test (valid id; a remount when the route moves to another id; `abc`,
+  `0`, `1.5`, `0x1f`, `%207` (decoded to ` 7`), unsafe integer) and one `viewed` event per id.
+- Review fixes (`Bug_Backlog.md` batch 24): R-1, R-2, R-6.
+- `positiveId` moved from `src/lib/utils.ts` into `RouteId.tsx`, its only caller (`/simplify`).
+
 ## [0.12.36] - 2026-10-30
 
 Released-name refresh (`openspec/changes/archive/2026-10-29-released-name-refresh/`; spec

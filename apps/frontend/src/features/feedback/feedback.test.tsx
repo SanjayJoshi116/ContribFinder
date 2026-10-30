@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -381,6 +381,33 @@ describe('interaction events', () => {
     const [, init] = callsTo(fetchMock, 'POST', '/api/v1/recommendations/7/feedback')[0]!
     expect(JSON.parse(init!.body as string)).toEqual({ action: 'viewed' })
     expect(init!.keepalive).toBe(true)
+  })
+
+  it('records one view per recommendation when the route moves to another id', async () => {
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/recommendations/1': () => json({ ...DETAIL, id: 1 }),
+      'GET /api/v1/recommendations/2': () =>
+        json({
+          ...DETAIL,
+          id: 2,
+          repository: { ...DETAIL.repository, full_name: 'pallets/flask' },
+        }),
+      'POST /api/v1/recommendations/1/feedback': () => noContent(),
+      'POST /api/v1/recommendations/2/feedback': () => noContent(),
+    })
+    const { router } = renderRoute('/app/recommendations/1')
+    await screen.findByRole('heading', { name: 'encode/httpx' })
+    await waitFor(() =>
+      expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/1/feedback')).toHaveLength(1),
+    )
+
+    await act(() => router.navigate('/app/recommendations/2'))
+    await screen.findByRole('heading', { name: 'pallets/flask' })
+    await waitFor(() =>
+      expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/2/feedback')).toHaveLength(1),
+    )
+    expect(callsTo(fetchMock, 'POST', '/api/v1/recommendations/1/feedback')).toHaveLength(1)
   })
 
   it('records opening on GitHub without blocking the link, and hides failures', async () => {

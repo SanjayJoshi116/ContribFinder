@@ -11,6 +11,5 @@ export function useIssue(id: number) {
   return useQuery<IssueDetail, ApiError>({
     queryKey: issueKey(id),
     queryFn: () => apiFetch<IssueDetail>(`/issues/${id}`),
-    enabled: Number.isInteger(id) && id > 0,
   })
 }
