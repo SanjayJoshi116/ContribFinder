@@ -22,6 +22,8 @@ UNDERSTAND DEVELOPER → FIND CANDIDATES → UNDERSTAND PROJECTS → MATCH
 - `Software Requirements Specification - 1.txt` (v1.0) supplies **concrete defaults**
   (model sketches, Celery task names, evidence weights, cache keys/TTLs, GitHubClient
   methods) wherever SRS-2 is silent. Where they conflict, SRS-2 wins.
+- Both SRS files are kept locally and gitignored (untracked in 0.12.39, before the repository
+  went public); a checkout without them still has `openspec/specs/` and this file.
 - Accepted behaviour lives in `openspec/specs/` (synced when a change is archived). Read the
   relevant spec before changing its capability.
 - Each phase below is specified in detail as an OpenSpec change under `openspec/changes/`
@@ -164,6 +166,7 @@ ContribFinder/
 │                           (accepted advisories); eslint.config.mjs (scripts only),
 │                           .prettierrc.json (shared with apps/frontend), .gitattributes (LF)
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
+├─ LICENSE (MIT), SECURITY.md (private vulnerability reporting)
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
 │  ideas.md (unplanned gap analysis by when it can ship: no ranking change first, then
 │  ranking-visible ideas; each idea needs an OpenSpec change first); reports/ (gitignored --json
@@ -276,7 +279,8 @@ Docker (kept, not used here): `docker compose up --build`. Compose overrides `DA
 
 Backend (`apps/backend`, uses `uv`):
 - `uv sync`: install deps
-- `uv run pytest`: tests. Uses `config.settings.test` against local PostgreSQL (creates `test_contribfinder`)
+- `uv run pytest`: tests. Uses `config.settings.test` against local PostgreSQL (creates `test_contribfinder`);
+  of `.env` only `DATABASE_URL` is read (`DJANGO_READ_DOTENV=DATABASE_URL`, since 0.12.39)
 - `uv run ruff check . && uv run ruff format --check .`: lint and format
 - `uv run mypy .`: strict type check
 - `uv run python manage.py makemigrations --settings config.settings.test`: new migrations
@@ -1415,7 +1419,7 @@ Archived: `openspec/changes/archive/2026-10-30-route-id-validation/` (no spec ch
   page state reset; `RouteId.test.tsx` guards it). A new
   detail route wraps its page the same way in `routes.tsx`.
 - Detail pages take `{ id: number }`; `useRecommendation`/`useIssue` trust their argument (no
-  `enabled` guard). Review: `Bug_Backlog.md` batch 24 (R-3…R-5 open).
+  `enabled` guard). Review: `Bug_Backlog.md` batch 24 (RT-3…RT-5 open).
 
 **Browser tests on the production build** (MVP+, platform)  ✅ shipped in v0.12.38 (no ranking change)
 
@@ -1433,8 +1437,28 @@ Archived: `openspec/changes/archive/2026-10-30-e2e-production-build/`. Spec: del
   `E2E_DEV_SERVER=1`) blocks a foreign image and `take()`s the violation (expected `img-src` from
   `CONTENT_SECURITY_POLICY`). The preview runs with `--host localhost` (e2e command, not
   `vite.config.ts`); the frontend server pipes stdout. Review: batch 25. A new script, image or API origin missing from `csp.config.ts` now fails CI.
-- Carry-over: task 3.3 (CI `e2e` job green, duration against the previous run) is checked after
-  the owner pushes `main`.
+- Task 3.3 closed: CI (e2e included) green on `main` after the push. No carry-overs.
+
+**Settings fixes, review sweep: config** (MVP+, fix release)  ✅ shipped in v0.12.39 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-30-config-review-fixes/` (no spec change,
+`skip_specs`). `Bug_Backlog.md` batch 26 (CFG-1…CFG-20), the first module of the full review
+sweep (workflow in `Bug_Backlog.md`). Also `LICENSE` (MIT), `SECURITY.md`, SRS files untracked.
+- `DJANGO_READ_DOTENV`: unset/true reads `.env`, `0` skips it (e2e), `DATABASE_URL` (the test
+  settings) takes only that key, via `_dotenv_value(path, key)` (django-environ's parser into a
+  local mapping, never `os.environ`). Local pytest thus matches CI except `REDIS_URL`, which CI
+  sets.
+- Settings helpers in `base.py`: `env_list` (commas), `env_words` (spaces or commas),
+  `env_json(name, default)` (blank = default, invalid → `ImproperlyConfigured` naming it),
+  `env_mapping(name, defaults)` (JSON object merged over defaults). New JSON settings use them,
+  never bare `env.json`.
+- `CELERY_BROKER_TRANSPORT_OPTIONS` (one dict after `GITHUB_MAX_RETRY_DELAY`):
+  `socket_timeout` ≥ 2 s, `visibility_timeout = max(3600, 2 * GITHUB_MAX_RETRY_DELAY)`.
+  `CONN_HEALTH_CHECKS = True`. `LOG_LEVEL` sets root and `django`; `django.db.backends` stays at
+  INFO (no SQL parameters in logs).
+- `config/exceptions.py`: dict detail → default message plus `details`; list detail → message.
+- CFG-7 (500s bypass `got_request_exception`) and CFG-8 (production re-reads `REDIS_URL`)
+  accepted.
 
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
@@ -1462,7 +1486,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39).
 
 ## 8. Release housekeeping
 

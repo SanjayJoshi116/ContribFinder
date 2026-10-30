@@ -7,6 +7,44 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.39] - 2026-10-30
+
+Settings fixes from the review sweep (`openspec/changes/archive/2026-10-30-config-review-fixes/`,
+no spec change, `skip_specs`; `Bug_Backlog.md` batch 26), plus files for publishing the
+repository. No API, model, migration or frontend change; baselines unchanged.
+
+### Added
+
+- `LICENSE` (MIT) and `SECURITY.md` (report vulnerabilities privately through GitHub's private
+  vulnerability reporting; scope, supported versions, how tokens are handled).
+
+### Removed
+
+- The two Software Requirements Specification files are no longer tracked (kept locally,
+  gitignored); `CLAUDE.md` and `openspec/specs/` hold what was built from them.
+
+### Fixed
+
+- Local tests see CI's settings: the test settings take only `DATABASE_URL` from the repo-root
+  `.env` (`DJANGO_READ_DOTENV=DATABASE_URL`, parsed by django-environ in `base.py`), so a
+  developer's `REDIS_URL`, `NUM_PROXIES` or `DISCOVERY_*` values no longer change test results
+  (CFG-1).
+- A Celery publish on a stalled Redis connection no longer hangs the HTTP request: the broker has
+  a read/write timeout (`REDIS_SOCKET_TIMEOUT`, at least 2 s for the worker's 1 s BRPOP) and a
+  `visibility_timeout` above the longest retry delay (CFG-2, CFG-5, CFG-17).
+- Persistent database connections are health-checked, so one dropped by a PostgreSQL restart
+  reconnects instead of failing the next query (CFG-3).
+- JSON settings name themselves when wrong: `env_json` / `env_mapping` raise
+  `ImproperlyConfigured` naming the setting for invalid JSON or a non-object (the eight object
+  settings, `DISCOVERY_STAR_BANDS`, `DISCOVERY_EXCLUDED_TOPICS`); a blank value means the default
+  (CFG-4, CFG-16).
+- An API error with a dict detail keeps a readable message and puts the detail in `details`; a
+  list detail becomes the message (CFG-6, CFG-19).
+- `LOG_LEVEL` now applies to Django's logger too; SQL (`django.db.backends`) is never logged with
+  its parameters, whatever the level (CFG-9, CFG-13).
+- `GITHUB_OAUTH_SCOPES` accepts commas as well as spaces (`env_words`) (CFG-10).
+- Review of the fix (CFG-11…CFG-20) fixed before release; CFG-7 and CFG-8 accepted.
+
 ## [0.12.38] - 2026-10-30
 
 Browser tests on the production build (`openspec/changes/archive/2026-10-30-e2e-production-build/`;
@@ -31,8 +69,7 @@ backend or dependency change; baselines unchanged.
   `--host localhost` on the e2e preview command instead of `vite.config.ts`; the fixture yields
   `{ seen, take() }` and the canary takes its expected `img-src` from `CONTENT_SECURITY_POLICY`.
 - Local runs: 9 passed in about 45 s on the production build (build under 5 s), 8 passed and
-  the canary skipped in about 42 s on the dev server. The CI
-  `e2e` duration is still to be compared after the push.
+  the canary skipped in about 42 s on the dev server.
 
 ## [0.12.37] - 2026-10-30
 
@@ -51,7 +88,7 @@ change; baselines unchanged.
   drop their `enabled` guard.
 - Tests: a `RouteId` unit test (valid id; a remount when the route moves to another id; `abc`,
   `0`, `1.5`, `0x1f`, `%207` (decoded to ` 7`), unsafe integer) and one `viewed` event per id.
-- Review fixes (`Bug_Backlog.md` batch 24): R-1, R-2, R-6.
+- Review fixes (`Bug_Backlog.md` batch 24): RT-1, RT-2, RT-6 (recorded then as R-1, R-2, R-6).
 - `positiveId` moved from `src/lib/utils.ts` into `RouteId.tsx`, its only caller (`/simplify`).
 
 ## [0.12.36] - 2026-10-30

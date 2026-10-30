@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.38 (2026-10-30)
+Version: 0.12.39 (2026-10-30)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -439,6 +439,20 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.39 - Settings fixes (review sweep: config)
+============================================================================
+
+Platform (Bug_Backlog.md batch 26)
+  [x] Local tests use CI's settings (only DATABASE_URL taken from .env)
+  [x] Broker read/write and visibility timeouts; database connections health-checked
+  [x] JSON settings fail naming the setting; blank means default
+  [x] LOG_LEVEL reaches Django's logger; SQL never logged with parameters
+  [x] Readable API errors for structured details; OAuth scopes accept commas
+
+Publishing
+  [x] LICENSE (MIT) and SECURITY.md; requirements documents kept out of the repository
+
+============================================================================
 SHIPPED - v0.12.38 - Browser tests on the production build
 ============================================================================
 
@@ -447,7 +461,7 @@ Web client (ideas.md section 14)
   [x] Any Content Security Policy violation fails a browser test
   [x] E2E_DEV_SERVER=1 keeps the dev server for local runs; CI never uses it
   [x] A canary test proves policy violations are still detected
-  [~] CI e2e job duration compared after the push (local: about 45 s build+preview)
+  [x] CI e2e job green on the production build (local: about 45 s build+preview)
 
 ============================================================================
 SHIPPED - v0.12.37 - Route-level id validation

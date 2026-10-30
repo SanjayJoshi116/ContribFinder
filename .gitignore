@@ -55,3 +55,6 @@ Thumbs.db
 # reports hold real-use aggregates, so they stay out of the repository like judging exports
 /reports/
 /apps/backend/reports/
+
+# Requirements documents: kept locally (CLAUDE.md §2), not published
+/Software Requirements Specification - *.txt

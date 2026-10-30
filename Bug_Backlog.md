@@ -1,17 +1,95 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since; current through 0.12.35. Order: open items and known gaps, the release index, the fix-batch plan
+each fix release since; current through 0.12.39. Order: the full review sweep (top priority),
+open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
 Status: `open` · `confirmed` / `partial` (verified, not fixed) · `fixed in part` · `fixed` ·
 `accepted` / `wontfix` · `false-positive`.
 
+## Full review sweep (top priority)
+
+Added 2026-10-30 (after v0.12.38), before the repository goes public: `/code-review` and
+`/security-review` over every module, high priority first. Tick each column when its review has
+run and its findings are recorded below as a new batch (verified rows, as in the 2026-10-19
+sweep); fixes go on one branch (e.g. `review/full-sweep`). Skipped: migrations, `tests/` (review
+with its module), generated `src/api/openapi.json` and `schema.d.ts`, empty `services/ai/`.
+`/code-review` takes a path (`/code-review high apps/backend/services/github`); `/security-review`
+reviews the branch's pending changes, so point it at the module explicitly (or diff against an
+empty base).
+
+### Workflow (reference)
+
+review → security → verify → propose → apply → simplify → review → archive. Steps 1–3 run per
+module; steps 4–8 once per priority group (high, then medium, then low).
+
+1. **Review**: `/code-review high <module path>`. Findings only; no fixes yet.
+2. **Security**: `/security-review` on the same module, named explicitly (its default is the
+   branch diff). High-confidence findings only.
+3. **Verify**: check every finding against the code; record a batch here (`<PREFIX>-n` rows,
+   verdict `confirmed` / `partial` / `accepted` / `false-positive`, with the fix in brief);
+   tick both boxes in the table (`[x] batch N`, or `[x] no findings`). Then the next module.
+4. **Propose**: when the group is done, `/opsx:propose` one OpenSpec change for the group's fix
+   batch: which rows are fixed, which are accepted and why. Rows that change specified behavior
+   get spec deltas; pure code fixes use `skip_specs` (as `json-report-writer`).
+5. **Apply**: `/opsx:apply` on one branch (e.g. `review/full-sweep`): fix, add a test per fix,
+   then backend `pytest`, `ruff`, `mypy`; frontend `test`, `lint`, `typecheck`, `format:check`,
+   `build`; e2e only when browser flows change.
+6. **Simplify**: `/simplify` on the fix diff; apply or note skips.
+7. **Review**: `/code-review` with no path (reviews the uncommitted fix diff, not the whole
+   module); verify and record as the next batch, fix before commit (as batches 23–25).
+8. **Archive**: `/opsx:archive`, release housekeeping (CLAUDE.md §8: patch bump, CHANGELOG,
+   features.txt, README, CLAUDE.md entry), tick the batch here as fixed, commit.
+
+Why this order: modules share code, so fixing after each one touches the same files repeatedly;
+a full re-review after fixing mostly repeats recorded rows, so step 7 reviews only the change;
+`/simplify` comes after the fixes so it cleans final code.
+
+| Priority | Module | Contents | code-review | security-review |
+|---|---|---|---|---|
+| High | `apps/backend/config/` | settings, urls, celery, error envelope | [x] batch 26 | [x] no findings |
+| High | `apps/backend/core/` | health, auth class, JSON errors, log redaction, checks, throttling, CSP | [ ] | [ ] |
+| High | `apps/backend/accounts/` | User, AuditEvent, auth views, session, account deletion | [ ] | [ ] |
+| High | `apps/backend/github/` | GitHubAccount/Profile, sync task, profile API | [ ] | [ ] |
+| High | `apps/backend/e2e/` | seed command; must stay out of production | [ ] | [ ] |
+| High | `apps/backend/services/*.py` | crypto, audit, jobs, job_guard, locks, feedback, data_deletion, data_versions | [ ] | [ ] |
+| High | `apps/backend/services/github/` | OAuth, GitHubClient, sync, storage | [ ] | [ ] |
+| High | `apps/frontend/src/api/` | client.ts, types.ts (skip generated openapi.json, schema.d.ts) | [ ] | [ ] |
+| High | `apps/frontend/src/features/auth/` | sign-in, route guard | [ ] | [ ] |
+| Medium | `apps/backend/jobs/` | SyncJob, status and versions API, recovery | [ ] | [ ] |
+| Medium | `apps/backend/developers/` | profile, skills, interests; profile API | [ ] | [ ] |
+| Medium | `apps/backend/repositories/` | repository models, discovery API, tasks, reports | [ ] | [ ] |
+| Medium | `apps/backend/issues/` | Issue, RecommendedIssue, issue detail API | [ ] | [ ] |
+| Medium | `apps/backend/recommendations/` | ScoringConfig, Recommendation, API, evaluation commands | [ ] | [ ] |
+| Medium | `apps/backend/feedback/` | feedback, saved, dismissed; keyset pages | [ ] | [ ] |
+| Medium | `apps/backend/services/profiling/` | taxonomy, manifest and README parsing (untrusted input) | [ ] | [ ] |
+| Medium | `apps/frontend/src/app/` | query client, 401 handling, job transitions, data versions | [ ] | [ ] |
+| Medium | `apps/frontend/src/routes/` | routes, AppShell, landing, privacy, RouteId | [ ] | [ ] |
+| Medium | `apps/frontend/src/features/issues/` | issue detail (untrusted issue bodies) | [ ] | [ ] |
+| Medium | `apps/frontend/e2e/ + vite.config.ts, csp.config.ts, playwright.config.ts` | Playwright, CSP, proxy | [ ] | [ ] |
+| Medium | `scripts/` | npm runners, process trees, WSL Redis, dependency audit | [ ] | [ ] |
+| Medium | `.github/workflows/` | ci.yml, audit.yml (token permissions) | [ ] | [ ] |
+| Low | `apps/backend/services/repositories/` | analysis, lifecycle, staleness, backlog, setup | [ ] | [ ] |
+| Low | `apps/backend/services/issues/` | labels, classification, technologies | [ ] | [ ] |
+| Low | `apps/backend/services/discovery/` | queries, filters, ordering, yield report | [ ] | [ ] |
+| Low | `apps/backend/services/matching/` | activity, technologies, features, signals | [ ] | [ ] |
+| Low | `apps/backend/services/ranking/` | config, pipeline, score, explain, freshness, activation | [ ] | [ ] |
+| Low | `apps/backend/services/evaluation/` | benchmark, metrics, bootstrap, feedback report (offline) | [ ] | [ ] |
+| Low | `apps/frontend/src/features/recommendations/` | list, cards, detail, filters | [ ] | [ ] |
+| Low | `apps/frontend/src/features/feedback/` | save/dismiss, saved and hidden lists | [ ] | [ ] |
+| Low | `apps/frontend/src/features/profile/` | profile, skills | [ ] | [ ] |
+| Low | `apps/frontend/src/features/sync/ + discovery/` | onboarding progress | [ ] | [ ] |
+| Low | `apps/frontend/src/components/ + src/lib/` | DeadEnd, utilities | [ ] | [ ] |
+| Low | `docker-compose.yml, .env.example, package.json` | root config | [ ] | [ ] |
+
 ## Open items
 
-None as of 2026-10-28: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; the review of
-0.12.32–0.12.34 (batch 21) fixed or closed in 0.12.34, and of 0.12.35 (batch 22) in 0.12.35. Known gaps (K) are
-in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
+The full review sweep above: started 2026-10-30; `config/` reviewed (batch 26,
+no security findings), 33 modules to go. Batch 26 fixed in 0.12.39 (`config-review-fixes`) (CFG-7, CFG-8 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+2026-10-19 "R" rows).
+Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
+their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
 a fresh holdout; they no longer wait for K-1 (since 2026-10-28).
 
 ## Known gaps (already tracked elsewhere)
@@ -92,8 +170,9 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 21 | **0.12.32–0.12.34 review** | M-1…M-15 | `code-review` (M-1…M-8) and `/simplify` (M-9…M-15) of the uncommitted 0.12.32–0.12.34 work. M-1, M-2, M-3, M-9, M-10, M-11 fixed in 0.12.34 before commit; the rest accepted or wontfix. |
 | 22 | **0.12.35 review** | N-1…N-10 | `code-review` (N-1…N-7) and `/simplify` (N-8…N-10) of the uncommitted labeled-issue fetch. N-1, N-2, N-3, N-8, N-9 fixed in 0.12.35 before commit; the rest accepted. |
 | 23 | **Released-name refresh review** | L-1…L-7 | `code-review` of the uncommitted `released-name-refresh` (plus 0.12.35). L-5 fixed in 0.12.35, L-1, L-2, L-4 in 0.12.36 before commit; L-3, L-6, L-7 accepted. |
-| 24 | **Route-id validation review** | R-1…R-6 | `code-review` of the uncommitted `route-id-validation` (0.12.37). R-1, R-2, R-6 fixed in 0.12.37 before commit; R-3, R-4, R-5 open. |
+| 24 | **Route-id validation review** | RT-1…RT-6 | `code-review` of the uncommitted `route-id-validation` (0.12.37). RT-1, RT-2, RT-6 fixed in 0.12.37 before commit; RT-3, RT-4, RT-5 open. |
 | 25 | **E2E production-build review** | E2E-1…E2E-13 | `code-review` (E2E-1…E2E-9) and `/simplify` (E2E-10…E2E-13) of the uncommitted `e2e-production-build` (0.12.38). E2E-1, E2E-2, E2E-5, E2E-7, E2E-10…E2E-12 fixed in 0.12.38 before commit, E2E-6 documented; E2E-3, E2E-4, E2E-8, E2E-9, E2E-13 accepted. |
+| 26 | **Sweep: `config/`** | CFG-1…CFG-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/config/`, verified, fixed in 0.12.39 (`config-review-fixes`) except CFG-7, CFG-8 (accepted); its fix-diff review CFG-11…CFG-20 fixed; `/security-review` of the module found nothing. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -105,9 +184,10 @@ batch 8 in 0.12.16 (`signal-explanation-accuracy`); S-7 of batch 18 in 0.12.17
 (`keyset-paging-links`); S-6 in 0.12.18 (`activation-command-only`); T-1…T-10 of batch 19 in 0.12.23; X-9 in 0.12.26 (`post-analysis-pool-cleanup`); Y-6 in 0.12.27 (`data-versions`); T-12 in 0.12.29 (`rank-constraint`); U-1…U-3, U-5…U-7 in 0.12.31 (`data-versions-fixes`); B-6, D-11 (the rest of batch 8) and T-11
 in 0.12.32 (no OpenSpec change: B-6 follows its documented rounded mean, the spec does not order
 title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 accepted. L-5 of batch 23 in 0.12.35; L-1, L-2, L-4 in 0.12.36
-(`released-name-refresh`); R-1, R-2, R-6 of batch 24 in 0.12.37 (`route-id-validation`); E2E-1, E2E-2, E2E-5, E2E-7
-(and E2E-6 documented) of batch 25 in 0.12.38 (`e2e-production-build`).
-Next: R-3…R-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
+(`released-name-refresh`); RT-1, RT-2, RT-6 of batch 24 in 0.12.37 (`route-id-validation`); E2E-1, E2E-2, E2E-5, E2E-7
+(and E2E-6 documented) of batch 25 in 0.12.38 (`e2e-production-build`); batch 26 (CFG-1…CFG-20,
+CFG-7 and CFG-8 accepted) in 0.12.39 (`config-review-fixes`).
+Next: the full review sweep; RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
 3, E-3) shipped in 0.12.2 and 0.12.3.
@@ -115,7 +195,9 @@ Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisite
 ## Summary
 
 Status after verification: `confirmed` = defect exists as described; `partial` = defect exists but
-scenario or severity is narrower; `false-positive` = not a defect.
+scenario or severity is narrower; `false-positive` = not a defect. The table covers the sweep of
+2026-10-19 and the reviews through batch 20; later batches (21–26) give each row's status in their
+own sections.
 
 | Section | Rows | Confirmed | Partial | False positive |
 |---|---|---|---|---|
@@ -695,17 +777,17 @@ delta predates the fixes).
 ## Route-id validation review (2026-10-30)
 
 Source: `code-review` over the uncommitted `route-id-validation` change (archived 2026-10-30).
-R-1, R-2, R-6 fixed before commit; R-3, R-4, R-5 open (kept for a later look; R-3 and R-5
+RT-1, RT-2, RT-6 fixed before commit; RT-3, RT-4, RT-5 open (kept for a later look; R-3 and R-5
 go against design decisions D3 and D1, so fixing them means revisiting the design).
 
 | ID | Type | Where | Finding → failure | Status |
 |---|---|---|---|---|
-| R-1 | test | `feedback.test.tsx` (one view per id) | The page's `viewed` ref already records one view per id, so the test passed without `key={id}`: nothing guarded the remount per id. | fixed (`RouteId.test.tsx` navigates 1 → 2 and asserts two mounts; fails without the key) |
-| R-2 | docs | CHANGELOG, `features.txt`, CLAUDE.md, `ideas.md` | "No behavior change", but keying by id remounts the page on an id change (design D2): scroll-to-hash and local state reset, a pending mutation's per-call callbacks are skipped. | fixed (release notes say the page remounts per id) |
-| R-3 | design | `useRecommendation`, `useIssue` | Without the `enabled` guard a future unchecked caller sends `/recommendations/NaN`. | open (design D3 chose no guard: it would hide the caller bug as a page that loads forever; a 404 shows a dead end) |
-| R-4 | cleanup | `RecommendationDetailPage.tsx` (`viewed` ref) | The id comparison is redundant with the remount. | open (the ref still stops StrictMode's double effect; could become a boolean) |
-| R-5 | altitude | `RouteId.tsx` render prop | `page={Component}` would be shorter in `routes.tsx`. | open (design D1 chose the render prop: page props type-checked, message beside the route) |
-| R-6 | docs | CHANGELOG, `RouteId.test.tsx` | CHANGELOG lists ` 7`; the test passes `%207`. | fixed (both say `%207`, decoded to ` 7`) |
+| RT-1 | test | `feedback.test.tsx` (one view per id) | The page's `viewed` ref already records one view per id, so the test passed without `key={id}`: nothing guarded the remount per id. | fixed (`RouteId.test.tsx` navigates 1 → 2 and asserts two mounts; fails without the key) |
+| RT-2 | docs | CHANGELOG, `features.txt`, CLAUDE.md, `ideas.md` | "No behavior change", but keying by id remounts the page on an id change (design D2): scroll-to-hash and local state reset, a pending mutation's per-call callbacks are skipped. | fixed (release notes say the page remounts per id) |
+| RT-3 | design | `useRecommendation`, `useIssue` | Without the `enabled` guard a future unchecked caller sends `/recommendations/NaN`. | open (design D3 chose no guard: it would hide the caller bug as a page that loads forever; a 404 shows a dead end) |
+| RT-4 | cleanup | `RecommendationDetailPage.tsx` (`viewed` ref) | The id comparison is redundant with the remount. | open (the ref still stops StrictMode's double effect; could become a boolean) |
+| RT-5 | altitude | `RouteId.tsx` render prop | `page={Component}` would be shorter in `routes.tsx`. | open (design D1 chose the render prop: page props type-checked, message beside the route) |
+| RT-6 | docs | CHANGELOG, `RouteId.test.tsx` | CHANGELOG lists ` 7`; the test passes `%207`. | fixed (both say `%207`, decoded to ` 7`) |
 
 ## E2E production-build review (2026-10-30)
 
@@ -728,3 +810,40 @@ against Vite and Playwright behavior before fixing.
 | E2E-11 | altitude | `vite.config.ts` | `preview.host` (an e2e concern) sat in config every `vite preview` reads. | fixed (`--host localhost` on the e2e preview command; E2E-11) |
 | E2E-12 | altitude | `e2e/policy.spec.ts` | The canary emptied the fixture's array (`length = 0`) and hard-coded `img-src 'self'`. | fixed (fixture yields `{ seen, take() }`; directive from `CONTENT_SECURITY_POLICY`) |
 | E2E-13 | cleanup | `playwright.config.ts`, `policy.spec.ts` | `E2E_DEV_SERVER === '1'` read twice; a full build on every local run. | accepted (two reads, no shared module; design D1: no stale-build skip) |
+
+## Sweep: `config/` (2026-10-30)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of every file in
+`apps/backend/config/`. Each row checked against the code; verdicts: `confirmed`, `partial`
+(real but narrower than reported), `accepted`. Fixed in 0.12.39 by the OpenSpec change `config-review-fixes`; CFG-7 and CFG-8 accepted. `/security-review` of the whole
+module found no high- or medium-confidence vulnerability (secrets without defaults, e2e app only
+in `e2e.py`, production `DEBUG = False`, Secure/HttpOnly/SameSite cookies, CSRF on, CORS closed
+by default, proxy headers trusted only with `NUM_PROXIES > 0`, JSON-only Celery, redacted logs).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CFG-1 | config | `settings/test.py` | `base.py` reads the repo-root `.env` (`DJANGO_READ_DOTENV` defaults on) and `test.py` resets none of `REDIS_URL`, `NUM_PROXIES`, `DISCOVERY_*`, `GITHUB_OAUTH_SCOPES`: local pytest runs with other settings than CI; tests with `CELERY_TASK_ALWAYS_EAGER=False` (`test_github_resilience.py`, `test_github_sync.py`) can reach the dev broker. | fixed (0.12.39, `config-review-fixes`: `DJANGO_READ_DOTENV=DATABASE_URL` in `test.py`; `base.py` takes only that key from `.env`) |
+| CFG-2 | bug | `settings/base.py:229` | `CELERY_BROKER_TRANSPORT_OPTIONS` has `socket_connect_timeout` only: a publish on a stalled open Redis connection has no read/write timeout, so `.delay()` in a request can hang (invariant 3). The cache sets both. | fixed (0.12.39, `config-review-fixes`) |
+| CFG-3 | resilience | `settings/base.py:91` | `CONN_MAX_AGE` 60 without `CONN_HEALTH_CHECKS`: a connection dropped by a PostgreSQL restart fails the next query with `OperationalError`. | fixed (0.12.39, `config-review-fixes`) |
+| CFG-4 | config | `settings/base.py:279…425` | Eight `{**defaults, **env.json(NAME, default={})}` merges: a JSON value that is not an object (`'[1,4]'`) crashes settings import with a nameless `TypeError` before the system checks run. | fixed (0.12.39, `config-review-fixes`: `env_json`, `env_mapping`; also `DISCOVERY_STAR_BANDS`, `DISCOVERY_EXCLUDED_TOPICS`) |
+| CFG-5 | config | `settings/base.py:227` | `CELERY_TASK_ACKS_LATE` on Redis without `visibility_timeout` (kombu 3600 s): a task or ETA held over an hour is redelivered. | fixed in part (0.12.39, `config-review-fixes`: `visibility_timeout = max(3600, 2 * GITHUB_MAX_RETRY_DELAY)`; a task running longer is still redelivered, claim fencing cancels the copy) |
+| CFG-6 | bug | `exceptions.py:68` | Non-validation errors use `str(exc.detail)`: a dict or list detail becomes a Python repr in `message`. | fixed (0.12.39, `config-review-fixes`: default message, detail in `details`) |
+| CFG-7 | ops | `exceptions.py:57` | Unhandled errors become a 500 inside DRF's handler, so `got_request_exception` never fires (future error tracking, DEBUG pages, test client re-raise). | accepted for now (revisit with observability, `ideas.md` §5) |
+| CFG-8 | cleanup | `settings/production.py:7` | Re-reads `REDIS_URL` from the environment instead of `base.REDIS_URL` (what cache and broker use). | accepted (tried and reverted: base and production read the same environment at startup, and the production-settings tests set `REDIS_URL` after `base` is imported) |
+| CFG-9 | config | `settings/base.py:469` | The `django` logger is fixed at INFO; `LOG_LEVEL` reaches only the root logger. | fixed (0.12.39, `config-review-fixes`) |
+| CFG-10 | config | `settings/base.py:242` | `GITHUB_OAUTH_SCOPES` splits on whitespace while every other list setting is comma-separated (`env_list`): `read:user, user:email` yields `read:user,`. | fixed (0.12.39, `config-review-fixes`: `env_words`) |
+
+Review of the fix diff (`/code-review`, workflow step 7), recorded as CFG-11…CFG-20:
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CFG-11 | test | `tests/test_config_settings.py` | Asserted `settings.REDIS_URL == ""`, but CI's backend job sets `REDIS_URL`: CI would fail. | fixed (assertion dropped; the `.env` behavior is tested on a temporary file; suite also run with CI's `REDIS_URL`) |
+| CFG-12 | process | `.gitignore` | Ignoring the SRS files does not untrack them; the docs say they are untracked. | fixed (owner ran `git rm --cached`; files kept locally, gitignored) |
+| CFG-13 | security | `settings/base.py` LOGGING | With `django` at `LOG_LEVEL`, `LOG_LEVEL=DEBUG` plus `DEBUG=True` would log every SQL statement with parameters (session keys, encrypted tokens). | fixed (`django.db.backends` pinned at INFO) |
+| CFG-14 | config | `settings/base.py` | `DJANGO_READ_DOTENV=database_url` (other case, spaces) silently read nothing. | fixed (compared trimmed, case-insensitively) |
+| CFG-15 | test | `tests/test_config_settings.py` | Asserted `DJANGO_READ_DOTENV == "DATABASE_URL"`, contradicting "an explicit environment wins". | fixed (dropped with CFG-11) |
+| CFG-16 | bug | `settings/base.py` `env_json` | A blank value (`EVIDENCE_WEIGHTS=`) failed as invalid JSON while `DISCOVERY_STAR_BANDS=` passed. | fixed (blank means the default) |
+| CFG-17 | config | `settings/base.py` broker | A sub-second `REDIS_SOCKET_TIMEOUT` would time out the worker's 1 s BRPOP. | fixed (broker `socket_timeout` at least 2 s) |
+| CFG-18 | docs | change `tasks.md` | Task 1.1 said `DJANGO_READ_DOTENV=0`. | fixed |
+| CFG-19 | api | `config/exceptions.py` | A list detail went to `details`, documented as an object; untested. | fixed (a list becomes the message; tested) |
+| CFG-20 | cleanup | `settings/base.py` | `_DotenvValues` kept a process-global class dict. | fixed (`_dotenv_value(path, key)` builds a local class per call) |

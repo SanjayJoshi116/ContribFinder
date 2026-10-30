@@ -1,8 +1,12 @@
 import os
 
+# CI's settings, not a developer's: of the repo-root .env only DATABASE_URL (the local
+# PostgreSQL) is used (base.py). An explicit environment wins.
+os.environ.setdefault("DJANGO_READ_DOTENV", "DATABASE_URL")
+
 # Deterministic, non-secret values so the suite runs without a .env.
 os.environ.setdefault("DJANGO_SECRET_KEY", "test-secret-key-not-for-production")
-# DATABASE_URL: CI sets it; locally base.py defaults to the local PostgreSQL install.
+# DATABASE_URL: CI sets it; locally the .env value (above) or base.py's default.
 os.environ.setdefault("TOKEN_ENCRYPTION_KEYS", "a3xvsSaVgXP5fzzK-ehE3KBhB0NR2UBdgAPViFYjPW8=")
 
 from .base import *  # noqa: F403

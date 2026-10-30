@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.38** (browser tests run the production build; MVP+). After signing in with
+**Version 0.12.39** (settings fixes from the review sweep; MIT licence; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -21,7 +21,10 @@ are measured offline on a hand-judged benchmark before they count as improvement
 - Stack: Django + DRF + Celery + PostgreSQL (+ Redis), React 19 + TypeScript + Vite.
 - What's shipped and planned: [`features.txt`](features.txt). Release notes: [`CHANGELOG.md`](CHANGELOG.md).
   Unplanned ideas (gap analysis): [`ideas.md`](ideas.md).
-- Requirements: `Software Requirements Specification - 2.txt` (authoritative) and `- 1.txt`.
+- Requirements: `Software Requirements Specification - 2.txt` (authoritative) and `- 1.txt`,
+  kept outside the repository (gitignored); `CLAUDE.md` and `openspec/specs/` carry what was
+  built from them.
+- License: [MIT](LICENSE). Security reports: [`SECURITY.md`](SECURITY.md).
 - Engineering guide and roadmap: [`CLAUDE.md`](CLAUDE.md). Specs: `openspec/specs/`; archived
   changes: `openspec/changes/archive/`.
 
@@ -358,11 +361,13 @@ set.
 
 `TOKEN_ENCRYPTION_KEYS` encrypts stored GitHub tokens. To rotate, put a new key first
 (`new,old`); old tokens still decrypt. If every key is lost, users just sign in again.
-Never commit `.env`.
+Never commit `.env`. Report vulnerabilities privately ([`SECURITY.md`](SECURITY.md)).
 
 ## Tests
 
 `uv run pytest` in `apps/backend` (uses local PostgreSQL) and `npm test` in `apps/frontend`.
+Of your `.env`, pytest uses only `DATABASE_URL` (`DJANGO_READ_DOTENV=DATABASE_URL` in the test
+settings), so local results match CI's; an explicit environment variable still wins.
 `npm run test:scripts` at the root tests the dev runners (process matching, port waits, beat
 schedule name, version check) with Node's built-in test runner.
 All commands are in `CLAUDE.md` §6.

@@ -14,7 +14,7 @@
 
 - [x] 3.1 `npm run e2e` passes locally against the production build; also with `E2E_DEV_SERVER=1`
 - [x] 3.2 `npm run lint`, `npm run format:check`, `npm run typecheck`; root `npm run lint:scripts` if scripts change
-- [ ] 3.3 CI `e2e` job green on the branch; note its duration against the previous run (follow-up: checked after the owner pushes `main`; local runs after the review fixes: 42 s build+preview (9 tests) vs 51 s dev server)
+- [x] 3.3 CI `e2e` job green on the branch; note its duration against the previous run (green on `main` after the v0.12.38 push, 2026-10-30; CI duration not recorded)
 
 ## 4. Docs and release
 

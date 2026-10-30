@@ -64,6 +64,11 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
         body = error_body(code, "Invalid input.", response.data)
     elif code == "csrf_failed":
         body = error_body(code, "CSRF verification failed.")
+    elif isinstance(exc.detail, dict):
+        # A structured detail goes to `details`; the message stays readable.
+        body = error_body(code, str(exc.default_detail), response.data)
+    elif isinstance(exc.detail, list):
+        body = error_body(code, " ".join(str(item) for item in exc.detail))
     else:
         body = error_body(code, str(exc.detail))
     response.data = body

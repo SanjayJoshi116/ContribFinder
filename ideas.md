@@ -238,6 +238,19 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   app-credential backlog is shared. Model what many concurrent onboardings do.
 - **Accessibility.** Not covered by any spec or backlog row.
 - **Observability.** Stage latencies, failure-rate trends (post-MVP: Sentry/Prometheus).
+- **Making the repository public** (checked 2026-10-30). History scanned: no real secrets (only
+  fake test tokens and the log-redaction regex), `.env`, `judging/`, `reports/` never
+  committed, no-reply commit emails, persona-only datasets. Done: `LICENSE` (MIT),
+  `SECURITY.md` (private vulnerability reporting), the SRS files untracked and kept locally (all
+  in v0.12.39; the first sweep module, `config/`, reviewed and fixed in the same release)
+  (their old copies stay in history; they are the owner's, not confidential). Left, in the
+  repository's GitHub settings (owner only):
+  - turn on private vulnerability reporting (`SECURITY.md` points to it), secret scanning with
+    push protection, and Dependabot alerts (free for public repositories);
+  - protect `main` (no force-push, required checks: CI and the dependency audit);
+  - Actions: require approval for workflows from fork pull requests, read-only default
+    `GITHUB_TOKEN` permissions;
+  - flipping to public is hard to undo: clones and forks persist if it goes private again.
 
 ## Evaluation
 
