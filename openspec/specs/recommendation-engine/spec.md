@@ -3,9 +3,7 @@
 ## Purpose
 
 Scores and ranks each developer's analyzed candidate repositories against their evidence-backed profile with deterministic, versioned and configurable signals, so that every stored recommendation can be traced to the data and configuration that produced it.
-
 ## Requirements
-
 ### Requirement: Repository technologies
 The system SHALL derive each candidate repository's technologies from its stored data, using the same skill catalog as the developer profile: languages (with their share of the repository's code), topics, and dependency manifest entries. Each detected technology SHALL record its catalog category and the sources that detected it. Technologies SHALL be derived from stored data only, without calling GitHub.
 
@@ -212,7 +210,7 @@ The system SHALL store every recommendation's rank, and every matched issue's ra
 - **THEN** they are ranked 1, 2 and 3 in the same order, and no recommendation is deleted
 
 ### Requirement: Recommendation generation job
-The system SHALL generate recommendations in a background job per user, tracked like other jobs, that reads only stored data. A job SHALL start when the user's repository discovery completes. At most one generation job SHALL be active per user. When a generation is requested while the user's generation job is already running, that job SHALL be followed by another generation once it completes, so the request is reflected even if the running job loaded its inputs before it. A run that starts after the request (a pending or retrying job) SHALL NOT run again for it. When matched issues are deleted or re-analyzed between ranking and storing, the job SHALL rank again from stored data, at most 3 times in total, and then fail without changing the stored recommendations. A failed generation SHALL keep the user's previous recommendations unchanged. A developer with no eligible candidates SHALL end with no recommendations and a completed job.
+The system SHALL generate recommendations in a background job per user, tracked like other jobs, that reads only stored data. A job SHALL start when the user's repository discovery completes. At most one generation job SHALL be active per user. When a generation is requested while the user's generation job is already running, that job SHALL be followed by another generation once it ends, whether it completed or failed, so the request is reflected even if the running job loaded its inputs before it. A run that starts after the request (a pending or retrying job) SHALL NOT run again for it. When matched issues are deleted or re-analyzed between ranking and storing, the job SHALL rank again from stored data, at most 3 times in total, and then fail without changing the stored recommendations. A failed generation SHALL keep the user's previous recommendations unchanged. A developer with no eligible candidates SHALL end with no recommendations and a completed job.
 
 #### Scenario: After discovery
 - **WHEN** a user's discovery job completes
@@ -233,6 +231,10 @@ The system SHALL generate recommendations in a background job per user, tracked 
 #### Scenario: Issues keep changing
 - **WHEN** matched issues disappear before every one of 3 attempts to store the result
 - **THEN** the job fails and the user's recommendations are exactly those of the previous successful generation
+
+#### Scenario: Restore during a generation that fails
+- **WHEN** a user restores a dismissed repository while their generation job is running, and that job then fails
+- **THEN** another generation runs after it, and the restored repository can be among its recommendations
 
 ### Requirement: Recommendation freshness
 The system SHALL periodically (configured interval, default 30 minutes) start a generation job for every developer whose recommendations are older than their profile analysis, older than the latest analysis of a repository in their pool, or produced by a configuration that is no longer active. A repository being marked stale or picked up for a refresh SHALL NOT by itself make recommendations outdated; new data fetched for it (even if it was marked stale since), a completed refresh, a failure or any other analysis SHALL. After a failed generation, the next one SHALL wait a configured delay (default 6 hours) unless the user or a pipeline step starts it. A developer who has recommendations but no candidates left SHALL also get a generation job. It SHALL NOT start a job for a developer whose recommendations are current, or who has an active generation job.
@@ -268,3 +270,4 @@ The system SHALL periodically (configured interval, default 30 minutes) start a 
 #### Scenario: Pool emptied
 - **WHEN** a developer has recommendations and their candidate pool became empty
 - **THEN** the next freshness run starts a generation job, which leaves them with no recommendations
+

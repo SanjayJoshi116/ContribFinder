@@ -199,7 +199,7 @@ When background work runs inline because no broker is configured, an error that 
 The system SHALL provide, for the requesting user only, when each area of their derived data last changed, as a time or null when the area holds no data:
 - `github`: the end of their last finished sync, completed or failed (a failed sync may already have stored GitHub data);
 - `profile`: the time their developer profile was last analyzed;
-- `recommendations`: the latest of the end of their last completed recommendation generation and the newest stored data time (metadata, README, community files, dependencies, activity, issues) of any repository they have a recommendation or a saved entry for.
+- `recommendations`: the latest of the end of their last completed recommendation generation and the newest stored data time (metadata, README, community files, dependencies, activity, issues) of any repository they have a recommendation or a saved entry for, and the time of their latest save, unsave, dismissal or restore.
 
 The endpoint SHALL read stored data only: it SHALL NOT call GitHub, start a job or change any row. It SHALL require authentication like every other endpoint and SHALL appear in the OpenAPI schema.
 
@@ -230,4 +230,8 @@ The endpoint SHALL read stored data only: it SHALL NOT call GitHub, start a job 
 #### Scenario: Read only
 - **WHEN** the versions are requested
 - **THEN** no job is started and no stored row changes
+
+#### Scenario: Dismissal in another tab
+- **WHEN** the user's last generation completed at 10:03 and they dismiss a recommended repository at 10:40
+- **THEN** `recommendations` is 10:40, and `github` and `profile` are unchanged
 

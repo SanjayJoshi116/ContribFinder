@@ -53,7 +53,7 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | High | `apps/backend/accounts/` | User, AuditEvent, auth views, session, account deletion | [x] batch 28 | [x] no findings |
 | High | `apps/backend/github/` | GitHubAccount/Profile, sync task, profile API | [x] batch 29 | [x] no findings |
 | High | `apps/backend/e2e/` | seed command; must stay out of production | [x] batch 30 | [x] no findings |
-| High | `apps/backend/services/*.py` | crypto, audit, jobs, job_guard, locks, feedback, data_deletion, data_versions | [ ] | [ ] |
+| High | `apps/backend/services/*.py` | crypto, audit, jobs, job_guard, locks, feedback, data_deletion, data_versions | [x] batch 31 | [x] no findings |
 | High | `apps/backend/services/github/` | OAuth, GitHubClient, sync, storage | [ ] | [ ] |
 | High | `apps/frontend/src/api/` | client.ts, types.ts (skip generated openapi.json, schema.d.ts) | [ ] | [ ] |
 | High | `apps/frontend/src/features/auth/` | sign-in, route guard | [ ] | [ ] |
@@ -86,9 +86,10 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 ## Open items
 
 The full review sweep above: started 2026-10-30; `config/`, `core/` and `accounts/` reviewed and
-fixed (batches 26–28; no security findings); `github/` and `e2e/` reviewed and fixed (batches
-29, 30; no security findings), 29 modules to go. Batches 26–30 fixed in 0.12.39–0.12.43 (CFG-7,
-CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+fixed (batches 26–28; no security findings); `github/`, `e2e/` and `services/*.py` reviewed and
+fixed (batches 29–31; no security findings), 28 modules to go. Batches 26–31 fixed in
+0.12.39–0.12.44 (CFG-7, CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 and SVC-13…SVC-15,
+SVC-17…SVC-19 accepted). Open: SVC-16 (per-user ETag cache generation, the root fix for SVC-6). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
 their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
@@ -179,6 +180,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 28 | **Sweep: `accounts/`** | ACC-1…ACC-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/accounts/`, verified; fixed in 0.12.41 (`accounts-review-fixes`), ACC-4 accepted; its fix-diff review ACC-11…ACC-20 fixed before commit (ACC-17 in part). `/security-review` of the module found nothing. |
 | 29 | **Sweep: `github/`** | GH-1…GH-8 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/github/`, verified; fixed in 0.12.42 (`github-review-fixes`), GH-6 accepted; its fix-diff review GH-9…GH-15 (GH-10, GH-13 fixed, the rest accepted or wontfix). `/security-review` of the module found nothing. |
 | 30 | **Sweep: `e2e/`** | SEED-1…SEED-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/e2e/`, verified; fixed in 0.12.43 (`e2e-seed-review-fixes`); its fix-diff review SEED-11…SEED-19 (SEED-13, SEED-14, SEED-18 accepted, the rest fixed). `/security-review` of the module found nothing. |
+| 31 | **Sweep: `services/*.py`** | SVC-1…SVC-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/services/*.py`, verified; fixed in 0.12.44 (`services-review-fixes`); its fix-diff review SVC-11…SVC-20 (SVC-11, SVC-12 fixed, SVC-20 in part, SVC-16 open, the rest accepted). `/security-review` of the module found nothing (validated against the code). |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -1010,4 +1012,45 @@ checked against the code.
 | SEED-17 | efficiency | `builders.py` | A filtered UPDATE ran after every create. | fixed (saves only an existing, older candidate) |
 | SEED-18 | efficiency | `e2e_seed.py` | One full pipeline per retry copy: 3 more in CI. | accepted (design Risks; CI e2e startup unchanged in practice) |
 | SEED-19 | docs | `services/jobs.py` `new_job` | Public `new_job` skips `_start_job`'s stale expiry and conflict handling, undocumented. | fixed (docstring: no checks; real jobs start through `start_*`) |
+
+## Sweep: `services/*.py` (2026-10-31)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of the top-level
+`apps/backend/services/*.py` (accounts, audit, crypto, data_deletion, data_versions, errors,
+feedback, job_guard, jobs, locks, text). Each row checked against the code.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| SVC-1 | privacy | `data_deletion.py:80` | The cache purge reads `user.pk` at commit; account deletion has already run `user.delete()` (pk None), so it purges `github:etag:None:*` and the deleted user's cached GitHub responses stay until their TTL. | confirmed (capture `user_id = user.pk` before `on_commit`; test the purge after account deletion); fixed (0.12.44, `services-review-fixes`) |
+| SVC-2 | race | `feedback.py:79` | `record` locks the recommendation but not the issue of an `opened_issue` event: an issue refresh deleting it meanwhile makes one commit fail its deferred FK (500). | confirmed (rare; lock the issue by pk after the recommendation, per `services/locks.py` order; gone → no event); fixed (0.12.44, `services-review-fixes`) |
+| SVC-3 | race | `data_deletion.py:97` | `_delete_orphans` decides orphans with NOT EXISTS and locks nothing: another user's discovery linking the repository at the same moment fails one transaction's deferred FK at commit. | partial (rare, fails loudly, no data lost; lock the candidate orphans in pk order, then re-check); fixed (0.12.44, `services-review-fixes`) |
+| SVC-4 | deadlock | `jobs.py:86` | `_end_jobs` locks rows in no fixed order; recovery, cancel and expiry can lock overlapping jobs in opposite orders. | confirmed (`.order_by("pk")` before `select_for_update()`); fixed (0.12.44, `services-review-fixes`) |
+| SVC-5 | bug | `jobs.py:379` | A rerun requested on a RUNNING generation is dropped when that run ends FAILED (`rerun_recommendations_if_requested` is only `on_completed`); a restored repository stays away up to `RECOMMENDATION_FAILED_RETRY_MINUTES`. | confirmed (also run the hook after a final failure; check `recommendation-engine` spec wording); fixed (0.12.44, `services-review-fixes`) |
+| SVC-6 | privacy | `data_deletion.py:103` | The purge runs once at commit: a cancelled sync's in-flight GitHub request can write its ETag entry afterwards, which then outlives "delete my data" for `GITHUB_ETAG_TTL`. | partial (window is one request; a second purge queued with a countdown past `GITHUB_HTTP_TIMEOUT`); narrowed (0.12.44, `services-review-fixes`: second purge; root fix SVC-16) |
+| SVC-7 | data | `feedback.py:63` | Event snapshots (rank, label, config version) come from the object loaded before the lock, so a regeneration in between stores the old values. | confirmed (minor; snapshot from the row re-read under the lock); fixed (0.12.44, `services-review-fixes`) |
+| SVC-8 | robustness | `jobs.py:74` | `claim_job` reloads with `.get()`: a job deleted by data deletion right after the claim raises `DoesNotExist` outside `run_tracked_job`'s try. | confirmed (`.first()`, None); fixed (0.12.44, `services-review-fixes`) |
+| SVC-9 | freshness | `data_versions.py:59` | Save, unsave, dismiss and restore without generation never move the `recommendations` version, so another tab keeps a stale saved/hidden list up to the stale time. | partial (matches the "Data versions endpoint" spec; a fix includes the user's latest save/dismiss feedback event time and needs a spec delta); fixed (0.12.44, `services-review-fixes`) |
+| SVC-10 | efficiency | `data_deletion.py:98` | `orphans.count()` then `orphans.delete()`: the anti-join runs twice and the audited count can differ from what was deleted. | confirmed (count from `delete()`'s per-model result); fixed (0.12.44, `services-review-fixes`) |
+
+`/simplify` of the fix diff (2026-10-31): `feedback.LIST_ACTIONS` and a partial index
+`feedback_list_change_idx (user, -created_at)` for the four list actions (`feedback.0006`): the
+versions read runs on every route change and would otherwise scan the user's `viewed` events;
+`services/feedback._current(recommendation, lock=)` is the one re-read for `record` and `save`;
+test cleanups. Skipped: the `list(...)` lock form (commented), a mypy-only local.
+
+Review of the fix diff (`/code-review medium`, 2026-10-31), recorded as SVC-11…SVC-20, each
+checked against the code.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| SVC-11 | deadlock | `data_deletion.py` `_delete_orphans` | The new orphan lock took rows in pk order; discovery's bulk repository locks go in GitHub ID order, so a deletion and another user's search could deadlock. | fixed (GitHub ID order) |
+| SVC-12 | docs | `data_deletion.py` `_delete_orphans` | The comment said every linking writer holds the row lock; with deferred FKs an insert-only writer locks nothing until commit. | fixed (comment narrowed; that case stays a loud FK failure, design D4) |
+| SVC-13 | behavior | `services/jobs.py` `on_failed` | A requested rerun follows any final failure, also a permanent one, outside the freshness sweep's failure backoff. | accepted (one extra run per request at most, design D2) |
+| SVC-14 | efficiency | `data_deletion.py` `_purge_later` | The delayed purge also clears the ETag cache of a sync started right after a delete-data. | accepted (the cache only saves requests: one unconditional round) |
+| SVC-15 | privacy | `data_deletion.py` `_purge_later` | A worker slower than `SYNC_STALE_AFTER_SECONDS` can still write after the second purge. | accepted (window bounded by `GITHUB_ETAG_TTL`; root fix SVC-16) |
+| SVC-16 | design | `data_deletion.py` | The timed second purge is a stopgap: the root fix scopes user ETag keys to a generation that deletion bumps (or checks the claim before a cache write). | open (follow-up; non-goal of `services-review-fixes`) |
+| SVC-17 | convention | `github/tasks.py` `purge_user_cache` | The task creates no `SyncJob` and does not retry. | accepted (best-effort cache cleanup, logged; entries expire within the TTL; as `revoke_later`, no job) |
+| SVC-18 | efficiency | `data_versions.py` | Every save or dismiss moves the version, so the next route change or focus refetches the recommendation area. | accepted (the purpose of SVC-9; at most one refetch per route change or focus) |
+| SVC-19 | freshness | `data_versions.py` | Event `created_at` is stamped at insert, not commit: a change committed after a newer generation time is not seen. | accepted (same clock basis as every version time) |
+| SVC-20 | migration | `feedback/0006` | Generated dependencies on unrelated apps; non-concurrent `AddIndex`. | fixed in part (dependencies trimmed to `feedback.0005` and the user model); plain `AddIndex` kept, as `feedback.0003` |
 

@@ -44,6 +44,15 @@ def _current_recommendation(user: User, repository: Repository) -> Recommendatio
     )
 
 
+def _current(recommendation: Recommendation, *, lock: bool = False) -> Recommendation | None:
+    """The recommendation as stored now, with what an event snapshots; None when it is gone.
+    ``lock`` takes its row lock (and only its row)."""
+    rows = Recommendation.objects.select_related("repository", "scoring_config")
+    if lock:
+        rows = rows.select_for_update(of=("self",))
+    return rows.filter(pk=recommendation.pk).first()
+
+
 def _event(
     user: User,
     repository: Repository,
@@ -78,18 +87,24 @@ def record(
         # Only this recommendation's row: views of one recommendation check and insert in
         # turn, without waiting for a generation's whole write. A recommendation deleted
         # meanwhile (regenerated away, dismissed) gets no event: it would reference no row.
-        if not Recommendation.objects.select_for_update().filter(pk=recommendation.pk).exists():
+        # The snapshot comes from the locked row, not the one the caller loaded before.
+        current = _current(recommendation, lock=True)
+        if current is None:
+            return False
+        # Then the issue (services/locks.py order): an issue refresh deleting it meanwhile
+        # would leave the event pointing at no row.
+        if issue is not None and not Issue.objects.select_for_update().filter(pk=issue.pk).exists():
             return False
         if action == FeedbackAction.VIEWED:
             since = timezone.now() - timedelta(minutes=settings.FEEDBACK_VIEW_DEDUP_MINUTES)
             if RecommendationFeedback.objects.filter(
                 user=user,
-                recommendation=recommendation,
+                recommendation=current,
                 action=FeedbackAction.VIEWED,
                 created_at__gte=since,
             ).exists():
                 return False
-        _event(user, recommendation.repository, recommendation, action, issue)
+        _event(user, current.repository, current, action, issue)
     return True
 
 
@@ -99,19 +114,21 @@ def save(user: User, recommendation: Recommendation) -> SavedRepository:
     away) by the time the lock is held: a dismissed repository is never saved."""
     with transaction.atomic():
         lock_developer(user.pk)
-        gone = not Recommendation.objects.filter(pk=recommendation.pk).exists()
+        # Re-read under the profile lock (a generation writes under it too): the snapshot is
+        # the row as it is now, not as the caller loaded it.
+        current = _current(recommendation)
         if (
-            gone
+            current is None
             or DismissedRepository.objects.filter(
-                user=user, repository_id=recommendation.repository_id
+                user=user, repository_id=current.repository_id
             ).exists()
         ):
             raise Recommendation.DoesNotExist()
         saved, created = SavedRepository.objects.get_or_create(
-            user=user, repository=recommendation.repository
+            user=user, repository=current.repository
         )
         if created:
-            _event(user, recommendation.repository, recommendation, FeedbackAction.SAVED)
+            _event(user, current.repository, current, FeedbackAction.SAVED)
     return saved
 
 

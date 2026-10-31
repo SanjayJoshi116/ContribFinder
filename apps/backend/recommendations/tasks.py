@@ -22,7 +22,13 @@ def _generate(job: SyncJob) -> None:
 )
 def generate_recommendations(self: Any, job_id: int) -> None:
     """Run a recommendation generation job (job type ``recommendation_generation``)."""
-    run_tracked_job(self, job_id, _generate, on_completed=rerun_recommendations_if_requested)
+    run_tracked_job(
+        self,
+        job_id,
+        _generate,
+        on_completed=rerun_recommendations_if_requested,
+        on_failed=rerun_recommendations_if_requested,
+    )
 
 
 @shared_task(name="recommendations.refresh_recommendations")

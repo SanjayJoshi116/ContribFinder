@@ -1330,7 +1330,7 @@ U-8 wontfix.
   only the generation status. The versions `queryFn` is pure and the comparison runs in an
   effect on `data` (a cancelled or joined fetch cannot invalidate twice); call
   `useDataVersions` from one component only. Delete-data `resetQueries` the versions (never
-  `removeQueries` an observed query). `versions()` is three reads (one `SyncJob` aggregate).
+  `removeQueries` an observed query). `versions()` is four reads since 0.12.44 (one `SyncJob` aggregate, plus the latest list change).
 - `DiscoveryService._remove_not_code` returns the `RepositoryCandidate` count from
   `delete()`'s per-model counts (the total includes cascaded discovery records).
 - Carry-over: K-1 unchanged (judge `real-a-v2` before any ranking search).
@@ -1544,6 +1544,27 @@ SEED-13, SEED-14, SEED-18 accepted). `/security-review` of `e2e/`: nothing.
   it). `e2e.builders.make_issue -> Issue`; `add_candidate` keeps the candidate's times within its
   records'.
 
+**Service fixes, review sweep: services** (MVP+, fix release)  ✅ shipped in v0.12.44 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-31-services-review-fixes/`. Specs: deltas to
+`recommendation-engine` ("Recommendation generation job"), `sync-jobs` ("Data versions
+endpoint"). `Bug_Backlog.md` batch 31 (SVC-1…SVC-20; SVC-16 open, accepted rows listed there).
+`/security-review` of `services/*.py`: nothing.
+- `data_deletion.delete_github_data` captures `user_id` first (account deletion deletes the user
+  before commit); purges on commit and queues `github.purge_user_cache(user_id)` with
+  `countdown=SYNC_STALE_AFTER_SECONDS` (robust). Root fix still open: SVC-16 (per-user ETag
+  cache generation).
+- `_delete_orphans` locks the touched repositories in GitHub ID order (every bulk repository lock
+  uses it), then deletes and counts from `delete()`.
+- `run_tracked_job(..., on_failed=)` runs after a final failure (never a retry or cancel), through
+  `_follow_up` like `on_completed`; generation passes `rerun_recommendations_if_requested` to
+  both. `_end_jobs` locks `order_by("pk")`; `claim_job` returns None for a job gone after the claim.
+- `services/feedback._current(recommendation, lock=)` re-reads what an event snapshots;
+  `opened_issue` locks its issue after the recommendation (gone → no event).
+- `data_versions`: `recommendations` also takes the latest `feedback.LIST_ACTIONS` event
+  (saved, unsaved, dismissed, undismissed); partial index `feedback_list_change_idx`
+  (`feedback.0006`). Four reads.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1570,7 +1591,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44).
 
 ## 8. Release housekeeping
 

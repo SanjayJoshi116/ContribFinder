@@ -71,7 +71,9 @@ def claim_job(job_id: int) -> SyncJob | None:
         if _end_jobs(claimable, Status.FAILED, error_code="worker_lost"):
             logger.warning("Job %s used every attempt; failed", job_id)
         return None
-    job = SyncJob.objects.select_related("user").get(pk=job_id)
+    job = SyncJob.objects.select_related("user").filter(pk=job_id).first()
+    if job is None:  # deleted with the user's data right after the claim
+        return None
     job.claim_token = token
     return job
 
@@ -83,7 +85,8 @@ def _end_jobs(jobs: QuerySet[SyncJob], status: str, **fields: Any) -> int:
     fields = {"completed_at": now, **fields}
     ended = 0
     with transaction.atomic():
-        for job in jobs.select_for_update():
+        # One lock order for every caller (recovery, cancel, expiry), so they never deadlock.
+        for job in jobs.order_by("pk").select_for_update():
             job.steps = {
                 name: SyncJob.StepState.FAILED if state == SyncJob.StepState.RUNNING else state
                 for name, state in (job.steps or {}).items()
@@ -117,9 +120,11 @@ def run_tracked_job(
     runner: Callable[[SyncJob], None],
     *,
     on_completed: Callable[[SyncJob], None] | None = None,
+    on_failed: Callable[[SyncJob], None] | None = None,
 ) -> None:
     """Claim a job, run it, and translate failures through ``decide_retry`` into a Celery
-    retry or a terminal FAILED state. ``on_completed`` runs once the job is COMPLETED; its
+    retry or a terminal FAILED state. ``on_completed`` runs once the job is COMPLETED,
+    ``on_failed`` once it is FAILED for good (never on a scheduled retry or a cancel); their
     errors are logged and never change the job's outcome.
 
     Without a worker (eager mode) nothing is retried inline: a retryable error fails the job
@@ -160,23 +165,30 @@ def run_tracked_job(
                 raise task.retry(countdown=decision.countdown) from None
             return
         logger.warning("Job %s failed: %s (%s)", job_id, decision.code, type(exc).__name__)
-        finish_job(
+        failed = finish_job(
             job,
             Status.FAILED,
             error_code=decision.code,
             error_detail=_safe_detail(exc),
             completed_at=timezone.now(),
         )
+        if failed:
+            _follow_up(on_failed, job)
         return
 
-    completed = finish_job(
+    if finish_job(
         job, Status.COMPLETED, error_code="", error_detail="", completed_at=timezone.now()
-    )
-    if completed and on_completed is not None:
-        try:
-            on_completed(job)
-        except Exception:
-            logger.exception("Follow-up of job %s failed", job_id)
+    ):
+        _follow_up(on_completed, job)
+
+
+def _follow_up(hook: Callable[[SyncJob], None] | None, job: SyncJob) -> None:
+    if hook is None:
+        return
+    try:
+        hook(job)
+    except Exception:
+        logger.exception("Follow-up of job %s failed", job.pk)
 
 
 class GitHubNotConnected(Exception):
@@ -377,7 +389,8 @@ def start_recommendations(
 
 
 def rerun_recommendations_if_requested(job: SyncJob) -> None:
-    """``on_completed`` hook of recommendation generation jobs (see ``start_recommendations``)."""
+    """``on_completed`` and ``on_failed`` hook of recommendation generation jobs (see
+    ``start_recommendations``): a request made while the job ran is never lost."""
     if SyncJob.objects.filter(pk=job.pk, rerun_requested=True).exists():
         start_recommendations(job.user)
 

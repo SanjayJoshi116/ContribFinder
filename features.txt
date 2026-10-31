@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.43 (2026-10-31)
+Version: 0.12.44 (2026-10-31)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,16 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.44 - Service fixes (review sweep: services)
+============================================================================
+
+Data controls and jobs (Bug_Backlog.md batch 31)
+  [x] Account deletion purges the user's cached GitHub responses (and again after workers stop)
+  [x] A rerun requested during a generation also follows a failed run
+  [x] Saving or dismissing moves the data version other tabs refresh by
+  [x] Feedback snapshots and job/repository locks taken consistently
 
 ============================================================================
 SHIPPED - v0.12.43 - Browser-test seed fixes (review sweep: e2e)

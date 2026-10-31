@@ -11,6 +11,7 @@ import logging
 from fnmatch import fnmatchcase
 from typing import Any
 
+from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.locmem import LocMemCache
 from django.core.cache.backends.redis import RedisCache
@@ -51,12 +52,15 @@ def _touched_repository_ids(user: User) -> set[int]:
 def delete_github_data(user: User) -> dict[str, int]:
     """Cancel the user's jobs and delete everything derived from GitHub for them, including
     shared repositories nobody else references. Returns counts for the audit entry (no
-    content). The user's cached GitHub responses are purged after commit."""
+    content). The user's cached GitHub responses are purged after commit, and once more later
+    for entries a cancelled worker's last request wrote after the first purge."""
+    # Account deletion deletes the user before this commits: ``user.pk`` is None by then.
+    user_id = user.pk
     jobs.cancel_active_syncs(user)
     with transaction.atomic():
         # Profile first, as every recommendation and feedback write does (services/locks.py);
         # the cascade below would otherwise lock recommendations before the profile.
-        lock_developer(user.pk)
+        lock_developer(user_id)
         repository_ids = _touched_repository_ids(user)
         # The developer profile cascades skills, interests, evidence, candidates, discoveries,
         # recommendations and reasons.
@@ -77,8 +81,17 @@ def delete_github_data(user: User) -> dict[str, int]:
         # The display name comes from the GitHub profile; the next sign-in sets it again.
         user.display_name = ""
         user.save(update_fields=["display_name"])
-        transaction.on_commit(lambda: purge_user_github_cache(user.pk))
+        transaction.on_commit(lambda: purge_user_github_cache(user_id))
+        transaction.on_commit(lambda: _purge_later(user_id), robust=True)
     return counts
+
+
+def _purge_later(user_id: int) -> None:
+    """Purge again once cancelled workers have stopped: by ``SYNC_STALE_AFTER_SECONDS`` a worker
+    has hit ``JobCancelled`` at a guarded write or counts as dead."""
+    from github.tasks import purge_user_cache  # avoid import cycle
+
+    purge_user_cache.apply_async((user_id,), countdown=settings.SYNC_STALE_AFTER_SECONDS)
 
 
 def _delete_orphans(repository_ids: set[int]) -> int:
@@ -86,6 +99,17 @@ def _delete_orphans(repository_ids: set[int]) -> int:
     dismissal references any more. Their analysis rows cascade."""
     if not repository_ids:
         return 0
+    # Discovery search upserts (and so locks) a repository before recording its candidate: lock
+    # first and decide in a later statement, which sees links those writers committed. GitHub ID
+    # order, as every bulk repository lock, so the two never deadlock. A writer that only inserts
+    # a row pointing at the repository takes no lock until its commit; it fails its deferred
+    # foreign key there instead (rare, loud, nothing lost).
+    list(
+        Repository.objects.select_for_update()
+        .filter(pk__in=repository_ids)
+        .order_by("github_id")
+        .values_list("pk", flat=True)
+    )
     orphans = Repository.objects.filter(pk__in=repository_ids)
     for model in (
         UserRepository,
@@ -95,9 +119,7 @@ def _delete_orphans(repository_ids: set[int]) -> int:
         DismissedRepository,
     ):
         orphans = orphans.exclude(Exists(model.objects.filter(repository=OuterRef("pk"))))
-    deleted = orphans.count()
-    orphans.delete()
-    return deleted
+    return orphans.delete()[1].get("repositories.Repository", 0)
 
 
 def purge_user_github_cache(user_id: int) -> None:

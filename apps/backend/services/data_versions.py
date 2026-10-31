@@ -13,7 +13,7 @@ from django.db.models import Max, Q
 
 from accounts.models import User
 from developers.models import DeveloperProfile
-from feedback.models import SavedRepository
+from feedback.models import LIST_ACTIONS, RecommendationFeedback, SavedRepository
 from jobs.models import SyncJob
 from recommendations.models import Recommendation
 from repositories.models import Repository
@@ -29,7 +29,8 @@ class DataVersions:
 
 
 def versions(user: User) -> DataVersions:
-    """Three reads: both job times in one aggregate, the profile, the repository times."""
+    """Four reads: both job times in one aggregate, the profile, the repository times, the
+    latest save or dismissal."""
     finished = SyncJob.objects.filter(user=user, completed_at__isnull=False).aggregate(
         # A failed sync may already have stored GitHub data, so it counts; a cancelled one (data
         # deletion, disconnect) does not. A failed generation stores nothing.
@@ -49,6 +50,7 @@ def versions(user: User) -> DataVersions:
         recommendations=_latest(
             finished["generation"],
             _repository_data_time(user, profile["id"] if profile else None),
+            _list_change_time(user),
         ),
     )
 
@@ -62,6 +64,15 @@ def _repository_data_time(user: User, profile_id: int | None) -> datetime | None
         **{part: Max(field) for part, field in PART_FIELDS.items()}
     )
     return _latest(*times.values())
+
+
+def _list_change_time(user: User) -> datetime | None:
+    """When the user last saved, unsaved, dismissed or restored a repository. Events go with
+    the GitHub data, so after deleting it this is None again."""
+    latest: datetime | None = RecommendationFeedback.objects.filter(
+        user=user, action__in=LIST_ACTIONS
+    ).aggregate(latest=Max("created_at"))["latest"]
+    return latest
 
 
 def _latest(*times: datetime | None) -> datetime | None:

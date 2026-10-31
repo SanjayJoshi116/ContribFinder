@@ -15,6 +15,15 @@ class FeedbackAction(models.TextChoices):
     OPENED_ISSUE = "opened_issue"
 
 
+# Actions that change the saved or hidden list (restore records ``undismissed``).
+LIST_ACTIONS = (
+    FeedbackAction.SAVED,
+    FeedbackAction.UNSAVED,
+    FeedbackAction.DISMISSED,
+    FeedbackAction.UNDISMISSED,
+)
+
+
 class DismissReason(models.TextChoices):
     """Why a user hid a repository: optional, recorded and reported, never scored."""
 
@@ -68,7 +77,14 @@ class RecommendationFeedback(models.Model):
             models.Index(
                 fields=["user", "recommendation", "action", "-created_at"],
                 name="feedback_dedup_idx",
-            )
+            ),
+            # The data version's latest list change (services.data_versions), without reading
+            # every ``viewed`` event.
+            models.Index(
+                fields=["user", "-created_at"],
+                condition=models.Q(action__in=LIST_ACTIONS),
+                name="feedback_list_change_idx",
+            ),
         ]
 
     def __str__(self) -> str:

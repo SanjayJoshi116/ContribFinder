@@ -7,6 +7,30 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.44] - 2026-10-31
+
+Service fixes from the review sweep (`openspec/changes/archive/2026-10-31-services-review-fixes/`;
+specs `recommendation-engine`, `sync-jobs`; `Bug_Backlog.md` batch 31). Migration
+`feedback.0006`. OpenAPI stays `1.0.0`; baselines unchanged.
+
+### Changed
+
+- A generation requested while one runs now follows it also when that run fails (SVC-5).
+- The `recommendations` data version also moves when the user saves, unsaves, dismisses or
+  restores a repository, so another tab refreshes its lists (SVC-9). Partial index
+  `feedback_list_change_idx` serves it.
+
+### Fixed
+
+- Account deletion purges the deleted user's cached GitHub responses; every deletion purges once
+  more after cancelled workers have stopped (SVC-1, SVC-6 narrowed).
+- Feedback events snapshot the recommendation as stored under the lock, and an `opened_issue`
+  event for an issue deleted meanwhile is skipped instead of failing (SVC-2, SVC-7).
+- Orphan cleanup locks repositories in GitHub ID order before deciding, and counts from the
+  delete (SVC-3, SVC-10, SVC-11).
+- Ending jobs locks them in pk order; a job deleted right after its claim is not claimed (SVC-4,
+  SVC-8).
+
 ## [0.12.43] - 2026-10-31
 
 Browser-test seed fixes from the review sweep

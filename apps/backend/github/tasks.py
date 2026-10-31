@@ -5,13 +5,20 @@ from celery import shared_task
 from django.conf import settings
 
 from jobs.models import SyncJob
+from services.data_deletion import purge_user_github_cache
 from services.github.accounts import record_revocation_failure, revoke
 from services.github.oauth import OAuthError
 from services.github.retry import Retry, attempt_number, decide_retry
 from services.github.sync import GitHubSyncService
 from services.jobs import claim_job, run_tracked_job, start_discovery_after
 
-__all__ = ["claim_job", "revoke_later", "revoke_replaced_token", "sync_github_profile"]
+__all__ = [
+    "claim_job",
+    "purge_user_cache",
+    "revoke_later",
+    "revoke_replaced_token",
+    "sync_github_profile",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +65,12 @@ def revoke_later(self: Any, encrypted: str, github_id: int | None, grant: bool) 
             # ciphertext only, and ``revoke`` raises nothing that carries the plaintext.
             logger.exception("GitHub revocation failed unexpectedly")
         record_revocation_failure(decision.code)
+
+
+@shared_task(name="github.purge_user_cache", acks_late=True)
+def purge_user_cache(user_id: int) -> None:
+    """The delayed second purge after a GitHub data deletion (``data_deletion``)."""
+    purge_user_github_cache(user_id)
 
 
 @shared_task(name="github.revoke_replaced_token", acks_late=True)
