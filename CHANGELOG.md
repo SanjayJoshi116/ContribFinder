@@ -7,6 +7,28 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.43] - 2026-10-31
+
+Browser-test seed fixes from the review sweep
+(`openspec/changes/archive/2026-10-31-e2e-seed-review-fixes/`; spec `web-client`;
+`Bug_Backlog.md` batch 30). No migration. OpenAPI stays `1.0.0`; baselines unchanged.
+
+### Fixed
+
+- The browser-test seed refuses any database but `contribfinder_e2e`, besides needing the
+  end-to-end settings (SEED-1).
+- A retried browser test that changes data starts from seeded data: save, dismiss and delete-data
+  each own a user, seeded once per attempt (`--attempts`, from Playwright's `RETRIES`), and the
+  sessions file says which users are per attempt. Retry copies are named `<user>-retry<n>`
+  (SEED-2, SEED-11…SEED-13, SEED-16).
+- The seed also clears sessions and audit entries, finishes each job in one fenced write and
+  fails if it cannot, and its snapshots agree with the repositories' push times
+  (SEED-5, SEED-7, SEED-10).
+- `CREATE DATABASE` quotes the name; jobs are built by one `services.jobs.new_job`;
+  `make_issue` returns `Issue`; `add_candidate` keeps a candidate as recent as its records and
+  first found no later than them (SEED-3, SEED-4, SEED-8, SEED-9, SEED-15, SEED-17, SEED-19).
+- A backend test seeds, resets and seeds again (SEED-6).
+
 ## [0.12.42] - 2026-10-31
 
 GitHub app fixes from the review sweep (`openspec/changes/archive/2026-10-31-github-review-fixes/`;

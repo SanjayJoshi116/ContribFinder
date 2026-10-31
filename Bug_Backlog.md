@@ -52,7 +52,7 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | High | `apps/backend/core/` | health, auth class, JSON errors, log redaction, checks, throttling, CSP | [x] batch 27 | [x] no findings |
 | High | `apps/backend/accounts/` | User, AuditEvent, auth views, session, account deletion | [x] batch 28 | [x] no findings |
 | High | `apps/backend/github/` | GitHubAccount/Profile, sync task, profile API | [x] batch 29 | [x] no findings |
-| High | `apps/backend/e2e/` | seed command; must stay out of production | [ ] | [ ] |
+| High | `apps/backend/e2e/` | seed command; must stay out of production | [x] batch 30 | [x] no findings |
 | High | `apps/backend/services/*.py` | crypto, audit, jobs, job_guard, locks, feedback, data_deletion, data_versions | [ ] | [ ] |
 | High | `apps/backend/services/github/` | OAuth, GitHubClient, sync, storage | [ ] | [ ] |
 | High | `apps/frontend/src/api/` | client.ts, types.ts (skip generated openapi.json, schema.d.ts) | [ ] | [ ] |
@@ -86,9 +86,9 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 ## Open items
 
 The full review sweep above: started 2026-10-30; `config/`, `core/` and `accounts/` reviewed and
-fixed (batches 26–28; no security findings); `github/` reviewed and fixed (batch 29; no
-security findings), 30 modules to go. Batches 26–29 fixed in 0.12.39–0.12.42 (CFG-7, CFG-8, ACC-4,
-GH-6 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+fixed (batches 26–28; no security findings); `github/` and `e2e/` reviewed and fixed (batches
+29, 30; no security findings), 29 modules to go. Batches 26–30 fixed in 0.12.39–0.12.43 (CFG-7,
+CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
 their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
@@ -178,6 +178,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 27 | **Sweep: `core/`** | CORE-1…CORE-10 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/core/`, verified; fixed in 0.12.40 (`core-review-fixes`). `/security-review` of the module found nothing. |
 | 28 | **Sweep: `accounts/`** | ACC-1…ACC-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/accounts/`, verified; fixed in 0.12.41 (`accounts-review-fixes`), ACC-4 accepted; its fix-diff review ACC-11…ACC-20 fixed before commit (ACC-17 in part). `/security-review` of the module found nothing. |
 | 29 | **Sweep: `github/`** | GH-1…GH-8 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/github/`, verified; fixed in 0.12.42 (`github-review-fixes`), GH-6 accepted; its fix-diff review GH-9…GH-15 (GH-10, GH-13 fixed, the rest accepted or wontfix). `/security-review` of the module found nothing. |
+| 30 | **Sweep: `e2e/`** | SEED-1…SEED-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/e2e/`, verified; fixed in 0.12.43 (`e2e-seed-review-fixes`); its fix-diff review SEED-11…SEED-19 (SEED-13, SEED-14, SEED-18 accepted, the rest fixed). `/security-review` of the module found nothing. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -967,3 +968,46 @@ against the code.
 | GH-13 | robustness | `features/sync/api.ts` | The page loop ignored the query's `AbortSignal`: a cancelled query kept fetching. | fixed (`signal` passed to every request) |
 | GH-14 | locking | `services/accounts.py` | The outer transaction makes the job cancel a savepoint, so job rows stay locked for the whole deletion. | accepted (design D1 and Risks; as disconnect since 0.12.41) |
 | GH-15 | naming | `services/accounts.py` | `accounts.delete_github_data` shadows `data_deletion.delete_github_data`. | accepted (design D1: callers import the module) |
+
+## Sweep: `e2e/` (2026-10-31)
+
+Source: full review sweep, `/code-review` (high) of `apps/backend/e2e/` (seed command,
+`builders.py`), reading `config/settings/e2e.py`, `services/jobs.py`, `tests/test_e2e_seed.py`,
+`apps/frontend/e2e/*.spec.ts` and `playwright.config.ts` for context. Each row checked against the
+code.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| SEED-1 | safety | `e2e_seed.py:54` | The destructive `_reset` is guarded only by "`e2e` in `INSTALLED_APPS`", never by the database: a settings module that ever installs the app would wipe its real database. | confirmed (latent: only `config.settings.e2e` installs the app today, and it pins `NAME` to `contribfinder_e2e`; also refuse unless the database name is the e2e one); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-2 | test isolation | `e2e_seed.py:36` | Seeded once per run, but CI retries once: `save` and `dismiss` both mutate `e2e-dashboard` (which `auth.spec` reads too), so a retried save finds "Saved"; a retried `data.spec` finds no data. Against "Mutating specs each own a seeded user". | confirmed (own users for save and dismiss; a retried delete-data cannot recover by design, accept or reseed that user per attempt); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-3 | test fidelity | `builders.py:48` | `add_candidate` on an existing candidate never advances its `last_seen_at`, and `discovery_seen` can leave the candidate older than its own record: states `DiscoveryService` never writes. | partial (test builder only; no current test reads the stale value; advance `last_seen_at` to the latest record time); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-4 | robustness | `e2e_seed.py:74` | `CREATE DATABASE "{name}"` by f-string, not `connection.ops.quote_name`; uses private `_nodb_cursor()`. | partial (name is the constant `contribfinder_e2e`; use `quote_name`; `_nodb_cursor` kept, Django has no public no-database cursor); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-5 | hygiene | `e2e_seed.py:77` | `_reset` keeps `django_session` and `AuditEvent` rows (no FK cascade), so a reused e2e database grows every run and keeps sessions of deleted users. | confirmed (minor; delete both in `_reset`); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-6 | test gap | `tests/test_e2e_seed.py:41` | The suite never runs `_reset` on seeded data or the sessions JSON: a new PROTECT FK breaks only the CI e2e job. | confirmed (test: seed, `_reset`, seed again; check the written keys); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-7 | convention | `e2e_seed.py:211` | `_run` saves steps unguarded, then `finish_job` writes again, and its False return is ignored (a seeded job could stay RUNNING silently). | confirmed (`finish_job(job, COMPLETED, steps=...)` once; raise `CommandError` on False); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-8 | duplication | `e2e_seed.py:195` | `_new_job` copies the job construction in `services.jobs._start_job`. | confirmed (minor; one `jobs.new_job(user, job_type)` for both); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-9 | typing | `builders.py:64` | `make_issue` returns `Any` (function-level import), so call sites lose strict mypy. | confirmed (top-level `Issue` import, `-> Issue`); fixed (0.12.43, `e2e-seed-review-fixes`) |
+| SEED-10 | test data | `e2e_seed.py:110` | Snapshot `days_since_push=2` while `pushed_at` is 3 days ago (`make_candidate_repo`). | confirmed (cosmetic; derive from `repo.pushed_at`); fixed (0.12.43, `e2e-seed-review-fixes`) |
+
+`/simplify` of the fix diff (2026-10-31): the seed's sessions file is the one contract (users
+that tests change map to one session per attempt, the rest to one id), so `e2e/fixtures.ts` keeps
+no user list or naming rule; the attempt count comes from `playwright.config.ts` `RETRIES` through
+`scripts/e2e-backend.mjs` (`--attempts`); the seed-twice test stubs the pipeline (52 s → 9.5 s);
+`PUSHED_DAYS_AGO`, the sessions file read once. Skipped: inlining the dashboard sign-in helper,
+cloning pipeline rows between seeded users (only if the seed gets slow).
+
+Review of the fix diff (`/code-review medium`, 2026-10-31), recorded as SEED-11…SEED-19, each
+checked against the code.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| SEED-11 | bug | `e2e_seed.py` `seed` | Retry copies named `<user>~n`: `~` is `staleness.RELEASED_MARK`, so their repositories (`e2e-save~1/own-0`) read as released names, and `~` is no GitHub login character. | fixed (`<user>-retry<n>`; test: no seeded name holds the mark) |
+| SEED-12 | test isolation | `e2e/fixtures.ts` | The fixture told shared from per-attempt users by list length: a mutating user seeded for one attempt and retried (`--retries` on the command line) reused its changed data. | fixed (shared users map to one id, per-attempt users to a list; a missing attempt fails naming it) |
+| SEED-13 | config | `playwright.config.ts` | A command-line `--retries` override is not passed to the seed. | accepted (with SEED-12 it fails loudly on the missing attempt) |
+| SEED-14 | test coverage | `builders.py` | Raising the candidate's `last_seen_at` to `discovery_seen` makes `seen` set only `first_discovered_at` in tests that pass both. | accepted (design D5: discovery stamps both with the run time; expiry and pool-order tests pass unchanged) |
+| SEED-15 | test data | `builders.py` | `first_discovered_at` could be later than its own record's `last_seen_at`. | fixed (the earlier of `seen` and `discovery_seen`) |
+| SEED-16 | robustness | `e2e_seed.py` | `--attempts < 1` was refused only after creating and migrating the database. | fixed (argparse type, before any side effect) |
+| SEED-17 | efficiency | `builders.py` | A filtered UPDATE ran after every create. | fixed (saves only an existing, older candidate) |
+| SEED-18 | efficiency | `e2e_seed.py` | One full pipeline per retry copy: 3 more in CI. | accepted (design Risks; CI e2e startup unchanged in practice) |
+| SEED-19 | docs | `services/jobs.py` `new_job` | Public `new_job` skips `_start_job`'s stale expiry and conflict handling, undocumented. | fixed (docstring: no checks; real jobs start through `start_*`) |
+

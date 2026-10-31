@@ -18,6 +18,8 @@ const frontend =
     ? `${VITE} ${SERVE}`
     : `${VITE} build ${OUT} --emptyOutDir && ${VITE} preview ${OUT} --host localhost ${SERVE}`
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
+// The seed builds one user per attempt for tests that change data, so it gets the same number.
+const RETRIES = process.env.CI ? 1 : 0
 
 // Browser tests against the real backend and PostgreSQL (database contribfinder_e2e, settings
 // config.settings.e2e). Ports 8001 and 5174 keep clear of the `npm start` stack.
@@ -26,7 +28,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: RETRIES,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: BASE_URL,
@@ -36,7 +38,7 @@ export default defineConfig({
   webServer: [
     {
       // Seeds (fresh data on every run), then serves Django.
-      command: `node ${JSON.stringify(path.join(repoRoot, 'scripts', 'e2e-backend.mjs'))} ${JSON.stringify(SESSIONS_FILE)}`,
+      command: `node ${JSON.stringify(path.join(repoRoot, 'scripts', 'e2e-backend.mjs'))} ${JSON.stringify(SESSIONS_FILE)} ${RETRIES + 1}`,
       url: 'http://127.0.0.1:8001/api/v1/health/',
       reuseExistingServer: false,
       timeout: 180_000,

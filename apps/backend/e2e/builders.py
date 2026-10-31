@@ -9,6 +9,7 @@ from typing import Any
 from django.utils import timezone
 
 from developers.models import DeveloperProfile
+from issues.models import Issue
 from repositories.models import CandidateDiscovery, Repository, RepositoryCandidate
 from services.repositories.staleness import PART_FIELDS
 
@@ -45,25 +46,29 @@ def add_candidate(
     prunes records it did not see again, so a record standing for "found by this run" needs a
     time after the run starts."""
     seen = seen or timezone.now()
-    cand, _ = RepositoryCandidate.objects.get_or_create(
+    record_seen = discovery_seen or seen
+    # As discovery: a candidate is seen whenever one of its records is, and found no later.
+    earliest, latest = min(seen, record_seen), max(seen, record_seen)
+    cand, created = RepositoryCandidate.objects.get_or_create(
         developer=profile,
         repository=repo,
-        defaults={"first_discovered_at": seen, "last_seen_at": seen},
+        defaults={"first_discovered_at": earliest, "last_seen_at": latest},
     )
+    if not created and cand.last_seen_at < latest:
+        cand.last_seen_at = latest
+        cand.save(update_fields=["last_seen_at"])
     CandidateDiscovery.objects.create(
         candidate=cand,
         source=source,
         query=query,
         search_rank=rank,
         first_seen_at=seen,
-        last_seen_at=discovery_seen or seen,
+        last_seen_at=record_seen,
     )
     return cand
 
 
-def make_issue(repo: Repository, number: int, **fields: Any) -> Any:
-    from issues.models import Issue
-
+def make_issue(repo: Repository, number: int, **fields: Any) -> Issue:
     now = timezone.now()
     defaults: dict[str, Any] = {
         "repository": repo,

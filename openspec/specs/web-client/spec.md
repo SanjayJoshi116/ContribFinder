@@ -5,9 +5,7 @@
 Defines how the single-page app keeps server state in step with the backend: when derived
 data is refreshed, how failed requests are retried, what happens when the session ends, and
 which flows are verified end to end in a real browser.
-
 ## Requirements
-
 ### Requirement: Refresh derived data on job transitions
 The SPA SHALL react to a sync, discovery or recommendation generation job only when it sees that
 job's id or status change to a finished state, compared with the last status it fetched. Seeing
@@ -128,7 +126,10 @@ GitHub. The tests SHALL make no request to GitHub, and SHALL cover at least:
 - an ended session returning to sign-in;
 - deleting GitHub data returning to onboarding.
 
-CI SHALL run these tests on every pull request and push to main.
+CI SHALL run these tests on every pull request and push to main. The seed command SHALL refuse to
+run against any database other than the end-to-end one, and SHALL leave no data from an earlier
+run (users, sessions, audit entries, repositories). Every test that changes data SHALL sign in as
+a user that no other test uses, and a retried attempt of such a test SHALL start from seeded data.
 
 #### Scenario: Seeding outside the end-to-end configuration
 - **WHEN** the seed command is invoked under the development, test or production settings
@@ -141,6 +142,14 @@ CI SHALL run these tests on every pull request and push to main.
 #### Scenario: Policy violation fails a test
 - **WHEN** a change makes a page load a script, image or connection from an origin the built app's policy does not allow
 - **THEN** the browser test that opens that page fails, naming the violation
+
+#### Scenario: Seeding another database
+- **WHEN** the seed command runs with the end-to-end configuration installed but a default database other than the end-to-end one
+- **THEN** it stops with an error before deleting or writing anything
+
+#### Scenario: Retried test that changes data
+- **WHEN** a test that saves, dismisses or deletes data fails after changing it and CI runs it again
+- **THEN** the retry signs in as a user with the seeded data, unchanged by the first attempt
 
 ### Requirement: Content Security Policy in the built app
 The production build of the SPA SHALL declare a Content Security Policy in its `index.html` that allows scripts and network connections only from the same origin, images only from the same origin, `data:` URLs and GitHub avatars (`https://avatars.githubusercontent.com`), styles from the same origin and inline style attributes, and SHALL forbid plugins (`object-src 'none'`) and `<base>` (`base-uri 'none'`). The built app SHALL work under it without policy violations. The development server SHALL NOT add the policy.
@@ -156,3 +165,4 @@ The production build of the SPA SHALL declare a Content Security Policy in its `
 #### Scenario: Development server
 - **WHEN** the SPA runs on the Vite development server
 - **THEN** `index.html` carries no Content Security Policy and hot reload works
+

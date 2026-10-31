@@ -45,7 +45,7 @@ def relevant_issue(repo, number: int, **fields) -> Issue:
             {"slug": "react", "source": "body"},
         ],
     }
-    return cast(Issue, make_issue(repo, number, **{**defaults, **fields}))
+    return make_issue(repo, number, **{**defaults, **fields})
 
 
 @pytest.fixture

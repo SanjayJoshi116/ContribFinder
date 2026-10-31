@@ -265,6 +265,18 @@ def _expire_stale(user: User, job_type: str = SYNC) -> None:
     )
 
 
+def new_job(user: User, job_type: str) -> SyncJob:
+    """A PENDING job of ``job_type`` with every step pending. Nothing is queued and nothing is
+    checked: a second active job of a type fails the partial unique constraint. Real jobs start
+    through ``start_*`` (``_start_job``), which handles both."""
+    return SyncJob.objects.create(
+        user=user,
+        job_type=job_type,
+        status=Status.PENDING,
+        steps=dict.fromkeys(STEPS_BY_JOB_TYPE[job_type], SyncJob.StepState.PENDING),
+    )
+
+
 def _start_job(user: User, job_type: str) -> tuple[SyncJob, bool]:
     """Return ``(job, created)``: the active job of this type, or a new one queued on commit.
     A RUNNING job that stopped updating is not active: it fails with ``worker_lost`` (D5)."""
@@ -274,12 +286,7 @@ def _start_job(user: User, job_type: str) -> tuple[SyncJob, bool]:
     task = _task_for(job_type)
     try:
         with transaction.atomic():
-            job = SyncJob.objects.create(
-                user=user,
-                job_type=job_type,
-                status=Status.PENDING,
-                steps=dict.fromkeys(STEPS_BY_JOB_TYPE[job_type], SyncJob.StepState.PENDING),
-            )
+            job = new_job(user, job_type)
             transaction.on_commit(lambda: task.delay(job.pk))
     except IntegrityError:
         # A concurrent start created the active job first (partial unique constraint). It may

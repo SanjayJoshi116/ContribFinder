@@ -294,7 +294,8 @@ Frontend (`apps/frontend`, npm):
   re-seeded every run; one-time `npx playwright install chromium`). The auto fixture
   `policyViolations` (`e2e/fixtures.ts`) fails a test on any Content Security Policy console
   error in its context (canary `e2e/policy.spec.ts`); specs import `test` from `fixtures.ts`. `E2E_DEV_SERVER=1` runs the dev server (local
-  only, no policy). Mutating specs each own a seeded user. New queries go through the shared client
+  only, no policy). Mutating specs each own a seeded user, one per attempt (`e2e_seed --attempts` from
+  `RETRIES` in `playwright.config.ts`; the sessions file maps them to a list). New queries go through the shared client
   (`src/app/queryClient.ts`): 4xx are never retried, any 401 ends the session, and derived data
   is refetched by the data versions (`src/app/dataVersions.ts`, `AREA_KEYS`), not on mount: a
   new derived query under `['profile', ...]` must be listed in its area.
@@ -1525,6 +1526,24 @@ Archived: `openspec/changes/archive/2026-10-31-github-review-fixes/`. Specs: del
   `useRepositories` keeps `page_size=100` and fetches each `next` by its own query (with the
   query's `signal`) into one page with the first `count`. `RepositoryListView` has no `distinct`.
 
+**Seed fixes, review sweep: e2e** (MVP+, fix release)  ✅ shipped in v0.12.43 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-31-e2e-seed-review-fixes/`. Spec: delta to
+`web-client` ("End-to-end coverage of the main flows"). `Bug_Backlog.md` batch 30 (SEED-1…SEED-19;
+SEED-13, SEED-14, SEED-18 accepted). `/security-review` of `e2e/`: nothing.
+- `e2e_seed`: `refuse_unless_e2e(installed_apps, database)` (app and `E2E_DATABASE`
+  `contribfinder_e2e`) before any side effect; `seed(attempts) -> {user: id | [id per attempt]}`
+  (`READ_USERS`, `UNSYNCED_USER` one id; `MUTATING_USERS` `e2e-save`, `e2e-dismiss`,
+  `e2e-delete`, copies `<user>-retry<n>`, never `~`: `staleness.RELEASED_MARK`). `_reset` also
+  clears sessions and audit entries.
+- `playwright.config.ts` `RETRIES` → `scripts/e2e-backend.mjs <sessions> <attempts>` →
+  `--attempts`. `fixtures.ts` `signInAs` reads the sessions file once: a string serves every
+  attempt, a list is indexed by `testInfo.retry` (missing → error naming the attempt). A new
+  data-changing spec adds its user to `MUTATING_USERS` and `SeededUser`.
+- `services.jobs.new_job(user, job_type)` builds a PENDING job (no checks; `_start_job` uses
+  it). `e2e.builders.make_issue -> Issue`; `add_candidate` keeps the candidate's times within its
+  records'.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1551,7 +1570,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43).
 
 ## 8. Release housekeeping
 

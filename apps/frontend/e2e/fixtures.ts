@@ -4,13 +4,22 @@ import { test as base, expect } from '@playwright/test'
 
 import { SESSIONS_FILE } from './sessions.ts'
 
-/** Users created by `e2e_seed` (apps/backend/e2e). Tests that change data own a user. */
-export type SeededUser = 'e2e-dashboard' | 'e2e-delete' | 'e2e-unsynced'
+/** Users created by `e2e_seed` (apps/backend/e2e). Tests that change data each own one of
+ * `e2e-save`, `e2e-dismiss`, `e2e-delete`; the others are only read. */
+export type SeededUser =
+  'e2e-dashboard' | 'e2e-unsynced' | 'e2e-save' | 'e2e-dismiss' | 'e2e-delete'
 
-function sessionId(user: SeededUser): string {
-  const sessions = JSON.parse(readFileSync(SESSIONS_FILE, 'utf-8')) as Record<string, string>
-  const id = sessions[user]
-  if (!id) throw new Error(`No seeded session for ${user}; did the backend seed run?`)
+// Written by the seed after this module loads (the backend web server), so read on first use.
+let sessions: Record<string, string | string[]> | undefined
+
+/** The session for this attempt. A user that tests change maps to one session per attempt (a
+ * retry signs in as a copy the first attempt never touched); the rest map to one shared id. */
+function sessionId(user: SeededUser, retry: number): string {
+  sessions ??= JSON.parse(readFileSync(SESSIONS_FILE, 'utf-8')) as Record<string, string | string[]>
+  const ids = sessions[user]
+  if (!ids) throw new Error(`No seeded session for ${user}; did the backend seed run?`)
+  const id = typeof ids === 'string' ? ids : ids[retry]
+  if (!id) throw new Error(`No seeded session for ${user}, attempt ${retry + 1} (seed --attempts)`)
   return id
 }
 
@@ -46,12 +55,12 @@ export const test = base.extend<{
     },
     { auto: true },
   ],
-  signInAs: async ({ context, baseURL }, use) => {
+  signInAs: async ({ context, baseURL }, use, testInfo) => {
     await use(async (user) => {
       await context.addCookies([
         {
           name: 'sessionid',
-          value: sessionId(user),
+          value: sessionId(user, testInfo.retry),
           url: baseURL!,
           httpOnly: true,
           sameSite: 'Lax',

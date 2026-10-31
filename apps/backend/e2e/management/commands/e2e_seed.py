@@ -1,19 +1,21 @@
 """Seed the browser-test database: users, their GitHub-derived data and a signed-in session
 each (end-to-end settings only)."""
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 from collections.abc import Callable
 from datetime import timedelta
+from itertools import count
 from typing import Any
 
 from django.conf import settings
+from django.contrib.sessions.models import Session
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.test import Client
 from django.utils import timezone
 
-from accounts.models import User
+from accounts.models import AuditEvent, User
 from core.reports import write_json
 from developers.models import DeveloperProfile, Interest, Skill
 from e2e.builders import add_candidate, fresh_repo, make_issue
@@ -32,9 +34,16 @@ from services.crypto import encrypt_token
 from services.profiling.analysis import ProfileAnalysisService
 from services.ranking.service import RecommendationService
 
-# One user per test that changes data, so specs can run in any order.
-SYNCED_USERS = ("e2e-dashboard", "e2e-delete")
+# The only database the seed may replace (config.settings.e2e pins it).
+E2E_DATABASE = "contribfinder_e2e"
+# Read by several tests, changed by none: one session serves every attempt.
+READ_USERS = ("e2e-dashboard",)
+# One user per test that changes data, seeded once per attempt (``--attempts``: Playwright's
+# retries + 1), so a retry starts from seeded data. The sessions file maps these to a list (one
+# session per attempt) and the rest to one session; e2e/fixtures.ts ``signInAs`` reads only it.
+MUTATING_USERS = ("e2e-save", "e2e-dismiss", "e2e-delete")
 UNSYNCED_USER = "e2e-unsynced"
+PUSHED_DAYS_AGO = 2  # every seeded candidate, and its snapshot
 CANDIDATES = 25  # more than one page (20), so pagination and filters show
 WITH_ISSUES = 3  # the best candidates carry relevant issues
 Step = SyncJob.StepState
@@ -49,21 +58,57 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument("--out", metavar="PATH", required=True, help="Session ids file.")
+        parser.add_argument(
+            "--attempts",
+            type=_positive,
+            default=1,
+            help="Attempts per browser test (retries + 1): one user per attempt for tests that "
+            "change data.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        if "e2e" not in settings.INSTALLED_APPS:  # pragma: no cover - the app is the guard
-            raise CommandError("Only for config.settings.e2e.")
+        refuse_unless_e2e(settings.INSTALLED_APPS, settings.DATABASES["default"]["NAME"])
         _create_database()
         call_command("migrate", interactive=False, verbosity=0)
-        _reset()
-        _seed_pool()
-        sessions = {
-            name: _session(_synced_user(index, name)) for index, name in enumerate(SYNCED_USERS)
-        }
-        sessions[UNSYNCED_USER] = _session(_user(len(SYNCED_USERS), UNSYNCED_USER))
+        sessions = seed(options["attempts"])
         out = options["out"]
         write_json(out, sessions, what="Sessions")
-        self.stdout.write(f"Seeded {len(sessions)} users; sessions in {out}")
+        self.stdout.write(f"Seeded the browser-test users; sessions in {out}")
+
+
+def _positive(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise ArgumentTypeError("must be at least 1")
+    return number
+
+
+def refuse_unless_e2e(installed_apps: list[str], database: str) -> None:
+    """The seed deletes every user and repository: only the end-to-end settings, and only their
+    database, may run it."""
+    if "e2e" not in installed_apps:
+        raise CommandError("Only for config.settings.e2e.")
+    if database != E2E_DATABASE:
+        raise CommandError(f"Only for the {E2E_DATABASE} database, not {database}.")
+
+
+def seed(attempts: int = 1) -> dict[str, str | list[str]]:
+    """Replace the data with the browser-test users; returns their session ids by name: a list
+    with one per attempt for users that tests change (attempt n > 0 signs in as
+    ``<name>-retry<n>``), one id for the rest, shared by every attempt."""
+    _reset()
+    _seed_pool()
+    index = count()
+
+    def synced(name: str) -> str:
+        return _session(_synced_user(next(index), name))
+
+    sessions: dict[str, str | list[str]] = {name: synced(name) for name in READ_USERS}
+    for name in MUTATING_USERS:
+        # Not "~": it marks a released repository name (staleness.RELEASED_MARK).
+        sessions[name] = [synced(f"{name}-retry{n}" if n else name) for n in range(attempts)]
+    sessions[UNSYNCED_USER] = _session(_user(next(index), UNSYNCED_USER))
+    return sessions
 
 
 def _create_database() -> None:
@@ -71,12 +116,15 @@ def _create_database() -> None:
     with connection._nodb_cursor() as cursor:
         cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", [name])
         if cursor.fetchone() is None:
-            cursor.execute(f'CREATE DATABASE "{name}"')
+            cursor.execute(f"CREATE DATABASE {connection.ops.quote_name(name)}")
 
 
 def _reset() -> None:
     """Everything but migration-seeded rows (scoring configurations): users cascade to their
-    accounts, jobs, profiles and feedback; repositories and the catalog are shared."""
+    accounts, jobs, profiles and feedback; repositories and the catalog are shared. Sessions and
+    audit entries have no cascade from users."""
+    Session.objects.all().delete()
+    AuditEvent.objects.all().delete()
     User.objects.all().delete()
     Repository.objects.all().delete()
     Skill.objects.all().delete()
@@ -92,6 +140,7 @@ def _seed_pool() -> None:
             stars=2000 - n * 50,
             has_contributing=True,
             has_good_first_issue_label=n <= WITH_ISSUES,
+            pushed_at=timezone.now() - timedelta(days=PUSHED_DAYS_AGO),
         )
         RepositoryLanguage.objects.create(repository=repo, language="Python", bytes=9000)
         RepositoryTopic.objects.create(repository=repo, topic="developer-tools")
@@ -107,7 +156,7 @@ def _seed_pool() -> None:
             open_issues=5,
             activity_label="recently_active",
             thresholds_version="e2e",
-            days_since_push=2,
+            days_since_push=PUSHED_DAYS_AGO,
             commits_90d=60,
             prs_merged_90d=20,
             contributors=30,
@@ -192,25 +241,16 @@ def _synced_user(index: int, name: str) -> User:
     return user
 
 
-def _new_job(user: User, job_type: str) -> SyncJob:
-    return SyncJob.objects.create(
-        user=user,
-        job_type=job_type,
-        status=SyncJob.Status.PENDING,
-        steps=dict.fromkeys(jobs.STEPS_BY_JOB_TYPE[job_type], Step.PENDING),
-    )
-
-
 def _run(user: User, job_type: str, runner: Callable[[SyncJob], object]) -> None:
     """Run a job's service the way a worker does (claim, run, finish), without its follow-up
     jobs: a discovery would call GitHub."""
-    job = jobs.claim_job(_new_job(user, job_type).pk)
+    job = jobs.claim_job(jobs.new_job(user, job_type).pk)
     if job is None:  # pragma: no cover - a fresh PENDING job is always claimable
         raise CommandError(f"Could not claim the {job_type} job")
     runner(job)
-    job.steps = dict.fromkeys(job.steps, Step.DONE)
-    job.save(update_fields=["steps"])
-    jobs.finish_job(job, SyncJob.Status.COMPLETED)
+    done = dict.fromkeys(job.steps, Step.DONE)
+    if not jobs.finish_job(job, SyncJob.Status.COMPLETED, steps=done):
+        raise CommandError(f"Could not finish the {job_type} job")
 
 
 def _record(user: User, job_type: str) -> None:

@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.42 (2026-10-31)
+Version: 0.12.43 (2026-10-31)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,15 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.43 - Browser-test seed fixes (review sweep: e2e)
+============================================================================
+
+Browser tests (Bug_Backlog.md batch 30)
+  [x] The seed refuses any database but the end-to-end one
+  [x] A retried test that changes data starts from seeded data (one user per test and attempt)
+  [x] The seed clears sessions and audit entries; seeded jobs and snapshots are consistent
 
 ============================================================================
 SHIPPED - v0.12.42 - GitHub app fixes (review sweep: github)

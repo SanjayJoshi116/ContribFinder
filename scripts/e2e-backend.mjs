@@ -1,6 +1,7 @@
 // Backend for the browser tests (`npm run e2e` in apps/frontend, started by Playwright):
 // create, migrate and seed the contribfinder_e2e database, then serve it on :8001. Uses
-// config.settings.e2e, the only settings with the seed command; sessions go to argv[2].
+// config.settings.e2e, the only settings with the seed command; sessions go to argv[2], and
+// argv[3] (default 1) is the attempts per test (Playwright's retries + 1).
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { parseEnv } from 'node:util'
@@ -20,15 +21,26 @@ process.env.DJANGO_READ_DOTENV = '0'
 
 const backend = path.join(root, 'apps', 'backend')
 const settings = ['--settings', 'config.settings.e2e']
-const sessions = process.argv[2]
+const [sessions, attempts = '1'] = process.argv.slice(2)
 if (!sessions) {
-  console.error('Usage: node scripts/e2e-backend.mjs <sessions.json>')
+  console.error('Usage: node scripts/e2e-backend.mjs <sessions.json> [attempts]')
   process.exit(2)
 }
 
-uv(['run', 'python', 'manage.py', 'e2e_seed', '--out', path.resolve(sessions), ...settings], {
-  cwd: backend,
-})
+uv(
+  [
+    'run',
+    'python',
+    'manage.py',
+    'e2e_seed',
+    '--out',
+    path.resolve(sessions),
+    '--attempts',
+    attempts,
+    ...settings,
+  ],
+  { cwd: backend },
+)
 
 // Not detached: Playwright stops a web server by SIGKILL to its process group, which this
 // runner cannot forward. A detached Django would survive in its own group, keep Playwright's
