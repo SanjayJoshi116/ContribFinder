@@ -22,7 +22,7 @@ from github.models import GitHubAccount
 from jobs.models import SyncJob
 from services.errors import JobCancelled, PermanentJobError
 from services.github.errors import GitHubError
-from services.github.retry import Retry, decide_retry
+from services.github.retry import Retry, attempt_number, decide_retry
 from services.github.sync import STEPS
 from services.job_guard import held, lost_before, stale_before
 
@@ -137,7 +137,9 @@ def run_tracked_job(
     except Exception as exc:
         decision = decide_retry(
             exc,
-            settings.SYNC_MAX_ATTEMPTS if settings.CELERY_TASK_ALWAYS_EAGER else job.attempts,
+            attempt_number(
+                job.attempts, settings.SYNC_MAX_ATTEMPTS, eager=settings.CELERY_TASK_ALWAYS_EAGER
+            ),
             max_attempts=settings.SYNC_MAX_ATTEMPTS,
             max_delay=settings.GITHUB_MAX_RETRY_DELAY,
         )

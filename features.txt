@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.41 (2026-10-30)
+Version: 0.12.42 (2026-10-31)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,16 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.42 - GitHub app fixes (review sweep: github)
+============================================================================
+
+GitHub data (Bug_Backlog.md batch 29)
+  [x] Deleting GitHub data and its audit entry are atomic
+  [x] GitHub account and profile admins cannot add or delete
+  [x] Revocation never retries inside a request; unexpected errors keep their traceback
+  [x] The dashboard lists every synced repository, whatever the per-sync cap
 
 ============================================================================
 SHIPPED - v0.12.41 - Account fixes (review sweep: accounts)

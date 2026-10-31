@@ -7,6 +7,29 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.42] - 2026-10-31
+
+GitHub app fixes from the review sweep (`openspec/changes/archive/2026-10-31-github-review-fixes/`;
+specs `data-controls`, `sync-jobs`; `Bug_Backlog.md` batch 29). No migration. OpenAPI stays
+`1.0.0`; baselines unchanged.
+
+### Fixed
+
+- Deleting GitHub data and recording it happen in one transaction: a failing audit write leaves
+  the data in place (`services/accounts.delete_github_data`) (GH-3).
+- The GitHub account and profile admins have no add or delete: a connection is removed by
+  disconnect (which revokes the token), data by delete-data. The admin therefore also refuses to
+  delete a user who has GitHub data; account deletion is the path (GH-2, GH-9).
+- Without a worker (eager mode) a revocation is tried once and a failure recorded, never retried
+  inline inside the request; the rule is shared with tracked jobs
+  (`services/github/retry.attempt_number`) (GH-5, supersedes ACC-17's acceptance).
+- A revocation failing on an unexpected error logs its traceback (never the token); GitHub
+  refusing does not (GH-1, GH-10).
+- The dashboard lists every synced repository: it follows `next`, and the repository list's page
+  cap follows `GITHUB_SYNC_MAX_REPOS` (never below 100) (GH-4, GH-13).
+- The repository list no longer runs `SELECT DISTINCT`; both GitHub admins load users in one
+  query (GH-7, GH-8).
+
 ## [0.12.41] - 2026-10-30
 
 Account fixes from the review sweep (`openspec/changes/archive/2026-10-30-accounts-review-fixes/`;

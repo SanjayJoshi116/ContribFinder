@@ -2,7 +2,16 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { COMPLETED_JOB, ME, SYNCED_USER, json, mockFetch, renderRoute } from '@/test/render'
+import {
+  COMPLETED_JOB,
+  ME,
+  REPO,
+  SYNCED_USER,
+  callsTo,
+  json,
+  mockFetch,
+  renderRoute,
+} from '@/test/render'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
 const NEVER_SYNCED = { 'GET /api/v1/sync/status': () => json({ job: null, last_synced_at: null }) }
@@ -156,6 +165,37 @@ describe('dashboard', () => {
       'https://github.com/octocat/tools',
     )
     expect(within(repos).getByText('cli')).toBeInTheDocument()
+  })
+
+  it('lists repositories from every page', async () => {
+    const repo = (name: string) => ({
+      ...REPO,
+      id: 100 + name.length,
+      name,
+      full_name: `octocat/${name}`,
+      html_url: `https://github.com/octocat/${name}`,
+    })
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/profile/repositories?page_size=100': () =>
+        json({
+          count: 2,
+          next: 'http://testserver/api/v1/profile/repositories?page=2&page_size=100',
+          previous: null,
+          results: [repo('first')],
+        }),
+      'GET /api/v1/profile/repositories?page=2&page_size=100': () =>
+        json({ count: 2, next: null, previous: null, results: [repo('second')] }),
+    })
+    renderRoute('/app')
+
+    const repos = await screen.findByRole('list', { name: 'Repositories' })
+    expect(await within(repos).findByRole('link', { name: 'octocat/second' })).toBeInTheDocument()
+    expect(within(repos).getByRole('link', { name: 'octocat/first' })).toBeInTheDocument()
+    expect(
+      callsTo(fetchMock, 'GET', '/api/v1/profile/repositories?page=2&page_size=100'),
+    ).toHaveLength(1)
   })
 
   it('refresh starts a sync', async () => {

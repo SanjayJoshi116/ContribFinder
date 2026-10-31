@@ -1,5 +1,6 @@
-"""Leaving: disconnecting GitHub and deleting the account (specs: github-authentication
-"Disconnect GitHub", data-controls "Delete account"). The views add only the session handling.
+"""Leaving: deleting GitHub data, disconnecting GitHub and deleting the account (specs:
+data-controls "Delete GitHub-derived data", github-authentication "Disconnect GitHub",
+data-controls "Delete account"). The views add only the session handling.
 
 GitHub is never called here: revocation is queued with the token encrypted, after the
 transaction commits (invariant 3); a broker failure never stops the disconnect or deletion.
@@ -38,6 +39,20 @@ def _leave(user: User, request: HttpRequest, action: str) -> str:
         metadata={"revocation": revocation, "deleted": deleted},
     )
     return revocation
+
+
+@transaction.atomic
+def delete_github_data(user: User, request: HttpRequest) -> None:
+    """Delete the user's GitHub-derived data and record it, all or nothing: a failing audit
+    write leaves the data in place. The account and the GitHub connection stay."""
+    deleted = data_deletion.delete_github_data(user)
+    audit.record(
+        AuditEvent.Action.GITHUB_DATA_DELETED,
+        AuditEvent.Outcome.SUCCESS,
+        user=user,
+        request=request,
+        metadata={"deleted": deleted},
+    )
 
 
 @transaction.atomic

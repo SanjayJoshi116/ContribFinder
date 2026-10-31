@@ -9,7 +9,7 @@ import pytest
 import respx
 from celery.exceptions import Retry
 from django.conf import settings
-from django.test import Client
+from django.test import Client, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -402,6 +402,7 @@ def test_disconnect_without_github_connection(user: User) -> None:
 
 
 @respx.mock
+@override_settings(CELERY_TASK_ALWAYS_EAGER=False)  # with a worker; eager mode never retries
 @pytest.mark.parametrize(
     "failure",
     [httpx.Response(500), httpx.ConnectTimeout("timed out")],
@@ -503,7 +504,8 @@ def test_failed_revocation_still_signs_in(
     with caplog.at_level(logging.DEBUG):
         _sign_in_twice(client, respx.mock, django_capture_on_commit_callbacks)
     assert "_auth_user_id" in client.session  # signed in with the new token
-    assert "Retry in" in caplog.text  # the revocation is scheduled again, never fatal
+    # Eager mode (no worker) decides as on the last attempt: recorded, never fatal.
+    assert "GitHub revocation failed for good: github_unavailable" in caplog.text
     assert TOKEN not in caplog.text and NEW_TOKEN not in caplog.text
 
 

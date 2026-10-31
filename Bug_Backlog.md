@@ -51,7 +51,7 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | High | `apps/backend/config/` | settings, urls, celery, error envelope | [x] batch 26 | [x] no findings |
 | High | `apps/backend/core/` | health, auth class, JSON errors, log redaction, checks, throttling, CSP | [x] batch 27 | [x] no findings |
 | High | `apps/backend/accounts/` | User, AuditEvent, auth views, session, account deletion | [x] batch 28 | [x] no findings |
-| High | `apps/backend/github/` | GitHubAccount/Profile, sync task, profile API | [ ] | [ ] |
+| High | `apps/backend/github/` | GitHubAccount/Profile, sync task, profile API | [x] batch 29 | [x] no findings |
 | High | `apps/backend/e2e/` | seed command; must stay out of production | [ ] | [ ] |
 | High | `apps/backend/services/*.py` | crypto, audit, jobs, job_guard, locks, feedback, data_deletion, data_versions | [ ] | [ ] |
 | High | `apps/backend/services/github/` | OAuth, GitHubClient, sync, storage | [ ] | [ ] |
@@ -86,7 +86,9 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 ## Open items
 
 The full review sweep above: started 2026-10-30; `config/`, `core/` and `accounts/` reviewed and
-fixed (batches 26–28; no security findings), 31 modules to go. Batches 26–28 fixed in 0.12.39–0.12.41 (CFG-7, CFG-8, ACC-4 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+fixed (batches 26–28; no security findings); `github/` reviewed and fixed (batch 29; no
+security findings), 30 modules to go. Batches 26–29 fixed in 0.12.39–0.12.42 (CFG-7, CFG-8, ACC-4,
+GH-6 accepted). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
 their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
@@ -175,6 +177,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 26 | **Sweep: `config/`** | CFG-1…CFG-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/config/`, verified, fixed in 0.12.39 (`config-review-fixes`) except CFG-7, CFG-8 (accepted); its fix-diff review CFG-11…CFG-20 fixed; `/security-review` of the module found nothing. |
 | 27 | **Sweep: `core/`** | CORE-1…CORE-10 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/core/`, verified; fixed in 0.12.40 (`core-review-fixes`). `/security-review` of the module found nothing. |
 | 28 | **Sweep: `accounts/`** | ACC-1…ACC-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/accounts/`, verified; fixed in 0.12.41 (`accounts-review-fixes`), ACC-4 accepted; its fix-diff review ACC-11…ACC-20 fixed before commit (ACC-17 in part). `/security-review` of the module found nothing. |
+| 29 | **Sweep: `github/`** | GH-1…GH-8 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/github/`, verified; fixed in 0.12.42 (`github-review-fixes`), GH-6 accepted; its fix-diff review GH-9…GH-15 (GH-10, GH-13 fixed, the rest accepted or wontfix). `/security-review` of the module found nothing. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -911,7 +914,7 @@ code. Fixed before the 0.12.41 commit (ACC-17 accepted in part).
 | ACC-14 | convention | `github/tasks.py` | `autoretry_for=(OAuthError,)` retries permanent errors too (401, 422), ignores `Retry-After`, and bypasses the pure retry policy (`services/github/retry.py`, CLAUDE.md §5). | fixed (0.12.41: `revoke_later` uses `decide_retry`; `_revoke` raises `GitHubTransientError` for network, 5xx and 429) |
 | ACC-15 | spec | `github/tasks.py` | A final failure after the retries is only Celery's log; the spec says it "SHALL be recorded without the token", and the audit entry stays `queued`. | fixed (0.12.41: audit `github_revocation_failed`, reason only) |
 | ACC-16 | bug | `services/github/accounts.py` `queue_unused_token_revocation` | Reuses `revoke_replaced_token`, which skips when the token equals the stored one and never retries: a refused sign-in's token may never be revoked. | fixed (0.12.41: a refused sign-in revokes the deactivated user's whole grant, no stored-token check) |
-| ACC-17 | config | `github/tasks.py` | Without Redis (eager), revocation runs inside the request and autoretry repeats it inline up to 4 times, against "GitHub is slow". | partial; accepted (without Redis one attempt runs inline; the retry is scheduled and the robust `on_commit` logs it, never fails the request) |
+| ACC-17 | config | `github/tasks.py` | Without Redis (eager), revocation runs inside the request and autoretry repeats it inline up to 4 times, against "GitHub is slow". | partial; accepted (without Redis one attempt runs inline; the retry is scheduled and the robust `on_commit` logs it, never fails the request); superseded by GH-5 (0.12.42: eager mode decides as the last attempt, no inline retry) |
 | ACC-18 | bug | `services/github/accounts.py:54` | The replaced-token dispatch in `link_github_account`'s `on_commit` can raise into the view's new `except Exception` after the token is stored: `failed` redirect with a stored token, old token never revoked. | fixed (0.12.41: the replaced-token dispatch is robust too) |
 | ACC-19 | robustness | `services/github/accounts.py:77` | `revoke_encrypted_grant` skips a token under a removed key silently. | fixed (0.12.41: logged) |
 | ACC-20 | cleanup | `github/tasks.py` | Task `revoke_grant` shares its name with `oauth.revoke_grant` (plaintext): a wrong import sends ciphertext to GitHub or plaintext to the broker. | fixed (0.12.41: task renamed `github.revoke_later`) |
@@ -922,3 +925,45 @@ tests reuse `_assert_auth_error_redirect`, `encrypt_token` and `UserFactory`. Sk
 after-commit dispatch helper and a navigation-view error wrapper (both `ideas.md` §15), a pure
 grant/token decision function, a direct call in the `revoke_replaced_token` forwarder, a
 redaction pre-check and a `strict` flag on `_between`.
+
+## Sweep: `github/` (2026-10-30)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/github/`
+(migrations skipped), reading `services/github/accounts.py`, `services/github/retry.py`,
+`services/jobs.py`, `services/data_deletion.py` and `features/sync/api.ts` for context. Each row
+checked against the code. `/security-review` of the whole module found no high- or
+medium-confidence vulnerability (every view filters by `current_user`, no id parameters, CSRF on
+DELETE, explicit read-only serializers with no `GitHubAccount` field, token excluded from the
+admin and every `__repr__`, task arguments are job ids or ciphertext, ETag cache scoped per user
+except public repository data).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| GH-1 | robustness | `tasks.py:37` | `revoke_later` maps every non-GitHub exception (database error, code bug) to a final `internal_error` with no traceback logged: the token stays live and nobody can see why. | partial (jobs fail `internal_error` the same way, by policy; the defect is the missing traceback: `logger.exception` before recording the failure); fixed (0.12.42, `github-review-fixes`) |
+| GH-2 | security | `admin.py:6` | `GitHubAccountAdmin` and `GitHubProfileAdmin` keep add and delete: an admin delete skips revocation and `delete_github_data` (grant stays live, derived data orphaned); the add form (`user`, `github_id` read-only, token excluded) fails with an IntegrityError 500. | confirmed (`has_add_permission`, `has_delete_permission` → False, as `AuditEventAdmin`); fixed (0.12.42, `github-review-fixes`) |
+| GH-3 | bug | `api.py:116` | `GitHubDataView.delete` commits `delete_github_data`, then writes the audit entry outside its transaction, in the view: a failing audit write returns 500 with the data already gone and no `github_data_deleted` entry (CLAUDE.md §5; account deletion is atomic since 0.12.41). | confirmed (one `@transaction.atomic` service in `services/accounts.py`; spec delta: deletion and its audit entry together or not at all); fixed (0.12.42, `github-review-fixes`) |
+| GH-4 | bug | `api.py:134` | `max_page_size = 100` is hard-coded to the default `GITHUB_SYNC_MAX_REPOS`, and the SPA fetches one page (`page_size=100`, never `next`): with the cap raised, repositories past 100 never show. | partial (only with a non-default setting; page cap from the setting, SPA asks for it or follows `next`); fixed (0.12.42, `github-review-fixes`) |
+| GH-5 | config | `tasks.py:45` | `revoke_later` calls `self.retry` in eager mode (no `REDIS_URL`): up to 4 inline attempts with no backoff inside the request's `on_commit`. `run_tracked_job` decides as on the last attempt (D4). | confirmed (pass `REVOCATION_ATTEMPTS` as the attempt count when `CELERY_TASK_ALWAYS_EAGER`; supersedes ACC-17's acceptance); fixed (0.12.42, `github-review-fixes`) |
+| GH-6 | race | `services/github/accounts.py:78` | Between `revoke` reading the stored token (none) and `revoke_grant` reaching GitHub, a completed re-sign-in gets its new token killed with the grant. | accepted (window is one GitHub call; a lock cannot be held across it (no I/O under a lock) and the account row is gone after disconnect; the user signs in again; as ACC-4) |
+| GH-7 | efficiency | `api.py:153` | `.distinct()` in `RepositoryListView` is redundant: `unique_user_repository_relation` plus the user and OWNER filter give one row per repository; every page and count runs `SELECT DISTINCT`. | confirmed (remove); fixed (0.12.42, `github-review-fixes`) |
+| GH-8 | efficiency | `admin.py:8` | Both admins list `user` without `list_select_related`: one query per row. | confirmed (minor; `list_select_related = ("user",)`); fixed (0.12.42, `github-review-fixes`) |
+
+`/simplify` of the fix diff (2026-10-31): `core/admin.py` `NoAddDeleteAdmin` shared by the GitHub
+admins and `AuditEventAdmin`; `services/github/retry.attempt_number(executed, max_attempts,
+eager=)` is the one eager rule (`run_tracked_job`, `revoke_later`); the traceback follows the
+decision (`internal_error`); the SPA fetches `next`'s own query; tests bulk-create. Skipped: one
+huge `page_size` from the SPA (design D2), merging the three `ReadOnlyAdmin` copies (outside the
+diff).
+
+Review of the fix diff (`/code-review medium`, 2026-10-31), recorded as GH-9…GH-15, each checked
+against the code.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| GH-9 | behavior | `github/admin.py` | No delete permission on the GitHub admins also stops the admin deleting a User who has a GitHub account or profile (cascade). | accepted (intended: an admin user delete would drop the account without revoking, GH-2's hole; `delete_account` is the path; design Risks) |
+| GH-10 | robustness | `github/tasks.py` | `OAuthError` (GitHub refusing, 401/422) maps to `internal_error`, so it would log a traceback as "unexpected". | fixed (no traceback for `OAuthError`; the audit reason stays `internal_error`, as before) |
+| GH-11 | design | `features/sync/api.ts` | The SPA asks for 100 per page although the server cap follows the setting: a large cap takes several requests. | wontfix (design D2: the SPA never depends on the server cap) |
+| GH-12 | race | `features/sync/api.ts` | Page-number paging across requests can repeat or skip a row if a sync stores repositories between pages. | accepted (the dashboard refetches when the sync finishes; one page under the default cap) |
+| GH-13 | robustness | `features/sync/api.ts` | The page loop ignored the query's `AbortSignal`: a cancelled query kept fetching. | fixed (`signal` passed to every request) |
+| GH-14 | locking | `services/accounts.py` | The outer transaction makes the job cancel a savepoint, so job rows stay locked for the whole deletion. | accepted (design D1 and Risks; as disconnect since 0.12.41) |
+| GH-15 | naming | `services/accounts.py` | `accounts.delete_github_data` shadows `data_deletion.delete_github_data`. | accepted (design D1: callers import the module) |

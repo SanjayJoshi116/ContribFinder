@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import F, QuerySet
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.exceptions import NotFound
@@ -7,11 +8,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import AuditEvent
 from core.authentication import current_user
 from core.serializers import error_responses
 from repositories.models import Repository, UserRepository
-from services import audit, data_deletion
+from services import accounts
 
 from .models import GitHubProfile
 from .serializers import GitHubProfileSerializer, RepositorySerializer
@@ -46,23 +46,20 @@ class GitHubDataView(APIView):
     )
     def delete(self, request: Request) -> Response:
         """Delete everything derived from GitHub; the account and connection stay."""
-        user = current_user(request)
-        deleted = data_deletion.delete_github_data(user)
-        audit.record(
-            AuditEvent.Action.GITHUB_DATA_DELETED,
-            AuditEvent.Outcome.SUCCESS,
-            user=user,
-            request=request,
-            metadata={"deleted": deleted},
-        )
+        accounts.delete_github_data(current_user(request), request)
         return Response(status=204)
 
 
 class RepositoryPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
-    # Matches the default per-sync repository cap, so one request can return every repo.
-    max_page_size = 100
+
+    @property
+    def max_page_size(self) -> int:  # type: ignore[override]
+        """The per-sync repository cap (never below 100), so one request can return every
+        synced repository. Read per request, so a changed setting applies at once."""
+        cap: int = settings.GITHUB_SYNC_MAX_REPOS
+        return max(100, cap)
 
 
 class RepositoryListView(ListAPIView[Repository]):
@@ -81,7 +78,6 @@ class RepositoryListView(ListAPIView[Repository]):
             )
             .prefetch_related("languages", "topics")
             .order_by(F("pushed_at").desc(nulls_last=True), "full_name")
-            .distinct()
         )
 
     @extend_schema(

@@ -3,9 +3,7 @@
 ## Purpose
 
 Lets users start and follow background GitHub synchronization without waiting on a long HTTP request. It tracks each job's lifecycle and progress and exposes the synced data and last-sync time to the frontend.
-
 ## Requirements
-
 ### Requirement: Start a sync
 A signed-in user with a connected GitHub account SHALL be able to start a sync. The request SHALL return immediately with the job's ID and status, while the work runs in the background.
 
@@ -100,7 +98,7 @@ Disconnecting GitHub SHALL cancel every active job of the user: profile sync, pr
 - **THEN** the job ends as CANCELLED and the recommendations stored before it started are unchanged
 
 ### Requirement: Synced data endpoints
-The system SHALL expose the requesting user's synced GitHub profile, including whether a profile README exists, and a paginated list of the repositories they own with languages and topics. These SHALL be served from stored data without calling GitHub. Repositories linked to the user only as contributor SHALL NOT appear in the repository list.
+The system SHALL expose the requesting user's synced GitHub profile, including whether a profile README exists, and a paginated list of the repositories they own with languages and topics. These SHALL be served from stored data without calling GitHub. Repositories linked to the user only as contributor SHALL NOT appear in the repository list. A client SHALL be able to request a page as large as the per-sync repository cap (at least 100), and the dashboard SHALL show every synced repository.
 
 #### Scenario: Profile data
 - **WHEN** a signed-in user with a completed sync requests `GET /api/v1/profile/github`
@@ -113,6 +111,10 @@ The system SHALL expose the requesting user's synced GitHub profile, including w
 #### Scenario: Contributed repositories excluded
 - **WHEN** the user owns 2 repositories and is linked to 3 others as contributor
 - **THEN** the repository list contains only the 2 owned repositories
+
+#### Scenario: Cap above 100
+- **WHEN** the per-sync repository cap is 200 and a user has 150 owned repositories synced
+- **THEN** one request with a page size of 200 returns all 150, and the dashboard lists all 150
 
 #### Scenario: Not yet synced
 - **WHEN** a user with no completed sync requests `GET /api/v1/profile/github`
@@ -228,3 +230,4 @@ The endpoint SHALL read stored data only: it SHALL NOT call GitHub, start a job 
 #### Scenario: Read only
 - **WHEN** the versions are requested
 - **THEN** no job is started and no stored row changes
+

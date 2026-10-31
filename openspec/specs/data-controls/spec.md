@@ -3,9 +3,7 @@
 ## Purpose
 
 Gives developers control over the data ContribFinder keeps about them: refresh it, see what is stored and why, delete everything derived from GitHub, or delete their account entirely, with each sensitive action audited.
-
 ## Requirements
-
 ### Requirement: Refresh rebuilds the pipeline
 Refreshing (`POST /api/v1/profile/sync`, subject to the existing cooldown) SHALL run the whole pipeline as tracked background jobs: GitHub sync, profile analysis, repository discovery and recommendation generation, each starting when the previous one completes. A failed stage SHALL stop the chain and keep the previous results of later stages. The dashboard SHALL show which stage is running (syncing, analyzing, finding projects, preparing recommendations) and update without a reload.
 
@@ -18,7 +16,7 @@ Refreshing (`POST /api/v1/profile/sync`, subject to the existing cooldown) SHALL
 - **THEN** no recommendation generation starts from it and the user's previous recommendations are unchanged
 
 ### Requirement: Delete GitHub-derived data
-A signed-in user SHALL be able to delete all GitHub-derived data (`DELETE /api/v1/profile/github-data`, CSRF-protected). The system SHALL first cancel the user's active jobs, then delete: the stored GitHub profile and profile README, the display name taken from GitHub, the user's repository links, the developer profile with its skills, interests and evidence, the candidate pool and discovery records, recommendations and reasons, saved and dismissed repositories, feedback events, the user's job history, and the user's cached GitHub responses. Shared repository data SHALL be deleted when no other user's link, candidate, recommendation, save or dismissal references it. The user account and the GitHub connection SHALL be kept, and the user SHALL be able to sync again from the start. Deletion SHALL be complete when the response is returned, and SHALL stay complete: background work that was running for the user when deletion started SHALL NOT write any of the deleted kinds of data afterwards.
+A signed-in user SHALL be able to delete all GitHub-derived data (`DELETE /api/v1/profile/github-data`, CSRF-protected). The system SHALL first cancel the user's active jobs, then delete: the stored GitHub profile and profile README, the display name taken from GitHub, the user's repository links, the developer profile with its skills, interests and evidence, the candidate pool and discovery records, recommendations and reasons, saved and dismissed repositories, feedback events, the user's job history, and the user's cached GitHub responses. Shared repository data SHALL be deleted when no other user's link, candidate, recommendation, save or dismissal references it. The user account and the GitHub connection SHALL be kept, and the user SHALL be able to sync again from the start. Deletion SHALL be complete when the response is returned, and SHALL stay complete: background work that was running for the user when deletion started SHALL NOT write any of the deleted kinds of data afterwards. The deletion and its audit entry SHALL happen together or not at all.
 
 #### Scenario: Data deleted
 - **WHEN** a user with a synced profile, recommendations, saves and feedback deletes their GitHub data
@@ -35,6 +33,10 @@ A signed-in user SHALL be able to delete all GitHub-derived data (`DELETE /api/v
 #### Scenario: Running job finishes after deletion
 - **WHEN** a profile sync, profile analysis, discovery or recommendation job is in the middle of a step while the user deletes their GitHub data, and the step finishes afterwards
 - **THEN** the step writes nothing, the job ends as cancelled, and the user's GitHub profile, developer profile, repository links, candidates and recommendations still do not exist
+
+#### Scenario: Recording the deletion fails
+- **WHEN** writing the `github_data_deleted` audit entry fails during a GitHub data deletion
+- **THEN** the response is an error, the user's GitHub-derived data still exists, and no `github_data_deleted` entry exists
 
 ### Requirement: Delete account
 A signed-in user SHALL be able to delete their ContribFinder account (`DELETE /api/v1/auth/account`, CSRF-protected). The system SHALL cancel the user's jobs, delete the stored credential and all GitHub-derived data as above, delete the user, and end the session. When connected, it SHALL ask GitHub to revoke the authorization in the background, never inside the request, holding the token only encrypted; a failed revocation SHALL NOT stop the deletion and SHALL be recorded without the token. The deletion audit entry, the anonymization of the user's audit entries and the deletion of the user SHALL happen together or not at all. After deletion, signing in with the same GitHub account SHALL create a new, empty account.
@@ -92,3 +94,4 @@ The signed-in dashboard SHALL offer "Delete GitHub data" and "Delete account", e
 #### Scenario: Confirmation required
 - **WHEN** the user clicks "Delete account"
 - **THEN** nothing is deleted until they confirm in a dialog that describes what will be deleted
+

@@ -27,6 +27,12 @@ class Fail:
     code: str
 
 
+def attempt_number(executed: int, max_attempts: int, *, eager: bool) -> int:
+    """The attempt to decide on. Without a worker (eager mode) the first try is the last: a
+    retry would run inline, inside the request, with no backoff."""
+    return max_attempts if eager else executed
+
+
 def decide_retry(
     error: Exception,
     attempts: int,

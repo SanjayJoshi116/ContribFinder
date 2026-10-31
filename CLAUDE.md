@@ -92,7 +92,7 @@ ContribFinder/
 │  │  ├─ core/              health, auth class, CSRF/400/403/404 JSON views, log redaction, checks,
 │  │  │                     startup (production check gate), throttling (cache-outage fallback),
 │  │  │                     backoff (per-process skip after a cache error), csp (Content-Security-
-│  │  │                     Policy middleware), reports (JSON files written by commands)
+│  │  │                     Policy middleware), reports (JSON files written by commands), admin (NoAddDeleteAdmin)
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
 │  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status and data versions API,
@@ -1507,6 +1507,24 @@ narrowed to the uncommitted diff and were fixed before commit.
 - Disconnect response `revocation`: `queued` | `not_connected` (`revoked`, `failed` kept in the
   enum, unused; OpenAPI `1.0.0`).
 
+**GitHub app fixes, review sweep: github** (MVP+, fix release)  ✅ shipped in v0.12.42 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-10-31-github-review-fixes/`. Specs: deltas to
+`data-controls` ("Delete GitHub-derived data"), `sync-jobs` ("Synced data endpoints").
+`Bug_Backlog.md` batch 29 (GH-1…GH-15; GH-6, GH-9, GH-12, GH-14, GH-15 accepted, GH-11 wontfix).
+- `services/accounts.delete_github_data(user, request)`: `@transaction.atomic` around
+  `data_deletion.delete_github_data` and the `github_data_deleted` entry; the view only calls it.
+  Same name as the routine: import the module (`accounts.delete_...`), never the bare name.
+- `core/admin.NoAddDeleteAdmin[M]` (no add, no delete) for `AuditEventAdmin`, `GitHubAccountAdmin`,
+  `GitHubProfileAdmin`. The admin thus cannot delete a User with GitHub data (cascade);
+  `delete_account` is the path (GH-9).
+- `services/github/retry.attempt_number(executed, max_attempts, *, eager)` is the one "eager =
+  last attempt" rule (`run_tracked_job`, `revoke_later`). `revoke_later` logs a traceback for
+  `internal_error` except `OAuthError` (GitHub refusing).
+- `RepositoryPagination.max_page_size` is a property: `max(100, GITHUB_SYNC_MAX_REPOS)`.
+  `useRepositories` keeps `page_size=100` and fetches each `next` by its own query (with the
+  query's `signal`) into one page with the first `count`. `RepositoryListView` has no `distinct`.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1533,7 +1551,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42).
 
 ## 8. Release housekeeping
 

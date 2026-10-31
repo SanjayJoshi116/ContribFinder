@@ -160,6 +160,7 @@ def test_a_permanent_failure_is_audited_not_retried(caplog: pytest.LogCaptureFix
     event = AuditEvent.objects.get(action="github_revocation_failed")
     assert event.user is None and event.metadata == {"reason": "internal_error"}
     assert_no_secrets(caplog.text + str(event.metadata))
+    assert not any(r.exc_info for r in caplog.records)  # GitHub refusing is not a bug
 
 
 @respx.mock
