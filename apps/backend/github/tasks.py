@@ -7,6 +7,7 @@ from django.conf import settings
 from jobs.models import SyncJob
 from services.data_deletion import purge_user_github_cache
 from services.github.accounts import record_revocation_failure, revoke
+from services.github.errors import GitHubRateLimited
 from services.github.oauth import OAuthError
 from services.github.retry import Retry, attempt_number, decide_retry
 from services.github.sync import GitHubSyncService
@@ -48,6 +49,10 @@ def revoke_later(self: Any, encrypted: str, github_id: int | None, grant: bool) 
     try:
         revoke(encrypted, github_id, grant=grant)
     except Exception as exc:
+        if isinstance(exc, GitHubRateLimited):
+            # A revocation must not end for a long wait (the shared policy fails a wait above
+            # the cap): try again after at most the cap, until the attempts run out.
+            exc = GitHubRateLimited(str(exc), min(exc.retry_after, settings.GITHUB_MAX_RETRY_DELAY))
         decision = decide_retry(
             exc,
             attempt_number(

@@ -315,6 +315,8 @@ CELERY_BROKER_TRANSPORT_OPTIONS: dict[str, float] = {
     "visibility_timeout": max(3600, 2 * GITHUB_MAX_RETRY_DELAY),
 }
 GITHUB_ETAG_TTL = env.int("GITHUB_ETAG_TTL", default=24 * 60 * 60)
+# Response bodies larger than this are served but not cached (Redis also holds the broker).
+GITHUB_ETAG_MAX_BYTES = env.int("GITHUB_ETAG_MAX_BYTES", default=256 * 1024)
 # After a response-cache error, a process sends GitHub requests unconditionally this long.
 GITHUB_CACHE_BACKOFF_SECONDS = env.int("GITHUB_CACHE_BACKOFF_SECONDS", default=30)
 SYNC_MAX_ATTEMPTS = env.int("SYNC_MAX_ATTEMPTS", default=5)

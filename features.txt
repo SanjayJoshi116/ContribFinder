@@ -1,5 +1,5 @@
 ContribFinder - Feature list
-Version: 0.12.44 (2026-10-31)
+Version: 0.12.47 (2026-11-02)
 Legend: [x] shipped   [~] partial / carried over   [ ] planned
 FR IDs refer to "Software Requirements Specification - 2.txt" section 83.
 Phase details: CLAUDE.md section 7. Release notes: CHANGELOG.md. Unplanned ideas: ideas.md.
@@ -437,6 +437,40 @@ Browser tests
   [x] Review follow-ups Y-1..Y-5, Y-8: no "session ended" after your own sign-out, status
       never waits on its refresh, malformed hash and odd ids handled, failed dismiss keeps
       its page, browser tests ignore the local .env except DATABASE_URL
+
+============================================================================
+SHIPPED - v0.12.47 - Sign-in and sign-out fixes (review sweep: frontend/src/features/auth)
+============================================================================
+
+Web client (Bug_Backlog.md batch 34)
+  [x] Unknown sign-in error codes (including __proto__) show the generic message
+  [x] A failed identity refresh keeps the signed-in pages; a 401 on it shows "session ended"
+  [x] Log out, disconnect and account deletion leave no user data cached
+  [x] Delete GitHub data goes to onboarding from the action itself
+  [x] One account action at a time (log out, disconnect, delete data, delete account)
+
+============================================================================
+SHIPPED - v0.12.46 - API client fixes (review sweep: frontend/src/api)
+============================================================================
+
+Web client (Bug_Backlog.md batch 33)
+  [x] Every failed request reports a status and a code (network_error, invalid_response)
+  [x] An unreadable success body is not retried; no response still is
+  [x] A wait from Retry-After is kept without the error envelope
+  [x] One CSRF token request for concurrent changes, with its own error, kept alive with feedback events
+
+============================================================================
+SHIPPED - v0.12.45 - GitHub service fixes (review sweep: services/github)
+============================================================================
+
+GitHub data (Bug_Backlog.md batch 32)
+  [x] A sync stores repositories in the shared lock order (no deadlock with discovery)
+  [x] Languages and dependencies replaced under the repository row lock
+  [x] Next-page links followed only to the API origin (scheme, host, port)
+  [x] A rate-limited token revocation is retried, also when GitHub asks for a long wait
+  [x] A contributed repository unreadable for now keeps its link; two names of one repository add up
+  [x] Large GitHub responses are not cached (GITHUB_ETAG_MAX_BYTES)
+  [x] A retried dependencies step reads the set it first chose
 
 ============================================================================
 SHIPPED - v0.12.44 - Service fixes (review sweep: services)

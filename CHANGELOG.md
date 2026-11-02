@@ -7,6 +7,92 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.47] - 2026-11-02
+
+Sign-in and sign-out fixes from the review sweep
+(`openspec/changes/archive/2026-11-02-auth-review-fixes/`; spec `web-client`; `Bug_Backlog.md`
+batch 34). Frontend only; no migration. OpenAPI stays `1.0.0`; baselines unchanged. The
+fix-diff review is batch 35 (see 0.12.45).
+
+### Changed
+
+- Log out, disconnect and account deletion leave the signed-in app through one path: nothing is
+  refetched on the way and no user data stays cached afterwards (AUTH-4, AUTH-5).
+- Only one account action (log out, disconnect, delete data, delete account) runs at a time;
+  the others are disabled meanwhile (AUTH-8).
+
+### Fixed
+
+- A sign-in error code such as `__proto__` in the link no longer breaks the sign-in page
+  (AUTH-1).
+- A failed background refresh of the signed-in identity keeps the pages instead of replacing
+  them with an error (AUTH-2); a 401 on that refresh shows the session-ended notice (AUTH-3).
+- Deleting GitHub data leaves the dashboard before its data is removed, and navigates to
+  onboarding from the action itself (AUTH-6, AUTH-7).
+- The disconnect test answers `revocation: 'queued'`, as the backend does (AUTH-9).
+
+## [0.12.46] - 2026-11-02
+
+API client fixes from the review sweep (`openspec/changes/archive/2026-11-02-api-client-review-fixes/`;
+spec `web-client`; `Bug_Backlog.md` batch 33). Frontend only; no migration. OpenAPI stays `1.0.0`;
+baselines unchanged. Fix-diff review: batch 35 (see 0.12.45).
+
+### Changed
+
+- Every failed API call is an `ApiError` with a status and a code: `network_error` (status 0) when
+  no response arrived, `invalid_response` when a success body is not JSON (API-1).
+- Only `network_error` and 5xx are retried; an unreadable success body or a bug in a query
+  function is not (API-1).
+
+### Added
+
+- `apiFetch(path, { json })` sends a JSON body with its `Content-Type`; the feedback calls use it
+  (API-9).
+
+### Fixed
+
+- An error without the JSON envelope keeps its `Retry-After` wait (API-2).
+- A failed CSRF token request reports its own status and code instead of status 0
+  `csrf_unavailable` (API-3).
+- Concurrent mutations share one CSRF token request (API-4), and a `keepalive` request (feedback
+  events) sends it with `keepalive` too (API-5).
+
+## [0.12.45] - 2026-11-02
+
+GitHub service fixes from the review sweep
+(`openspec/changes/archive/2026-11-02-github-services-review-fixes/`; spec `github-data-sync`;
+`Bug_Backlog.md` batch 32), with the fix-diff review of 0.12.45–0.12.47
+(`openspec/changes/archive/2026-11-02-fix-diff-review-fixes/`; spec `github-authentication`;
+batch 35). No migration. OpenAPI stays `1.0.0`; baselines unchanged.
+
+### Added
+
+- `GITHUB_ETAG_MAX_BYTES` (default 256 KiB, check `core.E020`): GitHub response bodies larger
+  than it are served but not cached, so big READMEs no longer grow Redis (GHS-8).
+
+### Changed
+
+- Contributions observed under two names of one repository (renamed or transferred) are counted
+  together (GHS-5).
+- A contributed repository that is still observed but unreadable (403, 451) keeps its contributor
+  link and previous counts; a 404 or a repository the user now owns still drops it (GHS-6).
+
+### Fixed
+
+- The sync stores owned repositories in GitHub ID order, the order of every bulk repository lock,
+  so it cannot deadlock with another user's discovery (GHS-1).
+- Languages and dependencies are replaced under the repository row lock, so a concurrent analysis
+  no longer makes the sync fail (GHS-2).
+- A next-page link is followed only to the API origin (scheme, host and port), like a redirect;
+  one Link-header parser serves pagination and counts (GHS-3, GHS-10).
+- A rate-limited (403/429) token revocation is retried instead of failing for good, also
+  when GitHub asks for a wait longer than `GITHUB_MAX_RETRY_DELAY` (GHS-4, FD-1).
+- `httpx` decoding and URL errors become GitHub errors (transient or client), never an
+  unclassified failure (GHS-7).
+- A retried dependencies step reads the repositories its first attempt chose (GHS-9).
+- One date parser (`client.parse_dt`) and one `API_VERSION`; the status → error mapping is
+  `errors.error_for_response`, shared by the client and the revocation (GHS-10, FD-8).
+
 ## [0.12.44] - 2026-10-31
 
 Service fixes from the review sweep (`openspec/changes/archive/2026-10-31-services-review-fixes/`;

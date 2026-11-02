@@ -3,9 +3,7 @@
 ## Purpose
 
 Lets a developer sign in to ContribFinder with their GitHub account, stay signed in through a secure session, sign out, and disconnect GitHub. The GitHub credential stays protected on the server at all times.
-
 ## Requirements
-
 ### Requirement: Sign in with GitHub
 The system SHALL let an unauthenticated user start GitHub authorization. It SHALL redirect them to GitHub with a single-use, unguessable `state` value tied to their browser session. It SHALL request only the minimum permissions needed to read public GitHub data. A browser session SHALL be able to hold several pending `state` values at once, so sign-in started in more than one tab can complete from any of them. Each pending value SHALL expire after a short lifetime, and the number kept per session SHALL be bounded.
 
@@ -122,7 +120,7 @@ The system SHALL let a signed-in user end their session. Logout SHALL keep the G
 - **THEN** the session is invalidated, later requests with the old cookie are unauthenticated, and the linked GitHub account is kept
 
 ### Requirement: Disconnect GitHub
-The system SHALL let a signed-in user disconnect GitHub. Disconnect SHALL delete the stored token and GitHub account link at once, delete the user's GitHub-derived data (as defined by GitHub data deletion), keep only the account and its audit trail, and end every session of the user, on every device. It SHALL ask GitHub to revoke the app's authorization in the background, never inside the request; the background revocation SHALL hold the token only encrypted, SHALL be retried on temporary failures, and a final failure SHALL be recorded without the token. The response SHALL say whether a revocation was queued or the user had no GitHub connection.
+The system SHALL let a signed-in user disconnect GitHub. Disconnect SHALL delete the stored token and GitHub account link at once, delete the user's GitHub-derived data (as defined by GitHub data deletion), keep only the account and its audit trail, and end every session of the user, on every device. It SHALL ask GitHub to revoke the app's authorization in the background, never inside the request; the background revocation SHALL hold the token only encrypted, SHALL be retried on temporary failures and on rate limits (waiting at most the configured maximum retry delay before each retry, however long a wait GitHub asks for), and a final failure SHALL be recorded without the token. The response SHALL say whether a revocation was queued or the user had no GitHub connection.
 
 #### Scenario: Successful disconnect
 - **WHEN** a signed-in user sends `POST /api/v1/auth/github/disconnect` with a valid CSRF token
@@ -144,6 +142,10 @@ The system SHALL let a signed-in user disconnect GitHub. Disconnect SHALL delete
 - **WHEN** a user who disconnected signs in with the same GitHub account again
 - **THEN** a GitHub account link is re-created for their existing user, and their data is synced from scratch
 
+#### Scenario: Revocation rate-limited with a long wait
+- **WHEN** GitHub answers the background revocation with a rate limit whose reset is an hour away
+- **THEN** the revocation is retried after at most the maximum retry delay instead of being recorded as failed
+
 ### Requirement: Audit trail for sensitive account actions
 The system SHALL record an audit entry for every sign-in, sign-in failure, logout, GitHub disconnect, GitHub data deletion and account deletion. Each entry SHALL hold the user (if known and not deleted), the action, the outcome and a timestamp, and SHALL NOT hold any credential. Audit entries SHALL NOT be added, changed or deleted through the administration interface.
 
@@ -158,3 +160,4 @@ The system SHALL record an audit entry for every sign-in, sign-in failure, logou
 #### Scenario: Audit entries are read-only for staff
 - **WHEN** a staff user opens the audit entries in the administration interface
 - **THEN** they can list and view entries but cannot add or delete any
+

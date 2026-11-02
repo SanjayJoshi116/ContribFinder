@@ -3,9 +3,7 @@
 ## Purpose
 
 Fetches a signed-in user's public GitHub data (profile, profile README, owned repositories, languages, topics) into ContribFinder. Later profiling and matching stages read it locally instead of calling GitHub on every request.
-
 ## Requirements
-
 ### Requirement: GitHub profile ingestion
 A sync SHALL fetch the authenticated user's GitHub profile and store it: GitHub ID, username, display name, bio, company, location, blog/website, follower count, following count, public repository count and account creation date. Each sync SHALL overwrite values that changed on GitHub. The username and avatar URL shown for the signed-in user SHALL be updated from the same response, so a rename on GitHub is visible after the next sync without signing in again.
 
@@ -146,7 +144,7 @@ The system SHALL send conditional requests (ETag) for resources it has fetched b
 - **THEN** that request does not try the cache and is sent without a condition
 
 ### Requirement: Credential use during sync
-Sync SHALL authenticate to GitHub with the user's stored token. The token SHALL NOT appear in job records, job arguments, error messages or logs. If GitHub rejects the token, the user has no connected GitHub account, or the stored token cannot be decrypted with any configured key, the sync SHALL stop without retrying and report that the user must sign in again. Redirects SHALL be followed with the token only to the GitHub API's own origin (same scheme, host and port); a redirect anywhere else, including plain HTTP on the same host, SHALL NOT be followed and SHALL NOT receive the token.
+Sync SHALL authenticate to GitHub with the user's stored token. The token SHALL NOT appear in job records, job arguments, error messages or logs. If GitHub rejects the token, the user has no connected GitHub account, or the stored token cannot be decrypted with any configured key, the sync SHALL stop without retrying and report that the user must sign in again. Redirects and pagination links SHALL be followed with the token only to the GitHub API's own origin (same scheme, host and port); a redirect or next-page link anywhere else, including plain HTTP or another port on the same host, SHALL NOT be followed and SHALL NOT receive the token.
 
 #### Scenario: Token revoked on GitHub
 - **WHEN** GitHub answers a sync request with 401
@@ -167,6 +165,10 @@ Sync SHALL authenticate to GitHub with the user's stored token. The token SHALL 
 #### Scenario: Redirect to plain HTTP
 - **WHEN** GitHub answers a request with a redirect to `http://` on the GitHub API host
 - **THEN** the redirect is not followed, no request carrying the token is sent over plain HTTP, and the request fails as a client error
+
+#### Scenario: Next-page link to plain HTTP
+- **WHEN** GitHub answers a listing with a next-page link to `http://` or another port on the GitHub API host
+- **THEN** the link is not followed, no request carrying the token is sent there, and the request fails as a client error
 
 ### Requirement: Dependency manifest ingestion
 A sync SHALL read root-level dependency manifests for the user's most recently pushed owned non-fork repositories, up to a configured number of repositories (default 30). The supported manifests are requirements.txt, pyproject.toml, package.json, go.mod, Cargo.toml, pom.xml, build.gradle and build.gradle.kts. For each repository the system SHALL store the dependency names found per ecosystem and manifest, replacing the previous set on each sync. Raw manifest contents SHALL NOT be stored. Manifests larger than a configured size SHALL be skipped. An empty repository, a repository without supported manifests, or a manifest that cannot be fetched (not found or forbidden) SHALL be skipped without failing the sync. A manifest that cannot be parsed, including one nested too deeply to parse, SHALL contribute no dependencies and SHALL NOT fail the sync or any other job that reads it. Rate limits and transient failures SHALL be handled as for other sync requests, and a retried sync SHALL NOT re-read repositories it already finished.
@@ -196,7 +198,7 @@ A sync SHALL collect the user's public contributions to repositories they do not
 - merged pull requests authored by the user, up to a configured number;
 - public push activity in the recent public events GitHub provides.
 
-For the contributed repositories with the most contributions, up to a configured number (default 20), the system SHALL store repository metadata, languages and topics as for owned repositories. It SHALL link them to the user as contributor with the number of merged pull requests and pushes observed, and the time of the latest one. Contributor links that are no longer observed SHALL be removed on the next successful sync. Private activity SHALL NOT be requested. If GitHub rejects the contribution search for the user as invalid, the step SHALL be recorded as skipped and the sync SHALL complete. A contributed repository that was renamed or transferred on GitHub SHALL be followed to its current name and stored under it; a repository that cannot be read (not found, forbidden or another non-retryable client error) SHALL be skipped without failing the sync.
+For the contributed repositories with the most contributions, up to a configured number (default 20), the system SHALL store repository metadata, languages and topics as for owned repositories. It SHALL link them to the user as contributor with the number of merged pull requests and pushes observed, and the time of the latest one. Contributor links that are no longer observed SHALL be removed on the next successful sync; a link to a repository that is still observed but cannot be read this time (forbidden, unreadable) SHALL be kept with its previous counts. Contributions observed under two names of one repository (renamed or transferred) SHALL be counted together. Private activity SHALL NOT be requested. If GitHub rejects the contribution search for the user as invalid, the step SHALL be recorded as skipped and the sync SHALL complete. A contributed repository that was renamed or transferred on GitHub SHALL be followed to its current name and stored under it; a repository that cannot be read (not found, forbidden or another non-retryable client error) SHALL be skipped without failing the sync.
 
 #### Scenario: Merged pull requests recorded
 - **WHEN** the user has 3 merged pull requests to `pallets/flask` and 1 to `psf/requests`
@@ -217,3 +219,12 @@ For the contributed repositories with the most contributions, up to a configured
 #### Scenario: Renamed contributed repository
 - **WHEN** the user's merged pull requests point to `old-org/tool`, and GitHub answers requests for it with a 301 redirect to the repository's current API location, `new-org/tool`
 - **THEN** the repository is stored as `new-org/tool` with its languages and topics and linked to the user as contributor
+
+#### Scenario: Contributed repository temporarily unreadable
+- **WHEN** a repository the user is linked to as contributor is still among their contributions but answers 403 during a sync
+- **THEN** the repository is skipped, the sync completes, and the contributor link keeps its previous counts
+
+#### Scenario: Contributions under an old and a new name
+- **WHEN** the user has 3 merged pull requests to `old-org/proj` and 2 pushes to `new-org/proj`, which GitHub resolves to the same repository
+- **THEN** one contributor link is stored with 3 merged pull requests and 2 pushes
+

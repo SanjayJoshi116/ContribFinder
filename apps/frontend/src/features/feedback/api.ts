@@ -35,8 +35,7 @@ export function recordFeedback(
 ): void {
   apiFetch<void>(`/recommendations/${recommendationId}/feedback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...extra }),
+    json: { action, ...extra },
     keepalive: true,
   }).catch(() => undefined)
 }
@@ -107,13 +106,7 @@ export function useDismiss() {
     mutationFn: ({ id, reason }) =>
       apiFetch(
         `/recommendations/${id}/dismiss`,
-        reason
-          ? {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reason }),
-            }
-          : { method: 'POST' },
+        reason ? { method: 'POST', json: { reason } } : { method: 'POST' },
       ),
     onMutate: async ({ id }) => {
       const previous = await snapshot(queryClient, id)

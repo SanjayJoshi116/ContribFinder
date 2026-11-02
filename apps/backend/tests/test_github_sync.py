@@ -83,11 +83,16 @@ def mock_github(
     return languages
 
 
-@pytest.fixture
-def job(user):
+def running_sync_job(user) -> SyncJob:
+    """A RUNNING profile sync of ``user``, as a claimed worker sees it."""
     return SyncJob.objects.create(
         user=user, job_type=SYNC, status="RUNNING", steps=initial_steps(), attempts=1
     )
+
+
+@pytest.fixture
+def job(user):
+    return running_sync_job(user)
 
 
 def run(job) -> None:

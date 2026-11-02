@@ -1,8 +1,8 @@
-import { MutationCache, QueryCache, QueryClient, hashKey } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 
 import { ApiError } from '@/api/client'
-import { ENDS_SESSION_META_KEY, meQueryKey } from '@/features/auth/api'
-import { SESSION_ENDED_PATH } from '@/features/auth/authErrors'
+
+import { ENDS_SESSION_META_KEY, type Navigate, endSession, isMe } from './session'
 
 const MAX_RETRIES = 2
 
@@ -11,38 +11,16 @@ const MAX_RETRIES = 2
  * every mount or focus. Status queries set `staleTime: 0`. */
 const DERIVED_STALE_TIME_MS = 5 * 60_000
 
-/** Only failures a retry can fix: no response (network, CSRF fetch) or a server error. A 4xx
- * is the answer, and retrying it only delays showing it. */
+/** Only failures a retry can fix: no response (`network_error`) or a server error. A 4xx is
+ * the answer, and retrying it only delays showing it; an unreadable success body or a bug in a
+ * query function would fail the same way again. */
 function isRetryable(error: unknown): boolean {
-  if (!(error instanceof ApiError)) return true
-  return error.status === 0 || error.status >= 500
-}
-
-const meQueryHash = hashKey(meQueryKey)
-const isMe = (query: { queryHash: string }) => query.queryHash === meQueryHash
-
-/** Leaves the signed-in app for the sign-in page with the session-ended notice. Only the
- * identity is dropped here, so the sign-in page asks the server again instead of bouncing back
- * to /app; the sign-in page drops the rest (`clearSignedInData`) once no signed-in page is left
- * to refetch it. */
-async function endSession(queryClient: QueryClient, navigate: Navigate): Promise<void> {
-  await queryClient.cancelQueries()
-  queryClient.removeQueries({ queryKey: meQueryKey, exact: true })
-  await navigate(SESSION_ENDED_PATH)
-}
-
-/** Drops every cached query except the identity, and pending mutation state. */
-export function clearSignedInData(queryClient: QueryClient): void {
-  queryClient.removeQueries({ predicate: (query) => !isMe(query) })
-  queryClient.getMutationCache().clear()
+  return error instanceof ApiError && (error.status === 0 || error.status >= 500)
 }
 
 function endsSession(meta: Record<string, unknown> | undefined): boolean {
   return meta?.[ENDS_SESSION_META_KEY] === true
 }
-
-/** Replaces the current location, e.g. `(path) => router.navigate(path, { replace: true })`. */
-type Navigate = (path: string) => Promise<void>
 
 interface Options {
   /** Used once when a signed-in request answers 401 (to the sign-in page), and again only after
@@ -64,10 +42,11 @@ export function createQueryClient({ navigate, retryDelay }: Options): QueryClien
 
   const queryClient = new QueryClient({
     queryCache: new QueryCache({
-      // A 401 on /auth/me is the normal signed-out answer: RequireAuth and the landing page
-      // handle it, and a first-time visitor must not be told their session ended.
+      // A 401 on /auth/me is the normal signed-out answer (RequireAuth and the landing page
+      // handle it, and a first-time visitor must not be told their session ended), unless the
+      // identity was known: then the session ended.
       onError: (error, query) => {
-        if (!isMe(query)) unauthenticated(error)
+        if (!isMe(query) || query.state.data !== undefined) unauthenticated(error)
       },
       onSuccess: (_data, query) => {
         if (isMe(query)) signedOut = false

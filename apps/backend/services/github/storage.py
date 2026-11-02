@@ -60,7 +60,16 @@ def upsert_repository(gh: GitHubRepo, now: Any, *, metadata_fetched: bool = True
     return repo
 
 
+def lock_repository(repo: Repository) -> None:
+    """Hold the repository row for a ``replace_*`` when nothing holds it yet (``upsert_repository``
+    and the analysis' claim already do): two writers never interleave delete and insert
+    (GHS-2)."""
+    list(Repository.objects.select_for_update().filter(pk=repo.pk).values_list("pk"))
+
+
 def replace_languages(repo: Repository, languages: dict[str, int]) -> None:
+    """Callers hold the repository row lock (``lock_repository``, or ``upsert_repository`` in
+    the same transaction)."""
     RepositoryLanguage.objects.filter(repository=repo).delete()
     RepositoryLanguage.objects.bulk_create(
         RepositoryLanguage(repository=repo, language=lang, bytes=count)
@@ -97,6 +106,7 @@ def read_manifests(
 
 
 def replace_dependencies(repo: Repository, dependencies: dict[tuple[str, str], str]) -> None:
+    """Callers hold the repository row lock, as for ``replace_languages``."""
     RepositoryDependency.objects.filter(repository=repo).delete()
     RepositoryDependency.objects.bulk_create(
         RepositoryDependency(repository=repo, ecosystem=eco, name=name, manifest_path=path)

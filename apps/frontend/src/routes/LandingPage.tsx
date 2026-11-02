@@ -3,7 +3,7 @@ import { LogIn } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 
-import { clearSignedInData } from '@/app/queryClient'
+import { clearSignedInData } from '@/app/session'
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL, useMe } from '@/features/auth/api'
 import { authErrorMessage } from '@/features/auth/authErrors'

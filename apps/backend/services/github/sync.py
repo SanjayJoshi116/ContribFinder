@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import datetime
 from typing import Any
 
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 
 from accounts.models import User
@@ -28,9 +27,10 @@ from repositories.models import (
 from services.job_guard import heartbeat, job_write, merge_metadata, save_progress
 from services.profiling.analysis import ProfileAnalysisService
 
-from .client import GitHubClient, GitHubUser, PullRequestRef, PushRef
+from .client import GitHubClient, GitHubUser, PullRequestRef, PushRef, parse_dt
 from .errors import GitHubClientError, GitHubForbidden, GitHubNotFound, GitHubValidationError
 from .storage import (
+    lock_repository,
     read_manifests,
     replace_dependencies,
     replace_languages,
@@ -135,7 +135,9 @@ class GitHubSyncService:
         owned = [r for r in repos if r.owner_login.lower() == login.lower()]
         owned.sort(key=lambda r: r.pushed_at or timezone.now().replace(year=1970), reverse=True)
         cap = settings.GITHUB_SYNC_MAX_REPOS
-        selected = owned[:cap]
+        # Chosen by push time, stored in GitHub ID order: the order of every bulk lock on
+        # shared repository rows, so a sync never deadlocks with discovery (GHS-1).
+        selected = sorted(owned[:cap], key=lambda r: r.github_id)
 
         now = timezone.now()
         with job_write(self.job):
@@ -186,6 +188,7 @@ class GitHubSyncService:
                 if languages is None:
                     skipped.append(repo.pk)
                 else:
+                    lock_repository(repo)
                     replace_languages(repo, languages)
                 done.append(repo.pk)
                 merge_metadata(self.job, {"languages_done": done, "languages_skipped": skipped})
@@ -196,15 +199,25 @@ class GitHubSyncService:
 
     def _step_dependencies(self, client: GitHubClient) -> str:
         done: list[int] = list(self.job.metadata.get("dependencies_done", []))
-        candidates = Repository.objects.filter(
-            pk__in=self.job.metadata.get("repo_ids", []), is_fork=False
-        ).order_by(F("pushed_at").desc(nulls_last=True), "pk")
-        cap = settings.GITHUB_MANIFEST_MAX_REPOS
-        total = candidates.count()
-        merge_metadata(self.job, {"dependencies_total": total, "dependencies_capped": total > cap})
-        for repo in candidates[:cap]:
-            if repo.pk in done:
-                continue
+        ids: list[int] | None = self.job.metadata.get("dependencies_ids")
+        if ids is None:
+            # Chosen once: a retry reads the same set, whatever was pushed since (GHS-9).
+            candidates = Repository.objects.filter(
+                pk__in=self.job.metadata.get("repo_ids", []), is_fork=False
+            ).order_by(F("pushed_at").desc(nulls_last=True), "pk")
+            cap = settings.GITHUB_MANIFEST_MAX_REPOS
+            total = candidates.count()
+            ids = list(candidates.values_list("pk", flat=True)[:cap])
+            merge_metadata(
+                self.job,
+                {
+                    "dependencies_ids": ids,
+                    "dependencies_total": total,
+                    "dependencies_capped": total > cap,
+                },
+            )
+        repos = Repository.objects.in_bulk([pk for pk in ids if pk not in done])
+        for repo in (repos[pk] for pk in ids if pk in repos):  # chosen order; deleted ones gone
             self._check_cancelled()
             try:
                 dependencies = read_manifests(client, repo.full_name)
@@ -212,6 +225,7 @@ class GitHubSyncService:
                 dependencies = None  # unreadable right now: keep what we knew
             if dependencies is not None:
                 with job_write(self.job):
+                    lock_repository(repo)
                     replace_dependencies(repo, dependencies)
             done.append(repo.pk)
             merge_metadata(self.job, {"dependencies_done": done})
@@ -240,22 +254,29 @@ class GitHubSyncService:
 
         # full name → stored repository pk, or None when it could not (or must not) be stored
         done: dict[str, int | None] = dict(self.job.metadata.get("contrib_done", {}))
+        # names observed but unreadable this time (403, 451, ...): their links are kept (GHS-6)
+        skipped: list[str] = list(self.job.metadata.get("contrib_skipped", []))
         for item in plan:
             name = item["full_name"]
             if name in done:
                 continue
             self._check_cancelled()
-            done[name] = self._store_contributed_repository(client, name, login)
-            merge_metadata(self.job, {"contrib_done": done})
+            try:
+                done[name] = self._store_contributed_repository(client, name, login)
+            except SKIPPABLE:
+                done[name] = None
+                skipped.append(name)
+            merge_metadata(self.job, {"contrib_done": done, "contrib_skipped": skipped})
 
-        by_pk: dict[int, dict[str, Any]] = {
-            pk: item for item in plan if (pk := done.get(item["full_name"])) is not None
-        }
+        by_pk = _merge_by_repository(plan, done)
         with job_write(self.job):
             links = UserRepository.objects.filter(
                 user=self.user, relation=UserRepository.Relation.CONTRIBUTOR
             )
-            links.exclude(repository_id__in=by_pk).delete()
+            unreadable = Q()
+            for name in skipped:
+                unreadable |= Q(repository__full_name__iexact=name)
+            links.exclude(repository_id__in=by_pk).exclude(unreadable).delete()
             for pk, item in by_pk.items():
                 UserRepository.objects.update_or_create(
                     user=self.user,
@@ -264,7 +285,7 @@ class GitHubSyncService:
                     defaults={
                         "merged_pr_count": item["prs"],
                         "push_count": item["pushes"],
-                        "last_contributed_at": _parse_dt(item["last"]),
+                        "last_contributed_at": parse_dt(item["last"]),
                     },
                 )
         return Step.DONE
@@ -277,12 +298,14 @@ class GitHubSyncService:
     def _store_contributed_repository(
         self, client: GitHubClient, full_name: str, login: str
     ) -> int | None:
+        """The stored repository's pk, or None when it is gone (404) or now the user's own.
+        Other ``SKIPPABLE`` errors propagate: the repository is observed but unreadable."""
         try:
             gh = client.get_repository(full_name)
             if gh.owner_login.lower() == login.lower():
                 return None  # transferred to the user since: it is their own repository now
             languages = client.get_languages(gh.full_name)
-        except SKIPPABLE:
+        except GitHubNotFound:
             return None
         with job_write(self.job):
             repo = upsert_repository(gh, timezone.now())
@@ -312,7 +335,7 @@ class GitHubSyncService:
                 key, {"full_name": full_name, "prs": 0, "pushes": 0, "last": None}
             )
             entry[kind] += 1
-            last = _parse_dt(entry["last"])
+            last = parse_dt(entry["last"])
             if when and (last is None or when > last):
                 entry["last"] = when.isoformat()
         ranked = sorted(grouped.values(), key=lambda e: (-e["prs"], -e["pushes"], e["full_name"]))
@@ -332,5 +355,23 @@ class GitHubSyncService:
         save_progress(self.job, steps=self.job.steps)
 
 
-def _parse_dt(value: str | None) -> datetime | None:
-    return datetime.fromisoformat(value) if value else None
+def _merge_by_repository(
+    plan: list[dict[str, Any]], done: dict[str, int | None]
+) -> dict[int, dict[str, Any]]:
+    """Plan items by stored pk. Two names of one repository (renamed or transferred) add up:
+    PRs and pushes summed, the latest time kept (GHS-5)."""
+    by_pk: dict[int, dict[str, Any]] = {}
+    for item in plan:
+        pk = done.get(item["full_name"])
+        if pk is None:
+            continue
+        merged = by_pk.get(pk)
+        if merged is None:
+            by_pk[pk] = dict(item)
+            continue
+        merged["prs"] += item["prs"]
+        merged["pushes"] += item["pushes"]
+        last, other = parse_dt(merged["last"]), parse_dt(item["last"])
+        if other is not None and (last is None or other > last):
+            merged["last"] = item["last"]
+    return by_pk

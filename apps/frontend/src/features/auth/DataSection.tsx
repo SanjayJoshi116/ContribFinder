@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 
 import {
   AlertDialog,
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 
-import { useDeleteAccount, useDeleteGitHubData } from './api'
+import { useAccountActionPending, useDeleteAccount, useDeleteGitHubData } from './api'
 
 const GITHUB_DATA =
   'your synced GitHub profile and profile README, your repository list, your developer profile ' +
@@ -58,10 +58,9 @@ function ConfirmDelete({
 
 /** "Your data": what is stored and how to delete it (FR-DATA-003). */
 export function DataSection() {
-  const navigate = useNavigate()
   const deleteData = useDeleteGitHubData()
   const deleteAccount = useDeleteAccount()
-  const busy = deleteData.isPending || deleteAccount.isPending
+  const busy = useAccountActionPending()
 
   return (
     <section className="space-y-3 rounded-lg border p-4" aria-labelledby="your-data-heading">
@@ -81,11 +80,7 @@ export function DataSection() {
           description={`This deletes ${GITHUB_DATA}. Your account and GitHub connection stay, so you can sync again from the start.`}
           confirm="Delete data"
           disabled={busy}
-          onConfirm={() =>
-            deleteData.mutate(undefined, {
-              onSuccess: () => navigate('/onboarding', { replace: true }),
-            })
-          }
+          onConfirm={() => deleteData.mutate()}
         />
         <ConfirmDelete
           trigger="Delete account"
@@ -93,11 +88,7 @@ export function DataSection() {
           description={`This revokes ContribFinder's access on GitHub and deletes your account, the stored GitHub credential and ${GITHUB_DATA}. It cannot be undone. An audit entry of the deletion is kept without any link to you.`}
           confirm="Delete account"
           disabled={busy}
-          onConfirm={() =>
-            deleteAccount.mutate(undefined, {
-              onSuccess: () => navigate('/', { replace: true }),
-            })
-          }
+          onConfirm={() => deleteAccount.mutate()}
         />
       </div>
       {(deleteData.isError || deleteAccount.isError) && (

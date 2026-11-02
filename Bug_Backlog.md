@@ -54,9 +54,9 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | High | `apps/backend/github/` | GitHubAccount/Profile, sync task, profile API | [x] batch 29 | [x] no findings |
 | High | `apps/backend/e2e/` | seed command; must stay out of production | [x] batch 30 | [x] no findings |
 | High | `apps/backend/services/*.py` | crypto, audit, jobs, job_guard, locks, feedback, data_deletion, data_versions | [x] batch 31 | [x] no findings |
-| High | `apps/backend/services/github/` | OAuth, GitHubClient, sync, storage | [ ] | [ ] |
-| High | `apps/frontend/src/api/` | client.ts, types.ts (skip generated openapi.json, schema.d.ts) | [ ] | [ ] |
-| High | `apps/frontend/src/features/auth/` | sign-in, route guard | [ ] | [ ] |
+| High | `apps/backend/services/github/` | OAuth, GitHubClient, sync, storage | [x] batch 32 | [x] no findings |
+| High | `apps/frontend/src/api/` | client.ts, types.ts (skip generated openapi.json, schema.d.ts) | [x] batch 33 | [x] no findings |
+| High | `apps/frontend/src/features/auth/` | sign-in, route guard | [x] batch 34 | [x] no findings |
 | Medium | `apps/backend/jobs/` | SyncJob, status and versions API, recovery | [ ] | [ ] |
 | Medium | `apps/backend/developers/` | profile, skills, interests; profile API | [ ] | [ ] |
 | Medium | `apps/backend/repositories/` | repository models, discovery API, tasks, reports | [ ] | [ ] |
@@ -86,10 +86,13 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 ## Open items
 
 The full review sweep above: started 2026-10-30; `config/`, `core/` and `accounts/` reviewed and
-fixed (batches 26–28; no security findings); `github/`, `e2e/` and `services/*.py` reviewed and
-fixed (batches 29–31; no security findings), 28 modules to go. Batches 26–31 fixed in
-0.12.39–0.12.44 (CFG-7, CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 and SVC-13…SVC-15,
-SVC-17…SVC-19 accepted). Open: SVC-16 (per-user ETag cache generation, the root fix for SVC-6). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+fixed (batches 26–28; no security findings); `github/`, `e2e/`, `services/*.py` and `services/github/`
+reviewed and fixed (batches 29–32; no security findings); `frontend/src/api/` reviewed and fixed (batch 33;
+no security findings); `frontend/src/features/auth/` reviewed and fixed (batch 34; no security
+findings), 25 modules to go. Batches 26–34 fixed in
+0.12.39–0.12.47 (CFG-7, CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 and SVC-13…SVC-15,
+SVC-17…SVC-19 accepted; batches 32–34: one `/simplify` and one fix-diff `/code-review` over their combined diff, batch 35).
+Open: SVC-16 (per-user ETag cache generation, the root fix for SVC-6). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
 their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
@@ -181,6 +184,10 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 29 | **Sweep: `github/`** | GH-1…GH-8 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/github/`, verified; fixed in 0.12.42 (`github-review-fixes`), GH-6 accepted; its fix-diff review GH-9…GH-15 (GH-10, GH-13 fixed, the rest accepted or wontfix). `/security-review` of the module found nothing. |
 | 30 | **Sweep: `e2e/`** | SEED-1…SEED-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/e2e/`, verified; fixed in 0.12.43 (`e2e-seed-review-fixes`); its fix-diff review SEED-11…SEED-19 (SEED-13, SEED-14, SEED-18 accepted, the rest fixed). `/security-review` of the module found nothing. |
 | 31 | **Sweep: `services/*.py`** | SVC-1…SVC-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/services/*.py`, verified; fixed in 0.12.44 (`services-review-fixes`); its fix-diff review SVC-11…SVC-20 (SVC-11, SVC-12 fixed, SVC-20 in part, SVC-16 open, the rest accepted). `/security-review` of the module found nothing (validated against the code). |
+| 32 | **Sweep: `services/github/`** | GHS-1…GHS-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/services/github/`, verified; GHS-3, GHS-7, GHS-8 partial, the rest confirmed; fixed in 0.12.45 (`github-services-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing (validated against the code). |
+| 33 | **Sweep: `frontend/src/api/`** | API-1…API-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/frontend/src/api/`, verified; API-1, API-4, API-9 confirmed, API-2, API-3, API-5 partial, API-6, API-7 accepted, API-8 false positive; fixed in 0.12.46 (`api-client-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing. `openapi.json` matches a fresh export. |
+| 34 | **Sweep: `frontend/src/features/auth/`** | AUTH-1…AUTH-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/frontend/src/features/auth/`, verified; AUTH-1, AUTH-2, AUTH-5, AUTH-6, AUTH-7, AUTH-9 confirmed, AUTH-3, AUTH-4, AUTH-8 partial; fixed in 0.12.47 (`auth-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing (no cross-user path for AUTH-4: sign-in is a full-page navigation). |
+| 35 | **Fix-diff review of batches 32–34** | FD-1…FD-10 | `/simplify` (4 agents, one combined diff of 0.12.45–0.12.47: `errors.error_for_response`, `client.parse_dt`, `storage.lock_repository` in the sync steps, `src/app/session.ts`, private `csrfToken`, shared test fixtures) then `/code-review` (high) of the result, 2026-11-02, verified; FD-1, FD-8, FD-10 fixed before commit, the rest accepted or wontfix. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -195,7 +202,10 @@ title keywords, and T-11's `issue-matching` spec was edited directly), with P-1 
 (`released-name-refresh`); RT-1, RT-2, RT-6 of batch 24 in 0.12.37 (`route-id-validation`); E2E-1, E2E-2, E2E-5, E2E-7
 (and E2E-6 documented) of batch 25 in 0.12.38 (`e2e-production-build`); batch 26 (CFG-1…CFG-20,
 CFG-7 and CFG-8 accepted) in 0.12.39 (`config-review-fixes`); batch 27 (CORE-1…CORE-10) in 0.12.40
-(`core-review-fixes`); batch 28 (ACC-1…ACC-10, ACC-4 accepted) in 0.12.41 (`accounts-review-fixes`).
+(`core-review-fixes`); batch 28 (ACC-1…ACC-10, ACC-4 accepted) in 0.12.41 (`accounts-review-fixes`); batch 32 (GHS-1…GHS-10) in 0.12.45
+(`github-services-review-fixes`); batch 33 (API-1…API-5, API-9; API-6, API-7 accepted, API-8 false
+positive) in 0.12.46 (`api-client-review-fixes`); batch 34 (AUTH-1…AUTH-9) in 0.12.47
+(`auth-review-fixes`).
 Next: the full review sweep; RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
@@ -1054,3 +1064,80 @@ checked against the code.
 | SVC-19 | freshness | `data_versions.py` | Event `created_at` is stamped at insert, not commit: a change committed after a newer generation time is not seen. | accepted (same clock basis as every version time) |
 | SVC-20 | migration | `feedback/0006` | Generated dependencies on unrelated apps; non-concurrent `AddIndex`. | fixed in part (dependencies trimmed to `feedback.0005` and the user model); plain `AddIndex` kept, as `feedback.0003` |
 
+## Sweep: `services/github/` (2026-10-31)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/services/github/`
+(client, sync, oauth, accounts, storage, retry, errors), reading discovery's lock order,
+`lifecycle.release_name`, `backlog.queue_released`, the analysis writers, `job_guard` and
+`revoke_later` for context. Each row checked against the code.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| GHS-1 | deadlock | `sync.py:142` | The repositories step upserts shared repository rows in one transaction in `pushed_at` order; discovery and orphan cleanup lock them in GitHub ID order, so a sync and another user's discovery can deadlock. | confirmed (upsert in GitHub ID order; selection by push time unchanged); fixed (0.12.45: upsert sorted by `github_id`) |
+| GHS-2 | race | `sync.py:189`, `:215` | Languages and dependencies are replaced (delete, insert) without the repository row lock; an analysis of the same shared row writes them under the lock, so the sync's insert can hit `unique_repo_language`/`unique_repo_dependency` and the sync fails `internal_error`. | confirmed (lock the row inside `job_write` before replacing); fixed (0.12.45: `storage._lock` in `replace_languages`/`replace_dependencies`) |
+| GHS-3 | security | `client.py:636` | `_next_link` checks only the host of a pagination link; redirects check scheme, host and port, so an `http://` or other-port `next` link would carry the Authorization header. | partial (needs a tampered GitHub response over TLS; same origin check as `_send`); fixed (0.12.45: `_api_origin`, `_link`) |
+| GHS-4 | bug | `oauth.py:158` | `_revoke` treats only 5xx/429 as transient: a 403 rate limit (shared app credentials with the background refresh) is a final `revocation_failed`, the grant stays valid. | confirmed (map the response through the client's rate-limit rules); fixed (0.12.45: 403/429 through `_error_for`; `GitHubRateLimited` retried) |
+| GHS-5 | data | `sync.py:251` | Two plan entries resolving to one repository (rename, transfer redirect) collapse in `by_pk`: only the last one's PR and push counts are kept. | confirmed (rare; sum counts, latest time per pk); fixed (0.12.45: `_merge_by_repository`) |
+| GHS-6 | data | `sync.py:258` | A contributed repository that hits a `SKIPPABLE` error is stored as None, so the final delete drops its existing contributor link and evidence; languages and dependencies keep what they knew. | confirmed (keep links of skipped repositories; drop only gone or now-owned ones); fixed (0.12.45: `contrib_skipped`; 404 and now-owned still drop the link) |
+| GHS-7 | robustness | `client.py:596` | `_send` catches only `httpx.TransportError`: `DecodingError` and `InvalidURL` (bad Location or Link) escape as non-GitHub errors, so a step fails `internal_error` instead of retrying or skipping. | partial (rare; map `httpx.HTTPError`/`InvalidURL` to transient or client errors, as `oauth` does); fixed (0.12.45: `httpx.HTTPError` transient, `InvalidURL` and a bad Link URL client errors; a malformed Location is httpx's `RemoteProtocolError`, transient) |
+| GHS-8 | memory | `client.py:578` | The ETag cache stores every 200 body with no size cap (READMEs, 100-item pages) for `GITHUB_ETAG_TTL`; large READMEs grow Redis, which also holds the broker. | partial (no measurement; skip caching bodies above a byte cap); fixed (0.12.45: `GITHUB_ETAG_MAX_BYTES`, default 256 KiB, `core.E020`) |
+| GHS-9 | consistency | `sync.py:205` | A retried dependencies step re-picks the capped set by live `pushed_at`, so it can read outside the first attempt's set and the stored totals stop describing what was read. | confirmed (minor; freeze the chosen ids in metadata, as `contrib_plan`); fixed (0.12.45: `dependencies_ids` in metadata) |
+| GHS-10 | duplication | `sync.py:335`, `oauth.py:15`, `client.py:620` | `sync._parse_dt` = `client._dt`; `oauth.API_VERSION` repeats `client.API_VERSION`; two Link-header parsers. | confirmed (one of each; GHS-3 fixes both parsers at once); fixed (0.12.45: `client._dt`, `client.API_VERSION`, one `_link`) |
+
+## Sweep: `frontend/src/api/` (2026-11-02)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/frontend/src/api/`
+(`client.ts`, `types.ts`; generated `schema.d.ts`/`openapi.json` matched a fresh export). Each row
+checked against the code, its callers (`app/queryClient.ts`, `RequireAuth`, the detail pages,
+`AppShell`, `features/feedback/api.ts`) and the backend (`accounts.views.CsrfView`, CSRF and
+throttle settings).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| API-1 | bug | `client.ts:74`, `:82` | `apiFetch` does not always throw `ApiError`: a rejected `fetch` (`TypeError`), a non-JSON 2xx body (`SyntaxError`, e.g. an HTML 200 for `/api/...`) and a rejected CSRF prelude escape as other types, though every hook types its error as `ApiError`. Readers of `error.status`/`error.code` (`RequireAuth`, detail-page 404, `RecommendationList`) see `undefined`; `isRetryable` treats any non-`ApiError` as network, so a deterministic `SyntaxError` is retried twice. | confirmed (generic error shown, no wrong redirect; wrap as `ApiError(0, 'network_error')` / `ApiError(status, 'invalid_response')`, retry only the former); fixed (0.12.46: `send` and `invalid_response`; `isRetryable` only `ApiError` 0/5xx) |
+| API-2 | bug | `client.ts:59` | The fallback error for a body without the `{error}` envelope drops the parsed `retryAfter` and any details. | partial (the only reader, `AppShell`, needs code `sync_cooldown`, which only an envelope carries; pass `retryAfter` anyway); fixed (0.12.46: fallback passes `retryAfter`) |
+| API-3 | bug | `client.ts:41` | `ensureCsrfToken` ignores the `/auth/csrf/` status: a 429 (anon throttle applies to `CsrfView`) or 500 becomes `ApiError(0, 'csrf_unavailable')`. | partial (mutations never retry, so no retry loop; the user sees "Could not obtain a CSRF token" instead of the throttle or server error; raise `toApiError` on a non-ok response); fixed (0.12.46: non-ok token response → `toApiError`) |
+| API-4 | efficiency | `client.ts:38` | No shared in-flight promise: concurrent mutations with no cookie each send `GET /auth/csrf/`, each counting toward the anon throttle. | confirmed (minor; one module-level pending promise, cleared when settled); fixed (0.12.46: `pendingCsrf`) |
+| API-5 | data | `client.ts:71`, `features/feedback/api.ts:40` | A `keepalive` request awaits the CSRF prelude without `keepalive`; if the cookie is missing and the page unloads, the prelude is aborted and the `opened_repository` event is lost (the `.catch` swallows it). | partial (rare: `login()` rotates and sets the cookie, valid a year; only a cleared cookie hits it; pass `keepalive` to the prelude); fixed (0.12.46: `ensureCsrfToken({ keepalive })`) |
+| API-6 | robustness | `client.ts:81` | Only 204 counts as an empty success; a 200/202/205 with no body throws `SyntaxError`. | accepted (every empty success in the backend is 204; revisit if a view changes) |
+| API-7 | robustness | `client.ts:48` | `Retry-After` in HTTP-date form becomes `NaN` and is dropped. | accepted (DRF throttles send seconds; no proxy in front adds dates) |
+| API-8 | robustness | `client.ts:70` | No refresh-and-retry once on `csrf_failed` after a stale or overwritten cookie. | false positive (`CSRF_USE_SESSIONS` off: double-submit reads header and cookie from the same cookie at send time, so any well-formed cookie, including one set by the e2e backend on `localhost`, passes) |
+| API-9 | cleanup | `client.ts:66`, `features/feedback/api.ts:38`, `:113` | No JSON-body option: callers repeat `Content-Type` and `JSON.stringify`; a caller forgetting the header gets 415. | confirmed (a `json` init option in `apiFetch`); fixed (0.12.46: `ApiInit` `json` option) |
+
+## Sweep: `frontend/src/features/auth/` (2026-11-02)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/frontend/src/features/auth/`
+(`api.ts`, `authErrors.ts`, `RequireAuth.tsx`, `DataSection.tsx`, `DisconnectSection.tsx`), with
+`app/queryClient.ts`, `routes/LandingPage.tsx` and `routes/AppShell.tsx` (both sections render
+there, under its `/onboarding` redirect). Each row checked against the code and TanStack Query v5
+behavior.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| AUTH-1 | bug | `authErrors.ts:14` | `MESSAGES[code]` on a plain object: `?auth_error=__proto__` returns `Object.prototype`, rendered as a React child, so the landing page throws; `constructor`/`toString` show an empty alert. Anyone with a link can break the sign-in page for the visitor. | confirmed (`Object.hasOwn(MESSAGES, code)`; client-side only, no script runs); fixed (0.12.47: `Object.hasOwn`) |
+| AUTH-2 | bug | `RequireAuth.tsx:30` | `me.isError` wins over cached data: a failed `/auth/me` refetch (focus after the 60 s stale time, network or 5xx after two retries) replaces every signed-in page with "Something went wrong loading your account". | confirmed (keep rendering while `me.data` exists; the error page only without data); fixed (0.12.47: `RequireAuth` renders the `Outlet` while `me.data` exists) |
+| AUTH-3 | bug | `RequireAuth.tsx:31`, `queryClient.ts` `isMe` | A 401 on the `/auth/me` refetch is ignored by the query cache, and `RequireAuth` sends the user to `/` without the session-ended notice or cache cleanup. | partial (the versions and sync status queries, `staleTime: 0`, usually 401 at the same focus or route change and run `endSession`; a 401 on `/auth/me` after a success should do the same); fixed (0.12.47: a `/auth/me` 401 with data runs `endSession`) |
+| AUTH-4 | privacy | `api.ts:68` | Log out and disconnect remove only `['auth', 'me']`; profile, recommendations, saved lists, jobs, versions and sync status stay in the query cache (disconnect has deleted them on the server). | partial (no cross-user path: signing in is a full-page navigation that reloads the app; still kept until reload in the tab; clean up as `clearSignedInData` does); fixed (0.12.47: `leaveSignedIn`) |
+| AUTH-5 | bug | `api.ts:108` | `useDeleteAccount` runs `queryClient.clear()` while `RequireAuth`, the layout and `AppShell` observe their queries: they rebuild and refetch against a deleted account (401s, hidden by `signedOut`), `RequireAuth` shows "Loading…", unmounting `DataSection`, so its per-call `navigate('/')` never runs; the 401 on `/auth/me` reaches `/` instead. | confirmed (navigate first, then drop the data, in the hook); fixed (0.12.47: `useDeleteAccount` through `leaveSignedIn`, no `clear()`) |
+| AUTH-6 | bug | `api.ts:89` | `useDeleteGitHubData` removes `['profile']` and `['jobs']` while the dashboard observes them, without cancelling: observers rebuild and refetch deleted data until `AppShell` redirects. | confirmed (minor; leave the dashboard first, then remove); fixed (0.12.47: cancel, refetch sync, navigate, then remove) |
+| AUTH-7 | dead code | `DataSection.tsx:85` | The per-call `navigate('/onboarding')` never runs: the hook's `onSuccess` awaits the `['sync']` refetch, `AppShell` redirects to `/onboarding` and unmounts `DataSection` first (per-call callbacks are skipped after unmount, CLAUDE.md Phase 8a). Works only through the redirect. | confirmed (navigate in the hook's `onSuccess`); fixed (0.12.47: navigation in the hooks) |
+| AUTH-8 | race | `DataSection.tsx:64`, `DisconnectSection.tsx:32` | The two sections lock only their own actions: Delete account and Disconnect can both be pending; whichever the server handles second answers 401/403, its `onError` resets the shared `signedOut` flag, and the user can land on "session ended" with the account not deleted. | partial (needs a second confirmation dialog within one request's time; one pending state for every account action); fixed (0.12.47: `accountMutationKey`, `useAccountActionPending`) |
+| AUTH-9 | test | `auth.test.tsx:122` | The disconnect test mocks `revocation: 'revoked'`, which the backend no longer sends (since 0.12.41: `queued` or `not_connected`). | confirmed (mock `queued`); fixed (0.12.47: mock `queued`) |
+
+## Fix-diff review of batches 32–34 (2026-11-02)
+
+Source: `/code-review` (high, no verify pass) of the uncommitted 0.12.45–0.12.47 diff after one
+combined `/simplify`. Each row checked against the code.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| FD-1 | bug | `oauth.py` `_revoke`, `github/tasks.py` `revoke_later` | A primary-limit 429/403 on revocation is now `GitHubRateLimited`; `decide_retry` fails a wait above `GITHUB_MAX_RETRY_DELAY` at once, so a reset 30 minutes away ends the revocation on the first try (before: four backoff tries, also inside the reset window). | partial (both lose it; fixed: `revoke_later` retries after `min(wait, GITHUB_MAX_RETRY_DELAY)` until the attempts run out; docstrings name `GitHubRateLimited`) |
+| FD-2 | deadlock | `sync.py` repositories step | `upsert_repository` calls `release_name`, which locks the name holder (another GitHub ID) out of ID order inside the sorted upserts. | accepted here (the same pattern in discovery's upserts; belongs to the `services/repositories/` sweep) |
+| FD-3 | data | `sync.py` contributions | A skipped name is the plan's; after a redirect the stored row has the new name, so its link is not kept. | accepted (design Risks: needs a rename and a 403 in one run; the next readable sync restores it) |
+| FD-4 | data | `client.ts` `csrfToken` | A keepalive call joining a non-keepalive pending CSRF request loses its event on unload. | accepted (design D3 Risks; one request's window, fire-and-forget event) |
+| FD-5 | robustness | `client.py` `_count_from_single_item_page` | A `rel="last"` outside the API origin now fails the count. | accepted (only a tampered or misconfigured response; a base URL with a port matches its own origin) |
+| FD-6 | robustness | `client.py` `_send` | A malformed Location is httpx's `RemoteProtocolError`, so transient. | accepted (recorded as the D5 deviation of `github-services-review-fixes`) |
+| FD-7 | altitude | `storage.py` `replace_*` | The row-lock precondition lives in docstrings; locking inside `replace_*` would remove it. | wontfix (`/simplify` moved it out: inside, it cost a query per analysis where the row is already held) |
+| FD-8 | logging | `errors.py` `error_for_response` | Messages say `GET` for the revocation's DELETE. | fixed (`method` parameter, default `GET`; revocation passes `DELETE`) |
+| FD-9 | efficiency | `features/auth/api.ts` `useDeleteGitHubData` | After `AppShell` already redirected, the hook's `replace('/onboarding')` adds a location key: one more `/sync/versions` request and an onboarding remount. | accepted (navigating first is not possible: onboarding sends a cached synced status back to `/app`; design D4 keeps the hook's navigation as the guarantee) |
+| FD-10 | test | `tests/test_github_sync.py` `new_job` | The test helper shares its name with `services.jobs.new_job` (PENDING vs RUNNING). | fixed (renamed `running_sync_job`) |

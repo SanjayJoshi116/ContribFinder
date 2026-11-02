@@ -132,7 +132,8 @@ ContribFinder/
 │  │     │                  data_deletion.py (GitHub data / account deletion), data_versions.py
 │  │     │                  (when each derived data area last changed)
 │  │     ├─ github/         oauth.py, accounts.py; GitHubClient, GitHubSyncService (Phase 2),
-│  │     │                  storage.py (shared repository upserts)
+│  │     │                  storage.py (shared repository upserts, lock_repository), errors.py
+│  │     │                  (typed errors, API_VERSION, error_for_response)
 │  │     ├─ profiling/      taxonomy, manifests, readme/collectors, confidence, interests,
 │  │     │                  experience, summary, analysis (Phase 3)
 │  │     ├─ discovery/      queries, filters (prefilter/eligibility), ordering (pool order),
@@ -153,7 +154,8 @@ ContribFinder/
 │  │     │                  bootstrap (paired intervals), feedback_report (outcomes per config)
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/           src/{app,components,features,hooks,lib,api,types,routes}; app/ holds
-│                         the query client (retry, stale time, 401), job-transition refresh and data versions;
+│                         the query client (retry, stale time, 401), session.ts (identity key,
+│                         endSession, leaveSignedIn), job-transition refresh and data versions;
 │                         e2e/ Playwright specs, playwright.config.ts; csp.config.ts (the built
 │                         app's Content-Security-Policy and its build-only Vite plugin)
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
@@ -1565,6 +1567,70 @@ endpoint"). `Bug_Backlog.md` batch 31 (SVC-1…SVC-20; SVC-16 open, accepted row
   (saved, unsaved, dismissed, undismissed); partial index `feedback_list_change_idx`
   (`feedback.0006`). Four reads.
 
+**GitHub service fixes, review sweep: services/github** (MVP+, fix release)  ✅ shipped in v0.12.45 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-02-github-services-review-fixes/`. Spec: delta to
+`github-data-sync` ("Credential use during sync", "External contribution ingestion").
+`Bug_Backlog.md` batch 32 (GHS-1…GHS-10). Fix-diff review of 0.12.45–0.12.47: one `/simplify`
+and one `/code-review` over the combined diff, batch 35 (FD-1…FD-10), archived as
+`2026-11-02-fix-diff-review-fixes` (delta to `github-authentication` "Disconnect GitHub").
+- The repositories step chooses by push time and upserts in GitHub ID order (the bulk lock
+  order). Callers of `storage.replace_languages`/`replace_dependencies` hold the repository
+  row lock: the sync's languages and dependencies steps call `storage.lock_repository(repo)`
+  inside `job_write`; `upsert_repository` and the analysis' claim already hold it.
+- `client._api_origin(url)` (scheme, host, port of `GITHUB_API_BASE_URL`) is the one origin check
+  (redirects, `_link(header, rel)` for `next` and `last`). `_send` maps `httpx.InvalidURL` to
+  `GitHubClientError` and any other `httpx.HTTPError` to `GitHubTransientError`; httpx raises
+  `RemoteProtocolError` (transient) for a malformed Location itself.
+- `services/github/errors.py` holds `API_VERSION`, the secondary-limit constants and
+  `error_for_response(response, path)` (the one status → error mapping). `oauth._revoke` passes a
+  403/429 to it and raises a `GitHubRateLimited` (retried by `revoke_later`); `client` and
+  `oauth` both import from `errors`, never from each other's privates. `revoke_later` retries a
+  rate limit after `min(wait, GITHUB_MAX_RETRY_DELAY)` (FD-1); the shared policy would fail it.
+  Test helper `test_github_sync.running_sync_job(user)` builds a RUNNING sync job.
+- `GITHUB_ETAG_MAX_BYTES` (256 KiB, `core.E020`): larger 200 bodies are not cached.
+- Contributions: `_merge_by_repository` sums plan items per stored pk; `_store_contributed_repository`
+  returns None for 404 or now-owned and lets other `SKIPPABLE` errors through, recorded in
+  `contrib_skipped` (links kept by `full_name__iexact`). Dependencies: `dependencies_ids` frozen
+  on the first attempt. `client.parse_dt` is the one GitHub time parser (`sync` uses it).
+
+**API client fixes, review sweep: frontend/src/api** (MVP+, fix release)  ✅ shipped in v0.12.46 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-02-api-client-review-fixes/`. Spec: delta to
+`web-client` ("Retry policy", new "Request failures"). `Bug_Backlog.md` batch 33 (API-1…API-5,
+API-9 fixed; API-6, API-7 accepted; API-8 false positive). Fix-diff review: batch 35 (see
+0.12.45).
+- `apiFetch` throws only `ApiError`: `send()` wraps a fetch rejection as `ApiError(0,
+  'network_error')` (an `AbortError` passes through for TanStack Query), a 2xx body that is not
+  JSON is `ApiError(status, 'invalid_response')`; the non-envelope error keeps `retryAfter`.
+- `isRetryable` (`src/app/queryClient.ts`): only `ApiError` with status 0 or 5xx.
+- `ensureCsrfToken({ keepalive })` shares one module-level `pendingCsrf`; a non-ok `/auth/csrf/`
+  raises `toApiError`; `csrf_unavailable` only when an ok answer set no cookie. `apiFetch`
+  forwards `init.keepalive`.
+- `ApiInit` = `RequestInit` with `json` (exclusive with `body`): sets `Content-Type` and
+  `JSON.stringify`. New JSON callers use it, never a hand-built header.
+
+**Sign-in and sign-out fixes, review sweep: frontend/src/features/auth** (MVP+, fix release)  ✅ shipped in v0.12.47 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-02-auth-review-fixes/`. Spec: delta to `web-client`
+("Ended session returns to sign-in", new "Leaving the signed-in app"). `Bug_Backlog.md` batch 34
+(AUTH-1…AUTH-9). Fix-diff review: batch 35 (see 0.12.45).
+- `authErrorMessage` reads own keys only (`Object.hasOwn`).
+- `RequireAuth` renders the `Outlet` whenever `me.data` exists. The query cache runs
+  `endSession` on a 401 from `/auth/me` only when that query held data (a first visit stays
+  silent).
+- `src/app/session.ts` holds the session primitives: `meQueryKey`, `ENDS_SESSION_META_KEY`,
+  `Navigate`, `isMe`, `endSession` and `leaveSignedIn` (one `leave` core: cancel, remove the
+  identity, navigate; `leaveSignedIn` then `clearSignedInData`). `queryClient.ts` and
+  `features/auth/api.ts` (which re-exports `meQueryKey`, `ENDS_SESSION_META_KEY`) import it, never
+  each other. Log out, disconnect and delete account
+  (`useSignOutMutation`) call it from the hook's `onSuccess`; components call `mutate()` with no
+  callbacks. Delete GitHub data cancels `['profile']`/`['jobs']`, awaits the identity and
+  `['sync']` refetch, navigates to `/onboarding` from the hook, then removes them.
+- `accountMutationKey = ['account']` prefixes the four account mutations;
+  `useAccountActionPending()` disables every account button (sections and Log out). A new
+  account action uses the key.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1591,7 +1657,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47).
 
 ## 8. Release housekeeping
 

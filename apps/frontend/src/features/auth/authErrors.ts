@@ -11,5 +11,6 @@ export const SESSION_ENDED_PATH = '/?auth_error=session_ended'
 
 export function authErrorMessage(code: string | null): string | null {
   if (!code) return null
-  return MESSAGES[code] ?? MESSAGES.failed
+  // Own keys only: `__proto__` or `constructor` from a link must not reach the page.
+  return Object.hasOwn(MESSAGES, code) ? MESSAGES[code] : MESSAGES.failed
 }

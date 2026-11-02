@@ -13,7 +13,6 @@ import functools
 import hashlib
 import json
 import logging
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -30,6 +29,7 @@ from github.models import GitHubAccount
 from services.crypto import TokenDecryptionError, decrypt_token
 
 from .errors import (
+    API_VERSION,
     GitHubAuthError,
     GitHubClientError,
     GitHubConflict,
@@ -37,27 +37,20 @@ from .errors import (
     GitHubGone,
     GitHubInvalidResponse,
     GitHubNotFound,
-    GitHubRateLimited,
     GitHubTransientError,
-    GitHubUnavailableForLegalReasons,
-    GitHubValidationError,
+    error_for_response,
 )
 from .oauth import has_app_credentials
 
 logger = logging.getLogger(__name__)
 _cache_backoff = Backoff("GITHUB_CACHE_BACKOFF_SECONDS", "GitHub response cache", logger)
 
-API_VERSION = "2022-11-28"
 JSON = "application/vnd.github+json"
 RAW = "application/vnd.github.raw+json"
 PER_PAGE = 100
 # GitHub serves at most 3 pages (300 events, ~90 days) of a user's public events.
 EVENTS_MAX_PAGES = 3
 LABELS_MAX_PAGES = 3
-# GitHub asks clients to wait at least a minute on a secondary limit without Retry-After.
-SECONDARY_LIMIT_DEFAULT_WAIT = 60
-# How GitHub words a secondary limit in the error message (current and older wording).
-SECONDARY_LIMIT_MARKERS = ("secondary rate limit", "abuse detection")
 REDIRECTS = (301, 302, 307, 308)
 # Renames and transfers redirect once; more hops than this is a loop.
 MAX_REDIRECTS = 3
@@ -65,7 +58,8 @@ MAX_REDIRECTS = 3
 PUBLIC_SCOPE = "public"
 
 
-def _dt(value: str | None) -> datetime | None:
+def parse_dt(value: str | None) -> datetime | None:
+    """A GitHub ISO 8601 time (also as stored in job metadata), or None."""
     return datetime.fromisoformat(value) if value else None
 
 
@@ -98,7 +92,7 @@ class GitHubUser:
             followers=int(data.get("followers") or 0),
             following=int(data.get("following") or 0),
             public_repos=int(data.get("public_repos") or 0),
-            created_at=_dt(data.get("created_at")),
+            created_at=parse_dt(data.get("created_at")),
         )
 
 
@@ -141,9 +135,9 @@ class GitHubRepo:
             license_spdx=license_info.get("spdx_id") or "",
             is_fork=bool(data.get("fork")),
             is_archived=bool(data.get("archived")),
-            created_at=_dt(data.get("created_at")),
-            updated_at=_dt(data.get("updated_at")),
-            pushed_at=_dt(data.get("pushed_at")),
+            created_at=parse_dt(data.get("created_at")),
+            updated_at=parse_dt(data.get("updated_at")),
+            pushed_at=parse_dt(data.get("pushed_at")),
             topics=tuple(data.get("topics") or ()),
         )
 
@@ -226,8 +220,8 @@ class IssueData:
             has_assignee=bool(data.get("assignee") or data.get("assignees")),
             comments=int(data.get("comments") or 0),
             html_url=str(data["html_url"]),
-            created_at=_dt(data.get("created_at")),
-            updated_at=_dt(data.get("updated_at")),
+            created_at=parse_dt(data.get("created_at")),
+            updated_at=parse_dt(data.get("updated_at")),
         )
 
 
@@ -402,7 +396,7 @@ class GitHubClient:
         refs = [
             PullRequestRef(
                 repo_full_name=_repo_from_api_url(str(item["repository_url"])),
-                merged_at=_dt((item.get("pull_request") or {}).get("merged_at")),
+                merged_at=parse_dt((item.get("pull_request") or {}).get("merged_at")),
             )
             for item in page.items[:limit]
         ]
@@ -417,7 +411,7 @@ class GitHubClient:
             repo = str((event.get("repo") or {}).get("name", ""))
             owner = repo.split("/", 1)[0]
             if event.get("type") == "PushEvent" and repo and owner.lower() != login.lower():
-                pushes.append(PushRef(repo, _dt(event.get("created_at"))))
+                pushes.append(PushRef(repo, parse_dt(event.get("created_at"))))
         return pushes
 
     # --- candidate repositories (Phase 4) -------------------------------------------
@@ -512,10 +506,10 @@ class GitHubClient:
         items: list[dict[str, Any]] = self._get(f"/repos/{full_name}/pulls?{params}").json()
         opened = merged = 0
         for pr in items:
-            created, merged_at = _dt(pr.get("created_at")), _dt(pr.get("merged_at"))
+            created, merged_at = parse_dt(pr.get("created_at")), parse_dt(pr.get("merged_at"))
             opened += bool(created and created >= since)
             merged += bool(merged_at and merged_at >= since)
-        oldest = _dt(items[-1].get("updated_at")) if items else None
+        oldest = parse_dt(items[-1].get("updated_at")) if items else None
         capped = len(items) >= PER_PAGE and oldest is not None and oldest >= since
         return PullSample(opened=opened, merged=merged, capped=capped)
 
@@ -525,7 +519,7 @@ class GitHubClient:
             data = self._get(f"/repos/{full_name}/releases/latest").json()
         except GitHubNotFound:
             return None
-        return _dt(data.get("published_at") or data.get("created_at"))
+        return parse_dt(data.get("published_at") or data.get("created_at"))
 
     # --- transport ------------------------------------------------------------
 
@@ -550,7 +544,7 @@ class GitHubClient:
             data = response.json()
             items.extend(data[items_key] if items_key else data)
             pages += 1
-            url = _next_link(response.link)
+            url = _link(response.link, "next")
         return Page(items=items, truncated=False)
 
     def _cache_key(self, url: str, accept: str) -> str:
@@ -575,7 +569,9 @@ class GitHubClient:
             return _Response(status=204, text="", link="")
         if response.status_code == 200:
             result = _Response(200, response.text, response.headers.get("Link", ""))
-            if etag := response.headers.get("ETag"):
+            # A body above the cap is served but not cached: Redis also holds the broker (GHS-8).
+            etag = response.headers.get("ETag")
+            if etag and len(response.content) <= settings.GITHUB_ETAG_MAX_BYTES:
                 _cached(
                     cache.set,
                     key,
@@ -583,7 +579,7 @@ class GitHubClient:
                     settings.GITHUB_ETAG_TTL,
                 )
             return result
-        raise _error_for(response, path)
+        raise error_for_response(response, path)
 
     def _send(self, url: str, headers: dict[str, str], path: str) -> httpx.Response:
         """GET ``url``, following redirects (renamed or transferred repositories) up to
@@ -593,17 +589,18 @@ class GitHubClient:
         for _ in range(MAX_REDIRECTS + 1):
             try:
                 response = self._http.get(target, headers=headers)
-            except httpx.TransportError as exc:
+            except httpx.InvalidURL:
+                raise GitHubClientError(f"GET {path}: invalid URL") from None
+            except httpx.HTTPError as exc:  # transport and decoding errors
                 raise GitHubTransientError(f"GET {path}: {type(exc).__name__}") from None
             if response.status_code not in REDIRECTS:
                 return response
             location = response.headers.get("Location")
             if not location:
                 raise GitHubClientError(f"GET {path} redirected without a location")
+            # httpx has parsed it already: a malformed one raised RemoteProtocolError above.
             target = response.request.url.join(location)
-            base = httpx.URL(settings.GITHUB_API_BASE_URL)
-            # Same scheme, host and port: never send the token elsewhere or over plain HTTP.
-            if (target.scheme, target.host, target.port) != (base.scheme, base.host, base.port):
+            if not _api_origin(target):
                 raise GitHubClientError(f"GET {path}: redirect points outside the GitHub API")
         raise GitHubClientError(f"GET {path}: too many redirects")
 
@@ -617,67 +614,33 @@ def _cached(call: Callable[..., Any], *args: Any) -> Any:
 def _count_from_single_item_page(response: _Response) -> int:
     """Total items of a ``per_page=1`` listing: the page number of ``rel="last"``, or the
     number of items on the only page."""
-    for part in response.link.split(","):
-        section = part.split(";")
-        if len(section) >= 2 and 'rel="last"' in section[1]:
-            page = httpx.URL(section[0].strip().strip("<>")).params.get("page")
-            if page and page.isdigit():
-                return int(page)
+    if last := _link(response.link, "last"):
+        page = httpx.URL(last).params.get("page")
+        if page and page.isdigit():
+            return int(page)
     data = response.json() if response.text else []
     return len(data) if isinstance(data, list) else 0
 
 
-def _next_link(link_header: str) -> str | None:
+def _api_origin(url: httpx.URL) -> bool:
+    """Whether ``url`` has the API's scheme, host and port: the only place the token goes,
+    never elsewhere or over plain HTTP (redirects and pagination links alike)."""
+    base = httpx.URL(settings.GITHUB_API_BASE_URL)
+    return (url.scheme, url.host, url.port) == (base.scheme, base.host, base.port)
+
+
+def _link(link_header: str, rel: str) -> str | None:
+    """The ``rel`` URL of a ``Link`` header, or None. Raises ``GitHubClientError`` for a URL
+    that cannot be parsed or lies outside the API origin."""
     for part in link_header.split(","):
         section = part.split(";")
-        if len(section) >= 2 and 'rel="next"' in section[1]:
+        if len(section) >= 2 and f'rel="{rel}"' in section[1]:
             url = section[0].strip().strip("<>")
-            # Only ever follow links on the API host: the Authorization header goes with them.
-            if httpx.URL(url).host != httpx.URL(settings.GITHUB_API_BASE_URL).host:
-                raise GitHubClientError("Pagination link points outside the GitHub API host")
+            try:
+                parsed = httpx.URL(url)
+            except (httpx.InvalidURL, ValueError):
+                raise GitHubClientError(f'Unreadable rel="{rel}" link') from None
+            if not _api_origin(parsed):
+                raise GitHubClientError(f'rel="{rel}" link points outside the GitHub API')
             return url
     return None
-
-
-def _error_for(response: httpx.Response, path: str) -> Exception:
-    status = response.status_code
-    where = f"GET {path} returned {status}"
-    if status == 401:
-        return GitHubAuthError(where)
-    if status in (403, 429):
-        retry_after = response.headers.get("Retry-After")
-        if retry_after and retry_after.isdigit():
-            return GitHubRateLimited(where, int(retry_after))
-        if response.headers.get("X-RateLimit-Remaining") == "0":
-            reset = response.headers.get("X-RateLimit-Reset", "")
-            wait = (
-                int(reset) - int(time.time()) if reset.isdigit() else SECONDARY_LIMIT_DEFAULT_WAIT
-            )
-            return GitHubRateLimited(where, max(wait, 1))
-        if status == 429 or _is_secondary_limit(response):
-            return GitHubRateLimited(where, SECONDARY_LIMIT_DEFAULT_WAIT)
-        return GitHubForbidden(where)
-    if status == 404:
-        return GitHubNotFound(where)
-    if status == 409:
-        return GitHubConflict(where)
-    if status == 410:
-        return GitHubGone(where)
-    if status == 451:
-        return GitHubUnavailableForLegalReasons(where)
-    if status == 422:
-        return GitHubValidationError(where)
-    if status >= 500:
-        return GitHubTransientError(where)
-    return GitHubClientError(where)
-
-
-def _is_secondary_limit(response: httpx.Response) -> bool:
-    """A 403 whose message says a secondary limit was hit (no Retry-After, requests
-    remaining). The message is only inspected, never copied into the error."""
-    try:
-        data = response.json()
-    except ValueError:
-        data = None
-    message = str(data.get("message", "")) if isinstance(data, dict) else response.text[:1024]
-    return any(marker in message.lower() for marker in SECONDARY_LIMIT_MARKERS)

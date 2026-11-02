@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.44** (service fixes from the review sweep; MVP+). After signing in with
+**Version 0.12.47** (sign-in and sign-out fixes from the review sweep; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -111,7 +111,8 @@ If Redis goes down while the app runs, API reads keep working: sessions live in 
 request throttling counts in each process's memory for `THROTTLE_CACHE_BACKOFF_SECONDS` (30)
 after a Redis error, then tries Redis again. A worker that loses the GitHub response cache keeps
 going: requests go out without their ETag condition, and the cache is skipped for
-`GITHUB_CACHE_BACKOFF_SECONDS` (30).
+`GITHUB_CACHE_BACKOFF_SECONDS` (30). GitHub responses larger than `GITHUB_ETAG_MAX_BYTES`
+(256 KiB) are never cached, so big READMEs do not grow Redis, which also holds the broker.
 
 Open http://localhost:5173. API health: http://localhost:5173/api/v1/health/.
 

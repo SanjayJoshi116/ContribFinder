@@ -3,6 +3,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createQueryClient } from '@/app/queryClient'
 import {
   COMPLETED_JOB,
   DEVELOPER_PROFILE,
@@ -93,6 +94,42 @@ describe('retry policy', () => {
     expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
     await settle()
     expect(callsTo(fetchMock, 'GET', '/api/v1/profile/skills?page_size=200').length).toBe(1)
+  })
+
+  it('does not retry a success body that is not JSON', async () => {
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/profile/skills?page_size=200': () =>
+        new Response('<html>app</html>', { status: 200 }),
+    })
+    renderRoute('/app')
+
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile/skills?page_size=200').length).toBe(1)
+  })
+
+  it('retries a request that got no response, twice', async () => {
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/profile/skills?page_size=200': () => {
+        throw new TypeError('Failed to fetch')
+      },
+    })
+    renderRoute('/app')
+
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile/skills?page_size=200').length).toBe(3)
+  })
+
+  it('does not retry an error that is not an ApiError', async () => {
+    const queryClient = createQueryClient({ retryDelay: 0, navigate: async () => undefined })
+    const queryFn = vi.fn(() => Promise.reject(new SyntaxError('bug')))
+    await expect(queryClient.fetchQuery({ queryKey: ['bug'], queryFn })).rejects.toThrow('bug')
+    expect(queryFn).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -1,5 +1,3 @@
-import { useNavigate } from 'react-router'
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,11 +11,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 
-import { useDisconnectGitHub } from './api'
+import { useAccountActionPending, useDisconnectGitHub } from './api'
 
 export function DisconnectSection() {
-  const navigate = useNavigate()
   const disconnect = useDisconnectGitHub()
+  const busy = useAccountActionPending()
 
   return (
     <section className="space-y-3 rounded-lg border p-4">
@@ -29,7 +27,7 @@ export function DisconnectSection() {
       </p>
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="destructive" size="sm" disabled={disconnect.isPending}>
+          <Button variant="destructive" size="sm" disabled={busy}>
             Disconnect GitHub
           </Button>
         </AlertDialogTrigger>
@@ -45,15 +43,7 @@ export function DisconnectSection() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                disconnect.mutate(undefined, {
-                  onSuccess: () => navigate('/', { replace: true }),
-                })
-              }
-            >
-              Disconnect
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => disconnect.mutate()}>Disconnect</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

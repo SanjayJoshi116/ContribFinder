@@ -10,9 +10,12 @@ from urllib.parse import urlencode
 import httpx
 from django.conf import settings
 
-from services.github.errors import GitHubTransientError
-
-API_VERSION = "2022-11-28"
+from services.github.errors import (
+    API_VERSION,
+    GitHubRateLimited,
+    GitHubTransientError,
+    error_for_response,
+)
 
 
 class OAuthError(Exception):
@@ -130,7 +133,8 @@ def fetch_identity(access_token: str) -> GitHubIdentity:
 
 def revoke_grant(access_token: str) -> None:
     """Revoke the OAuth grant (all tokens for this app/user pair). Raises
-    ``GitHubTransientError`` for a temporary failure, ``OAuthError`` otherwise."""
+    ``GitHubRateLimited`` for a rate limit, ``GitHubTransientError`` for another temporary
+    failure, ``OAuthError`` otherwise."""
     _revoke("grant", access_token)
 
 
@@ -155,8 +159,14 @@ def _revoke(kind: str, access_token: str) -> None:
             )
     except httpx.HTTPError as exc:
         raise GitHubTransientError(f"Revocation failed: {type(exc).__name__}") from None
-    if response.status_code >= 500 or response.status_code == 429:
+    if response.status_code >= 500:
         raise GitHubTransientError(f"Revocation returned {response.status_code}")
+    if response.status_code in (403, 429):
+        # A rate limit (the app credentials are shared with the background refresh) is
+        # retried with its wait; any other 403 is final (GHS-4).
+        error = error_for_response(response, f"/applications/{kind}", "DELETE")
+        if isinstance(error, GitHubRateLimited):
+            raise error
     # 404 means it is already gone, which is the state we want.
     if response.status_code not in (204, 404):
         raise OAuthError("revocation_failed", f"Revocation returned {response.status_code}")

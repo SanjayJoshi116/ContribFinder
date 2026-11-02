@@ -236,6 +236,14 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 - **Error handling for views the browser navigates to** (same review). The OAuth callback catches
   `Exception` itself to redirect instead of a JSON 500; a small redirect-on-error wrapper for
   navigation views would replace that one-off catch-all.
+- **A 401 rule per query, not per key** (from the batches 32–34 `/simplify`, 2026-11-02). The
+  query cache special-cases the identity query by hash (`isMe`) and, since 0.12.47, by whether it
+  held data; mutations use `meta.endsSession`. A query `meta` opt-out (set by `useMe` while it has
+  no identity) would make both sides one mechanism.
+- **Bulk repository locks behind one helper** (same pass, `Bug_Backlog.md` FD-2).
+  `release_name` locks the holder of a name out of GitHub ID order inside the sorted upserts of
+  the sync and discovery; a `lock_repositories(ids)` in ID order, taken before the upserts, would
+  enforce the rule in one place. Belongs with the `services/repositories/` sweep.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.

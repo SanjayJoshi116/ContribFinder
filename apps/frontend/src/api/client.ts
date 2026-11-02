@@ -34,14 +34,38 @@ export function readCookie(name: string): string | undefined {
     ?.slice(name.length + 1)
 }
 
-/** Ensures the CSRF cookie exists (Django sets it on GET /auth/csrf/). */
-export async function ensureCsrfToken(): Promise<string> {
+/** The request in flight for a CSRF cookie: concurrent mutations share it. */
+let pendingCsrf: Promise<string> | null = null
+
+/** The CSRF token, from the cookie or GET /auth/csrf/ (which sets it). A failed token request
+ * reports its own status and code. `keepalive` lets the request outlive the page, as the
+ * request that waits for it does. */
+function csrfToken(keepalive: boolean): Promise<string> {
   const existing = readCookie(CSRF_COOKIE)
-  if (existing) return existing
-  await fetch(`${API_BASE}/auth/csrf/`, { credentials: 'same-origin' })
+  if (existing) return Promise.resolve(existing)
+  pendingCsrf ??= fetchCsrfToken(keepalive).finally(() => {
+    pendingCsrf = null
+  })
+  return pendingCsrf
+}
+
+async function fetchCsrfToken(keepalive: boolean): Promise<string> {
+  const response = await send(`${API_BASE}/auth/csrf/`, { credentials: 'same-origin', keepalive })
+  if (!response.ok) throw await toApiError(response)
   const token = readCookie(CSRF_COOKIE)
   if (!token) throw new ApiError(0, 'csrf_unavailable', 'Could not obtain a CSRF token.')
   return token
+}
+
+/** `fetch`, with a failure before any response as `ApiError(0, 'network_error')`. An abort
+ * passes through: TanStack Query reads it as a cancellation. */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new ApiError(0, 'network_error', 'Could not reach the server.')
+  }
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -60,24 +84,39 @@ async function toApiError(response: Response): Promise<ApiError> {
     response.status,
     'http_error',
     `Request failed with status ${response.status}`,
+    undefined,
+    retryAfter,
   )
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const method = (init.method ?? 'GET').toUpperCase()
-  const headers = new Headers(init.headers)
+/** `RequestInit` plus `json`: a body sent as JSON, with its `Content-Type`. */
+export type ApiInit = Omit<RequestInit, 'body'> &
+  ({ body?: BodyInit | null; json?: never } | { json: unknown; body?: never })
+
+/** Every failure is an `ApiError`: the server's envelope, `http_error`, `network_error` (no
+ * response) or `invalid_response` (a success whose body is not JSON). */
+export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> {
+  const { json, ...rest } = init
+  const method = (rest.method ?? 'GET').toUpperCase()
+  const headers = new Headers(rest.headers)
   headers.set('Accept', 'application/json')
+  if (json !== undefined) headers.set('Content-Type', 'application/json')
   if (MUTATING.has(method)) {
-    headers.set('X-CSRFToken', await ensureCsrfToken())
+    headers.set('X-CSRFToken', await csrfToken(rest.keepalive === true))
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
+  const response = await send(`${API_BASE}${path}`, {
+    ...rest,
+    ...(json !== undefined ? { body: JSON.stringify(json) } : {}),
     method,
     headers,
     credentials: 'same-origin',
   })
   if (!response.ok) throw await toApiError(response)
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  try {
+    return (await response.json()) as T
+  } catch {
+    throw new ApiError(response.status, 'invalid_response', 'The server sent an unreadable answer.')
+  }
 }
