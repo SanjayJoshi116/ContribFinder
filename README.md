@@ -3,7 +3,8 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.47** (sign-in and sign-out fixes from the review sweep; MVP+). After signing in with
+**Version 0.12.50** (job, developer profile and repository data fixes from the review sweep;
+MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,

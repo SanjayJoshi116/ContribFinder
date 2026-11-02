@@ -3790,7 +3790,7 @@
       },
       "SyncJob": {
         "type": "object",
-        "description": "Public view of a job. ``metadata`` and ``error_detail`` stay internal.",
+        "description": "Public view of a job. ``metadata`` and ``error_detail`` stay internal. ``stalled``: RUNNING\nwith no heartbeat for ``SYNC_STALE_AFTER_SECONDS`` (its worker died); reading changes\nnothing, recovery still resumes it.",
         "properties": {
           "id": {
             "type": "integer",
@@ -3844,6 +3844,10 @@
             "format": "date-time",
             "readOnly": true,
             "nullable": true
+          },
+          "stalled": {
+            "type": "boolean",
+            "readOnly": true
           }
         },
         "required": [
@@ -3853,6 +3857,7 @@
           "error_code",
           "id",
           "job_type",
+          "stalled",
           "started_at",
           "status",
           "steps"

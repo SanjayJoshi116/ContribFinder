@@ -7,6 +7,87 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.50] - 2026-11-02
+
+Repository data fixes from the review sweep
+(`openspec/changes/archive/2026-11-02-repositories-review-fixes/`; spec `repository-analysis`;
+`Bug_Backlog.md` batch 38). No migration. OpenAPI stays `1.0.0`; baselines unchanged.
+One `/simplify` over the combined 0.12.48–0.12.50 diff (`Bug_Backlog.md` batch 39); the
+fix-diff `/code-review` was skipped by the owner.
+
+### Changed
+
+- Every repository admin is view-only: staff can no longer change a repository's lifecycle or
+  eligibility, edit its languages, topics or dependencies, or delete repositories, candidates
+  or snapshots with their cascade; lists load related rows in one query (REPO-5, REPO-6,
+  REPO-7).
+- A refresh that schedules a retry keeps its repository marked as queued until the retry has
+  had its chance (REPO-4).
+- One view-only admin base (`core.admin.ViewOnlyAdmin`) for the jobs, developer and repository
+  admins; shared admin test helpers; the stalled notice has one text (batch 39, `/simplify`).
+
+### Fixed
+
+- A repository refresh that fails with an unexpected error logs its traceback (REPO-1).
+- With tasks running inline, a rate-limited or transient refresh fails once instead of
+  retrying inline without backoff (REPO-2).
+- A refresh the broker refuses no longer leaves its repository marked as queued; the rest of
+  the batch is still sent (REPO-3). Each refused send is logged with its traceback.
+
+## [0.12.49] - 2026-11-02
+
+Developer profile fixes from the review sweep
+(`openspec/changes/archive/2026-11-02-developers-review-fixes/`; no spec change;
+`Bug_Backlog.md` batch 37). Migration `developers.0002` (ordering only, no SQL). OpenAPI stays
+`1.0.0`; baselines unchanged. One `/simplify` over the combined 0.12.48–0.12.50 diff
+(`Bug_Backlog.md` batch 39); the fix-diff `/code-review` was skipped by the owner.
+
+### Changed
+
+- The developer admins are view-only: no add, change or delete, so a catalog skill or a profile
+  can no longer be deleted with its cascade from the admin; lists load related rows in one
+  query, and interest evidence is shown (DEV-1, DEV-2, DEV-9).
+- `reanalyze_profiles` skips deactivated users and users whose sync is running (reported as
+  "syncing"); `--user` names an inactive user (DEV-4, DEV-5).
+- A test fails once the skill or interest catalog outgrows one profile page (DEV-6).
+
+### Fixed
+
+- Evidence without a date is listed after dated evidence, not before the newest (DEV-3).
+- Skills and interests with equal scores keep one order across pages (DEV-7).
+- The interests list returns no rows during schema generation, like every other list (DEV-8).
+
+## [0.12.48] - 2026-11-02
+
+Job fixes from the review sweep (`openspec/changes/archive/2026-11-02-jobs-review-fixes/`;
+specs `sync-jobs`, `web-client`; `Bug_Backlog.md` batch 36). Migration `jobs.0007` (index
+only). OpenAPI stays `1.0.0` (additive field); baselines unchanged. One `/simplify` over the
+combined 0.12.48–0.12.50 diff (`Bug_Backlog.md` batch 39); the fix-diff `/code-review` was
+skipped by the owner.
+
+### Added
+
+- Every job the API returns carries `stalled`: RUNNING with no heartbeat for
+  `SYNC_STALE_AFTER_SECONDS`, the rule recovery already uses. Reading a status changes nothing
+  (JOB-3).
+- The dashboard and onboarding say when background work stopped and resumes automatically, and
+  let you start a sync over a stalled one (Refresh, Try again); the stalled job is still polled
+  (JOB-3).
+
+### Changed
+
+- The jobs admin is view-only: no add, change or delete, and its list loads users in one query
+  (JOB-1, JOB-2, JOB-5).
+- Partial index `syncjob_active_updated_idx` for the recovery scan, and recovery runs that
+  waited a whole interval expire (JOB-8, in part).
+- The active statuses have one definition (`jobs.models.ACTIVE_STATUSES`), used by the unique
+  constraint too; the unused `SyncJob.is_active` is removed (JOB-4, JOB-6, JOB-7).
+
+### Fixed
+
+- Adding a job in the admin no longer fails with a 500, and saving a job there can no longer
+  overwrite a worker's update or make a dead job look alive (JOB-1, JOB-2).
+
 ## [0.12.47] - 2026-11-02
 
 Sign-in and sign-out fixes from the review sweep

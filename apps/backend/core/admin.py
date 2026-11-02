@@ -13,3 +13,12 @@ class NoAddDeleteAdmin[M: Model](admin.ModelAdmin[M]):
 
     def has_delete_permission(self, request: HttpRequest, obj: M | None = None) -> bool:
         return False
+
+
+class ViewOnlyAdmin[M: Model](NoAddDeleteAdmin[M]):
+    """Staff may look, never add, change or delete: rows written by background work (jobs,
+    analysis, discovery) under its own claims and locks. A save would bypass them (and
+    ``auto_now`` fields would move); a delete would cascade outside the deletion routine."""
+
+    def has_change_permission(self, request: HttpRequest, obj: M | None = None) -> bool:
+        return False

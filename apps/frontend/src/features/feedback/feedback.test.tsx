@@ -663,6 +663,38 @@ describe('pipeline stage line', () => {
     expect(await screen.findByText('Preparing recommendations…')).toBeInTheDocument()
   })
 
+  it('says a stalled sync stopped and lets the user start a new one', async () => {
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/sync/status': () =>
+        json({
+          job: { ...running({ repositories: 'running' }), stalled: true },
+          last_synced_at: COMPLETED_JOB.completed_at,
+        }),
+      'POST /api/v1/profile/sync': () => json({ ...running({ profile: 'pending' }), id: 6 }, 202),
+    })
+    renderRoute('/app')
+    expect(await screen.findByText(/Background work stopped/)).toBeInTheDocument()
+    expect(screen.queryByText('Syncing GitHub data…')).not.toBeInTheDocument()
+    const refresh = screen.getByRole('button', { name: 'Refresh' })
+    expect(refresh).toBeEnabled()
+    await userEvent.setup().click(refresh)
+    await waitFor(() => expect(callsTo(fetchMock, 'POST', '/api/v1/profile/sync')).toHaveLength(1))
+  })
+
+  it('says a stalled discovery stopped instead of finding projects', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/discovery/status': () =>
+        json({ ...NEVER_DISCOVERED, job: { ...discoveryJob('RUNNING'), stalled: true } }),
+    })
+    renderRoute('/app')
+    expect(await screen.findByText(/Background work stopped/)).toBeInTheDocument()
+    expect(screen.queryByText('Finding projects…')).not.toBeInTheDocument()
+  })
+
   it('shows nothing when idle', async () => {
     mockFetch(WITH_RECOMMENDATION)
     renderRoute('/app')

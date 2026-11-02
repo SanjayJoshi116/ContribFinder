@@ -57,9 +57,9 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | High | `apps/backend/services/github/` | OAuth, GitHubClient, sync, storage | [x] batch 32 | [x] no findings |
 | High | `apps/frontend/src/api/` | client.ts, types.ts (skip generated openapi.json, schema.d.ts) | [x] batch 33 | [x] no findings |
 | High | `apps/frontend/src/features/auth/` | sign-in, route guard | [x] batch 34 | [x] no findings |
-| Medium | `apps/backend/jobs/` | SyncJob, status and versions API, recovery | [ ] | [ ] |
-| Medium | `apps/backend/developers/` | profile, skills, interests; profile API | [ ] | [ ] |
-| Medium | `apps/backend/repositories/` | repository models, discovery API, tasks, reports | [ ] | [ ] |
+| Medium | `apps/backend/jobs/` | SyncJob, status and versions API, recovery | [x] batch 36 | [x] no findings |
+| Medium | `apps/backend/developers/` | profile, skills, interests; profile API | [x] batch 37 | [x] no findings |
+| Medium | `apps/backend/repositories/` | repository models, discovery API, tasks, reports | [x] batch 38 | [x] no findings |
 | Medium | `apps/backend/issues/` | Issue, RecommendedIssue, issue detail API | [ ] | [ ] |
 | Medium | `apps/backend/recommendations/` | ScoringConfig, Recommendation, API, evaluation commands | [ ] | [ ] |
 | Medium | `apps/backend/feedback/` | feedback, saved, dismissed; keyset pages | [ ] | [ ] |
@@ -188,6 +188,10 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 33 | **Sweep: `frontend/src/api/`** | API-1…API-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/frontend/src/api/`, verified; API-1, API-4, API-9 confirmed, API-2, API-3, API-5 partial, API-6, API-7 accepted, API-8 false positive; fixed in 0.12.46 (`api-client-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing. `openapi.json` matches a fresh export. |
 | 34 | **Sweep: `frontend/src/features/auth/`** | AUTH-1…AUTH-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/frontend/src/features/auth/`, verified; AUTH-1, AUTH-2, AUTH-5, AUTH-6, AUTH-7, AUTH-9 confirmed, AUTH-3, AUTH-4, AUTH-8 partial; fixed in 0.12.47 (`auth-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing (no cross-user path for AUTH-4: sign-in is a full-page navigation). |
 | 35 | **Fix-diff review of batches 32–34** | FD-1…FD-10 | `/simplify` (4 agents, one combined diff of 0.12.45–0.12.47: `errors.error_for_response`, `client.parse_dt`, `storage.lock_repository` in the sync steps, `src/app/session.ts`, private `csrfToken`, shared test fixtures) then `/code-review` (high) of the result, 2026-11-02, verified; FD-1, FD-8, FD-10 fixed before commit, the rest accepted or wontfix. |
+| 36 | **Sweep: `jobs/`** | JOB-1…JOB-10 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/backend/jobs/`, verified; JOB-1…JOB-7 confirmed, JOB-8 partial, JOB-9, JOB-10 accepted; fixed in 0.12.48 (`jobs-review-fixes`). `/security-review` of the module found nothing. |
+| 37 | **Sweep: `developers/`** | DEV-1…DEV-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/backend/developers/`, verified; DEV-1, DEV-2, DEV-8, DEV-9 confirmed, DEV-3, DEV-4, DEV-5, DEV-7 confirmed (minor), DEV-6 accepted with a guard test; fixed in 0.12.49 (`developers-review-fixes`). `/security-review` of the module found nothing. |
+| 38 | **Sweep: `repositories/`** | REPO-1…REPO-8 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/backend/repositories/`, verified; REPO-5, REPO-6, REPO-7 confirmed, REPO-1 confirmed (logging; no retry of database errors), REPO-2, REPO-3, REPO-4 confirmed (minor), REPO-8 accepted; fixed in 0.12.50 (`repositories-review-fixes`). `/security-review` of the module found nothing. |
+| 39 | **`/simplify` of batches 36–38** | SIM-1…SIM-16 | `/simplify` (4 agents: reuse, simplification, efficiency, altitude; one combined diff of 0.12.48–0.12.50), 2026-11-02; SIM-1…SIM-7 fixed before commit, the rest open, deferred, accepted or wontfix (two to `ideas.md` §15, SIM-8 to the `recommendations/` sweep). The fix-diff `/code-review` was skipped by the owner. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -205,8 +209,11 @@ CFG-7 and CFG-8 accepted) in 0.12.39 (`config-review-fixes`); batch 27 (CORE-1�
 (`core-review-fixes`); batch 28 (ACC-1…ACC-10, ACC-4 accepted) in 0.12.41 (`accounts-review-fixes`); batch 32 (GHS-1…GHS-10) in 0.12.45
 (`github-services-review-fixes`); batch 33 (API-1…API-5, API-9; API-6, API-7 accepted, API-8 false
 positive) in 0.12.46 (`api-client-review-fixes`); batch 34 (AUTH-1…AUTH-9) in 0.12.47
-(`auth-review-fixes`).
-Next: the full review sweep; RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
+(`auth-review-fixes`); batch 36 (JOB-1…JOB-8; JOB-9, JOB-10 accepted) in 0.12.48
+(`jobs-review-fixes`); batch 37 (DEV-1…DEV-9; DEV-6 accepted with a guard) in 0.12.49
+(`developers-review-fixes`); batch 38 (REPO-1…REPO-7; REPO-8 accepted) in 0.12.50
+(`repositories-review-fixes`); batch 39 (`/simplify`, SIM-1…SIM-7) in 0.12.50.
+Next: the full review sweep (next module `recommendations/`, starting with SIM-8); RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
 3, E-3) shipped in 0.12.2 and 0.12.3.
@@ -1141,3 +1148,88 @@ combined `/simplify`. Each row checked against the code.
 | FD-8 | logging | `errors.py` `error_for_response` | Messages say `GET` for the revocation's DELETE. | fixed (`method` parameter, default `GET`; revocation passes `DELETE`) |
 | FD-9 | efficiency | `features/auth/api.ts` `useDeleteGitHubData` | After `AppShell` already redirected, the hook's `replace('/onboarding')` adds a location key: one more `/sync/versions` request and an onboarding remount. | accepted (navigating first is not possible: onboarding sends a cached synced status back to `/app`; design D4 keeps the hook's navigation as the guarantee) |
 | FD-10 | test | `tests/test_github_sync.py` `new_job` | The test helper shares its name with `services.jobs.new_job` (PENDING vs RUNNING). | fixed (renamed `running_sync_job`) |
+
+## Sweep: `jobs/` (2026-11-02)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/jobs/`
+(`admin.py`, `api.py`, `models.py`, `serializers.py`, `tasks.py`), with `services/jobs.py` and
+`services/job_guard.py`. Each row checked against the code. `/security-review`: nothing
+(every query scoped to the user, no client-supplied ids, `error_detail`/`metadata`/`claim_token`
+never serialized).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| JOB-1 | bug | `admin.py:7` | Every field read-only on a plain `ModelAdmin`: Add saves a job with no user (IntegrityError, 500); Delete removes jobs behind the app's cancel and finish flows. | confirmed; fixed (0.12.48: `NoAddDeleteAdmin`) |
+| JOB-2 | race | `admin.py:10` | Save on the change page writes every column: overwrites a worker's status, claim or metadata written meanwhile, and `auto_now` bumps the heartbeat, so a dead job looks alive. | confirmed; fixed (0.12.48: no change permission, view only) |
+| JOB-3 | bug | `api.py:61` | `/sync/status` returns a dead worker's job as RUNNING for up to `SYNC_STALE_AFTER_SECONDS` plus one recovery interval; the UI spins with Refresh disabled while `start_profile_sync` would replace it. | confirmed; fixed (0.12.48: `stalled` on every returned job, `job_guard.is_stalled`; the SPA keeps polling, says work stopped, enables Refresh / Try again) |
+| JOB-4 | dead code | `models.py:85` | `SyncJob.is_active` is unused and counts dead RUNNING jobs, unlike `active_jobs()`. | confirmed; fixed (0.12.48: removed) |
+| JOB-5 | efficiency | `admin.py:8` | No `list_select_related`: one user query per changelist row. | confirmed; fixed (0.12.48) |
+| JOB-6 | consistency | `models.py:77` | The partial unique constraint repeats the active statuses next to `ACTIVE_STATUSES`. | confirmed; fixed (0.12.48: module-level `JobStatus`, `ACTIVE_STATUSES`; same stored values, no migration) |
+| JOB-7 | consistency | `serializers.py:34` | Missing steps filled with the literal `"pending"`. | confirmed; fixed (0.12.48: `StepState.PENDING`) |
+| JOB-8 | efficiency | `tasks.py:8` | Jobs are never pruned; the recovery scan by status and `updated_at` has no index; beat runs piled up while the worker was down all run. | partial (pruning is a retention decision, not taken); fixed (0.12.48: partial index `syncjob_active_updated_idx`, `jobs.0007`; `expires` on `recover-stale-jobs`) |
+| JOB-9 | abuse | `api.py:46` | The cooldown counts COMPLETED syncs only: failed or cancelled syncs restart at once. | accepted (by design: a failed sync may be retried; it already ran its own backoff; the global user throttle applies) |
+| JOB-10 | consistency | `api.py:62` | `last_synced_at` is the last completed sync; data versions' `github` the last finished one. | accepted (by design since 0.12.31: "last synced" means successful; versions also count a failed sync that stored data) |
+
+## Sweep: `developers/` (2026-11-02)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/developers/`
+(`admin.py`, `api.py`, `models.py`, `management/commands/reanalyze_profiles.py`), with
+`services/profiling/` and `services/jobs.py` as context. Each row checked against the code.
+`/security-review`: nothing (every query scoped to the requesting user, no client-supplied ids,
+evidence `detail` rendered as text, `experience_level` and `analysis_config` never serialized).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| DEV-1 | data loss | `admin.py:15` | `ReadOnlyAdmin` blocks add and change but not delete: deleting a `Skill` or `Interest` cascades to every developer's rows; deleting a profile cascades candidates, recommendations and recommended issues outside `data_deletion` (no developer lock, no job cancel, no audit). | confirmed; fixed (0.12.49: `ReadOnlyAdmin` on `NoAddDeleteAdmin`) |
+| DEV-2 | efficiency | `admin.py:46` | Changelists show foreign keys without `list_select_related`: one query per row. | confirmed; fixed (0.12.49) |
+| DEV-3 | display | `models.py:129`, `api.py` prefetches | Evidence ordered `-observed_at`: PostgreSQL puts NULLs first, so undated evidence (no README sync time, empty repository) precedes the newest. | confirmed (minor); fixed (0.12.49: `EVIDENCE_ORDER`, nulls last, then pk; `developers.0002`, state only) |
+| DEV-4 | consistency | `reanalyze_profiles.py:22` | Deactivated users queued; their analysis starts discovery. | confirmed (minor); fixed (0.12.49: `is_active=True`; `--user` names an inactive user) |
+| DEV-5 | efficiency | `reanalyze_profiles.py:32` | A user with a running sync gets a second analysis and discovery (`_start_job` checks only the analysis type). | confirmed (minor; operator command, newest result wins); fixed (0.12.49: skipped and counted `syncing`; a stalled sync does not hold it back) |
+| DEV-6 | robustness | `api.py:72`, `features/profile/api.ts` | The SPA reads one page of 200; past 200 skills the lowest are cut. | accepted (catalog 170 skills, 16 interests; analysis creates catalog entries only); guard test fails once a catalog passes `max_page_size` |
+| DEV-7 | bug | `api.py:101` | List order has no unique tiebreaker (`Skill.name` not unique): tied rows can repeat or skip across pages. | confirmed (minor); fixed (0.12.49: `pk` last, also in `Meta.ordering`) |
+| DEV-8 | robustness | `api.py:119` | `InterestListView.get_queryset` has no `swagger_fake_view` guard; works only while `filter_backends = []`. | confirmed; fixed (0.12.49) |
+| DEV-9 | admin | `admin.py:55` | Interest evidence is not shown in the admin, unlike skill evidence. | confirmed; fixed (0.12.49: `InterestEvidenceInline`) |
+
+## Sweep: `repositories/` (2026-11-02)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/repositories/`
+(`admin.py`, `api.py`, `serializers.py`, `tasks.py`), with `services/repositories/` and
+`services/github/retry.py` as context. Each row checked against the code. `/security-review`:
+nothing (both endpoints scoped to the user, no ids from the client, `UserRepository` never
+serialized, refreshes use the app's credentials, outbound requests only to the API origin).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| REPO-1 | observability | `tasks.py:59` | Any non-GitHub error (bug, database) becomes `internal_error`: no retry, a one-line warning without traceback, recorded and delayed 60 minutes; the same failure repeats silently. | confirmed (logging); fixed (0.12.50: `logger.exception` for `internal_error`, as `revoke_later`). Retrying database errors would change the shared policy for every task; the refresh delay already retries |
+| REPO-2 | bug | `tasks.py:62` | `retries + 1` passed straight to `decide_retry`, not through `attempt_number(eager=)`: an inline run retries inline with no backoff (up to `SYNC_MAX_ATTEMPTS`). | confirmed (minor); fixed (0.12.50) |
+| REPO-3 | robustness | `tasks.py:44` | `queue_batch` commits its stamps, then `.delay()` one by one without handling: a broker error leaves the rest stamped with no task for the `lost_before` window. | confirmed (minor); fixed (0.12.50: each send tried; refused ones `backlog.unmark_queued`; spec "Background refresh") |
+| REPO-4 | efficiency | `tasks.py:67` | Two rate-limit retries (up to ~1812 s) outlast the queued window (1500 s): the backlog queues a second task (fenced by the claim, but fetched twice). | confirmed (minor); fixed (0.12.50: a scheduled retry `backlog.mark_queued`; spec "Background refresh") |
+| REPO-5 | data integrity | `admin.py:43` | `RepositoryAdmin` (and `UserRepositoryAdmin`) fully editable: lifecycle and eligibility outside `lifecycle.py`, languages and dependencies without the row lock, deletes cascading into other users' candidates, recommendations and saves. | confirmed; fixed (0.12.50: view only, inlines cannot delete) |
+| REPO-6 | data loss | `admin.py:17` | `ReadOnlyAdmin` allows delete (candidates, snapshots). | confirmed (as DEV-1); fixed (0.12.50: on `NoAddDeleteAdmin`) |
+| REPO-7 | efficiency | `admin.py:59` | Three changelists without `list_select_related`. | confirmed; fixed (0.12.50) |
+| REPO-8 | display | `serializers.py:24` | `/discovery/candidates` returns a released name (`owner/name~<id>`) and its old link until re-analysis. | accepted (the SPA does not call it; the refresh is queued at once since 0.12.36; a fix needs a nullable `html_url`, a contract change) |
+
+## `/simplify` of batches 36–38 (2026-11-02)
+
+Source: `/simplify` with four agents (reuse, simplification, efficiency, altitude) over one
+combined diff of the uncommitted 0.12.48–0.12.50 code and tests (generated API files and
+lockfiles excluded). Findings deduplicated; each checked against the code.
+
+| ID | Type | Where | Finding | Status |
+|---|---|---|---|---|
+| SIM-1 | reuse | `jobs/admin.py`, `developers/admin.py`, `repositories/admin.py` | Three copies of "`NoAddDeleteAdmin` plus no change permission". | fixed (`core.admin.ViewOnlyAdmin`; app copies removed) |
+| SIM-2 | logging | `repositories/tasks.py` `process_repository_backlog` | `logger.exception` ran after the `except` block: it logged `NoneType: None`, no traceback. | fixed (warning with `exc_info` inside the `except`, per refused send; `unmark_queued` of no ids is a no-op) |
+| SIM-3 | simplification | `repositories/tasks.py` `_refresh` | Two near-identical log calls for `internal_error` and other failures. | fixed (one `logger.log`, level and `exc_info` from the code) |
+| SIM-4 | reuse | `tests/test_*_review_fixes.py` | Three `superuser` fixtures, three view-only permission tests, three changelist query-count closures. | fixed (`shared_fixtures.assert_view_only`, `changelist_queries`; pytest-django `admin_user`/`admin_client`) |
+| SIM-5 | simplification | `features/sync/pipeline.ts` | `isActive` repeated per stage after finding the current job. | fixed (branches on the first active job) |
+| SIM-6 | simplification | `app/jobTransitions.ts` `isStalled` | Re-checked `isActive`; the server sets `stalled` only for RUNNING. | fixed (reads `job.stalled`) |
+| SIM-7 | duplication | `pipeline.ts`, `OnboardingPage.tsx` | The stalled notice written twice with different endings. | fixed (`features/sync/messages.STALLED_NOTICE`) |
+| SIM-8 | data loss | `recommendations/admin.py` (feedback, issues import it) | Its own `ReadOnlyAdmin` still allows delete (as DEV-1, REPO-6). | open (outside the diff; first item of the `recommendations/` sweep) |
+| SIM-9 | altitude | `reanalyze_profiles.py` | The "sync is running" check lives in the command, not in `start_profile_analysis`. | wontfix (design D4 of `developers-review-fixes`: specified job behavior for every caller) |
+| SIM-10 | altitude | `_refresh`, `revoke_later`, `run_tracked_job` | Three call sites, two traceback rules. | deferred (`ideas.md` §15 "One traceback rule for job failures") |
+| SIM-11 | altitude | `repositories/tasks.py`, `backlog.py` | Stamp, unstamp and renew rules split between the task and `backlog`. | deferred (`ideas.md` §15 "The backlog owns sending its refreshes") |
+| SIM-12 | simplification | `backlog.mark_queued`, `unmark_queued` | One `update` with two values. | wontfix (two names read better at the call sites) |
+| SIM-13 | efficiency | `reanalyze_profiles.py` | One `active_jobs(...).exists()` per user. | accepted (operator command; an `Exists` annotation would need the private `_stale_running`) |
+| SIM-14 | simplification | `jobs/models.py` | `_ACTIVE` next to `ACTIVE_STATUSES` and the class aliases. | wontfix (the migration holds a list of strings; another form generates a migration) |
+| SIM-15 | reuse | tests | `make_job`/`make_profile` variants, an inline snapshot, a branching tied-rows test. | wontfix (test-local shapes differ on purpose: age, confidence) |
+| SIM-16 | efficiency | `syncjob_active_updated_idx` | Indexing `updated_at` costs heartbeat updates their HOT path. | accepted (a few running jobs; keeps recovery off a full scan) |

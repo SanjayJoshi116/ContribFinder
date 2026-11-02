@@ -150,6 +150,7 @@ export const COMPLETED_JOB = {
   created_at: '2026-09-28T10:00:00Z',
   started_at: '2026-09-28T10:00:00Z',
   completed_at: '2026-09-28T10:00:05Z',
+  stalled: false,
 }
 
 export const DEVELOPER_PROFILE = {
@@ -261,6 +262,7 @@ export function discoveryJob(status: string, error_code = '') {
     created_at: '2026-09-28T10:00:06Z',
     started_at: '2026-09-28T10:00:06Z',
     completed_at: done || status === 'FAILED' ? '2026-09-28T10:01:00Z' : null,
+    stalled: false,
   }
 }
 

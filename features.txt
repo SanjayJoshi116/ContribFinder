@@ -439,6 +439,34 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.50 - Repository data fixes (review sweep: repositories)
+============================================================================
+
+Repository data (Bug_Backlog.md batch 38)
+  [x] The repository admins are view-only (no lifecycle edits, no cascading deletes)
+  [x] Unexpected refresh errors are logged with a traceback; inline runs never retry inline
+  [x] A refused or retried refresh keeps the queued mark accurate
+  [x] One view-only admin base for job, developer and repository data
+
+============================================================================
+SHIPPED - v0.12.49 - Developer profile fixes (review sweep: developers)
+============================================================================
+
+Developer profile (Bug_Backlog.md batch 37)
+  [x] The developer admins are view-only (no catalog or profile delete with its cascade)
+  [x] Undated evidence listed last; tied skills and interests keep one order across pages
+  [x] Re-analysis skips deactivated users and users whose sync is running
+
+============================================================================
+SHIPPED - v0.12.48 - Job fixes (review sweep: jobs)
+============================================================================
+
+Jobs (Bug_Backlog.md batch 36)
+  [x] A job whose worker died is reported as stalled; the app says so and allows a new sync
+  [x] The jobs admin is view-only (no add, change or delete)
+  [x] Index for the recovery scan; piled-up recovery runs expire
+
+============================================================================
 SHIPPED - v0.12.47 - Sign-in and sign-out fixes (review sweep: frontend/src/features/auth)
 ============================================================================
 

@@ -166,7 +166,7 @@ The system SHALL record, per repository, when its metadata, README, community fi
 ### Requirement: Background refresh
 A periodic background task SHALL refresh, in batches of a configured size (default 50), the repositories that are in at least one developer's pool and are STALE, DISCOVERED and not analyzed within the configured grace period (default 10 minutes), or FAILED and due for retry. A refresh SHALL fetch only the data types that are stale when it runs, also when it was queued for particular data types, and SHALL use conditional requests. Repositories in no pool SHALL NOT be refreshed. Refreshing SHALL NOT block any HTTP request.
 
-A repository queued for a refresh SHALL NOT be queued again while that refresh can still run: until the configured stale-job time plus the maximum retry delay has passed since it was queued, or until an analysis completes or fails it. Overlapping background runs SHALL NOT queue the same repository twice. The recovery of an analysis abandoned by a dead worker SHALL NOT wait for this. A refresh that finds nothing stale on a repository that is not STALE (another analysis refreshed it after it was queued) SHALL change nothing, not even the time of the last transition.
+A repository queued for a refresh SHALL NOT be queued again while that refresh can still run: until the configured stale-job time plus the maximum retry delay has passed since it was queued or since its refresh last scheduled a retry, or until an analysis completes or fails it. A refresh whose task could not be sent SHALL NOT count as queued. Overlapping background runs SHALL NOT queue the same repository twice. The recovery of an analysis abandoned by a dead worker SHALL NOT wait for this. A refresh that finds nothing stale on a repository that is not STALE (another analysis refreshed it after it was queued) SHALL change nothing, not even the time of the last transition.
 
 A repository that gives up its name and is in at least one developer's pool SHALL have its refresh queued once the change that released the name is committed, without waiting for the periodic task, and SHALL count as queued from then on. This SHALL NOT apply to a repository that is FAILED or whose queued refresh can still run; those keep the paths above. A repository that another analysis holds SHALL NOT be queued then; that analysis, which discards what it fetched under the old name, SHALL queue its refresh again when it ends. It SHALL NOT apply when the application's client credentials are not configured or when background tasks run inline: the periodic task stays the fallback, and storing a repository SHALL NOT run another repository's analysis. A recorded refresh failure SHALL NOT hold this refresh back, unless GitHub rejected the application's client credentials within the configured delay.
 
@@ -235,6 +235,14 @@ A refresh that ends without being retried and without marking the repository FAI
 #### Scenario: Refresh retried after the delay
 - **WHEN** the configured delay has passed since a recorded refresh failure, and the next refresh completes
 - **THEN** the background task queues the repository, and after the analysis it has no recorded error
+
+#### Scenario: Retried refresh stays queued
+- **WHEN** a queued refresh hits rate limits and schedules its second retry after the stale-job time plus the maximum retry delay has passed since it was queued
+- **THEN** the next background run does not queue the repository again, because the retry renewed its queued time
+
+#### Scenario: Refresh task not sent
+- **WHEN** the background run picks three repositories and the broker refuses the second task
+- **THEN** the first and third repositories count as queued, the second does not, and the next background run can queue it
 
 ### Requirement: Credentials for shared repository data
 Analysis during a developer's discovery run SHALL use that developer's token. Background refresh SHALL NOT use any user's token: it SHALL authenticate with the application's OAuth client credentials and request public data only. If client credentials are not configured, background refresh SHALL do nothing and log a warning. Neither tokens nor the client secret SHALL appear in repository records, task arguments, error messages or logs.

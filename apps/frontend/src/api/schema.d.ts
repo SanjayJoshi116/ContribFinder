@@ -1275,7 +1275,11 @@ export interface components {
       | 'commit'
       | 'pull_request'
       | 'repeated_contribution'
-    /** @description Public view of a job. ``metadata`` and ``error_detail`` stay internal. */
+    /**
+     * @description Public view of a job. ``metadata`` and ``error_detail`` stay internal. ``stalled``: RUNNING
+     *     with no heartbeat for ``SYNC_STALE_AFTER_SECONDS`` (its worker died); reading changes
+     *     nothing, recovery still resumes it.
+     */
     SyncJob: {
       readonly id: number
       readonly job_type: components['schemas']['JobTypeEnum']
@@ -1291,6 +1295,7 @@ export interface components {
       readonly started_at: string | null
       /** Format: date-time */
       readonly completed_at: string | null
+      readonly stalled: boolean
     }
     /**
      * @description * `PENDING` - Pending

@@ -1,6 +1,6 @@
 from django.contrib import admin
-from django.db.models import Model
-from django.http import HttpRequest
+
+from core.admin import ViewOnlyAdmin
 
 from .models import (
     CandidateDiscovery,
@@ -14,33 +14,26 @@ from .models import (
 )
 
 
-class ReadOnlyAdmin[M: Model](admin.ModelAdmin[M]):
-    """Discovery data is rebuilt by background jobs; editing it here would be overwritten."""
-
-    def has_add_permission(self, request: HttpRequest) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj: M | None = None) -> bool:
-        return False
-
-
 class LanguageInline(admin.TabularInline[RepositoryLanguage, Repository]):
     model = RepositoryLanguage
     extra = 0
+    can_delete = False
 
 
 class TopicInline(admin.TabularInline[RepositoryTopic, Repository]):
     model = RepositoryTopic
     extra = 0
+    can_delete = False
 
 
 class DependencyInline(admin.TabularInline[RepositoryDependency, Repository]):
     model = RepositoryDependency
     extra = 0
+    can_delete = False
 
 
 @admin.register(Repository)
-class RepositoryAdmin(admin.ModelAdmin[Repository]):
+class RepositoryAdmin(ViewOnlyAdmin[Repository]):
     list_display = (
         "full_name",
         "primary_language",
@@ -56,14 +49,16 @@ class RepositoryAdmin(admin.ModelAdmin[Repository]):
 
 
 @admin.register(UserRepository)
-class UserRepositoryAdmin(admin.ModelAdmin[UserRepository]):
+class UserRepositoryAdmin(ViewOnlyAdmin[UserRepository]):
     list_display = ("user", "repository", "relation", "merged_pr_count", "linked_at")
+    list_select_related = ("user", "repository")
     list_filter = ("relation",)
 
 
 @admin.register(RepositorySnapshot)
-class RepositorySnapshotAdmin(ReadOnlyAdmin[RepositorySnapshot]):
+class RepositorySnapshotAdmin(ViewOnlyAdmin[RepositorySnapshot]):
     list_display = ("repository", "captured_at", "activity_label", "commits_90d", "contributors")
+    list_select_related = ("repository",)
     list_filter = ("activity_label",)
     search_fields = ("repository__full_name",)
 
@@ -76,7 +71,8 @@ class DiscoveryInline(admin.TabularInline[CandidateDiscovery, RepositoryCandidat
 
 
 @admin.register(RepositoryCandidate)
-class RepositoryCandidateAdmin(ReadOnlyAdmin[RepositoryCandidate]):
+class RepositoryCandidateAdmin(ViewOnlyAdmin[RepositoryCandidate]):
     list_display = ("developer", "repository", "first_discovered_at", "last_seen_at")
+    list_select_related = ("developer", "repository")
     search_fields = ("repository__full_name",)
     inlines = [DiscoveryInline]

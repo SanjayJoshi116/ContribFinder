@@ -8,6 +8,13 @@ export function isActive(job: SyncJob | null | undefined): boolean {
   return !!job && ACTIVE.has(job.status)
 }
 
+/** Running, but its worker stopped sending heartbeats (the server sets `stalled` only for a
+ * RUNNING job). Still active: it is polled and never treated as finished (recovery resumes
+ * it), but the user may start a sync over it. */
+export function isStalled(job: SyncJob | null | undefined): boolean {
+  return !!job?.stalled
+}
+
 const jobKey = (job: SyncJob | null | undefined) => `${job?.id ?? ''}:${job?.status ?? ''}`
 
 /** Fetches a job status and refreshes what the job produces once it has finished.

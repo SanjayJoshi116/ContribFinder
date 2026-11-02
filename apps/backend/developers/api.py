@@ -13,6 +13,7 @@ from core.authentication import current_user
 from core.serializers import error_responses
 
 from .models import (
+    EVIDENCE_ORDER,
     DeveloperInterest,
     DeveloperProfile,
     DeveloperSkill,
@@ -91,14 +92,12 @@ class SkillListView(ListAPIView[DeveloperSkill]):
     def get_queryset(self) -> QuerySet[DeveloperSkill]:
         if getattr(self, "swagger_fake_view", False):  # schema generation: no request user
             return DeveloperSkill.objects.none()
-        evidence = SkillEvidence.objects.select_related("repository").order_by(
-            "source", "-observed_at", "pk"
-        )
+        evidence = SkillEvidence.objects.select_related("repository").order_by(*EVIDENCE_ORDER)
         return (
             DeveloperSkill.objects.filter(profile__user=current_user(self.request))
             .select_related("skill")
             .prefetch_related(Prefetch("evidence", queryset=evidence))
-            .order_by("-confidence", "skill__name")
+            .order_by("-confidence", "skill__name", "pk")
         )
 
     @extend_schema(
@@ -117,14 +116,14 @@ class InterestListView(ListAPIView[DeveloperInterest]):
     filter_backends = []
 
     def get_queryset(self) -> QuerySet[DeveloperInterest]:
-        evidence = InterestEvidence.objects.select_related("repository").order_by(
-            "source", "-observed_at", "pk"
-        )
+        if getattr(self, "swagger_fake_view", False):  # schema generation: no request user
+            return DeveloperInterest.objects.none()
+        evidence = InterestEvidence.objects.select_related("repository").order_by(*EVIDENCE_ORDER)
         return (
             DeveloperInterest.objects.filter(profile__user=current_user(self.request))
             .select_related("interest")
             .prefetch_related(Prefetch("evidence", queryset=evidence))
-            .order_by("-strength", "interest__name")
+            .order_by("-strength", "interest__name", "pk")
         )
 
     @extend_schema(

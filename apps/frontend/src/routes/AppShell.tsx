@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { Navigate } from 'react-router'
 
-import { isActive } from '@/app/jobTransitions'
+import { isActive, isStalled } from '@/app/jobTransitions'
 import { lazyLoaders } from '@/app/lazyLoaders'
 import { Button } from '@/components/ui/button'
 import { useMe } from '@/features/auth/api'
@@ -41,7 +41,8 @@ export function AppShell() {
   if (!synced) return <Navigate to="/onboarding" replace />
 
   const job = status.data.job
-  const syncing = isActive(job)
+  // A stalled sync does not block a new one: starting replaces it (worker_lost).
+  const syncing = isActive(job) && !isStalled(job)
   const lastFailure = job && job.status === 'FAILED' ? failureMessage(job) : null
   const name = profile.data?.name || me?.display_name || me?.github_username || 'there'
   const repos = repositories.data?.results ?? []

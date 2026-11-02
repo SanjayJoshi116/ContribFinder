@@ -244,6 +244,15 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   `release_name` locks the holder of a name out of GitHub ID order inside the sorted upserts of
   the sync and discovery; a `lock_repositories(ids)` in ID order, taken before the upserts, would
   enforce the rule in one place. Belongs with the `services/repositories/` sweep.
+- **One traceback rule for job failures** (from the batches 36–38 `/simplify`, 2026-11-02).
+  `revoke_later` and the repository refresh log `internal_error` with its traceback;
+  `run_tracked_job` logs every final failure as a plain warning, so a sync or analysis bug loses
+  its stack. A shared `retry.log_failure(logger, decision, ...)` used by all three would give one
+  rule. Belongs with a `services/` follow-up (`Bug_Backlog.md` SIM-10).
+- **The backlog owns sending its refreshes** (same pass, SIM-11). `queue_batch` stamps
+  `refresh_queued_at`, and the task unstamps refused sends and renews on retry
+  (`backlog.mark_queued`/`unmark_queued`); a `backlog.dispatch(batch, send)` would keep every
+  stamp rule in `backlog`. Pairs with the "dispatch after commit" helper above.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.

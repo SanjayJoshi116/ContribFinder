@@ -3,9 +3,9 @@ import { Navigate, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL } from '@/features/auth/api'
-import { isActive } from '@/app/jobTransitions'
+import { isActive, isStalled } from '@/app/jobTransitions'
 import { useStartSync, useSyncStatus } from '@/features/sync/api'
-import { failureMessage } from '@/features/sync/messages'
+import { STALLED_NOTICE, failureMessage } from '@/features/sync/messages'
 import { SyncSteps } from '@/features/sync/SyncSteps'
 
 export function OnboardingPage() {
@@ -27,6 +27,7 @@ export function OnboardingPage() {
 
   const failed = job && (job.status === 'FAILED' || job.status === 'CANCELLED')
   const failure = failed ? failureMessage(job) : null
+  const stalled = isStalled(job)
 
   return (
     <section className="space-y-6">
@@ -41,6 +42,11 @@ export function OnboardingPage() {
       {job ? (
         <div className="rounded-lg border p-4">
           <SyncSteps job={job} />
+          {stalled && (
+            <p role="status" className="text-muted-foreground mt-4 text-sm">
+              {STALLED_NOTICE}, or try again.
+            </p>
+          )}
           {job.status === 'RETRYING' && (
             <p className="text-muted-foreground mt-4 text-sm">
               GitHub asked us to slow down or didn&apos;t respond. Retrying automatically…
@@ -62,7 +68,7 @@ export function OnboardingPage() {
           <a href={GITHUB_SIGN_IN_URL}>Sign in with GitHub again</a>
         </Button>
       ) : (
-        (!job || failed) && (
+        (!job || failed || stalled) && (
           <Button disabled={start.isPending} onClick={() => start.mutate()}>
             {job ? 'Try again' : 'Start sync'}
           </Button>

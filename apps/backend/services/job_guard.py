@@ -27,6 +27,12 @@ def stale_before(now: datetime) -> datetime:
     return now - timedelta(seconds=settings.SYNC_STALE_AFTER_SECONDS)
 
 
+def is_stalled(job: SyncJob, now: datetime) -> bool:
+    """The job is RUNNING with no heartbeat since ``stale_before``: its worker died (or is too
+    slow). ``services.jobs._stale_running`` is the same rule as a query."""
+    return job.status == SyncJob.Status.RUNNING and job.updated_at < stale_before(now)
+
+
 def lost_before(now: datetime) -> datetime:
     """Queued work (a job's message, a repository refresh task) untouched since before this
     has had its chance to be claimed and retried: its message was lost, so it may be queued

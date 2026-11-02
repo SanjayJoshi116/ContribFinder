@@ -5,6 +5,11 @@ pytest-django's test client in every other module."""
 from collections.abc import Iterator
 
 import pytest
+from django.contrib.admin.sites import site
+from django.db import connection
+from django.db.models import Model
+from django.test import Client, RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from developers.models import (
@@ -67,3 +72,24 @@ def public_client() -> Iterator[GitHubClient]:
 
 def active_configs() -> list[str]:
     return list(ScoringConfig.objects.filter(is_active=True).values_list("version", flat=True))
+
+
+def assert_view_only(model: type[Model], user, obj: Model | None = None) -> None:
+    """Staff (``user``) may view ``model`` in the admin and never add, change or delete it,
+    nor delete through its inlines (``core.admin.ViewOnlyAdmin``)."""
+    request = RequestFactory().get("/admin/")
+    request.user = user
+    admin = site._registry[model]
+    assert not admin.has_add_permission(request)
+    assert not admin.has_change_permission(request, obj)
+    assert not admin.has_delete_permission(request, obj)
+    assert admin.has_view_permission(request, obj)
+    for inline in admin.inlines:
+        assert inline.can_delete is False
+
+
+def changelist_queries(client: Client, url: str) -> int:
+    """Queries one admin changelist page runs (``client`` signed in as staff)."""
+    with CaptureQueriesContext(connection) as captured:
+        assert client.get(url).status_code == 200
+    return len(captured)

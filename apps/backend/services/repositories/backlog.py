@@ -108,6 +108,18 @@ def queue_released(pks: list[int], now: datetime, *, requeue: bool = False) -> l
     return picked
 
 
+def mark_queued(pks: list[int], now: datetime) -> None:
+    """Renew the queued time: a refresh that scheduled a retry can still run until a full
+    waiting period after the retry. Advisory: the analysis claim still fences the work."""
+    Repository.objects.filter(pk__in=pks).update(refresh_queued_at=now)
+
+
+def unmark_queued(pks: list[int]) -> None:
+    """The broker refused these refreshes: nothing will run, so the next run may queue them."""
+    if pks:
+        Repository.objects.filter(pk__in=pks).update(refresh_queued_at=None)
+
+
 def _not_queued(now: datetime) -> Q:
     """A queued task that can still run is not queued twice."""
     return ~Q(refresh_queued_at__gte=lost_before(now))

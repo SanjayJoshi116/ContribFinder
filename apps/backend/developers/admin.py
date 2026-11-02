@@ -1,34 +1,26 @@
 from django.contrib import admin
-from django.db.models import Model
-from django.http import HttpRequest
+
+from core.admin import ViewOnlyAdmin
 
 from .models import (
     DeveloperInterest,
     DeveloperProfile,
     DeveloperSkill,
     Interest,
+    InterestEvidence,
     Skill,
     SkillEvidence,
 )
 
 
-class ReadOnlyAdmin[M: Model](admin.ModelAdmin[M]):
-    """Derived data is rebuilt by analysis; editing it in the admin would be overwritten."""
-
-    def has_add_permission(self, request: HttpRequest) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj: M | None = None) -> bool:
-        return False
-
-
 @admin.register(DeveloperProfile)
-class DeveloperProfileAdmin(ReadOnlyAdmin[DeveloperProfile]):
+class DeveloperProfileAdmin(ViewOnlyAdmin[DeveloperProfile]):
     list_display = ("user", "experience_level", "analyzed_at")
+    list_select_related = ("user",)
 
 
 @admin.register(Skill)
-class SkillAdmin(ReadOnlyAdmin[Skill]):
+class SkillAdmin(ViewOnlyAdmin[Skill]):
     list_display = ("name", "slug", "category")
     list_filter = ("category",)
     search_fields = ("name", "slug")
@@ -42,16 +34,26 @@ class SkillEvidenceInline(admin.TabularInline[SkillEvidence, DeveloperSkill]):
 
 
 @admin.register(DeveloperSkill)
-class DeveloperSkillAdmin(ReadOnlyAdmin[DeveloperSkill]):
+class DeveloperSkillAdmin(ViewOnlyAdmin[DeveloperSkill]):
     list_display = ("profile", "skill", "confidence", "last_observed_at")
+    list_select_related = ("profile", "skill")
     inlines = [SkillEvidenceInline]
 
 
 @admin.register(Interest)
-class InterestAdmin(ReadOnlyAdmin[Interest]):
+class InterestAdmin(ViewOnlyAdmin[Interest]):
     list_display = ("name", "slug")
 
 
+class InterestEvidenceInline(admin.TabularInline[InterestEvidence, DeveloperInterest]):
+    model = InterestEvidence
+    extra = 0
+    can_delete = False
+    readonly_fields = ("source", "repository", "detail", "observed_at")
+
+
 @admin.register(DeveloperInterest)
-class DeveloperInterestAdmin(ReadOnlyAdmin[DeveloperInterest]):
+class DeveloperInterestAdmin(ViewOnlyAdmin[DeveloperInterest]):
     list_display = ("profile", "interest", "strength")
+    list_select_related = ("profile", "interest")
+    inlines = [InterestEvidenceInline]

@@ -45,7 +45,8 @@ STEPS_BY_JOB_TYPE: dict[str, tuple[str, ...]] = {
 
 
 def _stale_running(now: datetime) -> Q:
-    """RUNNING jobs that stopped sending heartbeats: their worker died (or is too slow)."""
+    """RUNNING jobs that stopped sending heartbeats: their worker died (or is too slow). The
+    query form of ``job_guard.is_stalled``."""
     return Q(status=Status.RUNNING, updated_at__lt=stale_before(now))
 
 

@@ -135,6 +135,32 @@ describe('onboarding', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 
+  it('says a stalled sync stopped and offers to try again', async () => {
+    let started = false
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/sync/status': () =>
+        json({
+          job: started
+            ? job({ id: 2, status: 'PENDING', steps: {} })
+            : job({ status: 'RUNNING', steps: { profile: 'running' }, stalled: true }),
+          last_synced_at: null,
+        }),
+      'POST /api/v1/profile/sync': () => {
+        started = true
+        return json(job({ id: 2, status: 'PENDING', steps: {} }), 202)
+      },
+    })
+    renderRoute('/onboarding')
+
+    expect(await screen.findByText(/Background work stopped/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+    await waitFor(() => expect(callsTo(fetchMock, 'POST', '/api/v1/profile/sync')).toHaveLength(1))
+    await waitFor(() =>
+      expect(screen.queryByText(/Background work stopped/)).not.toBeInTheDocument(),
+    )
+  })
+
   it('explains automatic retries while RETRYING', async () => {
     mockFetch({
       ...ME_ROUTE,

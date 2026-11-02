@@ -17,7 +17,7 @@ from services.discovery.service import DiscoveryService
 from services.github.client import GitHubClient
 from services.github.errors import GitHubAuthError
 from services.github.oauth import has_app_credentials
-from services.github.retry import Retry, decide_retry
+from services.github.retry import Retry, attempt_number, decide_retry
 from services.jobs import run_tracked_job, start_recommendations_after
 from services.repositories import backlog
 from services.repositories.analysis import RepositoryAnalysisService
@@ -41,10 +41,17 @@ def process_repository_backlog() -> int:
         logger.warning("GitHub client credentials are not configured; backlog not processed")
         return 0
     batch = backlog.queue_batch(timezone.now())
+    refused: list[int] = []
     for repo_id, kind in batch:
-        REFRESH_TASKS[kind].delay(repo_id)
-    logger.info("Queued %s repository refreshes", len(batch))
-    return len(batch)
+        try:
+            REFRESH_TASKS[kind].delay(repo_id)
+        except Exception:
+            logger.warning("Refresh of repository %s not queued", repo_id, exc_info=True)
+            refused.append(repo_id)
+    # Stamped by queue_batch, but no task will run: let the next run queue them again.
+    backlog.unmark_queued(refused)
+    logger.info("Queued %s repository refreshes", len(batch) - len(refused))
+    return len(batch) - len(refused)
 
 
 def _refresh(task: Any, repo_id: int, parts: list[str] | None) -> None:
@@ -57,15 +64,30 @@ def _refresh(task: Any, repo_id: int, parts: list[str] | None) -> None:
         record_refresh_failure(repo_id, backlog.AUTH_INVALID, since=started)
         return
     except Exception as exc:
+        attempt = attempt_number(
+            task.request.retries + 1,
+            settings.SYNC_MAX_ATTEMPTS,
+            eager=bool(task.request.is_eager),
+        )
         decision = decide_retry(
             exc,
-            task.request.retries + 1,
+            attempt,
             max_attempts=settings.SYNC_MAX_ATTEMPTS,
             max_delay=settings.GITHUB_MAX_RETRY_DELAY,
         )
         if isinstance(decision, Retry):
+            # Still queued until the retry has had its chance (backlog._not_queued).
+            backlog.mark_queued([repo_id], timezone.now())
             raise task.retry(countdown=decision.countdown) from None
-        logger.warning("Repository %s refresh failed: %s", repo_id, decision.code)
+        # Not a GitHub failure (a bug, a database error): keep its traceback.
+        unexpected = decision.code == "internal_error"
+        logger.log(
+            logging.ERROR if unexpected else logging.WARNING,
+            "Repository %s refresh failed: %s",
+            repo_id,
+            decision.code,
+            exc_info=unexpected,
+        )
         record_refresh_failure(repo_id, decision.code, since=started)
         return
     logger.info("Repository %s refresh: %s", repo_id, outcome)

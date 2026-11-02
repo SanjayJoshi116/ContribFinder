@@ -92,7 +92,7 @@ ContribFinder/
 │  │  ├─ core/              health, auth class, CSRF/400/403/404 JSON views, log redaction, checks,
 │  │  │                     startup (production check gate), throttling (cache-outage fallback),
 │  │  │                     backoff (per-process skip after a cache error), csp (Content-Security-
-│  │  │                     Policy middleware), reports (JSON files written by commands), admin (NoAddDeleteAdmin)
+│  │  │                     Policy middleware), reports (JSON files written by commands), admin (NoAddDeleteAdmin, ViewOnlyAdmin)
 │  │  ├─ accounts/          User, AuditEvent, auth views, session, data deletion
 │  │  ├─ github/            GitHubAccount, GitHubProfile, sync task (tasks.py), profile API
 │  │  ├─ jobs/              SyncJob (generic tracked jobs), sync status and data versions API,
@@ -1631,6 +1631,70 @@ Archived: `openspec/changes/archive/2026-11-02-auth-review-fixes/`. Spec: delta 
   `useAccountActionPending()` disables every account button (sections and Log out). A new
   account action uses the key.
 
+**Job fixes, review sweep: jobs** (MVP+, fix release)  ✅ shipped in v0.12.48 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-02-jobs-review-fixes/`. Specs: deltas to `sync-jobs`
+(new "Stalled jobs are reported"), `web-client` (new "Stalled job"). `Bug_Backlog.md` batch 36
+(JOB-1…JOB-10; JOB-9, JOB-10 accepted, JOB-8 partial). One `/simplify` over the combined 0.12.48–0.12.50 diff (batch 39); the fix-diff
+`/code-review` was skipped (owner).
+`/security-review` of `jobs/`: nothing.
+- `job_guard.is_stalled(job, now)`: RUNNING with `updated_at < stale_before(now)`;
+  `services.jobs._stale_running` is its query form (a test checks they agree). `SyncJobSerializer`
+  exposes it as `stalled` on every returned job (sync, discovery, generation status, start).
+  Reading never changes the job.
+- SPA: `isStalled(job)` (`src/app/jobTransitions.ts`) is active and stalled. `isActive` stays
+  true for a stalled job (polling continues, no finished-job refresh); `usePipelineStage`
+  returns `'stalled'` when the first active job of the chain is stalled; AppShell's Refresh and
+  onboarding's Try again work over a stalled sync (the start fails it `worker_lost`). Test job
+  fixtures carry `stalled: false`.
+- `jobs.models.JobStatus` (module level; `SyncJob.Status` is the same class) and
+  `ACTIVE_STATUSES`: the one active list, also for the unique constraint and the partial index
+  `syncjob_active_updated_idx` (`jobs.0007`). `SyncJob.is_active` removed.
+- `SyncJobAdmin(core.admin.ViewOnlyAdmin)` (view only: a save would overwrite a worker's claim
+  and bump the heartbeat); `list_select_related`. Beat `recover-stale-jobs` has
+  `options.expires = JOB_RECOVERY_INTERVAL_SECONDS`.
+
+**Developer profile fixes, review sweep: developers** (MVP+, fix release)  ✅ shipped in v0.12.49 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-02-developers-review-fixes/` (no spec change,
+`skip_specs`). `Bug_Backlog.md` batch 37 (DEV-1…DEV-9; DEV-6 accepted with a guard test).
+One `/simplify` over the combined 0.12.48–0.12.50 diff (batch 39); the fix-diff
+`/code-review` was skipped (owner). `/security-review` of
+`developers/`: nothing.
+- The developer admins use `core.admin.ViewOnlyAdmin` (no add, change or delete): developer
+  data and catalog rows are removed only by `data_deletion`. `list_select_related` per admin;
+  `InterestEvidenceInline`.
+- `developers.models.EVIDENCE_ORDER` (source, `observed_at` desc nulls last, pk): model ordering
+  and both API prefetches. Skill and interest lists end with `pk` (`developers.0002`, state only).
+- `reanalyze_profiles`: active users only; a user with an active sync (`active_jobs`, so not a
+  stalled one) is skipped and counted `syncing`.
+- `tests/test_developers_review_fixes.py` fails once `SKILLS` or `INTERESTS` exceeds
+  `ProfileListPagination.max_page_size` (200): the SPA (`features/profile/api.ts`) reads one page.
+
+**Repository data fixes, review sweep: repositories** (MVP+, fix release)  ✅ shipped in v0.12.50 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-02-repositories-review-fixes/`. Spec: delta to
+`repository-analysis` ("Background refresh"). `Bug_Backlog.md` batch 38 (REPO-1…REPO-8; REPO-8
+accepted). One `/simplify` over the combined 0.12.48–0.12.50 diff (batch 39); the fix-diff
+`/code-review` was skipped (owner). `/security-review`
+of `repositories/`: nothing.
+- Every repository admin uses `core.admin.ViewOnlyAdmin` (`NoAddDeleteAdmin` plus no change);
+  inlines `can_delete = False`, `list_select_related` per list.
+- `_refresh` (`repositories/tasks.py`) decides through `attempt_number(..., eager=)`;
+  `internal_error` is logged with `logger.exception`. Database errors are still not retried
+  (shared policy); the refresh failure delay retries them.
+- `backlog.mark_queued(pks, now)` (a scheduled retry renews `refresh_queued_at`) and
+  `backlog.unmark_queued(pks)` (a send the broker refused); `process_repository_backlog` tries
+  every send and returns the number sent.
+- Viewing a repository in the admin raises Django's `RemovedInDjango60Warning` (URLField scheme);
+  `FORMS_URLFIELD_ASSUME_HTTPS` is not set yet.
+- `/simplify` (batch 39): `core.admin.ViewOnlyAdmin` (`NoAddDeleteAdmin` plus no change) is the
+  one view-only base; a new admin for job-written data uses it. `recommendations/admin.py` still
+  has its own `ReadOnlyAdmin` (feedback, issues import it) that allows delete (SIM-8): next sweep
+  module. Admin tests use `shared_fixtures.assert_view_only(model, user, obj)` and
+  `changelist_queries(client, url)` with pytest-django's `admin_user`/`admin_client`. SPA:
+  `features/sync/messages.STALLED_NOTICE`; `isStalled` reads `job.stalled` only.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1657,7 +1721,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50).
 
 ## 8. Release housekeeping
 

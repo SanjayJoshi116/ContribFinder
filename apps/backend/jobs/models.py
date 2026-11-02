@@ -3,6 +3,21 @@ from django.db import models
 from django.db.models import Q
 
 
+class JobStatus(models.TextChoices):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    RETRYING = "RETRYING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+# The one definition of an active job's statuses: ``SyncJob.ACTIVE_STATUSES`` and the database
+# conditions below (a list of stored values, as the migrations hold it).
+ACTIVE_STATUSES = (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.RETRYING)
+_ACTIVE = [status.value for status in ACTIVE_STATUSES]
+
+
 class SyncJob(models.Model):
     """A tracked background job (SRS-2 §46). Generic: later phases add job types.
 
@@ -16,13 +31,7 @@ class SyncJob(models.Model):
         REPOSITORY_DISCOVERY = "repository_discovery"
         RECOMMENDATION_GENERATION = "recommendation_generation"
 
-    class Status(models.TextChoices):
-        PENDING = "PENDING"
-        RUNNING = "RUNNING"
-        RETRYING = "RETRYING"
-        COMPLETED = "COMPLETED"
-        FAILED = "FAILED"
-        CANCELLED = "CANCELLED"
+    Status = JobStatus
 
     class StepState(models.TextChoices):
         PENDING = "pending"
@@ -32,7 +41,7 @@ class SyncJob(models.Model):
         SKIPPED = "skipped"
         FAILED = "failed"
 
-    ACTIVE_STATUSES = (Status.PENDING, Status.RUNNING, Status.RETRYING)
+    ACTIVE_STATUSES = ACTIVE_STATUSES
     TERMINAL_STATUSES = (Status.COMPLETED, Status.FAILED, Status.CANCELLED)
 
     user = models.ForeignKey(
@@ -59,19 +68,24 @@ class SyncJob(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["user", "job_type", "-created_at"])]
+        indexes = [
+            models.Index(fields=["user", "job_type", "-created_at"]),
+            # Recovery and job starts look for active jobs by last update (heartbeat); finished
+            # jobs, which pile up, stay out of the index.
+            models.Index(
+                fields=["updated_at"],
+                condition=Q(status__in=_ACTIVE),
+                name="syncjob_active_updated_idx",
+            ),
+        ]
         constraints = [
             # At most one active job per user and type, enforced by the database.
             models.UniqueConstraint(
                 fields=["user", "job_type"],
-                condition=Q(status__in=["PENDING", "RUNNING", "RETRYING"]),
+                condition=Q(status__in=_ACTIVE),
                 name="one_active_job_per_user_and_type",
             )
         ]
 
     def __str__(self) -> str:
         return f"SyncJob({self.job_type}, {self.status}, user={self.user_id})"
-
-    @property
-    def is_active(self) -> bool:
-        return self.status in self.ACTIVE_STATUSES

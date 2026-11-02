@@ -322,6 +322,44 @@ describe('refresh on job transitions', () => {
     expect(callsTo(fetchMock, 'GET', '/api/v1/recommendations').length).toBe(list)
   })
 
+  it('keeps polling a stalled sync without refreshing, then refreshes once when it finishes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let statusCalls = 0
+    const versions = changingVersions()
+    const running = { ...COMPLETED_JOB, id: 2, status: 'RUNNING', completed_at: null }
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      ...versions.route,
+      'GET /api/v1/sync/status': () => {
+        statusCalls += 1
+        // Stalled twice, resumed once, then finished.
+        const job =
+          statusCalls <= 2
+            ? { ...running, stalled: true }
+            : statusCalls === 3
+              ? running
+              : { ...COMPLETED_JOB, id: 2 }
+        if (statusCalls === 4) versions.change('github', 'profile')
+        return json({ job, last_synced_at: COMPLETED_JOB.completed_at })
+      },
+    })
+    renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+
+    await vi.advanceTimersByTimeAsync(2100)
+    await waitFor(() => expect(statusCalls).toBeGreaterThanOrEqual(2))
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(1)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(4200)
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(2))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/profile').length).toBe(2)
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(2)
+  })
+
   it('refetches the list once per finished generation, however many components show it', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let statusCalls = 0

@@ -7,6 +7,12 @@ wholesale on each analysis. Raw GitHub data (including the profile README) stays
 
 from django.conf import settings
 from django.db import models
+from django.db.models import F
+
+# Evidence of a skill or interest: by source, newest first, undated last (PostgreSQL puts NULLs
+# first in a descending sort), then by pk so the order is stable. The model ordering and the API
+# prefetches use it.
+EVIDENCE_ORDER = ("source", F("observed_at").desc(nulls_last=True), "pk")
 
 
 class ExperienceLevel(models.TextChoices):
@@ -105,7 +111,7 @@ class DeveloperSkill(models.Model):
     last_observed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-confidence", "skill__name"]
+        ordering = ["-confidence", "skill__name", "pk"]
         constraints = [
             models.UniqueConstraint(fields=["profile", "skill"], name="unique_profile_skill")
         ]
@@ -126,7 +132,7 @@ class SkillEvidence(models.Model):
     observed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["source", "-observed_at"]
+        ordering = EVIDENCE_ORDER
         verbose_name_plural = "skill evidence"
 
     def __str__(self) -> str:
@@ -154,7 +160,7 @@ class DeveloperInterest(models.Model):
     strength = models.FloatField()
 
     class Meta:
-        ordering = ["-strength", "interest__name"]
+        ordering = ["-strength", "interest__name", "pk"]
         constraints = [
             models.UniqueConstraint(fields=["profile", "interest"], name="unique_profile_interest")
         ]
@@ -175,7 +181,7 @@ class InterestEvidence(models.Model):
     observed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["source", "-observed_at"]
+        ordering = EVIDENCE_ORDER
         verbose_name_plural = "interest evidence"
 
     def __str__(self) -> str:

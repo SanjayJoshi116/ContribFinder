@@ -507,6 +507,8 @@ CELERY_BEAT_SCHEDULE = {
     "recover-stale-jobs": {
         "task": "jobs.recover_stale_jobs",
         "schedule": float(JOB_RECOVERY_INTERVAL_SECONDS),
+        # Runs that waited a whole interval (worker down) are superseded by the next one.
+        "options": {"expires": JOB_RECOVERY_INTERVAL_SECONDS},
     },
     "mark-stale-repositories": {
         "task": "repositories.mark_stale_repositories",

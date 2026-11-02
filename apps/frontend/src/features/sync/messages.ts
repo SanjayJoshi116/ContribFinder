@@ -1,5 +1,9 @@
 import type { SyncJob, SyncStepState } from '@/api/types'
 
+/** A stalled job (its worker stopped): the first sentence of every notice about it. */
+export const STALLED_NOTICE =
+  'Background work stopped. It resumes automatically within a few minutes'
+
 export const STEP_LABELS: Record<string, string> = {
   profile: 'Profile',
   readme: 'Profile README',
