@@ -47,11 +47,12 @@ export function useRecommendationStatus(enabled = true) {
   const queryClient = useQueryClient()
   return useQuery<RecommendationStatus, ApiError>({
     queryKey: recommendationStatusKey,
-    queryFn: () =>
-      fetchStatusAndRefresh(
+    queryFn: ({ signal }) =>
+      fetchStatusAndRefresh<RecommendationStatus>(
         queryClient,
         recommendationStatusKey,
-        () => apiFetch<RecommendationStatus>('/recommendations/status'),
+        '/recommendations/status',
+        signal,
         () => refreshDataVersions(queryClient),
       ),
     staleTime: 0,

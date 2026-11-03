@@ -2,10 +2,10 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import type { DeveloperSkill } from '@/api/types'
+import { ExternalLink } from '@/components/ExternalLink'
+import { formatDate } from '@/lib/format'
 
 import { CATEGORY_LABELS, SOURCE_LABELS, evidenceLabel, groupByCategory } from './evidence'
-
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
 function SkillEvidenceList({ skill, id }: { skill: DeveloperSkill; id: string }) {
   return (
@@ -20,18 +20,13 @@ function SkillEvidenceList({ skill, id }: { skill: DeveloperSkill; id: string })
           {item.repository && (
             <>
               {' · '}
-              <a
-                href={item.repository.html_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline"
-              >
+              <ExternalLink href={item.repository.html_url} className="hover:underline">
                 {item.repository.full_name}
-              </a>
+              </ExternalLink>
             </>
           )}
           {item.detail && ` · ${item.detail}`}
-          {item.observed_at && ` · ${date.format(new Date(item.observed_at))}`}
+          {item.observed_at && ` · ${formatDate(item.observed_at)}`}
         </li>
       ))}
     </ul>

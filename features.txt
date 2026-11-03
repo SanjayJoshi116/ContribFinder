@@ -439,6 +439,43 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.57 - Issue detail fixes (review sweep: features/issues)
+============================================================================
+
+Issue detail page (Bug_Backlog.md batch 46)
+  [x] Contribution type explained by its label category, not a label the issue lacks
+  [x] Unknown difficulty signals left out; wordings pinned to the backend classifier
+  [x] A failed background refresh keeps the issue on screen; only a 404 ends it
+  [x] Middle-click opens on GitHub are recorded like clicks
+  [x] "No technologies mentioned" instead of "Not enough evidence"
+  [x] Shared Fact and date formatting across detail pages
+  [x] Recommendation detail, saved/hidden lists, discovery card and list keep data on a failed refresh
+
+============================================================================
+SHIPPED - v0.12.56 - Route fixes (review sweep: frontend/src/routes)
+============================================================================
+
+Web client (Bug_Backlog.md batch 45)
+  [x] A failed background refresh keeps the dashboard, profile and onboarding on screen
+  [x] Failed loads of skills, interests or repositories say so instead of showing nothing
+  [x] Back to the first page refreshes the data versions; state-only navigations do not
+  [x] Sync cooldown names the time a refresh is possible, on dashboard and onboarding
+  [x] Signed-in users never see the sign-in button flash on / or unknown paths
+  [~] Not-found page for unknown paths (left to the interface revamp)
+
+============================================================================
+SHIPPED - v0.12.55 - Query client and session fixes (review sweep: frontend/src/app)
+============================================================================
+
+Web client (Bug_Backlog.md batch 44)
+  [x] Deleting GitHub data no longer refetches the deleted data as if a sync had finished
+  [x] A cancelled job status fetch never refreshes; sign-out stops status requests
+  [x] Starting a sync keeps polling it even if an older status answer arrives late
+  [x] A session that ended during a failed sign-out still returns to sign-in with the notice
+  [x] A failed navigation to sign-in never leaves later 401s ignored
+  [x] Data versions refresh in one pass; a test checks every profile query is in an area
+
+============================================================================
 SHIPPED - v0.12.54 - Profiling fixes (review sweep: services/profiling)
 ============================================================================
 

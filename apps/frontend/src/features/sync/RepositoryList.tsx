@@ -1,4 +1,5 @@
 import type { Repository } from '@/api/types'
+import { ExternalLink } from '@/components/ExternalLink'
 
 export function RepositoryList({ repositories }: { repositories: readonly Repository[] }) {
   if (repositories.length === 0) {
@@ -9,14 +10,9 @@ export function RepositoryList({ repositories }: { repositories: readonly Reposi
       {repositories.map((repo) => (
         <li key={repo.id} className="space-y-1 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={repo.html_url}
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium hover:underline"
-            >
+            <ExternalLink href={repo.html_url} className="font-medium hover:underline">
               {repo.full_name}
-            </a>
+            </ExternalLink>
             {repo.is_fork && <Badge>fork</Badge>}
             {repo.is_archived && <Badge>archived</Badge>}
           </div>

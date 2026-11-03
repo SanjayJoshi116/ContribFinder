@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { ApiError, apiFetch } from '@/api/client'
+import type { ApiError } from '@/api/client'
 import type { DiscoveryStatus } from '@/api/types'
 import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 import { recommendationStatusKey } from '@/features/recommendations/api'
@@ -17,11 +17,12 @@ export function useDiscoveryStatus(enabled = true) {
   const queryClient = useQueryClient()
   return useQuery<DiscoveryStatus, ApiError>({
     queryKey: discoveryStatusKey,
-    queryFn: () =>
-      fetchStatusAndRefresh(
+    queryFn: ({ signal }) =>
+      fetchStatusAndRefresh<DiscoveryStatus>(
         queryClient,
         discoveryStatusKey,
-        () => apiFetch<DiscoveryStatus>('/discovery/status'),
+        '/discovery/status',
+        signal,
         () => queryClient.invalidateQueries({ queryKey: recommendationStatusKey }),
       ),
     staleTime: 0,

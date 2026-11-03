@@ -2,7 +2,7 @@ import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 
 import { ApiError } from '@/api/client'
 
-import { ENDS_SESSION_META_KEY, type Navigate, endSession, isMe } from './session'
+import { ENDS_SESSION_META_KEY, type Navigate, endSession, isMe, meQueryKey } from './session'
 
 const MAX_RETRIES = 2
 
@@ -37,7 +37,14 @@ export function createQueryClient({ navigate, retryDelay }: Options): QueryClien
   const unauthenticated = (error: unknown) => {
     if (signedOut || !(error instanceof ApiError) || error.status !== 401) return
     signedOut = true
-    void endSession(queryClient, navigate)
+    // A failed navigation must not leave later 401s ignored (APP-6). `endSession` has already
+    // removed the identity; putting it back keeps the signed-in pages, and the next 401 on it
+    // ends the session with the notice again (CR-7).
+    const me = queryClient.getQueryData(meQueryKey)
+    endSession(queryClient, navigate).catch(() => {
+      signedOut = false
+      if (me !== undefined) queryClient.setQueryData(meQueryKey, me)
+    })
   }
 
   const queryClient = new QueryClient({
@@ -59,7 +66,14 @@ export function createQueryClient({ navigate, retryDelay }: Options): QueryClien
         if (endsSession(mutation.options.meta)) signedOut = true
       },
       onError: (error, _variables, _result, mutation) => {
-        if (endsSession(mutation.options.meta)) signedOut = false
+        if (endsSession(mutation.options.meta)) {
+          signedOut = false
+          // 401s were ignored while it was pending: ask whether the session is still there; a
+          // 401 on the known identity ends it through the query cache above (APP-5).
+          if (!(error instanceof ApiError && error.status === 401)) {
+            void queryClient.refetchQueries({ queryKey: meQueryKey, exact: true })
+          }
+        }
         unauthenticated(error)
       },
     }),

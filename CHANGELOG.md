@@ -7,6 +7,99 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.57] - 2026-11-03
+
+Issue detail fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-issue-detail-review-fixes/`; spec deltas to
+`issue-matching`, `recommendation-feedback`, `web-client`; `Bug_Backlog.md` batch 46). Frontend
+plus one backend test: no migration, OpenAPI stays `1.0.0`, no ranking change. `/simplify` and
+the fix-diff `/code-review` were skipped (owner). `/security-review` of `features/issues/` found
+nothing. FI-5, FI-8, FI-9 false positives. One `/simplify` (batch 51) and one fix-diff
+`/code-review` (batch 52, all fixed) over the combined 0.12.55–0.12.57 code ran before release;
+their fixes are included here.
+
+### Changed
+
+- Opening a repository or an issue on GitHub with the middle mouse button now records
+  `opened_repository` / `opened_issue` like a click; `feedback_report` counts more open events
+  from this release on (FI-6).
+- The issue page names the category of the label that decided the contribution type ("From a
+  documentation label"), never a label the issue may not carry (FI-1).
+- One `Fact` component and one date formatter for the detail pages, the saved list and skill
+  evidence; recommendation detail values are now right-aligned like the issue page's (FI-10).
+
+### Fixed
+
+- A failed background refetch replaced the issue being read with "no longer among your relevant
+  issues"; it now stays shown, and only a 404 ends the page (FI-3).
+- An unknown difficulty signal showed its raw key, and malformed evidence could crash the page;
+  a backend test keeps the page's wordings equal to the signals the classifier writes (FI-2,
+  FI-4).
+- An issue that mentions no technology said "Not enough evidence"; it now says "No technologies
+  mentioned" (FI-7).
+- The recommendation detail page, the saved and hidden lists, the discovery card and the
+  recommendation list also replaced shown content after one failed refetch; they now keep it,
+  through one shared `Loaded` component where the page shape allows (CR-1, CR-2, CR-5).
+- "From a enhancement label" now reads "From an enhancement label", and malformed difficulty
+  evidence no longer crashes the issue page (CR-3, CR-4).
+- The sign-in page shows "Loading…" while the identity loads instead of a blank page, and a
+  failed navigation to sign-in keeps the identity, so the next 401 still shows the
+  session-ended notice (CR-6, CR-7).
+
+## [0.12.56] - 2026-11-03
+
+Route fixes from the review sweep (`openspec/changes/archive/2026-11-03-routes-review-fixes/`;
+spec delta to `web-client`; `Bug_Backlog.md` batch 45). Frontend only: no migration, OpenAPI
+stays `1.0.0`, no ranking change. `/simplify` and the fix-diff `/code-review` were skipped
+(owner). `/security-review` of `frontend/src/routes/` found nothing.
+
+### Fixed
+
+- One failed sync status poll replaced the dashboard or onboarding with "Could not load…"; a
+  failed developer profile refetch replaced the summary, skills, interests and languages. Shown
+  data now stays until a later fetch succeeds (ROUTE-2, ROUTE-3).
+- Skills, interests or repositories that failed to load looked like an empty list; they now say
+  they could not be loaded (ROUTE-4).
+- Back to the first page never refreshed the data versions, and a state-only navigation (after a
+  dismiss) refreshed them twice (ROUTE-1, ROUTE-7).
+- Onboarding showed no wait for a sync cooldown, and the dashboard's "in N minutes" went stale;
+  both now say from what time a refresh is possible (ROUTE-5, ROUTE-6).
+- A signed-in user opening `/` or an unknown path briefly saw "Continue with GitHub" (ROUTE-10;
+  a not-found page is left to the interface revamp).
+
+### Changed
+
+- The signed-in identity reaches the pages through the route outlet (`useSignedInUser`); the
+  impossible "no identity" branches are gone (ROUTE-8). Onboarding redirects to the dashboard
+  once (ROUTE-9).
+
+## [0.12.55] - 2026-11-03
+
+Query client and session fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-app-review-fixes/`; spec delta to `web-client`;
+`Bug_Backlog.md` batch 44). Frontend only: no migration, OpenAPI stays `1.0.0`, no ranking
+change. `/simplify` and the fix-diff `/code-review` were skipped (owner). `/security-review` of
+`frontend/src/app/` found nothing. APP-7 and APP-8 accepted.
+
+### Fixed
+
+- Deleting GitHub data no longer counts the vanished sync job as a finished one, which asked for
+  the deleted data again (APP-1).
+- A status fetch that is cancelled (by a refetch of the same status, or by leaving the signed-in
+  pages) no longer refreshes; status requests now pass the query's abort signal, so a cancelled
+  and restarted fetch refreshes once and sign-out stops them (APP-2, APP-3).
+- Starting a sync while a status fetch was in flight could replace the new job with the older
+  answer and stop polling, so its finish went unseen (APP-4).
+- A 401 that arrived while a sign-out was pending was dropped when the sign-out then failed,
+  leaving the user on signed-in pages with a dead session (APP-5).
+- If going to the sign-in page failed, later 401s were ignored (APP-6).
+
+### Changed
+
+- The data versions refresh invalidates every changed area in one pass (APP-10).
+- A test fails when a `['profile', ...]` query key is not covered by a data versions area
+  (APP-9).
+
 ## [0.12.54] - 2026-11-03
 
 Profiling fixes from the review sweep

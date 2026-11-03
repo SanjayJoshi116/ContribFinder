@@ -19,6 +19,9 @@ import { dataVersionsKey } from '@/app/dataVersions'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
 
+/** Lets the query cache notify its observers (TanStack batches on a timer). */
+const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+
 const REPOSITORY = {
   full_name: 'encode/httpx',
   owner: 'encode',
@@ -464,6 +467,69 @@ describe('interaction events', () => {
       expect(JSON.parse(posts[0]![1]!.body as string)).toEqual({ action: 'opened_repository' })
     })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('failed refresh', () => {
+  const down = () => json({ error: { code: 'unavailable', message: 'Down.' } }, 503)
+
+  it('keeps the recommendation detail page when its refetch fails', async () => {
+    let fail = false
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/recommendations/7': () => (fail ? down() : json(DETAIL)),
+      'POST /api/v1/recommendations/7/feedback': () => noContent(),
+    })
+    const { queryClient } = renderRoute('/app/recommendations/7')
+    const title = await screen.findByRole('heading', { level: 1 })
+
+    fail = true
+    await act(() => queryClient.refetchQueries({ queryKey: ['profile', 'recommendations'] }))
+    await settle()
+
+    expect(queryClient.getQueryState(['profile', 'recommendations', 'detail', 7])?.status).toBe(
+      'error',
+    )
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(title.textContent!)
+    expect(screen.queryByText(/could not load this recommendation/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps the saved and hidden lists when their refetch fails', async () => {
+    let fail = false
+    const saved = {
+      repository_id: 70,
+      repository: REPOSITORY,
+      saved_at: '2026-09-29T10:00:00Z',
+      activity_label: '',
+      recommendation: null,
+    }
+    const hidden = {
+      repository_id: 72,
+      repository: { ...REPOSITORY, full_name: 'meh/thing', name: 'thing' },
+      dismissed_at: '2026-09-29T11:00:00Z',
+      reason: null,
+    }
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/saved?page_size=50': () => (fail ? down() : page([saved])),
+      'GET /api/v1/dismissed?page_size=50': () => (fail ? down() : page([hidden])),
+    })
+    const { queryClient } = renderRoute('/app/saved')
+    expect(await screen.findByText('meh/thing')).toBeInTheDocument()
+
+    fail = true
+    await act(() =>
+      Promise.all([
+        queryClient.refetchQueries({ queryKey: ['profile', 'saved'] }),
+        queryClient.refetchQueries({ queryKey: ['profile', 'dismissed'] }),
+      ]),
+    )
+    await settle()
+
+    expect(queryClient.getQueryState(['profile', 'saved'])?.status).toBe('error')
+    expect(screen.getByText('meh/thing')).toBeInTheDocument()
+    expect(screen.getByText(REPOSITORY.full_name)).toBeInTheDocument()
+    expect(screen.queryByText(/could not load your/i)).not.toBeInTheDocument()
   })
 })
 

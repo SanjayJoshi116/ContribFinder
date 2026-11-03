@@ -1,14 +1,14 @@
 import { Link } from 'react-router'
 
 import type { DismissedRepository, SavedRepository } from '@/api/types'
+import { ExternalLink } from '@/components/ExternalLink'
 import { Button } from '@/components/ui/button'
 import { ACTIVITY_TEXT } from '@/features/recommendations/messages'
 import { MatchBadge } from '@/features/recommendations/RecommendationCard'
+import { formatDate } from '@/lib/format'
 
 import { useDismissed, useRestore, useSaved, useUnsaveRepository } from './api'
 import { DISMISS_REASON_TEXT } from './messages'
-
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
 function SavedEntry({ entry }: { entry: SavedRepository }) {
   const unsave = useUnsaveRepository()
@@ -27,9 +27,7 @@ function SavedEntry({ entry }: { entry: SavedRepository }) {
               repository.full_name
             )}
           </h3>
-          <p className="text-muted-foreground text-xs">
-            Saved {date.format(new Date(entry.saved_at))}
-          </p>
+          <p className="text-muted-foreground text-xs">Saved {formatDate(entry.saved_at)}</p>
         </div>
         {recommendation && <MatchBadge label={recommendation.match_label} />}
       </header>
@@ -45,14 +43,12 @@ function SavedEntry({ entry }: { entry: SavedRepository }) {
       )}
       <footer className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         {entry.activity_label && <span>{ACTIVITY_TEXT[entry.activity_label]}</span>}
-        <a
+        <ExternalLink
           href={repository.html_url}
-          target="_blank"
-          rel="noopener noreferrer"
           className="text-foreground underline-offset-2 hover:underline"
         >
           Open on GitHub
-        </a>
+        </ExternalLink>
         <Button
           variant="outline"
           size="sm"
@@ -129,7 +125,7 @@ export function SavedPage() {
         </h1>
         {saved.isPending ? (
           <p className="text-muted-foreground text-sm">Loading…</p>
-        ) : saved.isError ? (
+        ) : !saved.data ? (
           <p role="alert">Could not load your saved projects. Please refresh the page.</p>
         ) : savedEntries.length === 0 ? (
           <p className="text-muted-foreground text-sm">
@@ -156,7 +152,7 @@ export function SavedPage() {
         </p>
         {dismissed.isPending ? (
           <p className="text-muted-foreground text-sm">Loading…</p>
-        ) : dismissed.isError ? (
+        ) : !dismissed.data ? (
           <p role="alert">Could not load your hidden projects. Please refresh the page.</p>
         ) : hiddenEntries.length === 0 ? (
           <p className="text-muted-foreground text-sm">No hidden projects.</p>

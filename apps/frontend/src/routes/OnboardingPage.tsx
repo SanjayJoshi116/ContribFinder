@@ -1,28 +1,24 @@
-import { useEffect } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Navigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL } from '@/features/auth/api'
 import { isActive, isStalled } from '@/app/jobTransitions'
 import { useStartSync, useSyncStatus } from '@/features/sync/api'
-import { STALLED_NOTICE, failureMessage } from '@/features/sync/messages'
+import { STALLED_NOTICE, failureMessage, startErrorText } from '@/features/sync/messages'
 import { SyncSteps } from '@/features/sync/SyncSteps'
 
 export function OnboardingPage() {
   const status = useSyncStatus()
   const start = useStartSync()
-  const navigate = useNavigate()
   const job = status.data?.job ?? null
 
-  useEffect(() => {
-    if (job?.status === 'COMPLETED') navigate('/app', { replace: true })
-  }, [job?.status, navigate])
-
   if (status.isPending) return <p className="text-muted-foreground">Loading…</p>
-  if (status.isError) {
+  // Only without data: a failed poll keeps the progress shown (ROUTE-2).
+  if (!status.data) {
     return <p role="alert">Could not load sync status. Please refresh the page.</p>
   }
-  // Already synced and nothing running: nothing to onboard.
+  // Already synced and nothing running: nothing to onboard. A completed sync carries
+  // `last_synced_at` in the same answer, so this is the one redirect to the dashboard (ROUTE-9).
   if (status.data.last_synced_at && !isActive(job)) return <Navigate to="/app" replace />
 
   const failed = job && (job.status === 'FAILED' || job.status === 'CANCELLED')
@@ -76,7 +72,7 @@ export function OnboardingPage() {
       )}
       {start.isError && (
         <p role="alert" className="text-destructive text-sm">
-          {start.error.message}
+          {startErrorText(start.error, start.submittedAt)}
         </p>
       )}
     </section>

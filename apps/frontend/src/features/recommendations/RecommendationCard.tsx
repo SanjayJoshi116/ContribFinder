@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 
 import type { Recommendation } from '@/api/types'
+import { ExternalLink } from '@/components/ExternalLink'
 import { recordFeedback } from '@/features/feedback/api'
 import {
   DismissButton,
@@ -101,15 +102,13 @@ export function RecommendationCard({
               : `${recommendation.relevant_issue_count} relevant issues`}
           </Link>
         )}
-        <a
+        <ExternalLink
           href={repository.html_url}
-          target="_blank"
-          rel="noopener noreferrer"
           className="text-foreground underline-offset-2 hover:underline"
-          onClick={() => recordFeedback(recommendation.id, 'opened_repository')}
+          onOpen={() => recordFeedback(recommendation.id, 'opened_repository')}
         >
           Open on GitHub
-        </a>
+        </ExternalLink>
         <span className="ml-auto flex gap-2">
           <SaveButton recommendation={recommendation} />
           <DismissButton recommendation={recommendation} onDismissed={onDismissed} />

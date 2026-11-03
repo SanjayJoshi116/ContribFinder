@@ -3,7 +3,10 @@ import { Link, useNavigate } from 'react-router'
 
 import type { RecommendationDetail } from '@/api/types'
 import { DeadEnd } from '@/components/DeadEnd'
+import { ExternalLink } from '@/components/ExternalLink'
+import { Fact } from '@/components/Fact'
 import { recordFeedback } from '@/features/feedback/api'
+import { formatDate } from '@/lib/format'
 import { useScrollToHash } from '@/lib/useScrollToHash'
 import { DismissButton, SaveButton } from '@/features/feedback/RecommendationActions'
 
@@ -12,7 +15,6 @@ import { RelevantIssues } from './RelevantIssues'
 import { ACTIVITY_TEXT, SETUP_LABELS, SIZE_TEXT } from './messages'
 import { MatchBadge, TechnologyChips } from './RecommendationCard'
 
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 const UNAVAILABLE = 'Not available'
 
 const OPENNESS_LABELS: [keyof RecommendationDetail['openness'], string][] = [
@@ -40,15 +42,6 @@ function count(value: number | null | undefined, unit: string): string {
   return `${value} ${unit}${value === 1 ? '' : 's'}`
 }
 
-function Fact({ term, value }: { term: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b py-1 text-sm last:border-0">
-      <dt className="text-muted-foreground">{term}</dt>
-      <dd>{value}</dd>
-    </div>
-  )
-}
-
 function ActivityFacts({ signals }: { signals: RecommendationDetail['activity_signals'] }) {
   if (!signals) return <p className="text-muted-foreground text-sm">{UNAVAILABLE}</p>
   return (
@@ -71,9 +64,7 @@ function ActivityFacts({ signals }: { signals: RecommendationDetail['activity_si
       <Fact term="Contributors" value={count(signals.contributors, 'contributor')} />
       <Fact
         term="Latest release"
-        value={
-          signals.latest_release_at ? date.format(new Date(signals.latest_release_at)) : 'None'
-        }
+        value={signals.latest_release_at ? formatDate(signals.latest_release_at) : 'None'}
       />
       <Fact term="Open issues and pull requests" value={String(signals.open_issues)} />
     </dl>
@@ -116,11 +107,12 @@ export function RecommendationDetailPage({ id }: { id: number }) {
   }, [loadedId])
 
   if (recommendation.isPending) return <p className="text-muted-foreground">Loading…</p>
-  if (recommendation.isError) {
+  // A failed refetch keeps the page; a 404 means the recommendation is gone (CR-1).
+  if (!recommendation.data || recommendation.error?.status === 404) {
     return (
       <DeadEnd
         message={
-          recommendation.error.status === 404
+          recommendation.error?.status === 404
             ? 'This recommendation no longer exists. Recommendations change as your profile and projects are refreshed.'
             : 'Could not load this recommendation. Please refresh the page.'
         }
@@ -145,15 +137,13 @@ export function RecommendationDetailPage({ id }: { id: number }) {
           <p className="text-muted-foreground">{repository.description}</p>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          <a
+          <ExternalLink
             href={repository.html_url}
-            target="_blank"
-            rel="noopener noreferrer"
             className="text-sm underline-offset-2 hover:underline"
-            onClick={() => recordFeedback(rec.id, 'opened_repository')}
+            onOpen={() => recordFeedback(rec.id, 'opened_repository')}
           >
             Open on GitHub
-          </a>
+          </ExternalLink>
           <SaveButton recommendation={rec} />
           <DismissButton
             recommendation={rec}

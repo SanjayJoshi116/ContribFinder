@@ -1,7 +1,10 @@
+import type { QueryClient } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ApiError } from '@/api/client'
+import { startErrorText } from '@/features/sync/messages'
 import {
   COMPLETED_JOB,
   ME,
@@ -15,6 +18,8 @@ import {
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
 const NEVER_SYNCED = { 'GET /api/v1/sync/status': () => json({ job: null, last_synced_at: null }) }
+
+const cooldown = new ApiError(429, 'sync_cooldown', 'A sync ran recently.', undefined, 240)
 
 function job(overrides: Record<string, unknown>) {
   return { ...COMPLETED_JOB, completed_at: null, ...overrides }
@@ -161,6 +166,50 @@ describe('onboarding', () => {
     )
   })
 
+  it('shows the same cooldown message as the dashboard', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/sync/status': () =>
+        json({
+          job: job({ status: 'RUNNING', steps: { profile: 'running' }, stalled: true }),
+          last_synced_at: null,
+        }),
+      'POST /api/v1/profile/sync': () =>
+        new Response(
+          JSON.stringify({ error: { code: 'sync_cooldown', message: 'A sync ran recently.' } }),
+          { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '240' } },
+        ),
+    })
+    renderRoute('/onboarding')
+
+    await userEvent.click(await screen.findByRole('button', { name: /try again/i }))
+
+    expect(await screen.findByText(/you can refresh again after /i)).toBeInTheDocument()
+  })
+
+  it('keeps the progress when a status poll fails', async () => {
+    let fail = false
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/sync/status': () =>
+        fail
+          ? json({ error: { code: 'unavailable', message: 'Down.' } }, 503)
+          : json({
+              job: job({ status: 'RUNNING', steps: { profile: 'running' } }),
+              last_synced_at: null,
+            }),
+    })
+    const { queryClient } = renderRoute('/onboarding')
+    expect(await screen.findByText(/analyzing your github profile/i)).toBeInTheDocument()
+
+    fail = true
+    await queryClient.refetchQueries({ queryKey: ['sync', 'status'] })
+
+    await waitFor(() => expect(queryClient.getQueryState(['sync', 'status'])?.status).toBe('error'))
+    expect(screen.getByText(/analyzing your github profile/i)).toBeInTheDocument()
+    expect(screen.queryByText(/could not load sync status/i)).not.toBeInTheDocument()
+  })
+
   it('explains automatic retries while RETRYING', async () => {
     mockFetch({
       ...ME_ROUTE,
@@ -240,6 +289,44 @@ describe('dashboard', () => {
     expect(new Headers(post[1]!.headers).get('X-CSRFToken')).toBe('test-csrf-token')
   })
 
+  it('keeps the started sync when an older status answer arrives after the start', async () => {
+    const started = job({ id: 3, status: 'PENDING', steps: {} })
+    const rendered: { client?: QueryClient } = {}
+    let statusCalls = 0
+    let releaseOld = () => {}
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/sync/status': (init) => {
+        statusCalls += 1
+        if (statusCalls === 1) return SYNCED_USER['GET /api/v1/sync/status']!(init)
+        if (statusCalls === 2) {
+          // A focus refetch from before the start: answers with the previous finished job.
+          return new Promise<Response>((resolve) => {
+            releaseOld = () => resolve(SYNCED_USER['GET /api/v1/sync/status']!(init) as Response)
+          })
+        }
+        return json({ job: started, last_synced_at: COMPLETED_JOB.completed_at })
+      },
+      'POST /api/v1/profile/sync': () => {
+        void rendered.client!.refetchQueries({ queryKey: ['sync', 'status'] })
+        return json(started, 202)
+      },
+    })
+    const { queryClient } = renderRoute('/app')
+    rendered.client = queryClient
+
+    await userEvent.click(await screen.findByRole('button', { name: /refresh/i }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Syncing GitHub data…')
+    releaseOld()
+
+    await waitFor(
+      () => expect(callsTo(fetchMock, 'GET', '/api/v1/sync/status').length).toBeGreaterThan(2),
+      { timeout: 4000 },
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Syncing GitHub data…')
+  })
+
   it('explains the cooldown using Retry-After', async () => {
     mockFetch({
       ...ME_ROUTE,
@@ -252,10 +339,15 @@ describe('dashboard', () => {
     })
     renderRoute('/app')
 
+    const before = Date.now()
     await userEvent.click(await screen.findByRole('button', { name: /refresh/i }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /you can refresh again in 4 minutes/i,
+    const text = (await screen.findByRole('status')).textContent ?? ''
+    // The clock time 240 s after the click (either minute, if the click crossed one).
+    const times = [before, Date.now()].map((at) =>
+      startErrorText(cooldown, at).replace(/.*after /, ''),
     )
+    expect(text).toMatch(/you can refresh again after /i)
+    expect(times.some((time) => text.endsWith(time))).toBe(true)
   })
 })

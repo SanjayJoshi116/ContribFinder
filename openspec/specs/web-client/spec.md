@@ -10,12 +10,17 @@ which flows are verified end to end in a real browser.
 The SPA SHALL react to a sync, discovery or recommendation generation job only when it sees that
 job's id or status change to a finished state, compared with the last status it fetched. Seeing
 the same finished job again SHALL NOT trigger anything, for example after a window focus, a
-remount or navigating back to the dashboard. Each status fetch SHALL trigger at most one
-reaction, however many components display that status. A job that starts and finishes between
-two status fetches SHALL still trigger it. A finished sync or generation SHALL refetch the data versions (see
-"Refresh derived data by data versions"), never the derived data directly, and a finished sync
-SHALL also refetch the discovery and generation statuses. A finished discovery changes no data
-area, so it SHALL refetch only the generation status. It SHALL NOT refetch the status query that triggered it.
+remount or navigating back to the dashboard. A status with no job (for example after the user's
+GitHub data was deleted) SHALL NOT trigger anything. Each status fetch SHALL trigger at most one
+reaction, however many components display that status; a status fetch that is cancelled before
+it completes SHALL trigger nothing, and leaving the signed-in pages SHALL cancel status requests
+in flight. A job that starts and finishes between two status fetches SHALL still trigger it. When
+the user starts a sync, a status answer fetched before the start SHALL NOT replace the started
+job, so its progress is polled until it finishes. A finished sync or generation SHALL refetch the
+data versions (see "Refresh derived data by data versions"), never the derived data directly, and
+a finished sync SHALL also refetch the discovery and generation statuses. A finished discovery
+changes no data area, so it SHALL refetch only the generation status. It SHALL NOT refetch the
+status query that triggered it.
 
 #### Scenario: Discovery finishes
 - **WHEN** the discovery status changes from RUNNING to COMPLETED
@@ -45,8 +50,20 @@ area, so it SHALL refetch only the generation status. It SHALL NOT refetch the s
 - **WHEN** an operator re-analyzes the user's profile while the dashboard is open, and the generation that follows finishes
 - **THEN** the data versions show new `profile` and `recommendations` times, the developer profile, skills and interests and the recommendations are each refetched once, and the sync status is not refetched by that refresh
 
+#### Scenario: Job gone after deleting GitHub data
+- **WHEN** the sync status showed a COMPLETED job and, after the user deletes their GitHub data, it answers with no job
+- **THEN** neither the data versions nor the discovery and generation statuses are refetched because of it
+
+#### Scenario: Status fetch cancelled and restarted
+- **WHEN** a status fetch that will return a newly finished job is cancelled by a refetch of the same status, and the new fetch returns the same job
+- **THEN** the job's refresh runs once
+
+#### Scenario: Older status answer after starting a sync
+- **WHEN** a sync status fetch is in flight, the user starts a sync, and that fetch would answer with the previous finished job
+- **THEN** the started job stays shown and its status keeps being polled until it finishes
+
 ### Requirement: Refresh derived data by data versions
-While a user is signed in, the SPA SHALL keep one data versions query (`GET /api/v1/sync/versions`). It SHALL fetch it when the signed-in layout mounts, on window focus, on every route change and after a finished job (see "Refresh derived data on job transitions"). For each area whose time differs from the time in the previous versions fetch, it SHALL refetch that area's queries once:
+While a user is signed in, the SPA SHALL keep one data versions query (`GET /api/v1/sync/versions`). It SHALL fetch it when the signed-in layout mounts, on window focus, on every route change and after a finished job (see "Refresh derived data on job transitions"). A route change is a navigation to a different path, query or fragment than the previous route, including Back or Forward to a page visited before (the first one included); a navigation that changes only the history state is not one. For each area whose time differs from the time in the previous versions fetch, it SHALL refetch that area's queries once:
 - `github`: the GitHub profile and the synced repositories;
 - `profile`: the developer profile, skills and interests;
 - `recommendations`: the recommendation list and details, issue details, the saved list and the hidden list (it shows the stored repository data).
@@ -72,6 +89,14 @@ The first versions fetch after sign-in, or after the user's data was deleted, SH
 #### Scenario: First fetch
 - **WHEN** the signed-in layout mounts and fetches the data versions for the first time
 - **THEN** no derived query is refetched because of them
+
+#### Scenario: Back to the first page
+- **WHEN** the user opens the dashboard, then a recommendation, then goes Back to the dashboard
+- **THEN** the data versions are fetched again on the way back
+
+#### Scenario: State-only navigation
+- **WHEN** a page replaces its history entry with the same path, query and fragment and different state (for example after a dismiss)
+- **THEN** the data versions are not fetched because of it
 
 ### Requirement: Retry policy
 The SPA SHALL retry a failed data request only when it failed without a response (network
@@ -102,7 +127,10 @@ all cached user data and go to the sign-in page. This SHALL include a refresh of
 user's identity that answers 401 after it had succeeded. The sign-in page SHALL then say that the
 session ended and ask the user to sign in again. A 401 on the sign-in page itself (the normal
 signed-out state) SHALL NOT show that notice. A failed refresh of the identity that is not a 401
-SHALL NOT replace the signed-in pages while an identity is known.
+SHALL NOT replace the signed-in pages while an identity is known. While the user's own sign-out
+is pending, a 401 from another request SHALL NOT show the notice; if that sign-out then fails, a
+401 seen meanwhile SHALL end the session as above. If going to the sign-in page fails, a later
+401 SHALL still end the session.
 
 #### Scenario: Session expired while on the dashboard
 - **WHEN** the session expires and the next request from the dashboard answers 401
@@ -123,6 +151,14 @@ SHALL NOT replace the signed-in pages while an identity is known.
 #### Scenario: Identity refresh fails for a moment
 - **WHEN** the signed-in user's identity is refreshed and the request fails with 503 after its retries
 - **THEN** the signed-in page stays as it was
+
+#### Scenario: Sign-out fails after the session ended
+- **WHEN** the user logs out, another request answers 401 while the logout is pending, and the logout then fails with a network error
+- **THEN** the user is on the sign-in page with the session-ended notice
+
+#### Scenario: Sign-out succeeds with a 401 in flight
+- **WHEN** the user logs out, another request answers 401 while the logout is pending, and the logout succeeds
+- **THEN** the user is on the sign-in page without the session-ended notice
 
 ### Requirement: End-to-end coverage of the main flows
 The project SHALL have browser tests that run the built SPA against the real backend and a real
@@ -252,4 +288,70 @@ again).
 #### Scenario: Discovery stalled
 - **WHEN** the sync is finished and the discovery status returns a job with `stalled: true`
 - **THEN** the dashboard shows the stalled notice instead of "Finding projects…"
+
+### Requirement: Failed refresh keeps the page
+Once a page has shown data, a failed refetch of that data (a 5xx after its retries, or a network
+error) SHALL NOT replace what is shown with an error or an empty state; the shown data stays
+until a later fetch succeeds or the session ends. This SHALL hold for the sync status on the
+dashboard and onboarding, for the developer profile, skills, interests and repositories on
+the dashboard, for the discovery card and the recommendation list, for the recommendation and
+issue detail pages (an answer that the recommendation or issue no longer exists still ends that
+page), and for the saved and hidden lists. A load that fails before any data was shown SHALL show an error message, never an
+empty list that reads as "nothing found".
+
+#### Scenario: One sync status poll fails
+- **WHEN** the dashboard is showing and a sync status poll fails with 503 after its retries
+- **THEN** the dashboard stays as it was, with no "Could not load" message
+
+#### Scenario: Developer profile refetch fails
+- **WHEN** the dashboard shows the summary and skills, and a refetch of the developer profile fails with 503 after its retries
+- **THEN** the summary, skills, interests and languages stay shown
+
+#### Scenario: Skills fail to load
+- **WHEN** the dashboard loads and the skills request fails with 503 after its retries
+- **THEN** the skills section says the skills could not be loaded instead of showing no skills
+
+#### Scenario: Issue refetch fails
+- **WHEN** the user reads an issue and a refetch of it fails with 503 after its retries
+- **THEN** the issue stays shown
+
+#### Scenario: Discovery status poll fails
+- **WHEN** the dashboard shows the discovery card and a discovery status poll fails with 503 after its retries
+- **THEN** the card stays as it was, with no "Could not load project discovery" message
+
+#### Scenario: Saved list refetch fails
+- **WHEN** the saved page shows saved and hidden projects and their refetch fails with 503 after its retries
+- **THEN** both lists stay shown
+
+#### Scenario: Issue no longer relevant
+- **WHEN** the user reads an issue and a refetch of it answers 404
+- **THEN** the page says the issue is no longer among the relevant issues
+
+### Requirement: Sync start errors
+When starting a sync fails, the dashboard and onboarding SHALL show the same message for the same
+error. For a `sync_cooldown` rejection with a `Retry-After` time, the message SHALL say from what
+clock time a refresh is possible, computed when the rejection arrived, so it stays true while it
+is shown.
+
+#### Scenario: Cooldown on the dashboard
+- **WHEN** the user presses Refresh at 14:01 and the start answers 429 `sync_cooldown` with `Retry-After: 240`
+- **THEN** the dashboard says a refresh is possible again after 14:05
+
+#### Scenario: Cooldown on onboarding
+- **WHEN** onboarding shows a stalled sync, the user presses Try again, and the start answers 429 `sync_cooldown` with `Retry-After: 240`
+- **THEN** onboarding shows the same cooldown message as the dashboard
+
+### Requirement: Sign-in page while the identity loads
+The sign-in page SHALL NOT show its sign-in button while the signed-in user's identity is still
+loading (it SHALL show a loading message instead, never a blank page); a signed-in user opening `/` or an unknown path SHALL go to the dashboard without seeing
+"Continue with GitHub" first. Once the identity request answers 401 or fails, the sign-in page
+SHALL show as before.
+
+#### Scenario: Signed-in user opens the root
+- **WHEN** a signed-in user opens `/` and the identity request has not answered yet
+- **THEN** no "Continue with GitHub" button is shown, and the user lands on the dashboard once it answers
+
+#### Scenario: Signed-out visitor
+- **WHEN** a signed-out visitor opens `/` and the identity request answers 401
+- **THEN** the sign-in page with "Continue with GitHub" is shown
 

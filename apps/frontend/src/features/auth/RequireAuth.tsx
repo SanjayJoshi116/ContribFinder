@@ -7,7 +7,7 @@ export function RequireAuth() {
 
   // A known identity keeps the pages: a failed refresh is not a sign-out, and a 401 on it ends
   // the session through the query client (the session-ended notice).
-  if (me.data) return <Outlet />
+  if (me.data) return <Outlet context={me.data} />
   if (me.isPending) {
     return (
       <div className="text-muted-foreground flex min-h-svh items-center justify-center">

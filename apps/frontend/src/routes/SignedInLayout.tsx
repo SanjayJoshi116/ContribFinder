@@ -3,22 +3,25 @@ import { Outlet, useLocation } from 'react-router'
 
 import { useDataVersions } from '@/app/dataVersions'
 import { Button } from '@/components/ui/button'
-import { useAccountActionPending, useLogout, useMe } from '@/features/auth/api'
+import { useAccountActionPending, useLogout, useSignedInUser } from '@/features/auth/api'
 
 export function SignedInLayout() {
-  const { data: me } = useMe()
+  const me = useSignedInUser()
   const logout = useLogout()
   const accountActionPending = useAccountActionPending()
-  const { refetch: refetchVersions } = useDataVersions(!!me)
-  const { key: locationKey } = useLocation()
-  const firstLocation = useRef(locationKey)
+  const { refetch: refetchVersions } = useDataVersions()
+  const { pathname, search, hash } = useLocation()
+  const route = pathname + search + hash
+  const previousRoute = useRef(route)
 
   // Every route change asks which derived data changed; the mount fetch covers the first one.
+  // Compared with the previous route, so Back to the first page counts (ROUTE-1), and a
+  // state-only navigation does not (ROUTE-7).
   useEffect(() => {
-    if (me && locationKey !== firstLocation.current) void refetchVersions()
-  }, [me, locationKey, refetchVersions])
-
-  if (!me) return null
+    if (route === previousRoute.current) return
+    previousRoute.current = route
+    void refetchVersions()
+  }, [route, refetchVersions])
 
   return (
     <div className="min-h-svh">
@@ -43,7 +46,7 @@ export function SignedInLayout() {
         </p>
       )}
       <main className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
-        <Outlet />
+        <Outlet context={me} />
       </main>
     </div>
   )

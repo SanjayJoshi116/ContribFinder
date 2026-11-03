@@ -1,10 +1,13 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ME, json, mockFetch, noContent, renderRoute } from '@/test/render'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
+
+/** Lets the query cache notify its observers (TanStack batches on a timer). */
+const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)))
 
 const ISSUE = {
   id: 31,
@@ -87,7 +90,7 @@ describe('issue detail page', () => {
 
     const analysis = screen.getByRole('region', { name: 'ContribFinder analysis' })
     expect(within(analysis).getByText('Documentation')).toBeInTheDocument()
-    expect(within(analysis).getByText('From the "documentation" label')).toBeInTheDocument()
+    expect(within(analysis).getByText('From a documentation label')).toBeInTheDocument()
     expect(within(analysis).getByText('Beginner (estimated)')).toBeInTheDocument()
     expect(
       within(analysis).getByText(
@@ -150,6 +153,70 @@ describe('issue detail page', () => {
     )!
     expect(JSON.parse(String(init!.body))).toEqual({ action: 'opened_issue', issue_id: 31 })
     expect(init!.keepalive).toBe(true)
+  })
+
+  it('says when an issue mentions no technology', async () => {
+    const plain = { ...ISSUE, analysis: { ...ISSUE.analysis, technologies: [] } }
+    mockFetch({ ...ME_ROUTE, 'GET /api/v1/issues/31': () => json(plain) })
+    renderRoute('/app/issues/31')
+
+    const analysis = await screen.findByRole('region', { name: 'ContribFinder analysis' })
+    expect(within(analysis).getByText('No technologies mentioned')).toBeInTheDocument()
+  })
+
+  it('records opened_issue for a middle click on the GitHub link', async () => {
+    const fetchMock = mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/issues/31': () => json(ISSUE),
+      'POST /api/v1/recommendations/7/feedback': () => noContent(),
+    })
+    renderRoute('/app/issues/31')
+
+    const link = await screen.findByRole('link', { name: 'Open on GitHub' })
+    fireEvent(link, new MouseEvent('auxclick', { bubbles: true, button: 1 }))
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([url]) => url === '/api/v1/recommendations/7/feedback'),
+      ).toHaveLength(1),
+    )
+  })
+
+  it('keeps the issue shown when a refetch fails', async () => {
+    let fail = false
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/issues/31': () =>
+        fail ? json({ error: { code: 'unavailable', message: 'Down.' } }, 503) : json(ISSUE),
+    })
+    const { queryClient } = renderRoute('/app/issues/31')
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
+
+    fail = true
+    await act(() => queryClient.refetchQueries({ queryKey: ['profile', 'issues', 31] }))
+    await settle()
+
+    expect(queryClient.getQueryState(['profile', 'issues', 31])?.status).toBe('error')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(ISSUE.github.title)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('ends the page when a refetch says the issue is gone', async () => {
+    let gone = false
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/issues/31': () =>
+        gone ? json({ error: { code: 'not_found', message: 'Not found.' } }, 404) : json(ISSUE),
+    })
+    const { queryClient } = renderRoute('/app/issues/31')
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
+
+    gone = true
+    await act(() => queryClient.refetchQueries({ queryKey: ['profile', 'issues', 31] }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /no longer among your relevant issues/,
+    )
   })
 
   it('explains an issue that is no longer relevant', async () => {

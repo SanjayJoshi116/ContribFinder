@@ -1,7 +1,7 @@
 # Ideas
 
 Gap analysis from 2026-10-20 (v0.12.4), with later rounds added 2026-10-21 to 2026-10-27
-(v0.12.7–v0.12.35) and 2026-11-03 (v0.12.54). Nothing here is planned yet: each idea needs an
+(v0.12.7–v0.12.35) and 2026-11-03 (v0.12.54, v0.12.57). Nothing here is planned yet: each idea needs an
 OpenSpec change before work starts. Ranking-visible items (marked †) must win on the selection benchmark and not regress on
 a fresh holdout. Since 2026-10-28 they no longer wait for K-1 (judging real developers is
 optional; `Bug_Backlog.md`).
@@ -52,6 +52,15 @@ Round 6 (2026-10-22), from the `performance-cleanup` review and `/simplify` pass
 
 Round 4 (2026-10-21), from the `frontend-correctness` review and cleanup pass.
 
+- **A not-found page** (from batch 45, ROUTE-10, 2026-11-03). Unknown paths render the sign-in
+  page (`*` → `LandingPage`), which never says "not found"; signed-in users are sent to the
+  dashboard. A small not-found page (with the way to sign-in or the dashboard) belongs with the
+  interface revamp (§18).
+- **Own list actions without a second refetch** (from batch 44, APP-8, accepted). Save, unsave,
+  dismiss and restore move the `recommendations` data version, so the acting tab refetches that
+  area once more on the next route change. A "seen" path in `useDataVersions` after the user's
+  own list mutation would skip it, but must not hide a background change that lands in the same
+  window.
 - **Clamp past-the-end pages on the server.** `/recommendations?page=N` past the end returns
   404, and the client has two recovery paths (404 → page 1, emptied page → previous page).
   Returning the last page (with its number) removes both; with the list refetched after a
@@ -65,7 +74,9 @@ change, so it can ship now, but it is big: one OpenSpec change per step, startin
 design direction.
 
 - **Design direction first.** Tokens (color, type scale, spacing, radius) in one place, dark
-  mode, an empty/loading/error pattern used by every page. Decide before touching pages.
+  mode, an empty/loading/error pattern used by every page. Decide before touching pages. Since
+  0.12.57 `src/components/Loaded` holds the data-first order (data, else error, else loading) for
+  sections and cards; detail pages and lists with 404 or empty states still gate inline.
 - **Dashboard layout.** `AppShell` stacks profile summary, language chart, pipeline status,
   filters and the list in one column. A wider layout (profile and filters beside the list, the
   pipeline as a compact header bar) would show more recommendations above the fold.
@@ -266,6 +277,12 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   `re.IGNORECASE` and maps the match back through `casefold()`, skipping the few variants that
   fold differently (dotless `ı`). Named groups per slug (`match.lastgroup`) would map every match
   directly. No ranking change for ASCII text, but it touches every taxonomy path.
+- **Difficulty signal names in the API schema** (from the 0.12.55–0.12.57 `/simplify` and
+  review, `Bug_Backlog.md` SIM2-11, CR-9). `tests/test_issue_signal_wording.py` reads
+  `evidence.ts` with a regex to check every signal `classify` writes has words on the issue page.
+  Declaring the signal names as an enum in the issue detail serializer would put a
+  `DifficultySignal` union in `schema.d.ts`, so `SIGNAL_TEXT: Record<DifficultySignal, …>` is
+  checked by `tsc` and `api:sync` drift. OpenAPI addition (not breaking), needs an OpenSpec change.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.

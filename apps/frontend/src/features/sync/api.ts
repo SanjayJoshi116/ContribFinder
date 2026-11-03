@@ -19,16 +19,12 @@ export function useSyncStatus() {
   const queryClient = useQueryClient()
   return useQuery<SyncStatus, ApiError>({
     queryKey: syncStatusKey,
-    queryFn: () =>
-      fetchStatusAndRefresh(
-        queryClient,
-        syncStatusKey,
-        () => apiFetch<SyncStatus>('/sync/status'),
-        () =>
-          Promise.all([
-            refreshDataVersions(queryClient),
-            queryClient.invalidateQueries({ queryKey: ['jobs'] }),
-          ]),
+    queryFn: ({ signal }) =>
+      fetchStatusAndRefresh<SyncStatus>(queryClient, syncStatusKey, '/sync/status', signal, () =>
+        Promise.all([
+          refreshDataVersions(queryClient),
+          queryClient.invalidateQueries({ queryKey: ['jobs'] }),
+        ]),
       ),
     staleTime: 0,
     refetchInterval: (query) => (isActive(query.state.data?.job) ? POLL_INTERVAL_MS : false),
@@ -39,7 +35,10 @@ export function useStartSync() {
   const queryClient = useQueryClient()
   return useMutation<SyncJob, ApiError>({
     mutationFn: () => apiFetch<SyncJob>('/profile/sync', { method: 'POST' }),
-    onSuccess: (job) => {
+    onSuccess: async (job) => {
+      // A status fetch from before the start would answer with the previous job and stop the
+      // polling (APP-4); cancelled, it restores the cached status, which the job replaces.
+      await queryClient.cancelQueries({ queryKey: syncStatusKey })
       queryClient.setQueryData<SyncStatus>(syncStatusKey, (previous) => ({
         job,
         last_synced_at: previous?.last_synced_at ?? null,

@@ -36,3 +36,31 @@ describe('AREA_KEYS', () => {
     expect(keys.every((key) => key[0] === 'profile')).toBe(true)
   })
 })
+
+/** Every source file except tests and the area table itself, as text (APP-9). */
+const SOURCES = import.meta.glob<string>(
+  ['/src/**/*.{ts,tsx}', '!/src/**/*.test.{ts,tsx}', '!/src/app/dataVersions.ts'],
+  {
+    query: '?raw',
+    import: 'default',
+  },
+)
+
+describe('AREA_KEYS coverage', () => {
+  it('covers every derived query key under profile', async () => {
+    // Read only when this test runs, in parallel.
+    const texts = await Promise.all(Object.values(SOURCES).map((load) => load()))
+    const names = new Set<string>()
+    for (const text of texts) {
+      for (const match of text.matchAll(/\['profile',\s*'([^']+)'/g)) names.add(match[1])
+    }
+    const covered = new Set(
+      Object.values(AREA_KEYS)
+        .flat()
+        .map((key) => key[1]),
+    )
+    // A refactor that hides the literals must fail here, not pass with nothing to check.
+    expect(names.size).toBeGreaterThanOrEqual(covered.size)
+    expect([...names].filter((name) => !covered.has(name))).toEqual([])
+  })
+})

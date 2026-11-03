@@ -1,4 +1,10 @@
-import { useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query'
+import {
+  partialMatchKey,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 
 import { ApiError, apiFetch } from '@/api/client'
@@ -44,13 +50,12 @@ export function changedAreas(previous: DataVersions, current: DataVersions): Dat
  * keeps the same object for an unchanged answer, so nothing runs then. Without a previous value
  * (first fetch, or after the user's data was deleted and the query reset) nothing is refetched:
  * the derived data loads on its own. Call it from one component only (`SignedInLayout`). */
-export function useDataVersions(enabled = true) {
+export function useDataVersions() {
   const queryClient = useQueryClient()
   const query = useQuery<DataVersions, ApiError>({
     queryKey: dataVersionsKey,
     queryFn: () => apiFetch<DataVersions>('/sync/versions'),
     staleTime: 0,
-    enabled,
   })
   const seen = useRef<DataVersions | undefined>(undefined)
   const { data } = query
@@ -59,7 +64,11 @@ export function useDataVersions(enabled = true) {
     seen.current = data
     if (previous === undefined || data === undefined) return
     const keys = changedAreas(previous, data).flatMap((area) => AREA_KEYS[area])
-    void Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
+    if (keys.length === 0) return
+    // One pass over the cache for every changed key (APP-10).
+    void queryClient.invalidateQueries({
+      predicate: (query) => keys.some((key) => partialMatchKey(query.queryKey, key)),
+    })
   }, [data, queryClient])
   return query
 }

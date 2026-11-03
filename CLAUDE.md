@@ -153,7 +153,8 @@ ContribFinder/
 │  │     │                  (blind judging sheets), build (merge datasets) (Phase 8b+),
 │  │     │                  bootstrap (paired intervals), feedback_report (outcomes per config)
 │  │     └─ ai/             provider interfaces only (future)
-│  └─ frontend/           src/{app,components,features,hooks,lib,api,types,routes}; app/ holds
+│  └─ frontend/           src/{app,components,features,hooks,lib,api,types,routes}; components/
+│                         holds DeadEnd, ExternalLink, Fact, Loaded; lib/ format (dates); app/ holds
 │                         the query client (retry, stale time, 401), session.ts (identity key,
 │                         endSession, leaveSignedIn), job-transition refresh and data versions;
 │                         e2e/ Playwright specs, playwright.config.ts; csp.config.ts (the built
@@ -1773,6 +1774,69 @@ forks never count) and batch 50. `/security-review` of `services/profiling/`: no
 - Tests: `make_recommendation` (from `test_models_phase5`), `shared_fixtures.assert_changelist_flat`;
   strings with look-alike letters use `chr()` code points (ruff RUF001).
 
+**Query client fixes, review sweep: frontend/src/app** (MVP+, fix release)  ✅ shipped in v0.12.55 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-app-review-fixes/`. Spec: delta to `web-client`
+("Refresh derived data on job transitions", "Ended session returns to sign-in"). `Bug_Backlog.md`
+batch 44 (APP-1…APP-6, APP-9, APP-10 fixed; APP-7, APP-8 accepted). `/simplify` and the fix-diff
+`/code-review` were skipped (owner). `/security-review` of `src/app/`: nothing.
+- `fetchStatusAndRefresh<S>(queryClient, key, path, signal, refresh)` fetches `path` itself with
+  the `queryFn`'s `signal`; an aborted fetch never compares, and a status without a job never
+  refreshes. A new status hook passes its path and signal (since the `/simplify` below).
+- `useStartSync` awaits `cancelQueries(syncStatusKey)` before `setQueryData`; a new mutation that
+  writes a status key must cancel it first.
+- `createQueryClient`: a sign-out mutation that fails (not with a 401) refetches `/auth/me`, so a
+  session that ended while it was pending ends through the identity's 401; a rejected
+  `endSession` resets `signedOut` and puts the cached identity back (CR-7). One flag, `signedOut`.
+- `useDataVersions` invalidates once with a `partialMatchKey` predicate. `dataVersions.test.ts`
+  scans `src/` (`import.meta.glob` `?raw`) and fails when a `['profile', '<name>'` key is in no
+  `AREA_KEYS` area.
+
+**Route fixes, review sweep: frontend/src/routes** (MVP+, fix release)  ✅ shipped in v0.12.56 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-routes-review-fixes/`. Spec: delta to `web-client`
+("Refresh derived data by data versions"; new "Failed refresh keeps the page", "Sync start
+errors", "Sign-in page while the identity loads"). `Bug_Backlog.md` batch 45 (ROUTE-1…ROUTE-10;
+ROUTE-10 in part, no not-found page). `/simplify` and the fix-diff `/code-review` were skipped
+(owner). `/security-review` of `routes/`: nothing.
+- Pages gate on `data`, never `isError`/`isSuccess` first: a failed refetch keeps what is shown;
+  a failed first load shows an error line (`src/components/Loaded`), never an empty list. New
+  pages follow the same order (pending → no data: error → data).
+- `SignedInLayout` refetches the versions when `pathname + search + hash` differs from the
+  previous route (a ref), never on state-only navigations.
+- `RequireAuth` renders `<Outlet context={me.data} />`, `SignedInLayout` passes it on;
+  `useSignedInUser()` (`features/auth/api.ts`, `useOutletContext<Me>()`) reads it in any page
+  under them.
+- `startErrorText(error, at)` (`features/sync/messages.ts`) is the one sync start error text;
+  pass the mutation's `submittedAt`. `formatWait` removed.
+- `LandingPage` shows "Loading…" while `me.isPending` (since batch 52; was nothing).
+
+**Issue detail fixes, review sweep: features/issues** (MVP+, fix release)  ✅ shipped in v0.12.57 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-issue-detail-review-fixes/`. Specs: deltas to
+`issue-matching` ("Issue detail page"), `recommendation-feedback` ("Feedback events"),
+`web-client` ("Failed refresh keeps the page"). `Bug_Backlog.md` batch 46 (FI-1…FI-3, FI-6,
+FI-7, FI-10 fixed; FI-4 guard; FI-5, FI-8, FI-9 false positives). `/simplify` and the fix-diff
+`/code-review` were skipped (owner). `/security-review` of `features/issues/`: nothing.
+- `src/components/ExternalLink` (`href`, `onOpen`): new tab, `noopener noreferrer`, `onOpen` on
+  click and middle-button `auxclick`. Every GitHub link that records feedback uses it.
+- `src/components/Fact` (`term`, `value`, optional `note`) and `src/lib/format` (`formatDate`,
+  `formatDateTime`, `formatTime`): the one copy each; every external link uses `ExternalLink`.
+- `/simplify` over the combined 0.12.55–0.12.57 diff (4 agents, one diff; batch 51 of
+  `Bug_Backlog.md`): helpers above, `useDataVersions()` without `enabled`, lazy source glob in
+  `dataVersions.test.ts`. Skipped: a shared page-state helper for pages outside the diff
+  (`RecommendationDetailPage`, `DiscoveryCard`, `SavedPage`, `RecommendationList` still check
+  `isError` first; their low-group sweep), the signal names as an OpenAPI enum (API change).
+- `features/issues/evidence.ts` `SIGNAL_TEXT` words each difficulty signal; unknown ones are
+  dropped. `tests/test_issue_signal_wording.py` (backend) runs `classify.difficulty` and fails
+  when its signals differ from the `SIGNAL_TEXT` keys: a new signal needs words on the page.
+- `IssueDetailPage` and `RecommendationDetailPage` end with `DeadEnd` only for a 404 or without
+  data (batch 45 page order); `src/components/Loaded` (`query`, `failed`, optional `loading`,
+  render-prop children) is the shared form for sections and cards (`AppShell`, `DiscoveryCard`).
+  Fix-diff `/code-review` of 0.12.55–0.12.57: batch 52 (CR-1…CR-10), fixed before commit. Refetch
+  tests must wait after `refetchQueries` (`settle`): TanStack notifies observers on a timer, so
+  an assertion right after `act` sees the old render.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1799,7 +1863,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57).
 
 ## 8. Release housekeeping
 

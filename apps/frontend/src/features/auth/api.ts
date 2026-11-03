@@ -1,5 +1,5 @@
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
+import { useNavigate, useOutletContext } from 'react-router'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type { DisconnectResult, Me } from '@/api/types'
@@ -22,6 +22,13 @@ export function useMe() {
     queryFn: () => apiFetch<Me>('/auth/me'),
     staleTime: 60_000,
   })
+}
+
+/** The signed-in identity, for pages under `RequireAuth`: it renders them only with the
+ * identity and passes it as outlet context (`SignedInLayout` passes it on), so it is always
+ * defined there (ROUTE-8). */
+export function useSignedInUser(): Me {
+  return useOutletContext<Me>()
 }
 
 /** The navigation of the account actions lives in the hooks: per-call callbacks are skipped

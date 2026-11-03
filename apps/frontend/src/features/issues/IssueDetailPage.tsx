@@ -1,31 +1,18 @@
 import { Link } from 'react-router'
 
 import { DeadEnd } from '@/components/DeadEnd'
+import { ExternalLink } from '@/components/ExternalLink'
+import { Fact } from '@/components/Fact'
 import { recordFeedback } from '@/features/feedback/api'
-import {
-  CONTRIBUTION_TYPE_TEXT,
-  NOT_ENOUGH_EVIDENCE,
-  difficultyText,
-} from '@/features/recommendations/messages'
+import { CONTRIBUTION_TYPE_TEXT, difficultyText } from '@/features/recommendations/messages'
 import { MatchBadge } from '@/features/recommendations/RecommendationCard'
+import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { useIssue } from './api'
 import { contributionBasis, difficultyBasis } from './evidence'
 
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
-
-function Fact({ term, value, note }: { term: string; value: string; note?: string | null }) {
-  return (
-    <div className="flex justify-between gap-4 border-b py-1 text-sm last:border-0">
-      <dt className="text-muted-foreground">{term}</dt>
-      <dd className="text-right">
-        {value}
-        {note && <span className="text-muted-foreground block text-xs">{note}</span>}
-      </dd>
-    </div>
-  )
-}
+const NO_TECHNOLOGIES = 'No technologies mentioned'
 
 /** One relevant issue: GitHub's data kept visibly apart from ContribFinder's analysis. The
  * description is shown as plain text (React escapes it), never rendered as HTML. */
@@ -33,11 +20,12 @@ export function IssueDetailPage({ id }: { id: number }) {
   const issue = useIssue(id)
 
   if (issue.isPending) return <p className="text-muted-foreground">Loading…</p>
-  if (issue.isError) {
+  // A failed refetch keeps the issue shown; a 404 means it left the recommendation (FI-3).
+  if (!issue.data || issue.error?.status === 404) {
     return (
       <DeadEnd
         message={
-          issue.error.status === 404
+          issue.error?.status === 404
             ? 'This issue is no longer among your relevant issues. Issues change as projects are refreshed.'
             : 'Could not load this issue. Please refresh the page.'
         }
@@ -45,7 +33,7 @@ export function IssueDetailPage({ id }: { id: number }) {
     )
   }
 
-  const { github, analysis } = issue.data
+  const { github, analysis, id: issueId } = issue.data
   const { recommendation } = analysis
   const basis = difficultyBasis(analysis)
   return (
@@ -64,17 +52,13 @@ export function IssueDetailPage({ id }: { id: number }) {
             {github.repository_full_name} #{github.number}
           </span>
           <MatchBadge label={recommendation.match_label} />
-          <a
+          <ExternalLink
             href={github.url}
-            target="_blank"
-            rel="noopener noreferrer"
             className="underline-offset-2 hover:underline"
-            onClick={() =>
-              recordFeedback(recommendation.id, 'opened_issue', { issue_id: issue.data.id })
-            }
+            onOpen={() => recordFeedback(recommendation.id, 'opened_issue', { issue_id: issueId })}
           >
             Open on GitHub
-          </a>
+          </ExternalLink>
         </div>
       </header>
 
@@ -123,7 +107,7 @@ export function IssueDetailPage({ id }: { id: number }) {
               </ul>
             </>
           ) : (
-            <p className="text-muted-foreground text-sm">{NOT_ENOUGH_EVIDENCE}</p>
+            <p className="text-muted-foreground text-sm">{NO_TECHNOLOGIES}</p>
           )}
         </div>
       </section>
@@ -149,12 +133,8 @@ export function IssueDetailPage({ id }: { id: number }) {
         <dl>
           <Fact term="State" value={github.state === 'open' ? 'Open' : github.state} />
           <Fact term="Comments" value={String(github.comments)} />
-          {github.created_at && (
-            <Fact term="Opened" value={date.format(new Date(github.created_at))} />
-          )}
-          {github.updated_at && (
-            <Fact term="Last updated" value={date.format(new Date(github.updated_at))} />
-          )}
+          {github.created_at && <Fact term="Opened" value={formatDate(github.created_at)} />}
+          {github.updated_at && <Fact term="Last updated" value={formatDate(github.updated_at)} />}
         </dl>
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Description</h3>

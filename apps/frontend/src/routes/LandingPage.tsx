@@ -22,6 +22,15 @@ export function LandingPage() {
   }, [code, queryClient])
 
   if (me.isSuccess) return <Navigate to="/app" replace />
+  // A signed-in user must not see the sign-in button while the identity loads (ROUTE-10); the
+  // same loading text as RequireAuth, so a slow or retried answer is not a blank page (CR-6).
+  if (me.isPending) {
+    return (
+      <div className="text-muted-foreground flex min-h-svh items-center justify-center">
+        Loading…
+      </div>
+    )
+  }
 
   return (
     <main className="flex min-h-svh items-center justify-center px-4">

@@ -1,4 +1,6 @@
+import type { ApiError } from '@/api/client'
 import type { SyncJob, SyncStepState } from '@/api/types'
+import { formatDateTime, formatTime } from '@/lib/format'
 
 /** A stalled job (its worker stopped): the first sentence of every notice about it. */
 export const STALLED_NOTICE =
@@ -73,8 +75,15 @@ export function failureMessage(job: SyncJob): FailureMessage {
   return FAILURES[job.error_code] ?? GENERIC_FAILURE
 }
 
-export function formatWait(seconds: number): string {
-  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`
-  const minutes = Math.ceil(seconds / 60)
-  return `${minutes} minute${minutes === 1 ? '' : 's'}`
+/** The message for a failed sync start, the same on the dashboard and onboarding (ROUTE-5).
+ * A cooldown names the clock time from `at` (when the start was sent, close to the rejection),
+ * so the text stays true while it is shown (ROUTE-6). */
+export function startErrorText(error: ApiError, at: number): string {
+  if (error.code === 'sync_cooldown' && error.retryAfter) {
+    const when = new Date(at + error.retryAfter * 1000)
+    const sameDay = when.toDateString() === new Date(at).toDateString()
+    const time = sameDay ? formatTime(when) : formatDateTime(when)
+    return `Your data was synced recently. You can refresh again after ${time}.`
+  }
+  return error.message
 }

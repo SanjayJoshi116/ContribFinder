@@ -1,4 +1,5 @@
 import type { DeveloperInterest } from '@/api/types'
+import { ExternalLink } from '@/components/ExternalLink'
 
 const SOURCE_LABELS: Record<DeveloperInterest['evidence'][number]['source'], string> = {
   readme: 'Profile README',
@@ -30,14 +31,9 @@ export function InterestList({ interests }: { interests: readonly DeveloperInter
                   {item.repository && (
                     <>
                       {' · '}
-                      <a
-                        href={item.repository.html_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
+                      <ExternalLink href={item.repository.html_url} className="hover:underline">
                         {item.repository.full_name}
-                      </a>
+                      </ExternalLink>
                     </>
                   )}
                   {item.detail && ` · ${item.detail}`}

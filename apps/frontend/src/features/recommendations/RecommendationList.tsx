@@ -163,9 +163,9 @@ export function RecommendationList() {
 
       {list.isPending || recoverTo !== null ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
-      ) : list.isError ? (
+      ) : !list.data ? (
         <p role="alert" className="text-sm">
-          {list.error.code === 'validation_error'
+          {list.error?.code === 'validation_error'
             ? 'These filters are not valid. Clear them and try again.'
             : 'Could not load recommendations. Please refresh the page.'}
         </p>

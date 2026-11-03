@@ -220,6 +220,133 @@ describe('refresh by data versions', () => {
   })
 })
 
+describe('route changes', () => {
+  it('fetches the data versions on Back to the first page', async () => {
+    const fetchMock = mockFetch({ ...ME_ROUTE, ...SYNCED_USER })
+    const { router } = renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+
+    await act(() => router.navigate('/app#recommendations'))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(2))
+    await act(() => router.navigate(-1))
+    await waitFor(() => expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(3))
+  })
+
+  it('does not fetch the data versions for a state-only navigation', async () => {
+    const fetchMock = mockFetch({ ...ME_ROUTE, ...SYNCED_USER })
+    const { router } = renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+
+    await act(() => router.navigate('/app', { replace: true, state: { dismissed: 1 } }))
+    await settle()
+    expect(callsTo(fetchMock, 'GET', '/api/v1/sync/versions').length).toBe(1)
+  })
+})
+
+describe('failed refresh', () => {
+  const down = () => json({ error: { code: 'unavailable', message: 'Down.' } }, 503)
+
+  it('keeps the dashboard when a sync status poll fails', async () => {
+    let fail = false
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/sync/status': (init) =>
+        fail ? down() : SYNCED_USER['GET /api/v1/sync/status']!(init),
+    })
+    const { queryClient } = renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+
+    fail = true
+    await act(() => queryClient.refetchQueries({ queryKey: ['sync', 'status'] }))
+    await settle()
+
+    expect(queryClient.getQueryState(['sync', 'status'])?.status).toBe('error')
+    expect(screen.getByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    expect(screen.queryByText(/could not load your profile/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps the developer profile and skills when their refetch fails', async () => {
+    let fail = false
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/profile': (init) => (fail ? down() : SYNCED_USER['GET /api/v1/profile']!(init)),
+    })
+    const { queryClient } = renderRoute('/app')
+    expect(await screen.findByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    await settle()
+    const skills = screen.getByRole('region', { name: 'Skills' }).textContent
+
+    fail = true
+    await act(() => queryClient.refetchQueries({ queryKey: ['profile', 'developer'] }))
+    await settle()
+
+    expect(queryClient.getQueryState(['profile', 'developer'])?.status).toBe('error')
+    expect(screen.getByText(DEVELOPER_PROFILE.summary)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Skills' }).textContent).toBe(skills)
+    expect(screen.queryByText(/could not load your developer profile/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps the discovery card and the recommendation list when their refetch fails', async () => {
+    let fail = false
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/discovery/status': (init) =>
+        fail ? down() : SYNCED_USER['GET /api/v1/discovery/status']!(init),
+      'GET /api/v1/recommendations': (init) =>
+        fail ? down() : SYNCED_USER['GET /api/v1/recommendations']!(init),
+    })
+    const { queryClient } = renderRoute('/app')
+    expect(await screen.findByRole('heading', { name: 'Project discovery' })).toBeInTheDocument()
+    await settle()
+
+    fail = true
+    await act(() =>
+      Promise.all([
+        queryClient.refetchQueries({ queryKey: ['jobs', 'discovery'] }),
+        queryClient.refetchQueries({ queryKey: ['profile', 'recommendations'] }),
+      ]),
+    )
+    await settle()
+
+    expect(queryClient.getQueryState(['jobs', 'discovery'])?.status).toBe('error')
+    expect(screen.getByRole('heading', { name: 'Project discovery' })).toBeInTheDocument()
+    expect(screen.queryByText(/could not load project discovery/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/could not load recommendations/i)).not.toBeInTheDocument()
+  })
+
+  it('says the skills could not be loaded instead of showing none', async () => {
+    mockFetch({ ...ME_ROUTE, ...SYNCED_USER, 'GET /api/v1/profile/skills?page_size=200': down })
+    renderRoute('/app')
+
+    expect(await screen.findByText(/could not load your skills/i)).toBeInTheDocument()
+  })
+})
+
+describe('sign-in page', () => {
+  it('never shows the sign-in button to a signed-in user while the identity loads', async () => {
+    let answer = () => {}
+    mockFetch({
+      ...SYNCED_USER,
+      'GET /api/v1/auth/me': () =>
+        new Promise<Response>((resolve) => {
+          answer = () => resolve(json(ME))
+        }),
+    })
+    const { router } = renderRoute('/')
+    await settle()
+    expect(screen.queryByRole('link', { name: /continue with github/i })).not.toBeInTheDocument()
+
+    answer()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app'))
+    expect(screen.queryByRole('link', { name: /continue with github/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('ended session', () => {
   it('returns to sign-in with a notice and drops cached data', async () => {
     let meCalls = 0
@@ -264,6 +391,30 @@ describe('ended session', () => {
     await settle()
     expect(visited.filter((search) => search.includes('auth_error'))).toEqual([])
     expect(screen.queryByText(/your session ended/i)).not.toBeInTheDocument()
+  })
+
+  it('is reported once the logout fails, for a 401 that answered while it was pending', async () => {
+    let signedIn = true
+    const rendered: { client?: QueryClient } = {}
+    mockFetch({
+      ...SYNCED_USER,
+      'GET /api/v1/auth/me': () => (signedIn ? json(ME) : unauthenticated()),
+      'GET /api/v1/sync/status': (init) =>
+        signedIn ? SYNCED_USER['GET /api/v1/sync/status']!(init) : unauthenticated(),
+      'POST /api/v1/auth/logout': async () => {
+        signedIn = false
+        await rendered.client!.refetchQueries({ queryKey: ['sync', 'status'] })
+        // The session is gone, but the logout answer is lost.
+        throw new TypeError('Failed to fetch')
+      },
+    })
+    const { router, queryClient } = renderRoute('/app')
+    rendered.client = queryClient
+
+    await userEvent.click(await screen.findByRole('button', { name: /log out/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/your session ended/i)
+    expect(router.state.location.pathname).toBe('/')
   })
 })
 
