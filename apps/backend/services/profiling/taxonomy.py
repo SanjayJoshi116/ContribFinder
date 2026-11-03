@@ -22,7 +22,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from urllib.parse import unquote
 
-TAXONOMY_VERSION = "2026.09.1"
+TAXONOMY_VERSION = "2026.11.1"
 
 LANGUAGE = "language"
 FRAMEWORK = "framework"

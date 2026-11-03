@@ -18,11 +18,9 @@ from typing import Any
 
 from issues.models import ContributionType as CT
 from issues.models import Difficulty
+from services.profiling.text import strip_html_comments
 
 from . import labels as L
-
-# Issue templates leave their instructions as HTML comments; they are not the description.
-_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
 
 # Canonical label -> contribution type, highest priority first.
 LABEL_TYPES: tuple[tuple[str, str], ...] = (
@@ -129,7 +127,8 @@ def difficulty(
     contribution votes beginner; a long discussion votes advanced."""
     signals = _label_votes(raw_labels)
 
-    length = len(_HTML_COMMENT.sub("", body).strip())
+    # Issue templates leave their instructions as HTML comments; they are not the description.
+    length = len(strip_html_comments(body).strip())
     body_vote: str | None = None  # an empty description says nothing about the work
     if 0 < length < thresholds["short_body"]:
         body_vote = Difficulty.BEGINNER

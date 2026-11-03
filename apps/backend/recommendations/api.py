@@ -3,7 +3,7 @@ never calls GitHub, never recomputes scores."""
 
 from typing import Any
 
-from django.db.models import Exists, Max, OuterRef, Prefetch, QuerySet
+from django.db.models import Exists, OuterRef, Prefetch, QuerySet
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -164,12 +164,14 @@ class RecommendationStatusView(APIView):
             .first()
         )
         recs = Recommendation.objects.filter(developer__user=user)
+        # The newest row holds the last generation time (``generated_at`` is never null), so
+        # no separate Max aggregate (REC-9).
         latest = recs.select_related("scoring_config").order_by("-generated_at").first()
         return Response(
             RecommendationStatusSerializer(
                 {
                     "job": job,
-                    "last_generated_at": recs.aggregate(last=Max("generated_at"))["last"],
+                    "last_generated_at": latest.generated_at if latest else None,
                     "count": recs.count(),
                     "config_version": latest.scoring_config.version if latest else None,
                 }

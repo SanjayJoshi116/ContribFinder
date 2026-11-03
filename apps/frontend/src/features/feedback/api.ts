@@ -62,13 +62,26 @@ function rollback(queryClient: QueryClient, id: number, previous: Snapshot | und
   queryClient.setQueryData(recommendationDetailKey(id), previous.detail)
 }
 
-/** Optimistic Save/Saved toggle on the list and detail caches, rolled back on error. */
+export interface SaveVariables {
+  id: number
+  repositoryId: number
+}
+
+/** The one unsave request: by repository, whether or not it is still recommended. */
+const unsaveRepository = (repositoryId: number) =>
+  apiFetch(`/saved/${repositoryId}`, { method: 'DELETE' })
+
+/** Optimistic Save/Saved toggle on the list and detail caches, rolled back on error. Saving
+ * needs the live recommendation; unsaving goes by repository, so it still works once a
+ * background generation has dropped the recommendation (FB-3). */
 function useSaveToggle(saved: boolean) {
   const queryClient = useQueryClient()
-  return useMutation<unknown, ApiError, number, Snapshot>({
-    mutationFn: (id) =>
-      apiFetch(`/recommendations/${id}/save`, { method: saved ? 'POST' : 'DELETE' }),
-    onMutate: async (id) => {
+  return useMutation<unknown, ApiError, SaveVariables, Snapshot>({
+    mutationFn: ({ id, repositoryId }) =>
+      saved
+        ? apiFetch(`/recommendations/${id}/save`, { method: 'POST' })
+        : unsaveRepository(repositoryId),
+    onMutate: async ({ id }) => {
       const previous = await snapshot(queryClient, id)
       queryClient.setQueriesData<RecommendationPage>({ queryKey: recommendationListKey }, (page) =>
         page
@@ -80,7 +93,7 @@ function useSaveToggle(saved: boolean) {
       )
       return previous
     },
-    onError: (_error, id, previous) => rollback(queryClient, id, previous),
+    onError: (_error, { id }, previous) => rollback(queryClient, id, previous),
     onSettled: () => queryClient.invalidateQueries({ queryKey: savedKey }),
   })
 }
@@ -147,7 +160,7 @@ export function useRestore() {
 export function useUnsaveRepository() {
   const queryClient = useQueryClient()
   return useMutation<unknown, ApiError, number>({
-    mutationFn: (repositoryId) => apiFetch(`/saved/${repositoryId}`, { method: 'DELETE' }),
+    mutationFn: unsaveRepository,
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: savedKey }),

@@ -50,11 +50,34 @@ class SheetError(Exception):
 
 
 def _single_developer(export: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(export, Mapping):
+        raise SheetError("An export must be a JSON object.")
     developers = export.get("developers")
     if not isinstance(developers, list) or len(developers) != 1:
         raise SheetError("An export must hold exactly one developer.")
-    developer: dict[str, Any] = developers[0]
+    developer = developers[0]
+    if not isinstance(developer, dict):
+        raise SheetError("An export's developer must be a JSON object.")
     return developer
+
+
+def _candidate_names(developer: Mapping[str, Any]) -> list[str]:
+    """The repository name of each candidate; ``SheetError`` for any other shape."""
+    candidates = developer.get("candidates", [])
+    if not isinstance(candidates, list):
+        raise SheetError("A developer's candidates must be a list.")
+    names = []
+    for index, candidate in enumerate(candidates, start=1):
+        name = candidate.get("repository") if isinstance(candidate, dict) else None
+        if not isinstance(name, str) or not name:
+            raise SheetError(f"Candidate {index} has no repository name.")
+        names.append(name)
+    return names
+
+
+def candidate_count(export: Mapping[str, Any]) -> int:
+    """Rows a sheet of ``export`` has (validated as ``write_sheet`` validates it)."""
+    return len(_candidate_names(_single_developer(export)))
 
 
 def _languages(pairs: list[list[Any]]) -> str:
@@ -77,7 +100,7 @@ def write_sheet(export: Mapping[str, Any]) -> str:
         out.write(f"# {line}\n")
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(COLUMNS)
-    names = sorted(c["repository"] for c in developer.get("candidates", []))
+    names = sorted(_candidate_names(developer))
     for name in names:
         repo = repositories[name]
         snapshot = repo.get("snapshot") or {}
@@ -130,9 +153,9 @@ def read_sheet(text: str) -> dict[str, str]:
 def import_sheet(export: Mapping[str, Any], grades: Mapping[str, str]) -> dict[str, Any]:
     """A copy of ``export`` with the sheet's grades as judgments and the developer marked
     ``real``. Validates everything before returning; raises ``SheetError`` naming the row."""
-    result: dict[str, Any] = {**export, "developers": [dict(_single_developer(export))]}
-    developer = result["developers"][0]
-    pool = {c["repository"] for c in developer.get("candidates", [])}
+    developer = dict(_single_developer(export))
+    result: dict[str, Any] = {**export, "developers": [developer]}
+    pool = set(_candidate_names(developer))
     judgments: dict[str, int] = {}
     for name, text in grades.items():
         if name not in pool:

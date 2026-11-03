@@ -69,8 +69,15 @@ class ScoringConfig(models.Model):
         touches_fixed = update_fields is None or set(update_fields) & set(self.FIXED_FIELDS)
         if not self._state.adding and touches_fixed:
             stored = ScoringConfig.objects.filter(pk=self.pk).values(*self.FIXED_FIELDS).first()
+            if stored is None:
+                # Django would insert it again under the same pk and version, with whatever
+                # numbers this instance holds (REC-4).
+                raise ImmutableConfig(
+                    "A deleted scoring configuration cannot be saved again; "
+                    "create a new version instead."
+                )
             # Compared as stored: a tuple reads back as a list and is not a change.
-            changed = stored and [
+            changed = [
                 f
                 for f in self.FIXED_FIELDS
                 if stored[f] != json.loads(json.dumps(getattr(self, f)))

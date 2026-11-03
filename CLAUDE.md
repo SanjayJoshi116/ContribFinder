@@ -1689,11 +1689,89 @@ of `repositories/`: nothing.
 - Viewing a repository in the admin raises Django's `RemovedInDjango60Warning` (URLField scheme);
   `FORMS_URLFIELD_ASSUME_HTTPS` is not set yet.
 - `/simplify` (batch 39): `core.admin.ViewOnlyAdmin` (`NoAddDeleteAdmin` plus no change) is the
-  one view-only base; a new admin for job-written data uses it. `recommendations/admin.py` still
-  has its own `ReadOnlyAdmin` (feedback, issues import it) that allows delete (SIM-8): next sweep
-  module. Admin tests use `shared_fixtures.assert_view_only(model, user, obj)` and
+  one view-only base; a new admin for job-written data uses it. `recommendations/admin.py`'s own
+  `ReadOnlyAdmin` (allowed delete, SIM-8) was removed in 0.12.52. Admin tests use `shared_fixtures.assert_view_only(model, user, obj)` and
   `changelist_queries(client, url)` with pytest-django's `admin_user`/`admin_client`. SPA:
   `features/sync/messages.STALLED_NOTICE`; `isStalled` reads `job.stalled` only.
+
+**Issue data fixes, review sweep: issues** (MVP+, fix release)  ✅ shipped in v0.12.51 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-issues-review-fixes/` (no spec change,
+`skip_specs`). `Bug_Backlog.md` batch 40 (ISS-1…ISS-8; ISS-3, ISS-4, ISS-6 accepted).
+`/simplify` and the fix-diff `/code-review` were skipped (owner). `/security-review` of
+`issues/`: nothing.
+- `IssueAdmin` and `RecommendedIssueAdmin` use `core.admin.ViewOnlyAdmin` (deleting an issue
+  cascaded into recommended issues and left the recommendation's issue snapshots stale);
+  `IssueAdmin.list_select_related = ("repository",)`. SIM-8 closed in 0.12.52.
+- `IssueTechnologySerializer.source` choices are `technologies.TITLE`, `LABEL`, `BODY`.
+- Detail staleness (current skills for "matched", an issue assigned, locked or transferred
+  since generation) is bounded by the freshness sweep; design D3 rejects a detail-only filter
+  (the recommendation would still link an issue that 404s).
+
+**Recommendation fixes, review sweep: recommendations** (MVP+, fix release)  ✅ shipped in v0.12.52 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-recommendations-review-fixes/` (no spec change,
+`skip_specs`). `Bug_Backlog.md` batch 41 (REC-1…REC-10; REC-5 false positive) and SIM-8.
+`/simplify` and the fix-diff `/code-review` were skipped (owner). `/security-review` of
+`recommendations/`: nothing.
+- `recommendations.admin.ReadOnlyAdmin` is gone: `RecommendationAdmin` and the feedback admins
+  use `core.admin.ViewOnlyAdmin` (reason inline `can_delete = False`, `list_select_related`
+  each). `ScoringConfigAdmin` is `NoAddDeleteAdmin`: configurations come from seed migrations;
+  its changelist has no actions. Every admin now uses a `core.admin` base.
+- `ScoringConfig.save` raises `ImmutableConfig` when the row is gone (no re-insert).
+- `evaluate_ranking --top-n` below 1 → `CommandError`. `--write-baseline --top-n` is specified
+  behavior (REC-5).
+- `services/evaluation/sheet.py`: `_single_developer` and `_candidate_names` raise `SheetError`
+  for a malformed export; `candidate_count(export)`; `import_sheet` validates before unpacking.
+- `readme_excerpt`: `html.unescape` after `plain_text`; `_` stripped at word edges, `~` only as
+  `~~`; cut at `limit + 1`. Status endpoint: last time from the latest row (3 queries).
+
+**Feedback fixes, review sweep: feedback** (MVP+, fix release)  ✅ shipped in v0.12.53 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-feedback-review-fixes/` (`skip_specs`; spec
+"Recording feedback" edited directly for FD2-6). `Bug_Backlog.md` batch 42 (FB-1, FB-3, FB-5
+fixed; FB-2, FB-6 accepted by the owner; FB-4 false positive, FB-7 wontfix). One `/simplify` and
+one fix-diff `/code-review` over the combined 0.12.51–0.12.54 code: batch 50 (FD2-1…FD2-9), fixed
+before commit. `/security-review` of `feedback/`: nothing.
+- `services.feedback.record(user, recommendation, action, *, issue_id=None)`: after
+  `_current(lock=True)` one locking query (`select_for_update(of=("self",))` on the issue joined
+  to this recommendation's relevant issues). A miss is a race (closed, or dropped by a
+  regeneration): no event, `False`, 204, like a recommendation gone; only an issue of another
+  repository raises `IssueNotRelevant` (400 `issue_id`). Views never read `RecommendedIssue`.
+- `feedback.api._own_recommendation` loads `only("pk", "repository_id")`; services re-read what
+  they snapshot. `_current_recommendation(user, repository_id)` also loads the repository, so
+  `dismiss` reads once; a repository deleted meanwhile raises `Recommendation.DoesNotExist` → 404.
+  A service called from a view must not touch `recommendation.repository` before its re-read.
+- SPA: `useSave`/`useUnsave` take `{ id, repositoryId }`; every unsave goes through
+  `unsaveRepository` (`DELETE /saved/{repositoryId}`, works after the recommendation is
+  regenerated away). `DELETE /recommendations/{id}/save` is kept for API clients only.
+
+**Profiling fixes, review sweep: services/profiling** (MVP+, fix release)  ✅ shipped in v0.12.54 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-profiling-review-fixes/`. Spec: delta to
+`skill-detection` ("README skill evidence", "Dependency evidence", "Contribution evidence");
+after the fix-diff review "README skill evidence" and `developer-profile` "Experience level"
+were edited directly. `Bug_Backlog.md` batch 43 (PROF-1…PROF-9 fixed; PROF-8 owner decision:
+forks never count) and batch 50. `/security-review` of `services/profiling/`: nothing.
+`TAXONOMY_VERSION` 2026.11.1; baselines unchanged.
+- `ProfileInput.__post_init__` normalizes once for every consumer: `readme` without HTML
+  comments, `contributions` without forked repositories (evidence, interests and experience).
+  Tests build inputs through `profiling_fixtures.profile(...)` and read `.readme` from it.
+- `services.profiling.text.strip_html_comments` (`<!--.*?(?:-->|\Z)`, an unterminated comment
+  hides the rest) is the one stripper: `ProfileInput`, `parse_pom`, issue difficulty (`classify`).
+- `PhraseMatcher` keys and looks up by `casefold()` and skips a miss: it never raises, whatever
+  the text (also used on repository descriptions and issue text).
+- `tech_sections` follows CommonMark fences (a run of 3+ backticks or tildes; closed only by the
+  same character, at least as long, nothing after it); lines inside are section text, never
+  headings. `_ATX` closes only on whitespace + `#`.
+- Manifests: `_pep508_names` takes only a list, `_table(value)` for TOML tables; `_PEP508_DIRECT`
+  (`name[extras] @ URL`) before the URL skip; `_strip_gradle_comments` matches string literals or
+  comments and puts strings back (globs and URLs survive).
+- Catalog: one `_sync_catalog(model, catalog, slugs, fields)` in slug order: `in_bulk`, insert
+  only missing slugs (`ignore_conflicts`), `bulk_update` rows whose fields differ. An unchanged
+  taxonomy costs one read and writes nothing.
+- Tests: `make_recommendation` (from `test_models_phase5`), `shared_fixtures.assert_changelist_flat`;
+  strings with look-alike letters use `chr()` code points (ruff RUF001).
 
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
@@ -1721,7 +1799,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54).
 
 ## 8. Release housekeeping
 

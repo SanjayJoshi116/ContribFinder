@@ -20,20 +20,34 @@ class PhraseMatcher:
     """Finds catalog phrases in text and maps each to its slug."""
 
     def __init__(self, phrases: Mapping[str, str]) -> None:
-        self._slugs = {p.lower(): slug for p, slug in phrases.items()}
+        # Case-folded keys: IGNORECASE also matches variants whose lower() is not the catalog
+        # phrase (dotless i U+0131, long s U+017F, Kelvin sign U+212A); casefold() maps the
+        # last two back, and find() skips what still misses (PROF-1).
+        self._slugs = {p.casefold(): slug for p, slug in phrases.items()}
         ordered = sorted(self._slugs, key=len, reverse=True)  # longest phrase wins
         alternation = "|".join(re.escape(p) for p in ordered)
         self._pattern = re.compile(f"{_BEFORE}(?:{alternation}){_AFTER}", re.IGNORECASE)
 
     def find(self, text: str) -> dict[str, str]:
-        """``{slug: first matched phrase}`` in order of first appearance."""
+        """``{slug: first matched phrase}`` in order of first appearance. Never raises: a
+        match whose case-fold is not a catalog phrase is skipped."""
         found: dict[str, str] = {}
         if not self._slugs:
             return found
         for match in self._pattern.finditer(text):
-            phrase = match.group(0).lower()
-            found.setdefault(self._slugs[phrase], phrase)
+            if (slug := self._slugs.get(match.group(0).casefold())) is not None:
+                found.setdefault(slug, match.group(0).lower())
         return found
+
+
+_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
+
+
+def strip_html_comments(text: str) -> str:
+    """``text`` without ``<!-- … -->`` comments (HTML, Markdown and XML alike); an unterminated
+    ``<!--`` hides the rest, as GitHub renders it. The one stripper for profile READMEs,
+    manifests and issue bodies: commented-out content is never evidence (PROF-3, PROF-6)."""
+    return _HTML_COMMENT.sub("", text)
 
 
 def plain_text(markdown: str) -> str:

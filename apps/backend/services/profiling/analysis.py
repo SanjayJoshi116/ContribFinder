@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any
@@ -217,31 +218,44 @@ def build_input(user: User, now: datetime) -> ProfileInput:
 # --- persistence ----------------------------------------------------------------------------
 
 
-# Catalog rows are shared by every user's analysis. Upserting them in one global order
-# (skills, then interests, each sorted) keeps concurrent analyses from deadlocking (B-3).
+# Catalog rows are shared by every user's analysis. Writing them in one global order (skills,
+# then interests, each sorted) keeps concurrent analyses from deadlocking (B-3). Missing rows
+# are inserted and existing ones written only when the taxonomy renamed them: an unconditional
+# upsert rewrote (and locked) every shared row on every analysis, so concurrent analyses
+# queued on rows such as "python" (PROF-9).
+
+
+def _sync_catalog[Row: (Skill, Interest)](
+    model: type[Row], catalog: Mapping[str, Any], slugs: list[str], fields: tuple[str, ...]
+) -> dict[str, Row]:
+    ordered = sorted(set(slugs))
+    rows = model.objects.in_bulk(ordered, field_name="slug")
+    if missing := [slug for slug in ordered if slug not in rows]:
+        model.objects.bulk_create(
+            [
+                model(slug=slug, **{f: getattr(catalog[slug], f) for f in fields})
+                for slug in missing
+            ],
+            ignore_conflicts=True,  # another analysis may insert it meanwhile
+        )
+        rows = model.objects.in_bulk(ordered, field_name="slug")
+    changed = []
+    for slug in ordered:
+        row, wanted = rows[slug], {f: getattr(catalog[slug], f) for f in fields}
+        if any(getattr(row, f) != value for f, value in wanted.items()):
+            for f, value in wanted.items():
+                setattr(row, f, value)
+            changed.append(row)
+    model.objects.bulk_update(changed, list(fields))
+    return rows
 
 
 def _upsert_catalog_skills(slugs: list[str]) -> dict[str, Skill]:
-    Skill.objects.bulk_create(
-        [
-            Skill(slug=slug, name=SKILLS_BY_SLUG[slug].name, category=SKILLS_BY_SLUG[slug].category)
-            for slug in sorted(set(slugs))
-        ],
-        update_conflicts=True,
-        unique_fields=["slug"],
-        update_fields=["name", "category"],
-    )
-    return Skill.objects.in_bulk(slugs, field_name="slug")
+    return _sync_catalog(Skill, SKILLS_BY_SLUG, slugs, ("name", "category"))
 
 
 def _upsert_catalog_interests(slugs: list[str]) -> dict[str, Interest]:
-    Interest.objects.bulk_create(
-        [Interest(slug=slug, name=INTERESTS_BY_SLUG[slug].name) for slug in sorted(set(slugs))],
-        update_conflicts=True,
-        unique_fields=["slug"],
-        update_fields=["name"],
-    )
-    return Interest.objects.in_bulk(slugs, field_name="slug")
+    return _sync_catalog(Interest, INTERESTS_BY_SLUG, slugs, ("name",))
 
 
 class ProfileAnalysisService:

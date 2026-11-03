@@ -439,6 +439,48 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.54 - Profiling fixes (review sweep: services/profiling)
+============================================================================
+
+Developer profile (Bug_Backlog.md batch 43)
+  [x] Unusual letter case in READMEs, descriptions or issues never crashes analysis
+  [x] Commented-out README sections and code-block comments give no skills; "C#" headings intact
+  [x] Manifests: no letter-by-letter names, direct references kept, commented-out deps ignored
+  [x] Contributions to forks give no skill or interest evidence, nor count toward experience
+  [x] Unclosed README comments hide the rest; nested code fences and Gradle globs handled
+  [x] Shared skill and interest rows written only when new or renamed
+
+============================================================================
+SHIPPED - v0.12.53 - Feedback fixes (review sweep: feedback)
+============================================================================
+
+Feedback (Bug_Backlog.md batch 42)
+  [x] An opened-issue event names only an issue that is still relevant (checked under the lock)
+  [x] Unsave works after the recommendation was regenerated away (unsaves by repository)
+  [x] Feedback, save and dismiss read the recommendation once
+  [x] Opening an issue that closed meanwhile records nothing, without an error
+  [x] Dismissing a project whose data was deleted meanwhile answers 404, not 500
+
+============================================================================
+SHIPPED - v0.12.52 - Recommendation fixes (review sweep: recommendations)
+============================================================================
+
+Recommendations (Bug_Backlog.md batch 41)
+  [x] Recommendation and feedback admins are view-only (no cascading deletes)
+  [x] Scoring configurations cannot be added or deleted in the admin, nor saved back once deleted
+  [x] Evaluation refuses a top N below 1; judging commands report malformed exports
+  [x] README excerpt keeps whole words, word characters and entities
+
+============================================================================
+SHIPPED - v0.12.51 - Issue data fixes (review sweep: issues)
+============================================================================
+
+Issue data (Bug_Backlog.md batch 40)
+  [x] The issue admins are view-only (no issue delete with its cascade, no stale filter counts)
+  [x] The issue changelist loads repositories in one query
+  [x] Technology source choices have one definition
+
+============================================================================
 SHIPPED - v0.12.50 - Repository data fixes (review sweep: repositories)
 ============================================================================
 

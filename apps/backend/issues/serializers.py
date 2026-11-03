@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from recommendations.models import MatchLabel
 from recommendations.serializers import IssueReasonSerializer
+from services.issues import technologies
 from services.profiling.taxonomy import SKILLS_BY_SLUG
 
 from .models import ContributionType, Difficulty, RecommendedIssue
@@ -32,7 +33,9 @@ class IssueTechnologySerializer(serializers.Serializer[dict[str, Any]]):
     slug = serializers.CharField()
     name = serializers.CharField()
     # A field named like Field.source: DRF moves it into the declared fields at class creation.
-    source = serializers.ChoiceField(choices=["title", "label", "body"])  # type: ignore[assignment]
+    source = serializers.ChoiceField(  # type: ignore[assignment]
+        choices=[technologies.TITLE, technologies.LABEL, technologies.BODY]
+    )
     matched = serializers.BooleanField(help_text="The developer has demonstrated it.")
 
 

@@ -1,24 +1,18 @@
 from django.contrib import admin
-from django.db.models import Model
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
+from core.admin import NoAddDeleteAdmin, ViewOnlyAdmin
+
 from .models import Recommendation, RecommendationReason, ScoringConfig
 
 
-class ReadOnlyAdmin[M: Model](admin.ModelAdmin[M]):
-    """Recommendations are rebuilt by background jobs; editing them here would be overwritten."""
-
-    def has_add_permission(self, request: HttpRequest) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj: M | None = None) -> bool:
-        return False
-
-
 @admin.register(ScoringConfig)
-class ScoringConfigAdmin(admin.ModelAdmin[ScoringConfig]):
+class ScoringConfigAdmin(NoAddDeleteAdmin[ScoringConfig]):
+    # Configurations are stored by seed migrations only (``_seeding.store_inactive``); a deleted
+    # version could be stored again with other numbers, and the active one must stay. Change
+    # stays for the description: the fixed fields are read-only below.
     list_display = ("version", "is_active", "created_at")
     readonly_fields = ("is_active", "created_at")
 
@@ -55,10 +49,11 @@ class ReasonInline(admin.TabularInline[RecommendationReason, Recommendation]):
     extra = 0
     fields = ("position", "type", "text", "weight", "detail")
     readonly_fields = fields
+    can_delete = False
 
 
 @admin.register(Recommendation)
-class RecommendationAdmin(ReadOnlyAdmin[Recommendation]):
+class RecommendationAdmin(ViewOnlyAdmin[Recommendation]):
     list_display = (
         "developer",
         "rank",
@@ -69,6 +64,6 @@ class RecommendationAdmin(ReadOnlyAdmin[Recommendation]):
         "generated_at",
     )
     list_filter = ("match_label", "scoring_config")
+    list_select_related = ("developer", "repository", "scoring_config")
     search_fields = ("repository__full_name",)
-    readonly_fields = ("signal_scores", "technologies")
     inlines = [ReasonInline]

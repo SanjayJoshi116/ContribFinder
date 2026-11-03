@@ -7,6 +7,115 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.54] - 2026-11-03
+
+Profiling fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-profiling-review-fixes/`; spec delta to `skill-detection`;
+`Bug_Backlog.md` batch 43). No migration. OpenAPI stays `1.0.0`; baselines unchanged.
+`TAXONOMY_VERSION` 2026.11.1: stored profiles change on their next analysis
+(`npm run manage -- reanalyze_profiles` applies it at once). One `/simplify` and one fix-diff
+`/code-review` over the combined 0.12.51–0.12.54 code (`Bug_Backlog.md` batch 50, FD2-1…FD2-9)
+ran before release; their fixes are included here and in 0.12.53. `/security-review` of
+`services/profiling/` found nothing. Specs "README skill evidence" and "Experience level" were
+edited directly after the review.
+
+### Changed
+
+- Contributions to forked repositories no longer give skill or interest evidence, nor count
+  toward the experience level (PROF-8, FD2-5, owner decision).
+- Analyses no longer rewrite the shared skill and interest catalog rows on every run; only
+  missing or renamed rows are written (PROF-9).
+
+### Fixed
+
+- Text with look-alike letters (dotless `ı`, long `ſ`, Kelvin sign) crashed profile analysis,
+  recommendation generation and issue analysis; matching now case-folds and never raises
+  (PROF-1).
+- README: commented-out sections and badges gave skills or interests (also after an
+  unterminated `<!--`, which GitHub hides to the end); `#` comments in code blocks, including
+  nested longer fences, were read as headings (inventing or cutting sections); `## C#` lost its
+  `#` (PROF-2, PROF-3, PROF-7, FD2-2, FD2-3).
+- Manifests: a pyproject string where a list belongs was read one letter at a time; a
+  `name @ URL` requirement lost its name; commented-out `pom.xml` and Gradle dependencies
+  counted, while globs and URLs inside Gradle strings are kept (PROF-4, PROF-5, PROF-6, FD2-1).
+- Issue difficulty and profile READMEs now strip HTML comments the same way (FD2-3).
+
+## [0.12.53] - 2026-11-03
+
+Feedback fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-feedback-review-fixes/`; no spec change;
+`Bug_Backlog.md` batch 42). No migration. OpenAPI stays `1.0.0`; baselines unchanged.
+The fix-diff review of 0.12.51–0.12.54 (batch 50) is folded in; spec "Recording feedback" was
+edited directly for FD2-6. `/security-review` of `feedback/` found nothing.
+
+### Changed
+
+- Feedback, save and dismiss requests read the recommendation once: the ownership check loads
+  only its id and repository (FB-5).
+- An `opened_issue` for an issue closed or dropped since the page loaded stores no event and is
+  not an error, like a recommendation gone meanwhile; only an issue of another repository is
+  rejected with 400 (FD2-6, owner decision).
+
+### Fixed
+
+- An `opened_issue` event could be stored for an issue a concurrent generation had just dropped:
+  relevance is now checked in the service under the recommendation lock (FB-1).
+- Unsave on a card or the detail page failed with 404 once a background generation had dropped
+  the recommendation, and the project stayed saved; it now unsaves by repository
+  (`DELETE /api/v1/saved/{repository_id}`) (FB-3).
+- Dismissing a project whose repository was deleted meanwhile (delete-data) answered 500; it is
+  now 404 (FD2-4).
+
+## [0.12.52] - 2026-11-03
+
+Recommendation fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-recommendations-review-fixes/`; no spec change;
+`Bug_Backlog.md` batch 41, SIM-8). No migration. OpenAPI stays `1.0.0`; baselines unchanged.
+`/simplify` and the fix-diff `/code-review` were skipped by the owner. `/security-review` of
+`recommendations/` found nothing.
+
+### Changed
+
+- The recommendation and feedback admins are view-only: staff can no longer delete
+  recommendations (with their reasons and issues), saves, dismissals or feedback history;
+  changelists load related rows in one query (REC-1, REC-6, SIM-8).
+- Scoring configurations cannot be added or deleted in the admin; seed migrations store them
+  and only the description stays editable (REC-2).
+- The recommendation status endpoint runs one query fewer (REC-9).
+
+### Fixed
+
+- A deleted scoring configuration can no longer be saved back with other numbers (REC-4).
+- `evaluate_ranking --top-n` below 1 is refused instead of using the default or dropping the
+  last repositories (REC-3).
+- `benchmark_sheet` and `import_judgments` report a malformed export as an error instead of a
+  traceback, and `benchmark_sheet` writes nothing then (REC-7).
+- The README excerpt keeps a word that ends exactly at its limit, keeps `_` and `~` inside
+  words and paths, and shows HTML entities as their characters (REC-8, REC-10).
+
+## [0.12.51] - 2026-11-03
+
+Issue data fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-issues-review-fixes/`; no spec change;
+`Bug_Backlog.md` batch 40). No migration. OpenAPI stays `1.0.0`; baselines unchanged.
+`/simplify` and the fix-diff `/code-review` were skipped by the owner. `/security-review` of
+`issues/` found nothing.
+
+### Changed
+
+- Both issue admins are view-only: staff can no longer delete an issue (with its cascade into
+  every developer's recommended issues) or a recommended issue, which left the difficulty and
+  contribution-type filters counting issues that were gone (ISS-1, ISS-2, ISS-8).
+- The issue changelist loads repositories in one query (ISS-5).
+- The issue detail's technology source choices come from the detector's constants; the API is
+  unchanged (ISS-7).
+
+### Accepted
+
+- The issue detail may show skills matched against the current profile, or an issue assigned,
+  locked or transferred since generation, until the freshness sweep regenerates (ISS-3, ISS-4,
+  ISS-6).
+
 ## [0.12.50] - 2026-11-02
 
 Repository data fixes from the review sweep

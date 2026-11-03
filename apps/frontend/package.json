@@ -1,6 +1,6 @@
 {
   "name": "contribfinder-frontend",
-  "version": "0.12.50",
+  "version": "0.12.54",
   "private": true,
   "type": "module",
   "scripts": {

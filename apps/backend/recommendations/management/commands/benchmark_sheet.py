@@ -5,7 +5,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
-from services.evaluation.sheet import SheetError, write_sheet
+from services.evaluation.sheet import SheetError, candidate_count, write_sheet
 
 
 class Command(BaseCommand):
@@ -22,12 +22,12 @@ class Command(BaseCommand):
         try:
             export = json.loads(Path(options["export"]).read_text(encoding="utf-8"))
             text = write_sheet(export)
+            rows = candidate_count(export)
             out = Path(options["out"])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(text, encoding="utf-8-sig")
         except (OSError, ValueError, KeyError, SheetError) as exc:
             raise CommandError(f"Cannot write a sheet: {exc}") from exc
-        rows = len(export["developers"][0]["candidates"])
         self.stdout.write(
             f"Sheet with {rows} rows written to {options['out']}. Fill the grade column, then "
             "run import_judgments."

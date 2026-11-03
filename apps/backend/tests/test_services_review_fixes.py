@@ -163,7 +163,8 @@ def test_events_snapshot_the_row_under_the_lock(user: User, recommendation) -> N
 def test_an_issue_gone_before_the_lock_stores_no_event(user: User, recommendation) -> None:
     issue = make_issue(recommendation.repository, 1)
     type(issue).objects.filter(pk=issue.pk).delete()  # an issue refresh closed it meanwhile
-    assert not feedback.record(user, recommendation, "opened_issue", issue=issue)
+    # A race, like a recommendation gone meanwhile: no event, no error.
+    assert not feedback.record(user, recommendation, "opened_issue", issue_id=issue.pk)
     assert not RecommendationFeedback.objects.exists()
 
 

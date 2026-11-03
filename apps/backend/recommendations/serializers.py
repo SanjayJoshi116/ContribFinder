@@ -2,6 +2,7 @@
 values are internal ranking data and deliberately absent: users see the match label and the
 reasons behind it."""
 
+import html
 import re
 from typing import Any
 
@@ -17,16 +18,20 @@ from services.profiling.text import plain_text
 
 from .models import MatchLabel, Recommendation, RecommendationReason, RepositorySize
 
-_MARKDOWN_NOISE = re.compile(r"[#*_>`|~]+|!\[[^\]]*\]|\[|\]")
+# Markdown marks, never word characters: `_` only at a word's edge (``my_package`` keeps it),
+# `~` only as strikethrough (``~~``), so ``~/.config`` survives (REC-10).
+_MARKDOWN_NOISE = re.compile(r"[#*>`|]+|~~+|(?<!\w)_+|_+(?!\w)|!\[[^\]]*\]|\[|\]")
 _WHITESPACE = re.compile(r"\s+")
 
 
 def readme_excerpt(content: str, limit: int) -> str:
-    """Plain-text start of a README, cut at a word boundary."""
-    text = _WHITESPACE.sub(" ", _MARKDOWN_NOISE.sub(" ", plain_text(content))).strip()
+    """Plain-text start of a README, cut at a word boundary: a word ending at ``limit`` is
+    kept (REC-8). Entities such as ``&amp;`` read as the character they stand for."""
+    prose = html.unescape(plain_text(content))
+    text = _WHITESPACE.sub(" ", _MARKDOWN_NOISE.sub(" ", prose)).strip()
     if len(text) <= limit:
         return text
-    cut = text[:limit].rsplit(" ", 1)[0]
+    cut = text[: limit + 1].rsplit(" ", 1)[0][:limit].rstrip()
     return f"{cut}…"
 
 

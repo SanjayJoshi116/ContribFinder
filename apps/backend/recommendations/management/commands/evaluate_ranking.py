@@ -93,6 +93,8 @@ class Command(BaseCommand):
         resamples, seed = options["resamples"], options["seed"]
         if resamples < 1:
             raise CommandError("--resamples must be at least 1.")
+        if options["top_n"] is not None and options["top_n"] < 1:
+            raise CommandError("--top-n must be at least 1.")
         try:
             if options["dataset"]:
                 paths = [Path(options["dataset"])]
@@ -108,7 +110,9 @@ class Command(BaseCommand):
         min_score = options["min_score"]
         if min_score is None:
             min_score = baseline.MIN_SCORE if pinned else settings.RECOMMENDATION_MIN_SCORE
-        top_n = options["top_n"] or (baseline.TOP_N if pinned else settings.RECOMMENDATIONS_TOP_N)
+        top_n = options["top_n"]
+        if top_n is None:
+            top_n = baseline.TOP_N if pinned else settings.RECOMMENDATIONS_TOP_N
 
         everything: list[Report] = []
         verdicts: list[Verdict] = []

@@ -20,7 +20,6 @@ from rest_framework.views import APIView
 
 from core.authentication import current_user
 from core.serializers import error_responses
-from issues.models import RecommendedIssue
 from recommendations.models import Recommendation
 from repositories.queries import latest_snapshot
 from services import feedback
@@ -38,9 +37,10 @@ _NO_CONTENT = OpenApiResponse(description="Done.")
 
 
 def _own_recommendation(request: Request, pk: int) -> Recommendation:
-    """The requesting user's recommendation; 404 for anyone else's."""
+    """The requesting user's recommendation, pk and repository id only; 404 for anyone
+    else's. The services re-read the row under their locks (FB-5)."""
     return get_object_or_404(
-        Recommendation.objects.select_related("repository", "scoring_config"),
+        Recommendation.objects.only("pk", "repository_id"),
         pk=pk,
         developer__user=current_user(request),
     )
@@ -56,19 +56,17 @@ class FeedbackView(APIView):
         recommendation = _own_recommendation(request, pk)
         body = FeedbackSerializer(data=request.data)
         body.is_valid(raise_exception=True)
-        issue = None
-        if (issue_id := body.validated_data.get("issue_id")) is not None:
-            relevant = (
-                RecommendedIssue.objects.filter(recommendation=recommendation, issue_id=issue_id)
-                .select_related("issue")
-                .first()
+        try:
+            feedback.record(
+                current_user(request),
+                recommendation,
+                body.validated_data["action"],
+                issue_id=body.validated_data.get("issue_id"),
             )
-            if relevant is None:
-                raise ValidationError({"issue_id": "Not a relevant issue of this recommendation."})
-            issue = relevant.issue
-        feedback.record(
-            current_user(request), recommendation, body.validated_data["action"], issue=issue
-        )
+        except feedback.IssueNotRelevant:
+            raise ValidationError(
+                {"issue_id": "Not a relevant issue of this recommendation."}
+            ) from None
         return Response(status=204)
 
 
@@ -90,6 +88,8 @@ class SaveView(APIView):
         responses={200: SaveResultSerializer, **error_responses(401, 403, 404)},
     )
     def delete(self, request: Request, pk: int) -> Response:
+        # Kept for API clients (OpenAPI 1.0.0); the SPA unsaves through DELETE /saved/{id},
+        # which still works once the recommendation is regenerated away (FB-3).
         recommendation = _own_recommendation(request, pk)
         feedback.unsave(current_user(request), recommendation.repository_id)
         return Response(SaveResultSerializer({"saved": False}).data)
@@ -105,9 +105,12 @@ class DismissView(APIView):
         recommendation = _own_recommendation(request, pk)
         body = DismissSerializer(data=request.data)
         body.is_valid(raise_exception=True)
-        feedback.dismiss(
-            current_user(request), recommendation, body.validated_data.get("reason", "")
-        )
+        try:
+            feedback.dismiss(
+                current_user(request), recommendation, body.validated_data.get("reason", "")
+            )
+        except Recommendation.DoesNotExist:
+            raise Http404 from None  # its repository was deleted with the user's data meanwhile
         return Response(status=204)
 
 

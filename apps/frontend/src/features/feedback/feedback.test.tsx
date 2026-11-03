@@ -158,6 +158,40 @@ describe('save and dismiss', () => {
     )
   })
 
+  it('unsaves by repository, so a recommendation regenerated away still unsaves', async () => {
+    const fetchMock = mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () => page([{ ...RECOMMENDATION, saved: true }]),
+      'DELETE /api/v1/saved/70': () => new Response(null, { status: 204 }),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Saved' }))
+
+    expect(await within(card).findByRole('button', { name: 'Save' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(callsTo(fetchMock, 'DELETE', '/api/v1/saved/70')).toHaveLength(1)
+    expect(callsTo(fetchMock, 'DELETE', '/api/v1/recommendations/7/save')).toHaveLength(0)
+  })
+
+  it('rolls Unsave back when the request fails', async () => {
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () => page([{ ...RECOMMENDATION, saved: true }]),
+      'DELETE /api/v1/saved/70': () => json({ error: { code: 'error', message: 'Nope' } }, 500),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Saved' }))
+    expect(await within(card).findByRole('button', { name: 'Saved' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
   it('removes a dismissed card at once, and Undo restores it', async () => {
     let dismissed = false
     // Answer the dismissal only after the card is gone, as on a real network: the button that

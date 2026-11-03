@@ -24,7 +24,12 @@ export function SaveButton({ recommendation }: { recommendation: Recommendation 
       // One request at a time: overlapping save and unsave have no order, and each rollback
       // would restore a snapshot taken before the other.
       disabled={save.isPending || unsave.isPending}
-      onClick={() => (saved ? unsave : save).mutate(recommendation.id)}
+      onClick={() =>
+        (saved ? unsave : save).mutate({
+          id: recommendation.id,
+          repositoryId: recommendation.repository_id,
+        })
+      }
     >
       {saved ? <BookmarkCheck aria-hidden="true" /> : <Bookmark aria-hidden="true" />}
       {saved ? 'Saved' : 'Save'}

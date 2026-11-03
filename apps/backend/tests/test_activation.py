@@ -270,7 +270,9 @@ def test_admin_offers_no_activation_action(admin_client, monkeypatch) -> None:
 
     monkeypatch.setattr(activation, "benchmark_judge", judge_called)
     changelist = reverse("admin:recommendations_scoringconfig_changelist")
-    actions = admin_client.get(changelist).context["action_form"].fields["action"].choices
+    # Without delete permission (REC-2) the changelist offers no action at all.
+    action_form = admin_client.get(changelist).context["action_form"]
+    actions = action_form.fields["action"].choices if action_form else []
     assert "activate" not in [name for name, _ in actions]
 
     v1 = ScoringConfig.objects.get(version="v1-deterministic")
@@ -294,4 +296,6 @@ def test_admin_page_shows_the_command(admin_client) -> None:
         "v1-deterministic"
     )
     assert "Active. To activate another configuration" in change_page("v2-deterministic")
-    assert "activate_scoring_config" not in page(reverse("admin:recommendations_scoringconfig_add"))
+    # Configurations are stored by seed migrations only (REC-2): no add page.
+    add = admin_client.get(reverse("admin:recommendations_scoringconfig_add"))
+    assert add.status_code == 403

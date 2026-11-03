@@ -1,7 +1,7 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since; current through 0.12.41. Order: the full review sweep (top priority),
+each fix release since; current through 0.12.54. Order: the full review sweep (top priority),
 open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
@@ -60,16 +60,16 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | Medium | `apps/backend/jobs/` | SyncJob, status and versions API, recovery | [x] batch 36 | [x] no findings |
 | Medium | `apps/backend/developers/` | profile, skills, interests; profile API | [x] batch 37 | [x] no findings |
 | Medium | `apps/backend/repositories/` | repository models, discovery API, tasks, reports | [x] batch 38 | [x] no findings |
-| Medium | `apps/backend/issues/` | Issue, RecommendedIssue, issue detail API | [ ] | [ ] |
-| Medium | `apps/backend/recommendations/` | ScoringConfig, Recommendation, API, evaluation commands | [ ] | [ ] |
-| Medium | `apps/backend/feedback/` | feedback, saved, dismissed; keyset pages | [ ] | [ ] |
-| Medium | `apps/backend/services/profiling/` | taxonomy, manifest and README parsing (untrusted input) | [ ] | [ ] |
-| Medium | `apps/frontend/src/app/` | query client, 401 handling, job transitions, data versions | [ ] | [ ] |
-| Medium | `apps/frontend/src/routes/` | routes, AppShell, landing, privacy, RouteId | [ ] | [ ] |
-| Medium | `apps/frontend/src/features/issues/` | issue detail (untrusted issue bodies) | [ ] | [ ] |
-| Medium | `apps/frontend/e2e/ + vite.config.ts, csp.config.ts, playwright.config.ts` | Playwright, CSP, proxy | [ ] | [ ] |
-| Medium | `scripts/` | npm runners, process trees, WSL Redis, dependency audit | [ ] | [ ] |
-| Medium | `.github/workflows/` | ci.yml, audit.yml (token permissions) | [ ] | [ ] |
+| Medium | `apps/backend/issues/` | Issue, RecommendedIssue, issue detail API | [x] batch 40 | [x] no findings |
+| Medium | `apps/backend/recommendations/` | ScoringConfig, Recommendation, API, evaluation commands | [x] batch 41 | [x] no findings |
+| Medium | `apps/backend/feedback/` | feedback, saved, dismissed; keyset pages | [x] batch 42 | [x] no findings |
+| Medium | `apps/backend/services/profiling/` | taxonomy, manifest and README parsing (untrusted input) | [x] batch 43 | [x] no findings |
+| Medium | `apps/frontend/src/app/` | query client, 401 handling, job transitions, data versions | [x] batch 44 | [x] no findings |
+| Medium | `apps/frontend/src/routes/` | routes, AppShell, landing, privacy, RouteId | [x] batch 45 | [x] no findings |
+| Medium | `apps/frontend/src/features/issues/` | issue detail (untrusted issue bodies) | [x] batch 46 | [x] no findings |
+| Medium | `apps/frontend/e2e/ + vite.config.ts, csp.config.ts, playwright.config.ts` | Playwright, CSP, proxy | [x] batch 47 | [x] no findings |
+| Medium | `scripts/` | npm runners, process trees, WSL Redis, dependency audit | [x] batch 48 | [x] no findings |
+| Medium | `.github/workflows/` | ci.yml, audit.yml (token permissions) | [x] batch 49 | [x] no findings |
 | Low | `apps/backend/services/repositories/` | analysis, lifecycle, staleness, backlog, setup | [ ] | [ ] |
 | Low | `apps/backend/services/issues/` | labels, classification, technologies | [ ] | [ ] |
 | Low | `apps/backend/services/discovery/` | queries, filters, ordering, yield report | [ ] | [ ] |
@@ -192,6 +192,17 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 37 | **Sweep: `developers/`** | DEV-1…DEV-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/backend/developers/`, verified; DEV-1, DEV-2, DEV-8, DEV-9 confirmed, DEV-3, DEV-4, DEV-5, DEV-7 confirmed (minor), DEV-6 accepted with a guard test; fixed in 0.12.49 (`developers-review-fixes`). `/security-review` of the module found nothing. |
 | 38 | **Sweep: `repositories/`** | REPO-1…REPO-8 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/backend/repositories/`, verified; REPO-5, REPO-6, REPO-7 confirmed, REPO-1 confirmed (logging; no retry of database errors), REPO-2, REPO-3, REPO-4 confirmed (minor), REPO-8 accepted; fixed in 0.12.50 (`repositories-review-fixes`). `/security-review` of the module found nothing. |
 | 39 | **`/simplify` of batches 36–38** | SIM-1…SIM-16 | `/simplify` (4 agents: reuse, simplification, efficiency, altitude; one combined diff of 0.12.48–0.12.50), 2026-11-02; SIM-1…SIM-7 fixed before commit, the rest open, deferred, accepted or wontfix (two to `ideas.md` §15, SIM-8 to the `recommendations/` sweep). The fix-diff `/code-review` was skipped by the owner. |
+| 40 | **Sweep: `issues/`** | ISS-1…ISS-8 | Full review sweep, 2026-11-03: `/code-review` (high) of `apps/backend/issues/`, verified; ISS-1, ISS-2, ISS-5, ISS-7, ISS-8 confirmed, ISS-3, ISS-4, ISS-6 accepted; fixed in 0.12.51 (`issues-review-fixes`). `/security-review` of the module found nothing. |
+| 41 | **Sweep: `recommendations/`** | REC-1…REC-10 | Full review sweep, 2026-11-03: `/code-review` (high) of `apps/backend/recommendations/`, verified; REC-1…REC-4, REC-6, REC-8, REC-10 confirmed, REC-7, REC-9 confirmed (minor), REC-5 false positive (specified); fixed in 0.12.52 (`recommendations-review-fixes`), closing SIM-8. `/security-review` of the module found nothing. |
+| 42 | **Sweep: `feedback/`** | FB-1…FB-7 | Full review sweep, 2026-11-03: `/code-review` (high) of `apps/backend/feedback/`, verified; FB-1, FB-3, FB-5 fixed in 0.12.53 (`feedback-review-fixes`), FB-2, FB-6 accepted (owner), FB-4 false positive, FB-7 wontfix. `/security-review` found nothing. |
+| 43 | **Sweep: `services/profiling/`** | PROF-1…PROF-9 | Full review sweep, 2026-11-03: verified (PROF-1…PROF-8 reproduced); all fixed in 0.12.54 (`profiling-review-fixes`, `skill-detection` delta), PROF-8 by owner decision (forks never count). `/security-review` found nothing. |
+| 44 | **Sweep: `frontend/src/app/`** | APP-1…APP-10 | Full review sweep, 2026-11-03: verified; open (APP-7 accepted). `/security-review` found nothing. |
+| 45 | **Sweep: `frontend/src/routes/`** | ROUTE-1…ROUTE-10 | Full review sweep, 2026-11-03: verified; open. `/security-review` found nothing. |
+| 46 | **Sweep: `features/issues/`** | FI-1…FI-10 | Full review sweep, 2026-11-03: verified; open (FI-4 accepted, FI-5, FI-8, FI-9 false positive). `/security-review` found nothing. |
+| 47 | **Sweep: `frontend/e2e/` + config** | E2EC-1…E2EC-7 | Full review sweep, 2026-11-03: verified; open (E2EC-2, E2EC-5 accepted). `/security-review` found nothing. |
+| 48 | **Sweep: `scripts/`** | SCR-1…SCR-10 | Full review sweep, 2026-11-03: verified; open. `/security-review` found nothing. |
+| 49 | **Sweep: `.github/workflows/`** | CI-1…CI-10 | Full review sweep, 2026-11-03: verified; open (CI-4…CI-6 hardening). `/security-review` found nothing. |
+| 50 | **Fix-diff review of 0.12.51–0.12.54** | FD2-1…FD2-9 | `/simplify` (4 agents, one diff, applied) and `/code-review` (high) of the uncommitted 0.12.51–0.12.54 code, 2026-11-03; all fixed before commit (FD2-5, FD2-6 owner decisions). |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -212,8 +223,10 @@ positive) in 0.12.46 (`api-client-review-fixes`); batch 34 (AUTH-1…AUTH-9) in 
 (`auth-review-fixes`); batch 36 (JOB-1…JOB-8; JOB-9, JOB-10 accepted) in 0.12.48
 (`jobs-review-fixes`); batch 37 (DEV-1…DEV-9; DEV-6 accepted with a guard) in 0.12.49
 (`developers-review-fixes`); batch 38 (REPO-1…REPO-7; REPO-8 accepted) in 0.12.50
-(`repositories-review-fixes`); batch 39 (`/simplify`, SIM-1…SIM-7) in 0.12.50.
-Next: the full review sweep (next module `recommendations/`, starting with SIM-8); RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
+(`repositories-review-fixes`); batch 39 (`/simplify`, SIM-1…SIM-7) in 0.12.50; batch 40 (ISS-1, ISS-2, ISS-5, ISS-7, ISS-8; ISS-3, ISS-4, ISS-6
+accepted) in 0.12.51 (`issues-review-fixes`); batch 41 (REC-1…REC-4, REC-6…REC-10; REC-5 false
+positive) and SIM-8 in 0.12.52 (`recommendations-review-fixes`); batch 42 (FB-1, FB-3, FB-5; FB-2, FB-6 accepted, FB-4 false positive, FB-7 wontfix) in 0.12.53 (`feedback-review-fixes`); batch 43 (PROF-1…PROF-9) in 0.12.54 (`profiling-review-fixes`); batch 50 (fix-diff review of 0.12.51–0.12.54, FD2-1…FD2-9) folded into 0.12.53 and 0.12.54.
+Next: the full review sweep (batch 42 fixed in 0.12.53, batch 43 in 0.12.54; batches 44 `frontend/src/app/`, 45 `frontend/src/routes/`, 46 `features/issues/`, 47 `frontend/e2e/` with its config, 48 `scripts/` and 49 `.github/workflows/` recorded and not yet fixed, one change each as batch 42; then the low group); RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
 3, E-3) shipped in 0.12.2 and 0.12.3.
@@ -1224,7 +1237,7 @@ lockfiles excluded). Findings deduplicated; each checked against the code.
 | SIM-5 | simplification | `features/sync/pipeline.ts` | `isActive` repeated per stage after finding the current job. | fixed (branches on the first active job) |
 | SIM-6 | simplification | `app/jobTransitions.ts` `isStalled` | Re-checked `isActive`; the server sets `stalled` only for RUNNING. | fixed (reads `job.stalled`) |
 | SIM-7 | duplication | `pipeline.ts`, `OnboardingPage.tsx` | The stalled notice written twice with different endings. | fixed (`features/sync/messages.STALLED_NOTICE`) |
-| SIM-8 | data loss | `recommendations/admin.py` (feedback, issues import it) | Its own `ReadOnlyAdmin` still allows delete (as DEV-1, REPO-6). | open (outside the diff; first item of the `recommendations/` sweep) |
+| SIM-8 | data loss | `recommendations/admin.py` (feedback imports it) | Its own `ReadOnlyAdmin` still allows delete (as DEV-1, REPO-6). | fixed (`issues/` in 0.12.51, ISS-1, ISS-2; `recommendations/` and `feedback/` in 0.12.52, REC-1: `ReadOnlyAdmin` removed) |
 | SIM-9 | altitude | `reanalyze_profiles.py` | The "sync is running" check lives in the command, not in `start_profile_analysis`. | wontfix (design D4 of `developers-review-fixes`: specified job behavior for every caller) |
 | SIM-10 | altitude | `_refresh`, `revoke_later`, `run_tracked_job` | Three call sites, two traceback rules. | deferred (`ideas.md` §15 "One traceback rule for job failures") |
 | SIM-11 | altitude | `repositories/tasks.py`, `backlog.py` | Stamp, unstamp and renew rules split between the task and `backlog`. | deferred (`ideas.md` §15 "The backlog owns sending its refreshes") |
@@ -1233,3 +1246,250 @@ lockfiles excluded). Findings deduplicated; each checked against the code.
 | SIM-14 | simplification | `jobs/models.py` | `_ACTIVE` next to `ACTIVE_STATUSES` and the class aliases. | wontfix (the migration holds a list of strings; another form generates a migration) |
 | SIM-15 | reuse | tests | `make_job`/`make_profile` variants, an inline snapshot, a branching tied-rows test. | wontfix (test-local shapes differ on purpose: age, confidence) |
 | SIM-16 | efficiency | `syncjob_active_updated_idx` | Indexing `updated_at` costs heartbeat updates their HOT path. | accepted (a few running jobs; keeps recovery off a full scan) |
+
+## Sweep: `issues/` (2026-11-03)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/issues/`
+(`admin.py`, `api.py`, `models.py`, `serializers.py`), with `services/issues/` and
+`services/matching/issues.py` as context. Each row checked against the code. `/security-review`:
+nothing (the detail is scoped to the user's own recommendations, anything else 404; the issue
+body is returned as plain text and rendered escaped).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| ISS-1 | data loss | `admin.py:9` | `IssueAdmin` on `ReadOnlyAdmin` allows delete: an `Issue` cascades into every developer's `RecommendedIssue` outside `data_deletion` and the lock order, and the recommendations' issue snapshots (`relevant_issue_count`, `issue_difficulties`, `issue_contribution_types`) keep counting it, so the difficulty and contribution-type filters return recommendations with no matching issue until the next generation. | confirmed (SIM-8 for this module, as DEV-1, REPO-6); fixed (0.12.51: `core.admin.ViewOnlyAdmin`) |
+| ISS-2 | data loss | `admin.py:30` | `RecommendedIssueAdmin` allows delete: the same stale snapshots, for one developer. | confirmed; fixed (0.12.51: `ViewOnlyAdmin`) |
+| ISS-3 | staleness | `api.py:33` | "matched" uses the current skills, the reasons come from the last generation. | accepted (a profile analysis moves `analyzed_at`; the freshness sweep regenerates within 30 minutes; design D3) |
+| ISS-4 | staleness | `api.py:25` | An issue assigned or locked since generation is still shown. | accepted (the issue fetch moves `issues_synced_at`; regeneration re-runs `load_issues`, which drops it; a filter here alone would leave the recommendation listing a link that 404s; D3) |
+| ISS-5 | efficiency | `admin.py:9` | The issue changelist prints `Repository.__str__` per row: one query per row. | confirmed; fixed (0.12.51: `list_select_related = ("repository",)`; `RecommendedIssueAdmin` needs none, its `__str__`s read ids) |
+| ISS-6 | staleness | `api.py:25` | An issue transferred between two pooled repositories keeps its old link until regeneration. | accepted (bounded by the freshness sweep, as ISS-4; D3) |
+| ISS-7 | duplication | `serializers.py:35` | Technology `source` choices repeat the literals of `services/issues/technologies.py`. | confirmed; fixed (0.12.51: `technologies.TITLE`, `LABEL`, `BODY`; OpenAPI unchanged) |
+| ISS-8 | cleanup | `admin.py:20`, `admin.py:32` | `readonly_fields` do nothing once change permission is off. | confirmed; fixed (0.12.51: removed) |
+
+## Sweep: `recommendations/` (2026-11-03)
+
+Source: full review sweep, `/code-review` (high, no verify pass) of `apps/backend/recommendations/`
+(`admin.py`, `api.py`, `models.py`, `serializers.py`, management commands), with
+`services/ranking/`, `services/evaluation/` and `feedback/admin.py` as context. Each row checked
+against the code. `/security-review`: nothing (every endpoint scoped to the user, another user's
+id is 404; no score, rank or signal values serialized; admin HTML escapes the version; command
+paths are operator input).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| REC-1 | data loss | `admin.py:10` | `ReadOnlyAdmin` allows delete: `RecommendationAdmin` and the three feedback admins delete recommendations (reasons and recommended issues cascade outside `lock_developer`), dismissals (the project returns with no `undismissed` event or generation) and append-only feedback history. | confirmed (SIM-8); fixed (0.12.52: `ReadOnlyAdmin` removed, all four on `core.admin.ViewOnlyAdmin`, reason inline cannot delete) |
+| REC-2 | data integrity | `admin.py:21` | `ScoringConfigAdmin` allows add and delete; `PROTECT` blocks only configurations with recommendations, so an evaluated version can be deleted and stored again with other numbers, and the active one deleted (generation then fails `NoScoringConfig`). | confirmed (breaks "Versioned scoring configuration"); fixed (0.12.52: `NoAddDeleteAdmin`; seeds store configurations, description stays editable) |
+| REC-3 | bug | `evaluate_ranking.py:111` | `--top-n 0` falls back to the default; `--top-n -5` reaches `kept[:top_n]` and drops the last 5. | confirmed; fixed (0.12.52: below 1 refused, `is not None`) |
+| REC-4 | data integrity | `models.py:73` | `ScoringConfig.save` skips the check when the row is gone; Django inserts it again with the instance's numbers. | confirmed; fixed (0.12.52: `ImmutableConfig`) |
+| REC-5 | design | `evaluate_ranking.py:171` | `--write-baseline` accepts `--top-n`, while activation judges at the pinned top N. | false positive (spec "at the pinned minimum score default and top N unless a top N is given"; format 4 records top N per dataset) |
+| REC-6 | efficiency | `admin.py:61`, `feedback/admin.py` | No `list_select_related`: one query per row for developer, repository and config (user and repository in feedback). | confirmed; fixed (0.12.52) |
+| REC-7 | robustness | `import_judgments.py:28`, `benchmark_sheet.py:30` | A JSON list or a candidate without `repository` crashes with a traceback; `benchmark_sheet` counted rows after writing the CSV. | confirmed (minor); fixed (0.12.52: `SheetError` from `sheet._single_developer`/`_candidate_names`, `candidate_count` before writing) |
+| REC-8 | display | `serializers.py:29` | The excerpt drops a complete word ending exactly at the limit. | confirmed; fixed (0.12.52: cut at `limit + 1`) |
+| REC-9 | efficiency | `api.py:172` | Status runs a `Max` aggregate the latest row already answers (4 queries). | confirmed (minor); fixed (0.12.52: 3 queries) |
+| REC-10 | display | `serializers.py:20` | `_`/`~` stripped inside words (`my_package`, `~/.config`); HTML entities shown literally. | confirmed; fixed (0.12.52: `_` at word edges, `~~` only, `html.unescape`) |
+
+## Sweep: `feedback/` (2026-11-03)
+
+Batch 42. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/backend/feedback/` (`admin.py`, `api.py`, `models.py`, `serializers.py`), with
+`services/feedback.py` as context. Each row checked against the code. The uncommitted
+`admin.py` change (`ViewOnlyAdmin`, REC-1/REC-6) raised nothing. `/security-review`: nothing
+(every endpoint goes through `IsAuthenticated` and the CSRF-checking session auth; recommendation
+endpoints look up `pk` with `developer__user`, another user's id is 404; `opened_issue` must name
+one of that recommendation's issues; clients post only `CLIENT_ACTIONS`; list, unsave and restore
+filter `user=`; a forged cursor moves only within the caller's rows, unreadable → 400).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| FB-1 | race | `feedback/api.py:61`, `services/feedback.py:79` | The `opened_issue` relevance check (`RecommendedIssue` of this recommendation) runs in the view before any lock; `record` locks the recommendation and the issue but never re-checks the link. A generation committing in between keeps the recommendation id (upsert) and replaces its `RecommendedIssue` rows (`ranking/service.py:250`), so an event is stored for an issue no longer offered; business rule in a view. | confirmed (generation rewrites `RecommendedIssue` while holding the recommendation row locks, `service.py:178`, so a check after `_current(lock=True)` is consistent); fix: `record(..., issue_id=)` checks the link under the lock, view passes the id (no event when the issue left, as for a gone recommendation; a 400 stays for an id never relevant before the lock). Fixed (0.12.53, `feedback-review-fixes`): `record(..., issue_id=)` locks the issue and checks the link under the recommendation lock; an issue closed or dropped meanwhile: 204, no event (FD2-6, owner) |
+| FB-2 | data quality | `services/feedback.py:98` | Only `viewed` is de-duplicated; `opened_repository` and `opened_issue` store one event per POST (double click, a script loop), and `feedback_report` shares count events, so one user can raise a config's or bucket's positive share and move a calibration verdict. | partial (as specified: spec "Recording feedback" de-duplicates `viewed` only; impact bounded to the analytics report, which also prints distinct users; opening twice is two real opens). Decide: accept, or de-duplicate opens within the view window (spec delta). Accepted (owner, 2026-11-03) |
+| FB-3 | bug | `feedback/api.py:93`, `features/feedback/api.ts:70` | Unsave by recommendation id (`DELETE /recommendations/{id}/save`) looks the recommendation up first: once a freshness generation drops it, a still-rendered card's Unsave gets 404 and the save stays on `/saved`, though `unsave` is meant to work whether or not the repository is still recommended. | confirmed; fix: the card's unsave calls `DELETE /saved/{repository_id}` (the hook already exists, `useUnsaveRepository`), or the view falls back to the repository; no spec change. Fixed (0.12.53): the card and detail Unsave call `DELETE /saved/{repository_id}`; the old endpoint stays |
+| FB-4 | gap | `services/feedback.py:171` | Restore does not check the repository is still pooled and scorable: a repository pruned or made ineligible meanwhile is in neither list after restore. | false positive (spec: after restore it "MAY be recommended again by the next generation"; the UI promises only that it is no longer hidden; it can return when discovery finds it again) |
+| FB-5 | efficiency | `feedback/api.py:40` | `_own_recommendation` joins repository and config, and `record`/`save` read the same row again (`_current`), so every feedback, save and dismiss request reads the recommendation twice; `SaveView.delete` needs only `repository_id`. | confirmed (minor; `viewed` fires per card shown); fix: ownership check with `.only("pk", "repository_id")`, the service's locked re-read is the full read (`dismiss` reads `recommendation.repository` and needs it). Fixed (0.12.53): `_own_recommendation` loads `only("pk", "repository_id")`, `dismiss` reads the repository by id |
+| FB-6 | efficiency | `feedback/api.py:162` | Cursor mode runs `queryset.count()` on every page besides the keyset query. | confirmed (minor: per-user rows on `saved_keyset_idx`/`dismissed_keyset_idx`; the spec requires `count` to be the total on every page, so dropping it is a spec change). Accept unless cheap. Accepted (owner, 2026-11-03) |
+| FB-7 | design | `feedback/api.py:126` | `KeysetPagination` is generic paging living in `feedback/api.py`; `/recommendations` keeps page numbers that shift on change. | wontfix (one consumer, so moving it gains nothing yet; `/recommendations` is ordered by `rank`, which a regeneration reassigns wholesale, so a keyset would not keep pages stable there either; the SPA refetches the list by data versions) |
+
+## Sweep: `services/profiling/` (2026-11-03)
+
+Batch 43. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/backend/services/profiling/` (no diff; the module as it stands). Each row checked against
+the code; PROF-1…PROF-8 reproduced with the backend venv. `/security-review`: nothing (`tomllib`
+and `json` only, pom/Gradle by regex, so no XML parser and no XXE; no `eval`/`pickle`/`yaml`/
+subprocess; ORM only; catalog rows only for taxonomy slugs, names from the taxonomy; writes only
+under the analyzed user's profile; evidence details capped and rendered as React text).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| PROF-1 | crash | `text.py:35` | `PhraseMatcher.find` looks the match up by `.lower()`, but `re.IGNORECASE` also matches Unicode case-fold variants (`ı` U+0131, `ſ` U+017F), whose lowercase is not the catalog key → `KeyError`. Reproduced: `PLAIN_MATCHER.find("Kotlın developer")` → `KeyError('kotlın')`, `SYNONYM_MATCHER.find("Machıne learning")` → `KeyError('machıne learning')`. Untrusted text reaches it: a profile README fails the analysis; a repository description (`matching/signals.py:98`) or an issue title/body (`issues/technologies.py:26`, `:31`) fails generation or issue analysis for every user whose pool holds that repository. | confirmed (highest priority of the batch); fix: key the map by `casefold()` and look up `match.group(0).casefold()`, skip a miss; test with `ı`, `ſ` and `K` (Kelvin sign). Fixed (0.12.54, `profiling-review-fixes`): `casefold()` keys and lookup, a miss is skipped |
+| PROF-2 | wrong evidence | `readme.py:53` | `tech_sections` reads `#` lines inside fenced code as ATX headings. Reproduced: `## About` + a bash fence with `# install tools` → a section "install tools" (`tool` matches `_SECTION_TITLE`) yielding go and rust; `## Skills\n- Python` + a fence with `# setup` + `- Go` ends the section at the comment, Go lost. | confirmed; fix: skip lines inside ``` / ~~~ fences when collecting headings. Fixed (0.12.54): fenced lines are never headings (still section text) |
+| PROF-3 | wrong evidence | `readme.py:133` | Headings inside HTML comments count, and the section text starts after `<!--`, so `plain_text` never strips the comment. Reproduced: `<!--\n## Tech stack\n- Go\n- Rust\n-->` → go, rust ("Tech stack" section). Template READMEs leave such placeholders; badges and alt text inside comments count too. | confirmed; fix: drop `<!-- ... -->` from the README before any extraction (as `classify._HTML_COMMENT` for issues, D-12). Fixed (0.12.54): HTML comments dropped before README extraction |
+| PROF-4 | wrong data | `manifests.py:56` | `parse_pyproject` iterates `project.dependencies`, each `optional-dependencies` and `dependency-groups` value without checking for a list; a string is iterated per character. Reproduced: `optional-dependencies={dev="pytest"}` → `p, y, t, e, s, t`. Junk `RepositoryDependency` rows; they also set `has_dependencies`, which keeps a lists/docs repository eligible under `not_code`. | confirmed; fix: `_pep508_names` takes only a list (else nothing); same for the `.values()` mappings (a non-dict skips). Fixed (0.12.54): only lists of specs and tables of groups are read |
+| PROF-5 | lost evidence | `manifests.py:45` | `parse_requirements` skips every line containing `://`, so a PEP 508 direct reference (`django @ https://...`) loses its name. Reproduced: only `flask` of `django @ https://example.com/django.whl\nflask`. | confirmed (minor); fix: match `name @ ` before the URL skip (bare URLs and `-e` lines still skipped). Fixed (0.12.54): `name[extras] @ URL` keeps its name |
+| PROF-6 | wrong evidence | `manifests.py:116` | `parse_pom` and `parse_gradle` match commented-out dependencies. Reproduced: `<!-- <dependency>…a…b…</dependency> -->` → `a:b`; `// implementation "org.x:y:1"` → `org.x:y`. | confirmed; fix: strip `<!-- -->` (pom) and `//` / `/* */` comments (Gradle; outside string literals is enough for coordinates) before matching. Fixed (0.12.54): pom `<!-- -->`, Gradle `/* */` and `//` after whitespace stripped |
+| PROF-7 | display | `readme.py:28` | The ATX regex's closing `#*` takes a trailing `#` with no space before it. Reproduced: `## Languages: C#` → title "Languages C" (`_clean_title` also drops `:`); evidence detail misnames the section. | confirmed (minor); fix: closing sequence only after whitespace (`(?:\s+#+)?\s*$`, CommonMark). Fixed (0.12.54): closing `#` only after whitespace |
+| PROF-8 | spec gap | `collectors.py:81`, `interests.py` | Contribution evidence (skills: `pull_request`, `commit`, `repeated_contribution`; interests: `contribution`) never checks `contribution.repo.is_fork`; the module docstring says "forks never count". | partial: interest-detection spec says "Forked repositories SHALL NOT provide evidence" (violated); skill-detection's "Contribution evidence" is silent (its fork rule covers owned repositories). Decide: skip forks in both (pushes to someone's fork are rare; merged PRs to a fork are unusual), or document that contributions to forks count; either way the docstring and one spec need aligning. Decided by the owner (2026-11-03): forks never count. Fixed (0.12.54): `ProfileInput.contributed_work` for skills and interests; `skill-detection` spec delta; experience ignores forks too (FD2-5, owner) |
+| PROF-9 | contention | `analysis.py:225`, `:290` | `_upsert_catalog_skills`/`_interests` (`bulk_create(update_conflicts=True)`) rewrite every matched shared `Skill`/`Interest` row on every analysis, inside the `_persist` transaction (`job_write`), so concurrent analyses (`reanalyze_profiles` on 4 threads, sync-triggered) queue on hot rows (`python`, `javascript`) until the previous one commits, and each run leaves dead tuples. | confirmed (by reading; not timed). Fix: `ignore_conflicts=True` insert, then update only rows whose name or category differ (names change only with the taxonomy), keeping the global sorted order (B-3). Fixed (0.12.54): insert-ignore, then `bulk_update` of changed rows only |
+
+## Sweep: `frontend/src/app/` (2026-11-03)
+
+Batch 44. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/app/` (no diff; the module as it stands), with `features/sync/api.ts` and
+`features/auth/api.ts` as context. Each row checked against the code (by reading; nothing run).
+`/security-review`: nothing (query cache in memory only, no persister or web storage; sign-in is
+a full-page OAuth round trip, so no cache survives to another user; every sign-out path clears
+after the server confirms; CSRF token only on mutating same-origin requests; navigation targets
+and fetch paths are constants; no `eval`/`innerHTML` sinks).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| APP-1 | bug | `jobTransitions.ts:39` | A job that disappeared (`status.job` null) counts as newly finished: delete-data's `invalidateQueries(['sync'])` (`features/auth/api.ts:79`) sees `5:COMPLETED` → `:` and calls the sync refresh, which invalidates `['jobs']` (just cancelled, still observed) and the versions. A versions answer (all null) landing before the later `resetQueries` makes the layout invalidate every `['profile', ...]` area while the dashboard still observes them: requests for deleted data, the case U-7 meant to avoid. | confirmed (window until `replace('/onboarding')`; extra requests, no wrong data kept: the keys are removed after); fix: refresh only when `status.job` is non-null |
+| APP-2 | race | `jobTransitions.ts:34` | The finished-job comparison runs inside the `queryFn`: an `invalidateQueries` (default `cancelRefetch`) that cancels an in-flight status fetch restores the cached data, and both the abandoned and the new run read the same `previous` and call `refresh()`; the second refresh can cancel and restart other status queries in turn. Same defect U-6 fixed for data versions. | confirmed (duplicate refreshes, extra requests; no wrong state); fix: compare in an effect on the status data (one observer per status, as `useDataVersions`), or pass the signal (APP-3) so the abandoned run stops before comparing |
+| APP-3 | cleanup | `jobTransitions.ts:31` | `fetchStatus` takes no `AbortSignal` (`() => apiFetch(...)` in each status hook), so `cancelQueries` (sign-out's `leave`, APP-2's cancel) never aborts a status request, and its `refresh()` still runs after the user left. | confirmed (minor; after sign-out the invalidated queries are removed by `clearSignedInData`); fix: `queryFn: ({ signal }) => fetchStatusAndRefresh(..., () => apiFetch(path, { signal }), ...)`, and return early on `signal.aborted` before comparing |
+| APP-4 | bug | `features/sync/api.ts:43` | `useStartSync.onSuccess` writes the new PENDING job with `setQueryData` without cancelling an in-flight `/sync/status` fetch (focus, route change); the older answer (finished job 5) lands after and replaces job 6, `refetchInterval` sees no active job and stops polling, so job 6's finish is never seen until the next focus or route change. | confirmed; fix: `await queryClient.cancelQueries({ queryKey: syncStatusKey })` before `setQueryData` (check the other start mutations: generation and restore set or invalidate their status the same way) |
+| APP-5 | bug | `queryClient.ts:62` | A sign-out mutation sets `signedOut = true` on mutate and back to false on error: a 401 swallowed while it was pending (the session did end server-side, the logout answer was lost) is never reported, and the network error itself ends nothing. The user stays on signed-in pages with a dead session. | partial (bounded: the next request that answers 401, a focus or route change refetching versions, ends the session); fix: remember a swallowed 401 while pending and report it on the mutation's error |
+| APP-6 | robustness | `session.ts:25` | `leave` awaits `navigate`; `unauthenticated` calls `void endSession(...)`, so a rejected navigation is unhandled and `signedOut` stays true until a successful `/auth/me`, which signed-in pages may never fetch again: later 401s are ignored. | partial (React Router's `navigate` to a constant path with no loaders or blockers does not reject today); fix: `.catch` in `unauthenticated` that resets `signedOut` (cheap guard) |
+| APP-7 | design | `session.ts:31` | `endSession` leaves clearing the cache to `LandingPage`'s effect on `?auth_error=session_ended`; a navigation replaced before it mounts would keep the user's data cached. | accepted (by design: clearing before the navigation commits let the dashboard refetch, see 0.12.8; only the same user's data, in memory; the security review found no cross-user path since sign-in reloads the page) |
+| APP-8 | efficiency | `dataVersions.ts:61` | The user's own save, unsave, dismiss and restore move the `recommendations` version (`feedback.LIST_ACTIONS`, 0.12.44), so the next route change refetches every recommendations-area query (list pages and filters, details, issues, saved, dismissed) the mutation already refreshed. | partial (intended for other tabs and devices; redundant in the acting tab); fix: after a list mutation, refetch the versions so the new time becomes the seen value without invalidating (a `seed` path in `useDataVersions`), or accept |
+| APP-9 | test gap | `dataVersions.test.ts:33` | Nothing enforces CLAUDE.md's rule that every derived `['profile', ...]` query is listed in `AREA_KEYS`; the test only checks listed keys start with `profile`. A forgotten key stays stale for its 5-minute `staleTime` after background changes. | confirmed; fix: export the profile query keys from one place (or scan `queryClient` in a render test of every page) and assert each is covered by an area |
+| APP-10 | efficiency | `dataVersions.ts:62` | One `invalidateQueries` per key (up to 9), each scanning the cache. | confirmed (minor; small caches); fix: one call with a predicate over the changed keys (`partialMatchKey`), or accept |
+
+## Sweep: `frontend/src/routes/` (2026-11-03)
+
+Batch 45. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/routes/` (no diff; the module as it stands). Each row checked against the code
+(by reading; nothing run). `/security-review`: nothing (no unsafe sinks; `?auth_error=` is only a
+key into a fixed own-keys message table; navigation targets and the sign-in URL are constants, the
+OAuth callback redirects to settings paths only; `RouteId` admits `^[1-9]\d*$` safe integers, so
+nothing else reaches an API path; `/app/*` and `/onboarding` sit under `RequireAuth`, public routes
+render no user data).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| ROUTE-1 | bug | `SignedInLayout.tsx:14` | The mount skip compares with the first `location.key`, kept forever: `createBrowserRouter`'s first entry is `default`, so Back to it (e.g. `/app` after a detail page) never refetches the versions, and a background change stays unseen until focus or another route change. | confirmed; fix: a boolean "mounted" ref skips only the first run (with ROUTE-7) |
+| ROUTE-2 | bug | `AppShell.tsx:38`, `OnboardingPage.tsx:22` | `status.isError` is also true when a background refetch fails with data cached (TanStack v5): one failed sync status poll (5xx after two retries) replaces the whole dashboard (or onboarding) with "Could not load…" until a later poll succeeds. | confirmed; fix: error page only without `status.data` (as `RequireAuth` checks `me.data` first) |
+| ROUTE-3 | bug | `AppShell.tsx:31`, `:89` | `analyzed = developer.isSuccess` turns false on a failed refetch with data cached: summary, discovery card, recommendations, skills, interests and languages are replaced by "Could not load your developer profile", and `useSkills`/`useInterests` are disabled. A data-versions refetch hitting one 5xx is enough. | confirmed; fix: gate on `developer.data` (`not_analyzed` only without data) |
+| ROUTE-4 | bug | `AppShell.tsx:116`, `:127`, `:152` | Skills, interests and repositories check only `isPending`; a failed load renders `data?.results ?? []`, an empty section indistinguishable from "none found" (CLAUDE.md §3: failures never shown as empty data). | confirmed; fix: an error line when `isError` and no data |
+| ROUTE-5 | display | `OnboardingPage.tsx:79` | Onboarding shows `start.error.message` only; `sync_cooldown` gets no wait time (AppShell formats `retryAfter`). Reachable with a recent completed sync and a stalled active one ("Try again"). | confirmed (rare); fix: one `startErrorText(error)` in `features/sync/messages.ts` used by both pages |
+| ROUTE-6 | display | `AppShell.tsx:76` | The cooldown notice's "in N minutes" stays until the next mutate, so it is wrong once the wait has passed. | confirmed (minor); fix: `start.reset()` after `retryAfter` (timer) or word it with the time ("after 14:05") |
+| ROUTE-7 | efficiency | `SignedInLayout.tsx:18` | Keyed on `location.key`, which also changes on state-only `replace` navigations: the dismiss flow (`navigate('/app', { state })`, then RecommendationList clearing the state) refetches the versions twice for one page view. | confirmed (minor); fix: key on `pathname + search` |
+| ROUTE-8 | cleanup | `SignedInLayout.tsx:12`, `:18`, `:21` | `!!me`, `me &&` and `if (!me) return null` cannot be false: `routes.tsx` nests the layout under `RequireAuth`, which renders the `Outlet` only with `me.data`. | confirmed (dead code); fix: read `me` as defined (a non-null helper or `RequireAuth` passing it via outlet context) |
+| ROUTE-9 | cleanup | `OnboardingPage.tsx:17` | The effect navigating to `/app` on COMPLETED repeats the render-time `<Navigate>` (`:26`): a completed sync comes with `last_synced_at` in the same status answer, so both fire (two navigations, two versions refetches); its promise is not `void`ed. | confirmed; fix: remove the effect |
+| ROUTE-10 | ux | `LandingPage.tsx:24` | While `/auth/me` is pending the sign-in page shows, so a signed-in user opening `/` or an unknown path sees "Continue with GitHub" briefly; a click starts a new OAuth round trip (harmless); unknown paths never say "not found". | partial (flash confirmed; the click only re-signs in); fix: render nothing (or a spinner) while `me.isPending`; a not-found page for `*` is a separate UX choice |
+
+## Sweep: `frontend/src/features/issues/` (2026-11-03)
+
+Batch 46. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/features/issues/` (no diff; the module as it stands), with
+`services/issues/classify.py` and `issues/` as context. Each row checked against the code (by
+reading; nothing run). `/security-review`: nothing (issue body rendered as a React text child in a
+`<pre>`, no markdown library or HTML sink; every other GitHub field is escaped text; the only
+data-driven attribute is `href={github.url}`, GitHub's own `html_url`, with `rel="noopener
+noreferrer"`; `IssueDetailView` filters by the requesting user, another user's issue is 404;
+`opened_issue` posts ids only).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| FI-1 | wrong explanation | `evidence.ts:38` | `contributionBasis` quotes the canonical label (`classify.contribution_type` stores `{"by": "label", "value": <canonical>}`) as if it were the issue's GitHub label: an issue labeled `kind/docs` reads `From the "documentation" label`, while "From GitHub" lists no such label. | confirmed; fix: word it as the category (`From a documentation label`), or store the raw label that mapped to it (backend evidence change, `ISSUE_TAXONOMY_VERSION` bump) |
+| FI-2 | robustness | `evidence.ts:31` | `difficultyBasis` returns the raw signal key for an unknown signal (`linked_prs`). | partial (every signal `classify` writes today — `label`, `body_length`, `technology_count`, `contribution_type`, `comments` — is handled); fix: skip unknown signals, plus a test pinning the list to `classify`'s signals |
+| FI-3 | bug | `IssueDetailPage.tsx:35` | `issue.isError` is checked before data: a failed background refetch (data versions after a route change or focus; 5xx after retries or network loss) replaces the issue being read with the DeadEnd. | confirmed (as ROUTE-2); fix: DeadEnd only without `issue.data` (a 404 on refetch still ends the page) |
+| FI-4 | robustness | `evidence.ts:13` | `difficulty_evidence.signals` is cast to `Vote[]` unchecked; a non-array crashes the render. | accepted (the backend always writes a list via `_vote`; evidence is recomputed on every fetch; a cheap `Array.isArray` guard can ride with FI-2) |
+| FI-5 | robustness | `IssueDetailPage.tsx:152` | `date.format(new Date(x))` throws `RangeError` for an unparsable time. | false positive (DRF `DateTimeField` serializes ISO 8601 or null, and null is skipped) |
+| FI-6 | data quality | `IssueDetailPage.tsx:71` | `opened_issue` is recorded on `onClick` only; middle click and "Open link in new tab" (`auxclick`, context menu) record nothing, so `feedback_report` undercounts positive events. Same for `opened_repository` (`RecommendationCard.tsx:109`, `RecommendationDetailPage.tsx:153`). | confirmed; fix: also record on `onAuxClick` (button 1) in one shared external-link component; the context menu stays unrecorded (no event) |
+| FI-7 | wording | `IssueDetailPage.tsx:126` | No technologies shows "Not enough evidence", though zero mentions is a computed fact. | confirmed; fix: "No technologies mentioned" |
+| FI-8 | display | `IssueDetailPage.tsx:86` | "Why it matches" renders over an empty list when `reasons` is empty. | false positive (an issue is relevant only with a per-part contribution above 0, and its reasons come from the same contributions, T-11/T-1, so a stored relevant issue has at least one reason) |
+| FI-9 | display | `IssueDetailPage.tsx:150` | State capitalized only for `open`. | false positive in practice (issues are listed with `state=open`, `client.py:460`, and closed ones are dropped on the next fetch, so stored rows are `open`); optional: a state text map |
+| FI-10 | duplication | `IssueDetailPage.tsx:16`, `:74` | `Fact` duplicates `RecommendationDetailPage.tsx:43` (one with a note); the medium-date `Intl.DateTimeFormat` is repeated in four files (`SavedPage`, `SkillGroups`, both detail pages). | confirmed; fix: one `Fact` (optional note) in `src/components`, one `formatDate` in `src/lib` |
+
+## Sweep: `frontend/e2e/` with `vite.config.ts`, `csp.config.ts`, `playwright.config.ts` (2026-11-03)
+
+Batch 47. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/e2e/` and the three configs (no diff; as they stand), with
+`scripts/e2e-backend.mjs` as context. Each row checked against the code (by reading; nothing run).
+`/security-review`: nothing (built policy `script-src 'self'` without `unsafe-*`, `object-src` and
+`base-uri 'none'`; framing denied by Django's `X_FRAME_OPTIONS` and header policies, README tells
+whoever serves `dist/` to send `frame-ancestors`; `host: true` judged hardening: public source,
+`.env` under Vite's `fs.deny`, `ALLOWED_HOSTS` plus host-scoped Lax cookies keep the developer's
+session out of reach, single fixed proxy target; `e2e_seed` refuses without the `e2e` app and
+`contribfinder_e2e`; sessions file gitignored and outside `public/`; runner spawns with argument
+arrays).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| E2EC-1 | test tooling | `fixtures.ts:21`, `playwright.config.ts:22`, `:41` | Mutating tests pick their seeded user by `testInfo.retry`, and the seed builds `RETRIES + 1` copies from the config constant: `--repeat-each 2` (same `retry` 0) or a second `--ui` run (servers not re-seeded) reuses the already-changed `e2e-save`/`e2e-delete` and fails; CLI `--retries 2` throws "No seeded session …, attempt 2". | partial (CI and `npm run e2e` use the config's retries and a fresh seed per run, so they pass; only ad-hoc flags break); fix: document the flags as unsupported in `playwright.config.ts`/README, or seed more copies via an env var and index by `retry + repeatEachIndex * attempts` |
+| E2EC-2 | hardening | `vite.config.ts:20` | `server.host: true` listens on every interface, and `preview` inherits it: the dev server and its `/api` proxy to the developer's Django are reachable on the LAN. | accepted as hardening (security review: no concrete exploit, see the note above); optional: default `host: 'localhost'` and let `docker-compose.yml` pass `--host` (the frontend container publishes 5173) |
+| E2EC-3 | hardening | `playwright.config.ts:18` | The `E2E_DEV_SERVER=1` branch lacks `--host localhost`, unlike the preview branch, whose comment promises localhost only. | confirmed (local only, seeded throwaway database); fix: add `--host localhost` to the dev branch too (one constant with `SERVE`) |
+| E2EC-4 | test isolation | `dashboard.spec.ts:53`, `auth.spec.ts:22` | The "read-only" `e2e-dashboard` user writes data: the relevant-issues link opens the detail page, which posts a `viewed` event (`RecommendationDetailPage.tsx:107`); `fixtures.ts:8` says the others are only read. | confirmed (no spec reads feedback today, so nothing fails); fix: correct the comment ("only views are recorded"), or route such tests through a mutating user if one ever asserts on feedback |
+| E2EC-5 | test design | `fixtures.ts:40` | The policy check matches Chromium's English console text, not the `securitypolicyviolation` event. | accepted (by design, 0.12.38: the canary `policy.spec.ts` fails when the wording changes, so checks cannot go silent unnoticed); optional: `addInitScript` + `exposeBinding` on `securitypolicyviolation` would drop the canary |
+| E2EC-6 | config | `vite.config.ts:30` | `test.exclude` replaces Vitest's default list (`dist`, `.git`, `.cache`, tool configs…), and `dist-e2e/` is not listed. | confirmed (minor; build output is hashed bundles, no `*.test.*` today); fix: `[...configDefaults.exclude, 'e2e/**', 'dist-e2e/**']` |
+| E2EC-7 | flake | `policy.spec.ts:22` | The canary polls for at least one violation, then requires exactly one; a duplicate console entry arriving after `take()` fails the fixture's teardown. | partial (Chromium logs one error per blocked load; not observed in CI since 0.12.38); fix: assert every taken entry contains the directive (`toContain`-style over the array), cheap |
+
+## Sweep: `scripts/` (2026-11-03)
+
+Batch 48. Source: full review sweep, `/code-review` (high, no verify pass) of `scripts/` (no
+diff; the module as it stands). Each row checked against the code (by reading; nothing run).
+`/security-review`: nothing (every spawn takes fixed argv without a shell, except constant
+`npm ci` and Windows `npm audit --json`; no command string built from `.run/` records, process
+command lines, audit JSON or git output; `.env` secrets from `crypto.randomBytes`, an existing
+`.env` never touched, values never printed; a forged `.run/` record needs write access to the
+checkout and must still match the live executable and marker; advisory data only parsed;
+`audit.yml` runs on `pull_request`, not `pull_request_target`).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| SCR-1 | bug | `stack.mjs:33` | `ownedByPath` matches the repository root as a plain substring: `npm run stop` in `G:\Projects\ContribFinder` also kills Django, Celery and Vite of a sibling checkout `G:\Projects\ContribFinder-v2` (its paths contain the root). Breaks "kills this repo's stack only". | confirmed; fix: match the root followed by a path separator (`/` after normalizing `\`), test with a sibling prefix |
+| SCR-2 | bug | `stack.mjs:34`, `:36` | Any node process with `vite` in its command line counts as stack Vite, which includes `node_modules/vitest/vitest.mjs` (`npm test`, IDE Vitest workers) and Playwright's `vite preview`; any python with `celery` anywhere (`pytest tests/test_celery_config.py`) counts as the worker. `npm run stop` force-kills them. | confirmed; fix: match `vite/bin/vite.js` (not `vitest`) for node and `-m celery` / the `celery` executable for python; tests for vitest and a pytest path |
+| SCR-3 | bug | `stop.mjs:15` | `Where-Object CommandLine` drops processes whose command line is unreadable (a stack started from an elevated console, stopped from a normal one); their live runner records then look stale, are deleted, and nothing is killed, so a later elevated stop cannot find them either. | partial (a non-elevated stop could not kill them anyway; the loss is the deleted records); fix: list every process with its pid and treat a record whose pid is alive with an unreadable command line as "unknown, keep" (and report it) |
+| SCR-4 | bug | `child.mjs:115`, `:117` | On POSIX `stop` signals `-child.pid` and `killTree` kills `-pid`, ignoring `options.detached`: with `detached: false` (`e2e-backend.mjs:61`) the child leads no group, both throw ESRCH (swallowed), Django keeps serving :8001 and the runner waits forever on its `exit`. | partial (Playwright stops the web server by SIGKILL to the runner's group, which includes the non-detached Django, so CI is unaffected; a manual SIGTERM on Linux hangs); fix: group signals only when detached, else `child.kill(signal)` |
+| SCR-5 | bug | `child.mjs:133` | The `exit` handler calls `process.exit` as soon as the direct child (uv.exe) exits; the pending `killTree` timer is dropped, so a grandchild still running (Django's autoreloader child, a Celery pool python) is orphaned and holds its port until `npm run stop`; the header promises the whole tree is killed. | partial (not reproduced; on Windows an orphan's parent pid is gone, so `taskkill /T` cannot reach it after the fact); fix: while stopping, `killTree(child.pid)` before the child is allowed to exit (e.g. on the first signal on Windows after the grace, and on `exit` run a final `killTree` by the recorded group/job), or record grandchildren by marker so `stop` finds them |
+| SCR-6 | bug | `redis.mjs:86`, `:104` | When Redis never becomes reachable the catch calls `stop()`, which exits 0: `concurrently`'s `killOthersOn: ['failure']` never fires, backend and Vite keep running, and worker and beat fail 60 s later far below the real cause. | confirmed; fix: `stop(code = 0)` with `stop(1)` from the catch |
+| SCR-7 | robustness | `redis.mjs:61` | The keep-alive `ChildProcess` has no `'error'` listener: a spawn failure (first start or a restart: EMFILE, WSL being updated) is an unhandled `'error'` event and crashes the runner with a stack trace, past the restart-budget message; the comment says a failed spawn is handled. | confirmed; fix: `session.on('error', ...)` logging and exiting 1 (or counting against the restart budget) |
+| SCR-8 | bug | `env.mjs:42` | `URL.hostname` keeps IPv6 brackets: `REDIS_URL=redis://[::1]:6379/1` gives `[::1]`, so `isLocal` is false (no WSL Redis started) and `net.connect` fails `ENOTFOUND`. | confirmed (minor; the default and `.env.example` use `localhost`); fix: strip `[`/`]` from the hostname |
+| SCR-9 | bug | `uv.mjs:24` | Python install folders are ordered by lexical `sort().reverse()`: `Python39` comes before `Python313`/`Python312`, so an old pip-`--user` uv is picked over a current one. | confirmed (minor; `UV_BIN` and PATH come first); fix: sort by the numeric version suffix |
+| SCR-10 | duplication | `setup.mjs:14`, `backend.mjs:9`, `manage.mjs:8` | Each recomputes the repository root from `import.meta.url` instead of importing `root` from `env.mjs`. | confirmed; fix: `import { root } from './env.mjs'` and `path.join(root, 'apps', 'backend')` (check `setup.mjs` can import `env.mjs` before `.env` exists) |
+
+## Sweep: `.github/workflows/` (2026-11-03)
+
+Batch 49. Source: full review sweep, `/code-review` (high, no verify pass) of `ci.yml` and
+`audit.yml` (no diff; as they stand), with `apps/frontend/package.json`, `check-version.mjs` and
+`csp.config.test.ts` as context. Each row checked against the files (by reading; nothing run).
+`/security-review`: nothing (`pull_request` and `push` to `main` only, plus `schedule` and
+`workflow_dispatch` for the audit; no `pull_request_target`/`workflow_run`/`issue_comment`;
+`permissions: contents: read` everywhere, no `secrets.*`; only `event_name`/`ref`/`sha` and
+`hashFiles` in expressions, none in `run:`; PR caches are scoped to the PR ref, so a fork cannot
+seed `main`'s; the only artifact, `playwright-report/`, holds at most cookies of throwaway seeded
+users). Verdicts on CI-4…CI-6: hardening (read-only token, no secrets, nothing deployed or
+published), worth doing in a public repository.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CI-1 | gap | `ci.yml:51`, `:114`, `:157` | `uv sync --frozen` installs the lock without checking it against `pyproject.toml`, and the bare `uv run …` steps then lock and sync by default: a dependency added without `uv lock` passes CI on a resolution never committed, while Docker (`--frozen`) and the audit (`uv export --frozen`) use the stale lock. `check-version.mjs:32` says `uv sync --frozen` rejects stale locks; it does not. | confirmed; fix: `--locked` on the syncs and `UV_LOCKED: 1` at workflow level (covers `uv run` inside npm scripts); correct the comment |
+| CI-2 | gap | `ci.yml:83`, `:85` | `npm test` runs before `npm run build`, so `csp.config.test.ts:46` (`it.runIf(existsSync('dist/index.html'))`: built index carries the policy, no inline script) is always skipped in CI. | confirmed (e2e covers the policy indirectly since 0.12.38); fix: Build before Tests (and drop the separate Type check, CI-10) |
+| CI-3 | gap | `ci.yml:123` | The drift check `git diff --exit-code -- apps/frontend/src/api` ignores untracked files: a newly generated file there is never flagged. | confirmed (minor; both outputs are tracked today); fix: fail on non-empty `git status --porcelain -- apps/frontend/src/api` |
+| CI-4 | supply chain | `apps/frontend/package.json:17` (`gen:api`), `ci.yml:119` | `npx --yes openapi-typescript@7.13.0` resolves the package and its transitive dependencies outside any lockfile on every run; nothing pins their integrity, `audit:deps` never sees them, and a transitive release can change the output (drift failure with no code change). | confirmed (hardening per the security review); fix: pinned `openapi-typescript` devDependency in `apps/frontend` (locked, audited), `gen:api` calls the local binary (needs `npm install --allow-remote=all`, which the owner runs) |
+| CI-5 | supply chain | `ci.yml:46`…, `audit.yml:27`… | Actions pinned to mutable tags (`checkout@v4`, `setup-uv@v6`, `setup-node@v4`, `cache@v4`, `upload-artifact@v4`) in a public repository. | confirmed (hardening: read-only token, no secrets); fix: full commit SHAs with a version comment (and Dependabot for actions to keep them current) |
+| CI-6 | supply chain | `ci.yml:46`…, `audit.yml:27` | `actions/checkout` keeps `persist-credentials: true`: the job token stays in `.git/config` for `npm ci` lifecycle scripts and the npx download; no step pushes. | confirmed (hardening: `contents: read`, nothing uploads `.git`); fix: `persist-credentials: false` on every checkout |
+| CI-7 | diagnostics | `ci.yml:177` | The Playwright report uploads only `if: failure()`; the e2e job's only limit is `timeout-minutes: 30`, and a timed-out job is cancelled, so a hang (the 0.12.12 mode) loses the report and traces. | confirmed; fix: step-level `timeout-minutes` on "Browser tests" (e.g. 20) and `if: ${{ failure() \|\| cancelled() }}`; also upload `test-results/` (traces) |
+| CI-8 | coverage | `ci.yml:108` | `test:scripts` runs on `ubuntu-latest` only; the runners' main target is Windows (`taskkill`/`killTree`, `%APPDATA%` uv lookup, `npm.cmd` shell in `audit.mjs`, detached `wsl.exe`), so the win32 branches never run in CI. | confirmed; fix: a `windows-latest` job (or matrix leg) for `test:scripts` (pure functions run anywhere; platform branches need injectable `platform`) |
+| CI-9 | speed | `ci.yml:167` | The Playwright browser cache key hashes the whole frontend lockfile; the browsers depend only on the exactly pinned `@playwright/test` (`1.64.0`), so every release bump re-downloads Chromium. | confirmed (minor, ~1–2 min per lockfile change); fix: key on the installed Playwright version (`npx playwright --version` into a step output) |
+| CI-10 | speed | `ci.yml:81`, `:85` | `tsc -b` runs twice: "Type check" (`npm run typecheck`) and "Build" (`tsc -b && vite build`). | confirmed (minor); fix: drop the Type check step (Build fails on type errors), with CI-2's reorder |
+
+## Fix-diff review of 0.12.51–0.12.54 (2026-11-03)
+
+Batch 50. Source: `/simplify` (4 agents, one combined diff of the uncommitted 0.12.51–0.12.54
+code; applied directly: one `strip_html_comments`, single-query `opened_issue` check, `dismiss`
+reads once, `_sync_catalog`, shared test builders; four skips noted in the CLAUDE.md 0.12.54
+entry), then `/code-review` (high) of the same diff. FD2-1 and FD2-2 reproduced by the reviewer;
+each row checked against the code. FD2-5 and FD2-6 decided by the owner (2026-11-03). All fixed
+before commit, folded into 0.12.53/0.12.54.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| FD2-1 | regression | `services/profiling/manifests.py` (`_GRADLE_COMMENT`) | The Gradle block-comment rule fired on `/*` inside string literals (globs such as `'META-INF/*.kotlin_module'`, `'**/*.java'`) and, with `re.S`, deleted everything to the next `*/`: every dependency lost, a real Android repository could turn `not_code`. | confirmed (reproduced); fixed: one regex matches string literals or comments and puts strings back (`_strip_gradle_comments`), so globs and URLs survive; the whitespace rule for `//` is gone |
+| FD2-2 | regression | `services/profiling/readme.py` (`tech_sections`) | The fence tracker compared only a 3-character marker: a nested ```` ```bash ```` inside a ```` ````markdown ```` block closed it early (PROF-2 back) and the real close then opened a phantom fence hiding later headings. | confirmed (reproduced); fixed: CommonMark rule, a fence closes only on a run of the same character at least as long with no info string |
+| FD2-3 | gap | `services/profiling/text.py` (`strip_html_comments`) | An unterminated `<!--` stayed text (GitHub hides the rest), and `issues/classify._HTML_COMMENT` stripped to the end: two strippers disagreed on the same input. | confirmed; fixed: one stripper, `<!--.*?(?:-->|\Z)`, used by READMEs, `parse_pom` and issue difficulty (`classify` imports it); spec "README skill evidence" edited directly |
+| FD2-4 | bug | `services/feedback.py` (`dismiss`) | `Repository.objects.get` after a concurrent delete-data raised `DoesNotExist`: HTTP 500. | confirmed; fixed: `dismiss` raises `Recommendation.DoesNotExist` when the repository is gone, the view answers 404 |
+| FD2-5 | consistency | `services/profiling/experience.py` | Experience signals still counted contributions to forks after PROF-8. | owner: forks never count, also for experience. Fixed: `ProfileInput.__post_init__` drops fork contributions (and strips README comments, FD2-9), `contributed_work` removed; spec "Experience level" (developer-profile) edited directly |
+| FD2-6 | behavior | `services/feedback.py` (`record`) | An issue closed or dropped between page load and click returned 400, while a recommendation gone meanwhile returns 204. | owner: 204, no event, for both races. Fixed: on a miss, 400 (`IssueNotRelevant`) only for an issue of another repository; spec "Recording feedback" edited directly |
+| FD2-7 | duplication | `services/issues/classify.py` | A second comment regex with a different unterminated rule. | fixed with FD2-3 |
+| FD2-8 | duplication | `features/feedback/api.ts` | The unsave toggle repeated `useUnsaveRepository`'s request; `DELETE /recommendations/{id}/save` unused by the SPA. | fixed: one `unsaveRepository` request function; the endpoint is kept for API clients (comment in `SaveView.delete`, OpenAPI `1.0.0`) |
+| FD2-9 | altitude | `services/profiling/interests.py`, `readme.py` | Comment stripping per README consumer. | fixed: once in `ProfileInput` (every consumer reads the stripped README) |

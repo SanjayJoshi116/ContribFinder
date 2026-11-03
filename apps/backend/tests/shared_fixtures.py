@@ -2,7 +2,7 @@
 that use them, not put in ``conftest.py``: a global ``client`` fixture would replace
 pytest-django's test client in every other module."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import pytest
 from django.contrib.admin.sites import site
@@ -93,3 +93,13 @@ def changelist_queries(client: Client, url: str) -> int:
     with CaptureQueriesContext(connection) as captured:
         assert client.get(url).status_code == 200
     return len(captured)
+
+
+def assert_changelist_flat(client: Client, url: str, make: Callable[[int], object]) -> None:
+    """The changelist at ``url`` runs as many queries for four rows as for one; ``make(n)``
+    builds the ``n``-th row."""
+    make(1)
+    one = changelist_queries(client, url)
+    for n in range(2, 5):
+        make(n)
+    assert changelist_queries(client, url) == one

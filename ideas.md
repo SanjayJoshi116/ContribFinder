@@ -1,8 +1,8 @@
 # Ideas
 
 Gap analysis from 2026-10-20 (v0.12.4), with later rounds added 2026-10-21 to 2026-10-27
-(v0.12.7–v0.12.35). Nothing here is planned yet: each idea needs an OpenSpec change before work
-starts. Ranking-visible items (marked †) must win on the selection benchmark and not regress on
+(v0.12.7–v0.12.35) and 2026-11-03 (v0.12.54). Nothing here is planned yet: each idea needs an
+OpenSpec change before work starts. Ranking-visible items (marked †) must win on the selection benchmark and not regress on
 a fresh holdout. Since 2026-10-28 they no longer wait for K-1 (judging real developers is
 optional; `Bug_Backlog.md`).
 
@@ -253,6 +253,19 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   `refresh_queued_at`, and the task unstamps refused sends and renews on retry
   (`backlog.mark_queued`/`unmark_queued`); a `backlog.dispatch(batch, send)` would keep every
   stamp rule in `backlog`. Pairs with the "dispatch after commit" helper above.
+- **Feedback services take ids** (from the 0.12.51–0.12.54 `/simplify`, `Bug_Backlog.md` batch
+  50). Since 0.12.53 the views pass a `Recommendation` loaded with `only("pk", "repository_id")`,
+  and `save`, `dismiss` and `record` must not touch `recommendation.repository` before their own
+  re-read (a deferred field would be one hidden query). Taking `recommendation_id` and
+  `repository_id`, as `unsave` and `restore` already do, would make that rule the type.
+- **Retire `DELETE /recommendations/{id}/save`** (same pass). The SPA unsaves through
+  `DELETE /saved/{repository_id}` since 0.12.53; the old endpoint still 404s once a generation
+  drops the recommendation. Deprecating it in OpenAPI first, then removing it, is a contract
+  change and needs its own OpenSpec change.
+- **Phrase matching without a case-folded lookup** (same pass). `PhraseMatcher` matches with
+  `re.IGNORECASE` and maps the match back through `casefold()`, skipping the few variants that
+  fold differently (dotless `ı`). Named groups per slug (`match.lastgroup`) would map every match
+  directly. No ranking change for ASCII text, but it touches every taxonomy path.
 - **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
   seeds only. One test that migrates every app back to its first migration and forward again
   would catch the next irreversible or non-idempotent `RunPython`.

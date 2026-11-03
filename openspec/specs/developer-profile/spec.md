@@ -45,7 +45,7 @@ The profile SHALL include the user's languages aggregated across their owned non
 - **THEN** the breakdown is Python 8000 bytes (share 0.73, 2 repositories) followed by TypeScript 3000 bytes (share 0.27, 1 repository)
 
 ### Requirement: Internal experience level
-The system SHALL estimate an experience level of beginner, intermediate or experienced from several observable signals. The signals are account age, active owned non-fork repositories, merged external pull requests, distinct repositories contributed to and the number of well-evidenced skills. The thresholds are configurable. When fewer than two signals have data, the level SHALL be `unknown`; repository count alone SHALL never decide the level. The experience level is an internal matching signal and SHALL NOT be shown in the UI or returned by the profile API.
+The system SHALL estimate an experience level of beginner, intermediate or experienced from several observable signals. The signals are account age, active owned non-fork repositories, merged external pull requests, distinct repositories contributed to and the number of well-evidenced skills; contributions to forked repositories SHALL NOT count. The thresholds are configurable. When fewer than two signals have data, the level SHALL be `unknown`; repository count alone SHALL never decide the level. The experience level is an internal matching signal and SHALL NOT be shown in the UI or returned by the profile API.
 
 #### Scenario: Multiple signals
 - **WHEN** an account is 6 years old, has 15 active repositories, 25 merged external pull requests to 6 repositories and 10 well-evidenced skills

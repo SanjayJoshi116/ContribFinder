@@ -6,6 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from .text import strip_html_comments
+
 
 @dataclass(frozen=True)
 class DependencyInput:
@@ -58,6 +60,15 @@ class ProfileInput:
     def own_work(self) -> tuple[RepoInput, ...]:
         """Owned repositories that are the user's own work (forks excluded)."""
         return tuple(r for r in self.owned if not r.is_fork)
+
+    def __post_init__(self) -> None:
+        # Normalized once for every consumer (evidence, interests, experience, summary):
+        # commented-out README content is never read (PROF-3), and contributions to forked
+        # repositories never count (PROF-8, also for experience).
+        object.__setattr__(self, "readme", strip_html_comments(self.readme))
+        object.__setattr__(
+            self, "contributions", tuple(c for c in self.contributions if not c.repo.is_fork)
+        )
 
 
 @dataclass(frozen=True)
