@@ -59,6 +59,24 @@ export function pruneRecords(dir = RUN_DIR) {
   for (const { file, pid } of readRecords(dir)) if (!pid || !alive(pid)) removeRecord(file)
 }
 
+/** ``roots`` and all their descendants, from ``[pid, ppid]`` pairs. */
+export function withDescendants(roots, pairs) {
+  const children = new Map()
+  for (const [pid, ppid] of pairs) children.set(ppid, [...(children.get(ppid) ?? []), pid])
+  const found = new Set(roots)
+  for (const pid of found) for (const child of children.get(pid) ?? []) found.add(child)
+  return [...found]
+}
+
+/** ``[pid, ppid]`` pairs of every process (`ps -eo pid=,ppid=`); empty when ps fails. */
+function processPairs() {
+  const out = spawnSync('ps', ['-eo', 'pid=,ppid='], { encoding: 'utf8' }).stdout ?? ''
+  return out
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/).map(Number))
+    .filter(([pid, ppid]) => Number.isInteger(pid) && Number.isInteger(ppid))
+}
+
 /** Force-kill processes (one pid or an array) and all their descendants. */
 export function killTree(pidOrPids) {
   const pids = [pidOrPids].flat().filter((pid) => pid !== undefined)
@@ -69,12 +87,20 @@ export function killTree(pidOrPids) {
     spawnSync('taskkill', [...args, '/T', '/F'], { stdio: 'ignore' })
     return
   }
-  for (const pid of pids) {
-    try {
-      process.kill(-pid, 'SIGKILL') // the child leads its own process group (detached)
-    } catch {
-      // already gone
-    }
+  // POSIX: the tree is listed before anything dies (an orphan's parent link is lost), then
+  // each group a pid leads (a detached runner child) and every listed descendant is killed. A
+  // pid that leads no group (a non-detached child, a path-matched Celery) is reached through
+  // the tree (CR3-3, CR3-5).
+  const tree = withDescendants(pids, processPairs())
+  for (const pid of pids) sigkill(-pid)
+  for (const pid of tree) sigkill(pid)
+}
+
+function sigkill(target) {
+  try {
+    process.kill(target, 'SIGKILL')
+  } catch {
+    // already gone, or no such group
   }
 }
 
@@ -106,25 +132,29 @@ export function watchStack(onGone) {
 export function runChild(cmd, args, options = {}) {
   const posix = process.platform !== 'win32'
   const child = spawn(cmd, args, { stdio: 'inherit', detached: posix, ...options })
+  // On POSIX a detached child leads its own process group and is signalled through it; one
+  // started with `detached: false` (e2e-backend.mjs) leads none, so it is signalled itself
+  // (SCR-4). A force kill takes the whole tree either way (`killTree`).
+  const grouped = posix && (options.detached ?? true)
+  const forceKill = () => killTree(child.pid)
   let stopping = false
   const stop = (signal) => {
     if (stopping) {
-      killTree(child.pid)
+      forceKill()
       return
     }
     stopping = true
-    if (posix) {
-      try {
-        process.kill(-child.pid, signal)
-      } catch {
-        // the group already exited
-      }
+    try {
+      if (grouped) process.kill(-child.pid, signal)
+      else if (posix) child.kill(signal)
+    } catch {
+      // already exited
     }
-    setTimeout(() => killTree(child.pid), GRACE_MS).unref()
+    setTimeout(forceKill, GRACE_MS).unref()
   }
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, stop)
   watchStack(() => {
-    killTree(child.pid)
+    forceKill()
     process.exit(1)
   })
   child.on('error', (error) => {

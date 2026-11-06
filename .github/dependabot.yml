@@ -1,0 +1,8 @@
+# Proposes updates for the commit-pinned GitHub Actions (ci.yml, audit.yml). npm and Python
+# dependencies are updated by hand; `npm run audit:deps` (audit.yml) reports their advisories.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

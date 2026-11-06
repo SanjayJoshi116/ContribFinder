@@ -15,6 +15,13 @@ concurrency:
 permissions:
   contents: read
 
+# Every uv command uses the committed lock as is, also `uv run` inside npm scripts: a dependency
+# change without `uv lock` fails instead of resolving on the fly (CI-1).
+env:
+  UV_LOCKED: "1"
+
+# Actions are pinned to commits (the version they stand for in the comment; Dependabot proposes
+# updates). No checkout keeps the job token in .git/config: nothing pushes (CI-5, CI-6).
 jobs:
   backend:
     timeout-minutes: 20
@@ -43,12 +50,14 @@ jobs:
       DATABASE_URL: postgres://contribfinder:contribfinder@localhost:5432/contribfinder
       REDIS_URL: redis://localhost:6379/0
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --frozen
+      - run: uv sync --locked
       - name: Lint
         run: uv run ruff check .
       - name: Format
@@ -67,8 +76,10 @@ jobs:
       run:
         working-directory: apps/frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
@@ -78,30 +89,33 @@ jobs:
         run: npm run lint
       - name: Format
         run: npm run format:check
-      - name: Type check
-        run: npm run typecheck
-      - name: Tests
-        run: npm test
+      # Before the tests: the build type-checks (tsc -b), and csp.config.test.ts checks the built
+      # index.html only when dist/ exists (CI-2, CI-10).
       - name: Build
         run: npm run build
+      - name: Tests
+        run: npm test
 
   api-contract:
     # Fails when the committed OpenAPI schema / generated TS types drift from the backend.
     timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           python-version: "3.12"
           enable-cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: |
             package-lock.json
             apps/frontend/package-lock.json
+            apps/frontend/tools/api-types/package-lock.json
       - name: Version consistency
         run: node scripts/check-version.mjs
       - run: npm ci
@@ -111,19 +125,42 @@ jobs:
         run: npm run lint:scripts
       - name: Script format
         run: npm run format:scripts
-      - run: uv sync --frozen
+      - run: uv sync --locked
         working-directory: apps/backend
       - run: npm ci
         working-directory: apps/frontend
+      # The type generator's own locked tree (it needs TypeScript 5; CI-4).
+      - run: npm ci
+        working-directory: apps/frontend/tools/api-types
       - name: Regenerate schema and types
         run: npm run api:sync
         working-directory: apps/frontend
+      # Untracked files count too: a newly generated file is drift (CI-3).
       - name: Check for drift
         run: |
-          if ! git diff --exit-code -- apps/frontend/src/api; then
+          drift="$(git status --porcelain -- apps/frontend/src/api)"
+          if [ -n "$drift" ]; then
+            echo "$drift"
+            git diff -- apps/frontend/src/api
             echo "::error::OpenAPI schema or generated types are stale. Run 'npm run api:sync' in apps/frontend and commit the result."
             exit 1
           fi
+
+  scripts-windows:
+    # The runners' main target is Windows (taskkill, %APPDATA% uv lookup, detached wsl.exe):
+    # their tests run there too. Lint and format stay on Linux (CI-8). The tests import only
+    # Node built-ins and ./*.mjs, so no `npm ci`.
+    timeout-minutes: 10
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+      - name: Script tests
+        run: npm run test:scripts
 
   e2e:
     # Browser tests (Playwright, Chromium) against the real Django backend and PostgreSQL.
@@ -144,39 +181,48 @@ jobs:
     env:
       DATABASE_URL: postgres://contribfinder:contribfinder@localhost:5432/contribfinder
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           python-version: "3.12"
           enable-cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: apps/frontend/package-lock.json
-      - run: uv sync --frozen
+      - run: uv sync --locked
         working-directory: apps/backend
       - run: npm ci
         working-directory: apps/frontend
-      # The browser download is cached by lockfile (Playwright pins its browser builds); the
-      # system libraries are not, so a cache hit still installs those.
+      # The browser download is cached by the installed Playwright (it pins its browser builds;
+      # its package.json changes only with its version), not by the whole lockfile (CI-9); the
+      # system libraries are not cached, so a hit still installs those.
       - id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('apps/frontend/package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('apps/frontend/node_modules/@playwright/test/package.json') }}
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
         working-directory: apps/frontend
       - if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
         working-directory: apps/frontend
+      # Its own limit, under the job's: a hang fails this step and the report below is still
+      # uploaded (a timed-out job is cancelled before any later step runs) (CI-7).
       - name: Browser tests
+        timeout-minutes: 20
         run: npm run e2e
         working-directory: apps/frontend
-      - uses: actions/upload-artifact@v4
-        if: failure()
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ failure() || cancelled() }}
         with:
           name: playwright-report
-          path: apps/frontend/playwright-report/
+          path: |
+            apps/frontend/playwright-report/
+            apps/frontend/test-results/
+          if-no-files-found: ignore
           retention-days: 7

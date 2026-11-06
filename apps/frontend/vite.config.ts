@@ -1,8 +1,8 @@
-/// <reference types="vitest/config" />
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 
 import { contentSecurityPolicy } from './csp.config.ts'
 
@@ -27,7 +27,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     // Browser tests run under Playwright (`npm run e2e`), not Vitest.
-    exclude: ['**/node_modules/**', 'e2e/**'],
+    // Vitest's own defaults stay (E2EC-6); dist-e2e holds the browser-test build.
+    exclude: [...configDefaults.exclude, 'e2e/**', 'dist-e2e/**'],
     // Room for several findBy* waits (5 s each, see src/test/setup.ts) in one test.
     testTimeout: 15_000,
     css: false,

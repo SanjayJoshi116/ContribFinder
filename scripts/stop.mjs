@@ -12,7 +12,9 @@ import { matchStack, parsePs } from './stack.mjs'
 function processes() {
   if (process.platform === 'win32') {
     const script =
-      'Get-CimInstance Win32_Process | Where-Object CommandLine | ' +
+      // Every process, also those whose command line cannot be read (another user's, or one
+      // started elevated): their records must not look stale (SCR-3).
+      'Get-CimInstance Win32_Process | ' +
       'Select-Object ProcessId, Name, CommandLine | ConvertTo-Json -Compress'
     const out = execFileSync('powershell.exe', ['-NoProfile', '-Command', script], {
       encoding: 'utf8',
@@ -22,7 +24,7 @@ function processes() {
     return (Array.isArray(rows) ? rows : [rows]).map((r) => ({
       pid: r.ProcessId,
       name: r.Name.toLowerCase().replace(/\.exe$/, ''),
-      cmd: r.CommandLine,
+      cmd: r.CommandLine ?? null,
     }))
   }
   const out = execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' })
@@ -38,9 +40,15 @@ function processes() {
 // Records first: a runner that starts in between then has a listed process, so its record is
 // never mistaken for a stale one.
 const records = readRecords()
-const { kill: ours, remove } = matchStack(processes(), records, root.toLowerCase(), process.pid)
+const { kill: ours, remove, unknown } = matchStack(processes(), records, root, process.pid)
 
-if (ours.length === 0) console.log('Nothing to stop.')
+for (const { pid, name } of unknown) {
+  console.log(
+    `Could not check ${pid} (${name}): its command line is not readable (started elevated?); ` +
+      'left running.',
+  )
+}
+if (ours.length === 0 && unknown.length === 0) console.log('Nothing to stop.')
 for (const { pid, cmd } of ours) console.log(`Stopping ${pid}: ${cmd.slice(0, 100)}`)
 killTree(ours.map(({ pid }) => pid))
 for (const file of remove) removeRecord(file)

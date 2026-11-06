@@ -1,17 +1,16 @@
 // `npm run setup`: one-time local setup without Docker.
 //   1. Create .env from .env.example with generated secrets (never overwrites an existing .env)
-//   2. Install backend deps (uv) and the root and frontend deps (`npm ci`, as CI: lockfiles stay
-//      untouched)
+//   2. Install backend deps (uv) and every npm tree (`NPM_TREES`, `npm ci` as CI: lockfiles
+//      stay untouched)
 //   3. Apply database migrations (needs the local PostgreSQL role/database, see README)
 import { randomBytes } from 'node:crypto'
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
+import { NPM_TREES, root } from './env.mjs'
 import { uv } from './uv.mjs'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const envPath = path.join(root, '.env')
 
 if (existsSync(envPath)) {
@@ -33,9 +32,8 @@ const backend = path.join(root, 'apps', 'backend')
 uv(['sync'], { cwd: backend })
 
 // Single command string: npm is a .cmd shim on Windows and needs a shell; no args to escape.
-// The root first: `npm start` needs `concurrently`.
-for (const cwd of [root, path.join(root, 'apps', 'frontend')]) {
-  const npm = spawnSync('npm ci', { cwd, stdio: 'inherit', shell: true })
+for (const tree of NPM_TREES) {
+  const npm = spawnSync('npm ci', { cwd: path.join(root, tree), stdio: 'inherit', shell: true })
   if (npm.status !== 0) process.exit(npm.status ?? 1)
 }
 

@@ -7,6 +7,105 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.60] - 2026-11-06
+
+CI fixes from the review sweep (`openspec/changes/archive/2026-11-06-ci-review-fixes/`; spec
+delta to `developer-tooling`; `Bug_Backlog.md` batch 49). CI and developer tooling only: no app,
+backend or API change, no ranking change. One `/simplify` over the combined 0.12.58–0.12.60 code
+(batch 53) and one fix-diff `/code-review` (batch 54), both applied before commit.
+`/security-review` of `.github/workflows/` found nothing. This closes the medium group of the
+review sweep.
+
+### Fixed
+
+- CI could pass on a Python resolution that was never committed: every `uv sync` is now
+  `--locked` and `UV_LOCKED=1` covers `uv run`, so a `pyproject.toml` change without `uv lock`
+  fails (CI-1). The `check-version.mjs` comment no longer claims `--frozen` rejects stale locks.
+- The built-index Content Security Policy test was always skipped in CI; the frontend job now
+  builds before it tests, and the separate type check is gone (the build type-checks) (CI-2,
+  CI-10).
+- The API drift check now also fails on untracked files under `apps/frontend/src/api` (CI-3).
+- A hung browser test lost its Playwright report; the step has its own 20-minute limit and the
+  report plus traces (`test-results/`) upload on failure or cancellation (CI-7).
+
+### Changed
+
+- The OpenAPI type generator comes from its own locked tree, `apps/frontend/tools/api-types/`
+  (`openapi-typescript` 7.13.0 with TypeScript 5.9.3; the app's TypeScript 6 is outside its peer
+  range), instead of `npx --yes`. `npm run setup` installs it, CI installs it with `npm ci`, and
+  `npm run audit:deps` audits it as a third npm tree (CI-4).
+- Every GitHub Action is pinned to a full commit SHA with its version as a comment;
+  `.github/dependabot.yml` proposes updates weekly (CI-5). Every checkout sets
+  `persist-credentials: false` (CI-6).
+- New CI job `scripts-windows` runs `npm run test:scripts` on `windows-latest` (CI-8).
+- The Playwright browser cache is keyed on the installed Playwright version, not the whole
+  frontend lockfile (CI-9).
+- `/simplify` (batch 53): `NPM_TREES` in `scripts/env.mjs` is the one list of npm trees for
+  setup and the audit (a test checks lockfiles and `ci.yml`); the Windows job installs nothing;
+  the built-index CSP test fails in CI when the build is missing; the Redis runner has one
+  failure exit.
+- Fix-diff `/code-review` (batch 54): on POSIX, `npm run stop` and a runner's force kill now
+  end the whole process tree, also for processes that lead no process group (path-matched
+  Celery or Django, the e2e backend's server under `uv`); `npm run stop` no longer counts a
+  python whose arguments mention Celery (`pytest -k celery`) as the worker; a CSP violation
+  logged twice no longer fails the canary; the env test lists every lockfile through git and
+  matches `ci.yml` entries exactly; the built-index CSP test is forced only by `CI=true`; docs
+  no longer promise a message for a second `--ui` run.
+
+## [0.12.59] - 2026-11-03
+
+Runner script fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-scripts-review-fixes/`; spec delta to `developer-tooling`;
+`Bug_Backlog.md` batch 48). Developer tooling only: no app, backend or API change, no ranking
+change. `/simplify` and the fix-diff `/code-review` were skipped (owner). `/security-review` of
+`scripts/` found nothing. SCR-5 accepted.
+
+### Fixed
+
+- `npm run stop` could kill a sibling checkout whose folder name starts with this one's
+  (`ContribFinder-v2`) and any Vitest or pytest process whose command line mentioned Vite or
+  Celery; it now matches the repository folder as a whole and only the stack's own programs
+  (SCR-1, SCR-2).
+- On Windows, processes whose command line could not be read (started elevated) were not
+  listed, so their records were deleted as stale; they are now left running, their records kept,
+  and `npm run stop` says so (SCR-3).
+- The Redis runner exited 0 when Redis never came up, so the stack kept running without it, and
+  crashed with a stack trace when the WSL keep-alive could not start; both now exit 1 with a
+  message and stop the stack (SCR-6, SCR-7).
+- On POSIX, a runner child started without its own process group (the e2e backend) ignored a
+  stop signal (SCR-4).
+- An IPv6 `REDIS_URL` (`redis://[::1]:6379/1`) was not recognized as local (SCR-8).
+- The uv lookup preferred an old Python's uv (`Python39` before `Python313`) (SCR-9).
+
+### Changed
+
+- `setup.mjs`, `backend.mjs` and `manage.mjs` take `root` from `env.mjs` (SCR-10).
+
+## [0.12.58] - 2026-11-03
+
+Browser-test tooling fixes from the review sweep
+(`openspec/changes/archive/2026-11-03-e2e-config-review-fixes/`; no spec change, `skip_specs`;
+`Bug_Backlog.md` batch 47). Test tooling only: no app, backend or API change, no ranking change.
+`/simplify` and the fix-diff `/code-review` were skipped (owner). `/security-review` of
+`frontend/e2e/` and its configs found nothing. E2EC-2, E2EC-5 accepted.
+
+### Fixed
+
+- A data-changing browser test run with `--repeat-each` reused the already-changed seeded user,
+  and CLI `--retries` failed with "attempt N"; both now fail at sign-in naming the cause and the
+  supported way (`RETRIES` in `playwright.config.ts`, a fresh `npm run e2e`) (E2EC-1).
+- The `E2E_DEV_SERVER=1` dev server listened on every interface; it now uses localhost only, like
+  the preview (E2EC-3).
+- Vitest's `exclude` replaced Vitest's default list; it now extends it and skips `dist-e2e/`
+  (E2EC-6).
+- The CSP canary failed on a duplicate console entry; it now checks every entry names `img-src`
+  (E2EC-7).
+
+### Changed
+
+- The fixture comment says read-only seeded users may record views (E2EC-4). README "End-to-end
+  tests" lists the unsupported Playwright flags.
+
 ## [0.12.57] - 2026-11-03
 
 Issue detail fixes from the review sweep

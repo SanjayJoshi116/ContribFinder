@@ -7,18 +7,21 @@ import { SESSIONS_FILE } from './e2e/sessions.ts'
 const PORT = 5174
 const BASE_URL = `http://localhost:${PORT}`
 const VITE = 'node node_modules/vite/bin/vite.js'
-const SERVE = `--port ${PORT} --strictPort`
+// Localhost only, also for the dev server: both proxy to the seeded backend (E2EC-3).
+const SERVE = `--host localhost --port ${PORT} --strictPort`
 const OUT = '--outDir dist-e2e'
 // The production build with its Content Security Policy, in its own folder so a local `dist/`
-// stays as it was. Not `npm run build`: that also type-checks (CI's typecheck job) and writes
-// `dist/`. The preview listens on localhost only: it proxies to the seeded backend.
+// stays as it was. Not `npm run build`: that also runs `tsc -b` and writes `dist/`.
 // E2E_DEV_SERVER=1 runs the dev server instead (no policy; local use only).
 const frontend =
   process.env.E2E_DEV_SERVER === '1'
     ? `${VITE} ${SERVE}`
-    : `${VITE} build ${OUT} --emptyOutDir && ${VITE} preview ${OUT} --host localhost ${SERVE}`
+    : `${VITE} build ${OUT} --emptyOutDir && ${VITE} preview ${OUT} ${SERVE}`
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 // The seed builds one user per attempt for tests that change data, so it gets the same number.
+// Change retries here, not with CLI --retries; CLI --retries and --repeat-each fail
+// data-changing tests at sign-in saying so. A second --ui run (servers not re-seeded) is not
+// detected: those tests fail on stale data; restart `npm run e2e -- --ui` to re-seed.
 const RETRIES = process.env.CI ? 1 : 0
 
 // Browser tests against the real backend and PostgreSQL (database contribfinder_e2e, settings

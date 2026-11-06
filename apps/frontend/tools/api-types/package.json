@@ -1,0 +1,9 @@
+{
+  "name": "contribfinder-api-types-generator",
+  "private": true,
+  "description": "Locked OpenAPI type generator for apps/frontend (gen:api). Its own tree: openapi-typescript needs TypeScript 5, the app uses 6.",
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

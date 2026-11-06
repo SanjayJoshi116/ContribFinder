@@ -158,7 +158,8 @@ ContribFinder/
 │                         the query client (retry, stale time, 401), session.ts (identity key,
 │                         endSession, leaveSignedIn), job-transition refresh and data versions;
 │                         e2e/ Playwright specs, playwright.config.ts; csp.config.ts (the built
-│                         app's Content-Security-Policy and its build-only Vite plugin)
+│                         app's Content-Security-Policy and its build-only Vite plugin);
+│                         tools/api-types/ (locked OpenAPI type generator, its own npm tree)
 ├─ scripts/                 npm runners: start, stop, setup, backend, frontend, worker, beat,
 │                           redis (WSL), child (process-tree runner, .run/ records), stack
 │                           (stop matching), env, wait-port, uv, manage, check-version,
@@ -174,7 +175,8 @@ ContribFinder/
 │  ideas.md (unplanned gap analysis by when it can ship: no ranking change first, then
 │  ranking-visible ideas; each idea needs an OpenSpec change first); reports/ (gitignored --json
 │  outputs)
-└─ .github/workflows/ci.yml, audit.yml (dependency audit: PRs, main, weekly, on demand)
+└─ .github/workflows/ci.yml, audit.yml (dependency audit: PRs, main, weekly, on demand);
+   dependabot.yml (GitHub Actions pins, weekly)
 ```
 
 ## 5. Conventions
@@ -223,15 +225,17 @@ Local, no Docker (primary on this machine):
   the console (SIGHUP) stops every runner, keep-alive included. Beat's schedule file is
   `contribfinder-celerybeat-<sha1(root)[:8]>` (`scheduleFile` in `env.mjs`) in the OS temp dir, one per checkout.
   The SPA proxies `/api`.
-- `npm run test:scripts`: Node built-in tests for the runners (`scripts/*.test.mjs`, also in CI).
+- `npm run test:scripts`: Node built-in tests for the runners (`scripts/*.test.mjs`, also in CI
+  on Linux and Windows; they import only Node built-ins and `./*.mjs`, so CI's Windows job
+  installs nothing).
   `npm run lint:scripts` / `format:scripts`: ESLint and Prettier for `scripts/` (also in CI).
   `.gitattributes` keeps LF in every checkout; a Windows checkout from before 0.12.11 refreshes
   its working files once (README).
   `npm run setup` uses `npm ci` (never rewrites a lockfile); `npm run check:version` also checks
   `packages[""].version` of both npm lockfiles.
 - `npm run audit:deps` (`scripts/audit.mjs`, CI workflow `audit.yml`): `pip-audit` (pinned,
-  through `uv tool run` on `uv export --frozen`) and `npm audit` for `apps/frontend` and the
-  root. Fails on any Python advisory and npm high/critical, unless accepted in
+  through `uv tool run` on `uv export --frozen`) and `npm audit` for `apps/frontend`,
+  `apps/frontend/tools/api-types` and the root. Fails on any Python advisory and npm high/critical, unless accepted in
   `audit-accepted.json` (ecosystem, id, package, reason, accepted_on; strict). Exit 0/1/2
   (clean / findings / could not run). The user's npm has `allow-remote=none`: a frontend
   `npm install`/`ci`/`audit fix` needs `--allow-remote=all`, which only the user runs.
@@ -291,7 +295,9 @@ Backend (`apps/backend`, uses `uv`):
 Frontend (`apps/frontend`, npm):
 - `npm run dev`, `npm test`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build`
 - `npm run api:sync`: re-export the OpenAPI schema from Django and regenerate
-  `src/api/schema.d.ts`. Run it after any API change and commit both files; CI fails on drift.
+  `src/api/schema.d.ts`. Run it after any API change and commit both files; CI fails on drift
+  (untracked files too). The generator is `apps/frontend/tools/api-types/` (`openapi-typescript`
+  with TypeScript 5, exact, own lockfile; the app is on TypeScript 6), installed by `npm run setup`.
 - `npm run e2e`: Playwright (Chromium) against the real backend on :8001 and the production
   build (`vite build` into `dist-e2e`, `vite preview`) on :5174 (database `contribfinder_e2e`,
   re-seeded every run; one-time `npx playwright install chromium`). The auto fixture
@@ -1837,6 +1843,79 @@ FI-7, FI-10 fixed; FI-4 guard; FI-5, FI-8, FI-9 false positives). `/simplify` an
   tests must wait after `refetchQueries` (`settle`): TanStack notifies observers on a timer, so
   an assertion right after `act` sees the old render.
 
+**Browser-test tooling fixes, review sweep: frontend/e2e + config** (MVP+, fix release)  ✅ shipped in v0.12.58 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-e2e-config-review-fixes/` (no spec change,
+`skip_specs`). `Bug_Backlog.md` batch 47 (E2EC-1, E2EC-3, E2EC-4, E2EC-6, E2EC-7 fixed; E2EC-2,
+E2EC-5 accepted). `/simplify` and the fix-diff `/code-review` were skipped (owner).
+`/security-review`: nothing.
+- `e2e/fixtures.ts` `sessionId(user, testInfo)`: a data-changing user throws for
+  `testInfo.repeatEachIndex > 0` and, for a retry past the seeded copies, names `RETRIES`. Only
+  `RETRIES` in `playwright.config.ts` changes retries; `--repeat-each`, CLI `--retries` and a
+  second `--ui` run are unsupported for those tests (README "End-to-end tests").
+- `playwright.config.ts` `SERVE` carries `--host localhost` for both servers.
+- `vite.config.ts` imports `configDefaults` from `vitest/config` (no triple-slash reference);
+  `test.exclude` is `[...configDefaults.exclude, 'e2e/**', 'dist-e2e/**']`.
+- `policy.spec.ts`: every taken violation must name the `img-src` directive.
+
+**Runner script fixes, review sweep: scripts** (MVP+, fix release)  ✅ shipped in v0.12.59 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-03-scripts-review-fixes/`. Spec: delta to
+`developer-tooling` ("Stopping the local stack stops only this repository", "Local Redis stays
+reachable while the stack runs", "Backend commands find uv without PATH"). `Bug_Backlog.md`
+batch 48 (SCR-1…SCR-4, SCR-6…SCR-10 fixed; SCR-5 accepted). `/simplify` and the fix-diff
+`/code-review` were skipped (owner). `/security-review` of `scripts/`: nothing.
+- `stack.matchStack(processes, records, repo, selfPid) -> { kill, remove, unknown }`: `repo` any
+  case and separator (normalized once, trailing `/`, so a sibling folder never matches); a live
+  record with `cmd: null` and the recorded executable goes to `unknown` (kept, not killed).
+  Path matching needs the stack's program shape: `VITE` (`/node_modules/vite/bin/vite.js`),
+  Celery as the program (`isCelery`, since 0.12.60), `RUNSERVER`. A new stack program that
+  must be found by path needs a shape there and a test.
+- `stop.mjs` lists every Windows process (`CommandLine` may be null) and reports unknowns.
+- `runChild`: `grouped = posix && (options.detached ?? true)`; a non-grouped child gets the
+  stop signal itself (the force kill takes the tree, since 0.12.60).
+- `redis.mjs`: `stop(code = 0)`; `stop(1)` when Redis never answers or the keep-alive fails
+  (`'error'`, or restarts used up).
+- `env.redisTarget` strips IPv6 brackets; `uv.newestPythonFirst(names)` orders install folders.
+  Every script takes `root` from `env.mjs`.
+- Shell heredocs in Claude Code's Bash on this machine turn a double backslash into a single one:
+  write files with backslashes through the Edit/Write tools, never a heredoc.
+
+**CI fixes, review sweep: .github/workflows** (MVP+, fix release)  ✅ shipped in v0.12.60 (no ranking change)
+
+Archived: `openspec/changes/archive/2026-11-06-ci-review-fixes/`. Spec: delta to
+`developer-tooling` (new "CI installs the committed locks", "CI runs pinned third-party code
+without a stored token", "Runner tests run on Windows and Linux", "Browser test reports survive a
+timeout"). `Bug_Backlog.md` batch 49 (CI-1…CI-10), closing the medium group of the sweep.
+One `/simplify` (batch 53) and one fix-diff `/code-review` (batch 54, CR3-1…CR3-8, all fixed)
+over the combined 0.12.58–0.12.60 code. `/security-review`: nothing.
+- POSIX `killTree(pids)` (`child.mjs`): lists `ps -eo pid=,ppid=` first, then SIGKILLs each
+  group a pid leads and every descendant (`withDescendants(roots, pairs)`, pure); `runChild`'s
+  force kill is always `killTree(child.pid)`. Celery is matched by `stack.isCelery(line)`: the
+  command (`.../celery`, `celery.exe`) or what python runs (`.../celery`, `-m celery`, past
+  interpreter flags), never an argument. `policyViolations.take()` also ignores later entries
+  with a taken text. A second `--ui` run is undetectable (documented, not guarded).
+- `uv sync --locked` in every job and `UV_LOCKED: "1"` at workflow level (covers `uv run` in npm
+  scripts): a `pyproject.toml` change without `uv lock` fails CI. `audit.yml` keeps
+  `uv export --frozen` (reads the lock only).
+- Frontend job: Lint, Format, Build, Tests (no Type check step; `csp.config.test.ts` sees
+  `dist/index.html`). Drift: `git status --porcelain -- apps/frontend/src/api` must be empty.
+- `gen:api` runs `tools/api-types/node_modules/openapi-typescript/bin/cli.js`; `api-contract`
+  runs `npm ci` there. A new dependency there needs the owner's `npm install --allow-remote=all`.
+- Every `uses:` is `owner/action@<40-hex sha> # vX.Y.Z` (newest tag of the major in use, from
+  `git ls-remote --tags`, annotated tags peeled); every checkout `persist-credentials: false`.
+  A new action or step follows both.
+- Browser tests: step `timeout-minutes: 20`; `playwright-report/` and `test-results/` upload
+  `if: failure() || cancelled()`. Browser cache key: `hashFiles` of the installed
+  `@playwright/test/package.json`. `csp.config.test.ts` runs the built-index test whenever `CI`
+  is set (a missing build fails).
+- Job `scripts-windows` (`windows-latest`): `npm run test:scripts`, no install (script tests
+  import only Node built-ins and `./*.mjs`; keep it so). Lint and format stay on Linux.
+- `scripts/env.mjs` `NPM_TREES` (root, `apps/frontend`, `apps/frontend/tools/api-types`) is the
+  one list for `setup.mjs` and `audit.mjs`; `env.test.mjs` fails when a tree lacks a lockfile or
+  `ci.yml` entry, or a `tools/*` lockfile is unlisted. A new npm tree goes there and in `ci.yml`.
+- Carry-over: task 5.4 (first CI run on `main` green, `scripts-windows` included) after the push.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1863,7 +1942,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60).
 
 ## 8. Release housekeeping
 

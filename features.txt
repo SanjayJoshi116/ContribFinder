@@ -439,6 +439,47 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.60 - CI fixes (review sweep: .github/workflows)
+============================================================================
+
+CI (Bug_Backlog.md batch 49)
+  [x] CI installs the committed locks (uv --locked, UV_LOCKED=1; a stale uv.lock fails)
+  [x] API type generator from its own locked, audited tree (tools/api-types), no npx download
+  [x] Actions pinned to commit SHAs, Dependabot for actions; no token left in .git/config
+  [x] Frontend job builds before testing (built-index CSP test runs); one type check
+  [x] Drift check catches untracked generated files
+  [~] Runner tests on Windows (scripts-windows job; first run after the push)
+  [x] Browser test report and traces kept on failure or timeout
+  [x] Playwright browser cache keyed on the Playwright version
+
+Developer tooling (Bug_Backlog.md batches 53, 54)
+  [x] One list of npm trees (NPM_TREES) for setup and the audit; a test keeps it and ci.yml honest
+  [x] npm run stop on Linux/macOS kills the whole process tree, also processes outside a group
+  [x] npm run stop leaves python processes alone whose arguments only mention Celery
+  [x] A CSP violation logged twice no longer fails the browser-test canary
+
+============================================================================
+SHIPPED - v0.12.59 - Runner script fixes (review sweep: scripts)
+============================================================================
+
+Developer tooling (Bug_Backlog.md batch 48)
+  [x] npm run stop leaves sibling checkouts, Vitest and pytest alone
+  [x] Unreadable (elevated) processes left running with their records kept, and reported
+  [x] Redis runner fails the stack when Redis never comes up or the keep-alive cannot start
+  [x] Non-detached runner children stop on POSIX signals
+  [x] IPv6 REDIS_URL recognized as local; newest Python's uv preferred
+
+============================================================================
+SHIPPED - v0.12.58 - Browser-test tooling fixes (review sweep: frontend/e2e + config)
+============================================================================
+
+Browser tests (Bug_Backlog.md batch 47)
+  [x] --repeat-each and CLI --retries on data-changing tests fail with a clear reason
+  [x] Dev-server e2e run listens on localhost only
+  [x] Vitest keeps its default excludes and skips dist-e2e
+  [x] CSP canary tolerates duplicate console entries
+
+============================================================================
 SHIPPED - v0.12.57 - Issue detail fixes (review sweep: features/issues)
 ============================================================================
 

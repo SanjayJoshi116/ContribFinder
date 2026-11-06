@@ -7,6 +7,12 @@ import { fileURLToPath } from 'node:url'
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
+/** Every npm tree with its own lockfile, relative to ``root``: installed by `npm run setup` (in
+ * this order: `npm start` needs the root's `concurrently`) and audited by `npm run audit:deps`.
+ * The API type generator has its own tree: it needs TypeScript 5, the app 6. CI lists them in
+ * `ci.yml` too. */
+export const NPM_TREES = ['.', 'apps/frontend', 'apps/frontend/tools/api-types']
+
 /** The module at ``moduleUrl`` is the script node was started with. Compares real paths: Node
  * resolves ``import.meta.url`` through symlinks and junctions but leaves ``argv[1]`` as typed, so
  * a plain comparison would silently skip a CLI (and pass a check) run through a linked path. */
@@ -38,8 +44,10 @@ export function redisTarget() {
   const value = process.env.REDIS_URL?.trim()
   if (!value) return null
   const url = new URL(value)
+  // URL keeps an IPv6 host in brackets (`[::1]`); sockets want it bare (SCR-8).
+  const hostname = url.hostname.replace(/^\[(.*)\]$/, '$1')
   // Node resolves "localhost" to ::1 first; WSL forwarding and redis bind 127.0.0.1.
-  const host = url.hostname === 'localhost' ? '127.0.0.1' : url.hostname
+  const host = hostname === 'localhost' ? '127.0.0.1' : hostname
   return { host, port: Number(url.port || 6379), isLocal: ['127.0.0.1', '::1'].includes(host) }
 }
 

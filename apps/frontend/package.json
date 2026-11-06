@@ -1,6 +1,6 @@
 {
   "name": "contribfinder-frontend",
-  "version": "0.12.57",
+  "version": "0.12.60",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "gen:api": "npx --yes openapi-typescript@7.13.0 src/api/openapi.json -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts src/api/openapi.json",
+    "gen:api": "node tools/api-types/node_modules/openapi-typescript/bin/cli.js src/api/openapi.json -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts src/api/openapi.json",
     "api:export": "node ../../scripts/manage.mjs spectacular --settings config.settings.test --format openapi-json --validate --fail-on-warn --file ../frontend/src/api/openapi.json",
     "api:sync": "npm run api:export && npm run gen:api"
   },

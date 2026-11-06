@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.57** (query client, session, route and issue detail fixes from the review sweep; MVP+). After signing in with
+**Version 0.12.60** (query client, session, route, issue detail, browser-test, runner script and CI fixes from the review sweep; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -372,14 +372,19 @@ Never commit `.env`. Report vulnerabilities privately ([`SECURITY.md`](SECURITY.
 Of your `.env`, pytest uses only `DATABASE_URL` (`DJANGO_READ_DOTENV=DATABASE_URL` in the test
 settings), so local results match CI's; an explicit environment variable still wins.
 `npm run test:scripts` at the root tests the dev runners (process matching, port waits, beat
-schedule name, version check) with Node's built-in test runner.
+schedule name, version check) with Node's built-in test runner; CI runs them on Linux and on
+Windows (`scripts-windows`). CI installs exactly what the lockfiles record (`uv sync --locked`,
+`npm ci`): a `pyproject.toml` change without `uv lock` fails it. The OpenAPI type generator
+(`npm run api:sync`) has its own locked npm tree in `apps/frontend/tools/api-types`
+(TypeScript 5; the app is on 6), installed by `npm run setup`.
 All commands are in `CLAUDE.md` §6.
 
 ### Dependency audit
 
 `npm run audit:deps` at the root checks every lockfile for known vulnerabilities: the backend's
-`uv.lock` with `pip-audit` (run through `uv`, nothing installed into the project) and both npm
-lockfiles (`apps/frontend`, root) with `npm audit`. It reads only the locked versions. Any Python
+`uv.lock` with `pip-audit` (run through `uv`, nothing installed into the project) and every npm
+lockfile (root, `apps/frontend`, and the API type generator's `apps/frontend/tools/api-types`;
+`NPM_TREES` in `scripts/env.mjs`) with `npm audit`. It reads only the locked versions. Any Python
 advisory and any high or critical npm advisory fails it (exit 1); low and moderate npm advisories
 are listed only, and a Python package pip-audit could not check fails too. Every locked
 package is audited on every platform (environment markers are ignored). Exit 2 means an audit
@@ -425,6 +430,11 @@ PostgreSQL. Nothing calls GitHub: sign-in uses sessions created by a seed comman
   the test.
 - `E2E_DEV_SERVER=1 npm run e2e` uses the Vite dev server instead (no build, no policy): quicker
   while writing a spec. CI never sets it.
+- Retries are set by `RETRIES` in `playwright.config.ts` (the seed builds one copy of each
+  data-changing user per attempt). CLI `--retries` and `--repeat-each` are not supported for
+  those tests: they fail at sign-in saying so. A second run inside one `--ui` session is not
+  supported either and cannot be detected: those tests fail on data the first run changed.
+  Run `npm run e2e` (or restart `--ui`) again for a fresh seed.
 - Of your `.env` only `DATABASE_URL` is used (`DJANGO_READ_DOTENV=0` for Django), so local runs
   see the same settings as CI. The SPA build does read `apps/frontend/.env*` files (Vite), so
   keep `VITE_*` overrides out of them when comparing with CI, which has none.

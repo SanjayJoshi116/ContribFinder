@@ -1,12 +1,12 @@
 // Audits every locked dependency set for known vulnerabilities (`npm run audit:deps`, CI):
-// apps/backend/uv.lock with pip-audit, apps/frontend and the root package-lock.json with npm audit.
+// apps/backend/uv.lock with pip-audit; every npm tree (`NPM_TREES` in env.mjs) with npm audit.
 // Exit 0 clean, 1 unaccepted findings, 2 an audit could not run or audit-accepted.json is invalid.
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { isMain, root } from './env.mjs'
+import { isMain, NPM_TREES, root } from './env.mjs'
 import { uvCommand } from './uv.mjs'
 
 export const ACCEPTED_FILE = 'audit-accepted.json'
@@ -256,8 +256,7 @@ if (isMain(import.meta.url)) {
 
     const findings = [
       ...auditPython(accepted),
-      ...auditNpm('apps/frontend', accepted),
-      ...auditNpm('.', accepted),
+      ...NPM_TREES.flatMap((tree) => auditNpm(tree, accepted)),
     ]
     for (const finding of findings) console.log(describe(finding))
     for (const entry of unusedAccepted(accepted, findings)) {

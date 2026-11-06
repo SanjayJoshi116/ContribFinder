@@ -10,6 +10,13 @@ import { refuseRun } from './env.mjs'
 
 const exe = process.platform === 'win32' ? 'uv.exe' : 'uv'
 
+/** Python install folder names (`Python313`, `Python39`, ...), newest version first; other names
+ * after them, in reverse name order as before (SCR-9: a plain sort put `Python39` first). */
+export function newestPythonFirst(names) {
+  const version = (name) => Number(/^python(\d+)/i.exec(name)?.[1] ?? -1)
+  return [...names].sort((a, b) => version(b) - version(a) || b.localeCompare(a))
+}
+
 /** Absolute paths where installers put uv without necessarily adding it to PATH. */
 function knownLocations() {
   const home = os.homedir()
@@ -21,7 +28,7 @@ function knownLocations() {
       process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs', 'Python'),
     ]) {
       if (!root || !existsSync(root)) continue
-      for (const entry of readdirSync(root).sort().reverse()) {
+      for (const entry of newestPythonFirst(readdirSync(root))) {
         dirs.push(path.join(root, entry, 'Scripts'))
       }
     }

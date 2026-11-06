@@ -100,3 +100,54 @@ test('an executable path with spaces is named by its exe link', () => {
   assert.equal(parsePs(out, exeOf)[0].name, 'node')
   assert.equal(parsePs(out)[0].name, 'a') // without the link only the first word is known
 })
+
+test('a sibling checkout whose name starts with this one is not this repository', () => {
+  const sibling = `${REPO}-v2`
+  const processes = [
+    { pid: 60, name: 'python', cmd: `python ${sibling}\\apps\\backend\\manage.py runserver 8000` },
+    node(61, `node ${sibling}\\apps\\frontend\\node_modules\\vite\\bin\\vite.js`),
+  ]
+  assert.deepEqual(killed(matchStack(processes, [], REPO, SELF)), [])
+})
+
+test('test runners and other programs are not the stack, whatever their paths', () => {
+  const processes = [
+    node(70, `node ${REPO}\\apps\\frontend\\node_modules\\vitest\\vitest.mjs run`),
+    {
+      pid: 71,
+      name: 'python',
+      cmd: `python -m pytest ${REPO}\\apps\\backend\\tests\\test_celery_config.py`,
+    },
+    { pid: 74, name: 'python', cmd: `python -m pytest ${REPO}\\apps\\backend\\tests -k celery` },
+    {
+      pid: 75,
+      name: 'python3',
+      cmd: `${REPO}/apps/backend/.venv/bin/python3 ${REPO}/apps/backend/.venv/bin/celery -A config worker`,
+    },
+    { pid: 76, name: 'python', cmd: `python -u -m celery -A config beat --workdir ${REPO}\\apps` },
+    { pid: 72, name: 'python', cmd: `python -m celery -A config worker --workdir ${REPO}\\apps` },
+    { pid: 73, name: 'celery', cmd: `"${REPO}\\apps\\backend\\.venv\\scripts\\celery.exe" beat` },
+  ]
+  assert.deepEqual(killed(matchStack(processes, [], REPO, SELF)), [72, 73, 75, 76])
+})
+
+test('a recorded process whose command line cannot be read is left running, record kept', () => {
+  const processes = [
+    { pid: 80, name: 'node', cmd: null },
+    { pid: 81, name: 'python', cmd: null },
+  ]
+  const result = matchStack(processes, [record(80, 'backend')], REPO, SELF)
+  assert.deepEqual(killed(result), [])
+  assert.deepEqual(result.remove, [])
+  assert.deepEqual(
+    result.unknown.map(({ pid }) => pid),
+    [80],
+  )
+})
+
+test('a reused pid that cannot be read is another program: its record is stale', () => {
+  const processes = [{ pid: 90, name: 'svchost', cmd: null }]
+  const result = matchStack(processes, [record(90, 'backend')], REPO, SELF)
+  assert.deepEqual(result.unknown, [])
+  assert.deepEqual(result.remove, ['backend-90.json'])
+})

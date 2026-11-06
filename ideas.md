@@ -298,8 +298,9 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   committed, no-reply commit emails, persona-only datasets. Done: `LICENSE` (MIT),
   `SECURITY.md` (private vulnerability reporting), the SRS files untracked and kept locally (all
   in v0.12.39; the first sweep module, `config/`, reviewed and fixed in the same release)
-  (their old copies stay in history; they are the owner's, not confidential). Left, in the
-  repository's GitHub settings (owner only):
+  (their old copies stay in history; they are the owner's, not confidential). CI hardened in
+  v0.12.60 (actions pinned to commit SHAs with Dependabot updates, `persist-credentials: false`,
+  locked installs only). Left, in the repository's GitHub settings (owner only):
   - turn on private vulnerability reporting (`SECURITY.md` points to it), secret scanning with
     push protection, and Dependabot alerts (free for public repositories);
   - protect `main` (no force-push, required checks: CI and the dependency audit);
@@ -429,7 +430,8 @@ Newest first.
 | Route-level id validation (`RouteId` wrapper for detail routes) | §14 | v0.12.37 (same dead ends; the page remounts per id) |
 | Released-name refresh queued at commit (`backlog.queue_released`) | §13 | v0.12.36 (pooled holders only, not inline) |
 | Labeled-issue fetch (entry-labeled issues beyond the recent cap) | §7 | v0.12.35 (only for capped repositories; default label names only) |
-| Dependency audit in CI (`pip-audit`, `npm audit`, accepted list, weekly run) | §5 | v0.12.34 (no Dependabot or CodeQL) |
+| CI hardening for the public repository (locked installs, SHA-pinned actions, no stored token, Windows runner tests) | §5 | v0.12.60 (backlog batch 49; Dependabot for actions only) |
+| Dependency audit in CI (`pip-audit`, `npm audit`, accepted list, weekly run) | §5 | v0.12.34 (no CodeQL; Dependabot for actions since v0.12.60, npm and pip stay manual) |
 | One JSON writer for management commands (`core/reports.py`) | §15 | v0.12.33 (T-14; non-ASCII kept in every file) |
 | Content-Security-Policy (backend header; meta tag in the built SPA) | §5 | v0.12.30 (no reporting endpoint; the SPA host adds `frame-ancestors`) |
 | New seeds stored inactive (`_seeding.store_inactive`, guard test) | §15 | v0.12.28 (v1/v2 seeds unchanged) |

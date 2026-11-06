@@ -19,5 +19,6 @@ test('a blocked foreign image is recorded as a policy violation', async ({
   }`)
 
   await expect.poll(() => policyViolations.seen.length).toBeGreaterThan(0)
-  expect(policyViolations.take()).toEqual([expect.stringContaining(`"${IMG_SRC}"`)])
+  // Each blocked load is one entry; a duplicate entry must not fail the canary (E2EC-7).
+  for (const violation of policyViolations.take()) expect(violation).toContain(`"${IMG_SRC}"`)
 })

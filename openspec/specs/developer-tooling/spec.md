@@ -10,8 +10,13 @@ and never lets a commit go unchecked.
 `npm run stop` SHALL stop the runners, workers, servers and helper processes that this
 repository's local stack started, and SHALL NOT stop processes of any other project, even when
 those run identically named scripts. A process SHALL be stopped only when it was recorded by
-one of this repository's runners and still matches the recorded program, or when its command
-line names this repository's path.
+one of this repository's runners and still matches the recorded program, or when it is one of the stack's own programs (Django's
+development server, a Celery worker or beat, the Vite dev server) and its command line names this
+repository's path as a whole folder (another folder whose name starts with this one's is not this
+repository). A test runner, editor or other program SHALL NOT be stopped because its command line
+mentions the stack or the path. A recorded process that is alive but whose command line cannot be
+read (for example started from an elevated console) SHALL be left running, its record kept, and
+`npm run stop` SHALL say so.
 
 #### Scenario: Another checkout keeps running
 - **WHEN** two checkouts of ContribFinder (or another project with a `scripts/start.mjs`) run
@@ -26,6 +31,18 @@ line names this repository's path.
 #### Scenario: Redis keep-alive stopped
 - **WHEN** `npm run stop` runs while the local stack keeps WSL awake for Redis
 - **THEN** the keep-alive process ends too
+
+#### Scenario: Sibling checkout with a longer name
+- **WHEN** `npm run stop` runs in `G:\Projects\ContribFinder` while a stack runs from `G:\Projects\ContribFinder-v2`
+- **THEN** the `ContribFinder-v2` processes keep running
+
+#### Scenario: Test runners keep running
+- **WHEN** `npm run stop` runs while Vitest runs in this repository's frontend and pytest runs a test file whose name contains "celery"
+- **THEN** both keep running
+
+#### Scenario: Process started elevated
+- **WHEN** a recorded runner was started from an elevated console and `npm run stop` runs from a normal one
+- **THEN** the runner is left running, its record is kept, and the command reports that it could not be checked
 
 ### Requirement: Closing the console stops the stack
 When the console that runs the local stack closes (or the stack's parent process disappears),
@@ -89,7 +106,7 @@ for the same pull request.
 - **THEN** the previous run is cancelled
 
 ### Requirement: Local Redis stays reachable while the stack runs
-On Windows, the Redis runner SHALL keep the WSL distro that runs Redis awake for as long as the stack runs. When the session that keeps it awake ends while the stack is running, the runner SHALL log the exit code and start a new one. After 3 such restarts within 5 minutes, the runner SHALL fail with a readable message instead of restarting again. Stopping the stack (Ctrl+C, `npm run stop`, closing the console) SHALL NOT start a new session.
+On Windows, the Redis runner SHALL keep the WSL distro that runs Redis awake for as long as the stack runs. When the session that keeps it awake ends while the stack is running, the runner SHALL log the exit code and start a new one. After 3 such restarts within 5 minutes, the runner SHALL fail with a readable message instead of restarting again. Stopping the stack (Ctrl+C, `npm run stop`, closing the console) SHALL NOT start a new session. When Redis does not become reachable at start, or a keep-alive session cannot be started, the runner SHALL exit with a failure status and a readable message, so the rest of the stack stops too. A local `REDIS_URL` with an IPv6 host (`redis://[::1]:6379/1`) SHALL be treated as local.
 
 #### Scenario: Keep-alive ends unexpectedly
 - **WHEN** the WSL keep-alive session exits while `npm start` is running
@@ -103,6 +120,14 @@ On Windows, the Redis runner SHALL keep the WSL distro that runs Redis awake for
 - **WHEN** the stack is stopped with Ctrl+C or `npm run stop`
 - **THEN** no new keep-alive session is started
 
+#### Scenario: Redis never comes up
+- **WHEN** `npm start` runs and Redis does not answer within the wait
+- **THEN** the Redis runner exits with a failure status and the other runners stop
+
+#### Scenario: Keep-alive cannot start
+- **WHEN** starting the WSL keep-alive session fails
+- **THEN** the Redis runner logs a readable message and exits with a failure status, without a stack trace
+
 ### Requirement: Format and lint checks pass on every platform
 The repository SHALL check out text files with LF line endings on every platform, so a clean checkout passes the format checks on Windows as well as in CI. The runner scripts (`scripts/*.mjs`) SHALL be covered by a lint and a format check that CI runs.
 
@@ -115,11 +140,15 @@ The repository SHALL check out text files with LF line endings on every platform
 - **THEN** CI fails on the scripts' lint or format step
 
 ### Requirement: Backend commands find uv without PATH
-Every npm command that runs backend code (`npm start` and its runners, `npm run manage`, `npm run api:sync`) SHALL find `uv` the same way, without requiring it on PATH.
+Every npm command that runs backend code (`npm start` and its runners, `npm run manage`, `npm run api:sync`) SHALL find `uv` the same way, without requiring it on PATH. Among Python installs that each provide `uv`, the newest Python version SHALL be tried first.
 
 #### Scenario: Schema export without uv on PATH
 - **WHEN** `uv` is installed but not on PATH, and `npm run api:sync` runs in `apps/frontend`
 - **THEN** the OpenAPI schema and the generated types are written as with `uv` on PATH
+
+#### Scenario: Several Python installs
+- **WHEN** `uv` is installed for both Python 3.9 and Python 3.13 and not on PATH
+- **THEN** the Python 3.13 one is used
 
 ### Requirement: Library scripts refuse to run as commands
 A script under `scripts/` that only provides functions to other scripts SHALL, when started
@@ -160,4 +189,47 @@ date; no audit SHALL be skipped or allowed to fail silently.
 #### Scenario: Accepted advisory
 - **WHEN** an advisory has no fixed version and the repository records it as accepted with a reason and a date
 - **THEN** the audit passes and the accepted advisory stays visible in the repository
+
+### Requirement: CI installs the committed locks
+CI SHALL install and run every dependency exactly as the committed lockfiles record them. A change
+to a dependency list without the matching lockfile update SHALL fail CI instead of being resolved
+on the fly. Tools that CI runs to generate committed files SHALL come from a lockfile too, never
+from an unlocked download.
+
+#### Scenario: Dependency added without locking
+- **WHEN** a pull request adds a package to `apps/backend/pyproject.toml` without running `uv lock`
+- **THEN** the backend job fails
+
+#### Scenario: Generated API types
+- **WHEN** CI regenerates `src/api/schema.d.ts`
+- **THEN** it uses the generator version locked in `apps/frontend/tools/api-types/package-lock.json`
+
+### Requirement: CI runs pinned third-party code without a stored token
+Every third-party action a workflow uses SHALL be pinned to a full commit, with the version it
+stands for noted next to it, and an automated update SHALL propose newer pins. No checkout SHALL
+leave the job's token in the repository's git configuration.
+
+#### Scenario: Action tag moved
+- **WHEN** the owner of a used action moves its `v4` tag to another commit
+- **THEN** CI keeps running the pinned commit until a pin update is merged
+
+#### Scenario: Install script reads git config
+- **WHEN** a dependency's install script reads `.git/config` during `npm ci`
+- **THEN** it finds no token
+
+### Requirement: Runner tests run on Windows and Linux
+CI SHALL run the runner script tests (`npm run test:scripts`) on Windows as well as on Linux, so
+the Windows-only paths of the runners are exercised.
+
+#### Scenario: Windows-only branch broken
+- **WHEN** a change breaks a runner test that only runs on Windows
+- **THEN** CI fails
+
+### Requirement: Browser test reports survive a timeout
+When the browser tests fail or run out of time, CI SHALL keep the Playwright report and traces as
+a downloadable artifact.
+
+#### Scenario: Hung browser test
+- **WHEN** a browser test hangs until the step's time limit
+- **THEN** the run is marked failed and its report and traces are uploaded
 

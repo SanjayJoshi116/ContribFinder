@@ -1,11 +1,11 @@
 // `npm run manage -- <command> [args]`: run a Django management command in apps/backend,
 // finding uv the same way `npm start` does (no need for uv on PATH).
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
+import { root } from './env.mjs'
 import { uv } from './uv.mjs'
 
-const backend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'backend')
+const backend = path.join(root, 'apps', 'backend')
 const args = process.argv.slice(2)
 if (args.length === 0) {
   console.error(

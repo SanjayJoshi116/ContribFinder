@@ -69,13 +69,24 @@ function startKeepAlive() {
     typeof session.pid === 'number'
       ? recordProcess({ pid: session.pid, exe: 'wsl', marker: 'sleep infinity' })
       : null
-  session.on('exit', (code) => {
+  // True when the runner is stopping anyway, so the session's end needs no handling.
+  const ended = () => {
     if (record) removeRecord(record)
-    if (stopping) return
+    return stopping
+  }
+  // A failed spawn (EMFILE, WSL being updated) emits 'error', not 'exit' with a pid (SCR-7).
+  session.on('error', (error) => {
+    if (ended()) return
+    console.error(`Could not start the WSL keep-alive: ${error.message}`)
+    stop(1)
+  })
+  session.on('exit', (code) => {
+    if (ended()) return
     const shown = code === null ? 'none' : `${code}, 0x${(code >>> 0).toString(16).toUpperCase()}`
     if (!restarts.allow()) {
       console.error(`WSL keep-alive ended again (code ${shown}): 4 times in 5 minutes; giving up.`)
-      process.exit(1)
+      stop(1)
+      return
     }
     console.error(`WSL keep-alive session ended (code ${shown}); starting a new one.`)
     keepAlive = startKeepAlive()
@@ -83,15 +94,17 @@ function startKeepAlive() {
   return session
 }
 
-keepAlive = startKeepAlive()
-const stop = () => {
+// Exits with ``code``: 1 when Redis never came up or the keep-alive fails, so `concurrently`
+// (killOthersOn failure) stops the rest of the stack (SCR-6).
+function stop(code = 0) {
   stopping = true
   keepAlive.kill()
-  process.exit(0)
+  process.exit(code)
 }
+keepAlive = startKeepAlive()
 // SIGHUP: the console window was closed.
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, stop)
-watchStack(stop)
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => stop())
+watchStack(() => stop())
 
 try {
   await waitPort(target.host, target.port)
@@ -101,5 +114,5 @@ try {
     `${error.message}. WSL localhost forwarding may be disabled; set REDIS_URL to the ` +
       `WSL IP (wsl hostname -I) instead.`,
   )
-  stop()
+  stop(1)
 }

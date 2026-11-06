@@ -43,11 +43,15 @@ describe('content security policy', () => {
 
   // After `npm run build`: the written index carries the policy and no inline script.
   const built = path.join(import.meta.dirname, 'dist', 'index.html')
-  it.runIf(existsSync(built))('is in the built index, which has no inline script', () => {
-    const html = readFileSync(built, 'utf-8')
-    expect(html).toContain('http-equiv="Content-Security-Policy"')
-    const scripts = html.match(/<script\b[^>]*>/g) ?? []
-    expect(scripts.length).toBeGreaterThan(0)
-    expect(scripts.every((tag) => tag.includes('src='))).toBe(true)
-  })
+  // CI builds before testing, so there a missing build fails instead of skipping (CI-2).
+  it.runIf(existsSync(built) || process.env.CI === 'true')(
+    'is in the built index, which has no inline script',
+    () => {
+      const html = readFileSync(built, 'utf-8')
+      expect(html).toContain('http-equiv="Content-Security-Policy"')
+      const scripts = html.match(/<script\b[^>]*>/g) ?? []
+      expect(scripts.length).toBeGreaterThan(0)
+      expect(scripts.every((tag) => tag.includes('src='))).toBe(true)
+    },
+  )
 })

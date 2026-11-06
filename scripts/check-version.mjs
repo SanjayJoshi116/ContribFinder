@@ -29,7 +29,7 @@ if (isMain(import.meta.url)) {
     'apps/backend/pyproject.toml': read('apps/backend/pyproject.toml').match(
       /^version = "(.+)"$/m,
     )?.[1],
-    // Lockfiles too: CI installs with `npm ci` / `uv sync --frozen`, which reject stale locks.
+    // Lockfiles too: CI installs with `npm ci` / `uv sync --locked`, which reject stale locks.
     ...lockfileVersions('package-lock.json', read('package-lock.json')),
     ...lockfileVersions('apps/frontend/package-lock.json', read('apps/frontend/package-lock.json')),
     'apps/backend/uv.lock': read('apps/backend/uv.lock').match(
