@@ -1914,7 +1914,7 @@ over the combined 0.12.58–0.12.60 code. `/security-review`: nothing.
 - `scripts/env.mjs` `NPM_TREES` (root, `apps/frontend`, `apps/frontend/tools/api-types`) is the
   one list for `setup.mjs` and `audit.mjs`; `env.test.mjs` fails when a tree lacks a lockfile or
   `ci.yml` entry, or a `tools/*` lockfile is unlisted. A new npm tree goes there and in `ci.yml`.
-- Carry-over: task 5.4 (first CI run on `main` green, `scripts-windows` included) after the push.
+- Task 5.4 closed: CI (`scripts-windows` included) green on `main` after the push. No carry-overs.
 
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an

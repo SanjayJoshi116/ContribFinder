@@ -35,7 +35,7 @@
   `npm run build`; `npm run test:scripts`, `lint:scripts`, `format:scripts`;
   `npm run check:version`; `npm run audit:deps` (the new devDependency).
 - [x] 5.3 `openspec validate ci-review-fixes --strict`.
-- [ ] 5.4 After the owner pushes: the CI run on `main` is green, `scripts-windows` included.
+- [x] 5.4 After the owner pushes: the CI run on `main` is green, `scripts-windows` included.
 
 ## 6. Release
 

@@ -448,7 +448,7 @@ CI (Bug_Backlog.md batch 49)
   [x] Actions pinned to commit SHAs, Dependabot for actions; no token left in .git/config
   [x] Frontend job builds before testing (built-index CSP test runs); one type check
   [x] Drift check catches untracked generated files
-  [~] Runner tests on Windows (scripts-windows job; first run after the push)
+  [x] Runner tests on Windows (scripts-windows job)
   [x] Browser test report and traces kept on failure or timeout
   [x] Playwright browser cache keyed on the Playwright version
 
