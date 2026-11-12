@@ -439,6 +439,18 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.61 - Public-release preparation
+============================================================================
+
+Repository (Bug_Backlog.md batch 55, ideas.md §5)
+  [x] CONTRIBUTING.md for outside contributors (setup, checks, rules, pull requests)
+  [x] Git history checked again: no real secrets, no local data, no-reply emails
+  [x] Dead CHANGELOG compare links removed (no v* tags exist)
+  [x] .gitignore covers private keys, certificates and .envrc
+  [ ] GitHub settings before going public (owner only: vulnerability reporting, secret
+      scanning, branch protection, fork workflow approval; PUB-3)
+
+============================================================================
 SHIPPED - v0.12.60 - CI fixes (review sweep: .github/workflows)
 ============================================================================
 

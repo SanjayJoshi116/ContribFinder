@@ -2,6 +2,13 @@
 .env
 .env.*
 !.env.example
+.envrc
+
+# Private keys and certificates (the repository is public)
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Python
 __pycache__/

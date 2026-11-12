@@ -170,7 +170,8 @@ ContribFinder/
 │                           (accepted advisories); eslint.config.mjs (scripts only),
 │                           .prettierrc.json (shared with apps/frontend), .gitattributes (LF)
 ├─ docker-compose.yml       backend, worker, beat, postgres, redis, frontend
-├─ LICENSE (MIT), SECURITY.md (private vulnerability reporting)
+├─ LICENSE (MIT), SECURITY.md (private vulnerability reporting), CONTRIBUTING.md (setup, checks,
+│  rules and pull requests for outside contributors; keep it in step with §3, §5 and §6)
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
 │  ideas.md (unplanned gap analysis by when it can ship: no ranking change first, then
 │  ranking-visible ideas; each idea needs an OpenSpec change first); reports/ (gitignored --json
@@ -1916,6 +1917,19 @@ over the combined 0.12.58–0.12.60 code. `/security-review`: nothing.
   `ci.yml` entry, or a `tools/*` lockfile is unlisted. A new npm tree goes there and in `ci.yml`.
 - Task 5.4 closed: CI (`scripts-windows` included) green on `main` after the push. No carry-overs.
 
+**Public-release preparation** (MVP+, docs)  ✅ shipped in v0.12.61 (no ranking change)
+
+No OpenSpec change (documentation and repository hygiene). `Bug_Backlog.md` batch 55
+(PUB-1 fixed, PUB-2 accepted, PUB-3 open), `ideas.md` §5.
+- `CONTRIBUTING.md` (setup, where code goes, checks, dependency and pull request rules); keep it
+  in step with §3, §5 and §6. Linked from the README.
+- `CHANGELOG.md` has no compare link references: the repository has no `v*` tags. Tag release
+  commits first if the links come back.
+- `.gitignore` also ignores `*.pem`, `*.key`, `*.p12`, `*.pfx` and `.envrc`.
+- Open (owner only, PUB-3): private vulnerability reporting, secret scanning with push
+  protection, Dependabot alerts, `main` protection, approval for fork workflows, then flip to
+  public (hard to undo: clones and forks persist).
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1942,7 +1956,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61).
 
 ## 8. Release housekeeping
 

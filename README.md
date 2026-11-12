@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.60** (query client, session, route, issue detail, browser-test, runner script and CI fixes from the review sweep; MVP+). After signing in with
+**Version 0.12.61** (public-release preparation: contributing guide, history check; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -24,7 +24,8 @@ are measured offline on a hand-judged benchmark before they count as improvement
 - Requirements: `Software Requirements Specification - 2.txt` (authoritative) and `- 1.txt`,
   kept outside the repository (gitignored); `CLAUDE.md` and `openspec/specs/` carry what was
   built from them.
-- License: [MIT](LICENSE). Security reports: [`SECURITY.md`](SECURITY.md).
+- License: [MIT](LICENSE). Security reports: [`SECURITY.md`](SECURITY.md). Contributing:
+  [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Engineering guide and roadmap: [`CLAUDE.md`](CLAUDE.md). Specs: `openspec/specs/`; archived
   changes: `openspec/changes/archive/`.
 

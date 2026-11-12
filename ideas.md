@@ -300,7 +300,9 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   in v0.12.39; the first sweep module, `config/`, reviewed and fixed in the same release)
   (their old copies stay in history; they are the owner's, not confidential). CI hardened in
   v0.12.60 (actions pinned to commit SHAs with Dependabot updates, `persist-credentials: false`,
-  locked installs only). Left, in the repository's GitHub settings (owner only):
+  locked installs only). Rechecked 2026-11-12 (after v0.12.60; `Bug_Backlog.md` batch 55):
+  history still clean; `CONTRIBUTING.md` added; the dead `CHANGELOG.md` compare links removed
+  (PUB-1: no `v*` tags exist), `.gitignore` covers keys and certificates (all v0.12.61). Left, in the repository's GitHub settings (owner only, PUB-3):
   - turn on private vulnerability reporting (`SECURITY.md` points to it), secret scanning with
     push protection, and Dependabot alerts (free for public repositories);
   - protect `main` (no force-push, required checks: CI and the dependency audit);

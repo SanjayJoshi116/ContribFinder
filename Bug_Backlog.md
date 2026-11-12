@@ -1,7 +1,7 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since; current through 0.12.59. Order: the full review sweep (top priority),
+each fix release since; current through 0.12.61. Order: the full review sweep (top priority),
 open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
@@ -96,7 +96,8 @@ fixed as CR-1) and one fix-diff `/code-review` (batch 52, all fixed) over their 
 Batches 26–34 fixed in
 0.12.39–0.12.47 (CFG-7, CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 and SVC-13…SVC-15,
 SVC-17…SVC-19 accepted; batches 32–34: one `/simplify` and one fix-diff `/code-review` over their combined diff, batch 35).
-Open: SVC-16 (per-user ETag cache generation, the root fix for SVC-6). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+Open: SVC-16 (per-user ETag cache generation, the root fix for SVC-6). PUB-3 (batch 55: the
+repository's GitHub settings before it goes public; owner only). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
 their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
@@ -211,6 +212,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 52 | **Fix-diff review of 0.12.55–0.12.57** | CR-1…CR-10 | `/code-review` (high, no verify pass) of the uncommitted 0.12.55–0.12.57 code after batch 51, 2026-11-03; each row checked by reading; CR-1…CR-7, CR-10 fixed before commit (owner: fix all), CR-8 already documented, CR-9 kept (SIM2-11). |
 | 53 | **`/simplify` of 0.12.58–0.12.60** | SIM3-1…SIM3-14 | `/simplify` (reuse, simplification, efficiency, altitude; one combined diff of the uncommitted 0.12.58–0.12.60 tooling and CI code), 2026-11-06; SIM3-1…SIM3-8 fixed before commit, SIM3-9 later fixed as CR3-5, SIM3-10…SIM3-14 skipped (reasons in its section). |
 | 54 | **Fix-diff review of 0.12.58–0.12.60** | CR3-1…CR3-8 | `/code-review` (high) of the uncommitted 0.12.58–0.12.60 code after batch 53, 2026-11-06; each row checked by reading; all fixed before commit (owner: fix all). |
+| 55 | **Public-release check** | PUB-1…PUB-3 | History and repository check before going public, 2026-11-12; PUB-1 fixed in 0.12.61, PUB-2 accepted, PUB-3 open (GitHub settings, owner only). |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -233,7 +235,7 @@ positive) in 0.12.46 (`api-client-review-fixes`); batch 34 (AUTH-1…AUTH-9) in 
 (`developers-review-fixes`); batch 38 (REPO-1…REPO-7; REPO-8 accepted) in 0.12.50
 (`repositories-review-fixes`); batch 39 (`/simplify`, SIM-1…SIM-7) in 0.12.50; batch 40 (ISS-1, ISS-2, ISS-5, ISS-7, ISS-8; ISS-3, ISS-4, ISS-6
 accepted) in 0.12.51 (`issues-review-fixes`); batch 41 (REC-1…REC-4, REC-6…REC-10; REC-5 false
-positive) and SIM-8 in 0.12.52 (`recommendations-review-fixes`); batch 42 (FB-1, FB-3, FB-5; FB-2, FB-6 accepted, FB-4 false positive, FB-7 wontfix) in 0.12.53 (`feedback-review-fixes`); batch 43 (PROF-1…PROF-9) in 0.12.54 (`profiling-review-fixes`); batch 50 (fix-diff review of 0.12.51–0.12.54, FD2-1…FD2-9) folded into 0.12.53 and 0.12.54; batch 44 (APP-1…APP-6, APP-9, APP-10; APP-7, APP-8 accepted) in 0.12.55 (`app-review-fixes`); batch 45 (ROUTE-1…ROUTE-10, ROUTE-10 in part) in 0.12.56 (`routes-review-fixes`); batch 46 (FI-1…FI-3, FI-6, FI-7, FI-10; FI-4 guard) in 0.12.57 (`issue-detail-review-fixes`); batch 51 (`/simplify`, SIM2-1…SIM2-8) and batch 52 (fix-diff review, CR-1…CR-7, CR-10) folded into 0.12.55–0.12.57; batch 47 (E2EC-1, E2EC-3, E2EC-4, E2EC-6, E2EC-7; E2EC-2, E2EC-5 accepted) in 0.12.58 (`e2e-config-review-fixes`); batch 48 (SCR-1…SCR-4, SCR-6…SCR-10; SCR-5 accepted) in 0.12.59 (`scripts-review-fixes`); batch 49 (CI-1…CI-10) in 0.12.60 (`ci-review-fixes`).
+positive) and SIM-8 in 0.12.52 (`recommendations-review-fixes`); batch 42 (FB-1, FB-3, FB-5; FB-2, FB-6 accepted, FB-4 false positive, FB-7 wontfix) in 0.12.53 (`feedback-review-fixes`); batch 43 (PROF-1…PROF-9) in 0.12.54 (`profiling-review-fixes`); batch 50 (fix-diff review of 0.12.51–0.12.54, FD2-1…FD2-9) folded into 0.12.53 and 0.12.54; batch 44 (APP-1…APP-6, APP-9, APP-10; APP-7, APP-8 accepted) in 0.12.55 (`app-review-fixes`); batch 45 (ROUTE-1…ROUTE-10, ROUTE-10 in part) in 0.12.56 (`routes-review-fixes`); batch 46 (FI-1…FI-3, FI-6, FI-7, FI-10; FI-4 guard) in 0.12.57 (`issue-detail-review-fixes`); batch 51 (`/simplify`, SIM2-1…SIM2-8) and batch 52 (fix-diff review, CR-1…CR-7, CR-10) folded into 0.12.55–0.12.57; batch 47 (E2EC-1, E2EC-3, E2EC-4, E2EC-6, E2EC-7; E2EC-2, E2EC-5 accepted) in 0.12.58 (`e2e-config-review-fixes`); batch 48 (SCR-1…SCR-4, SCR-6…SCR-10; SCR-5 accepted) in 0.12.59 (`scripts-review-fixes`); batch 49 (CI-1…CI-10) in 0.12.60 (`ci-review-fixes`); PUB-1 of batch 55 in 0.12.61 (no OpenSpec change, docs only).
 Next: the full review sweep (the medium group done, batch 49 fixed in 0.12.60; next the low group, one change each as batch 42); RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
@@ -1588,3 +1590,19 @@ paths first run in Linux CI (no Node in WSL here).
 | CR3-6 | test | `scripts/child.test.mjs` | The SCR-4 test's 5 s timeout equalled `GRACE_MS`, so the force kill could make it pass. | fixed: 2 s timeout |
 | CR3-7 | test | `scripts/env.test.mjs` | The root lockfile "in CI" check matched `apps/frontend/package-lock.json` as a substring; only `tools/*` was scanned for unlisted trees. | fixed: lockfiles from `git ls-files --cached --others --exclude-standard` must equal `NPM_TREES`; each must be a whole `ci.yml` entry |
 | CR3-8 | test | `csp.config.test.ts` | `CI=false` (or any value) also forced the built-index test (ENOENT without `dist/`). | fixed: `process.env.CI === 'true'` |
+
+## Public-release check (2026-11-12)
+
+Batch 55. Source: a check of the full git history and the tree before making the repository
+public (after v0.12.60; `ideas.md` §5 "Making the repository public"). Searched every commit's
+patch for token and key patterns, the paths ever committed, commit authors, local paths in
+tracked files, `.env.example`, the evaluation datasets, workflow permissions and triggers.
+Clean: only fake test tokens (`gho_testtoken0000…`), `.env`, `judging/`, `reports/` and `.run/`
+never committed, every commit on the no-reply address, persona-only datasets, `permissions:` set
+in both workflows, no `pull_request_target`, no `secrets.*`.
+
+| ID | Type | Where | Finding | Status |
+|---|---|---|---|---|
+| PUB-1 | docs | `CHANGELOG.md` (link references) | The compare links stopped at 0.10.0 and pointed at `v*` tags that were never created (the repository has no tags), so every version link returned 404. | fixed (0.12.61): link references removed, headings stay `## [x.y.z] - date` as plain text; noted under `[Unreleased]` "Removed". Tagging release commits and restoring the links stays possible |
+| PUB-2 | privacy | git history (`55f0fe9` … `8074cbe`) | Both SRS files, untracked in 0.12.39, are still reachable in history. | accepted: the owner's own documents, not confidential (`ideas.md` §5); removing them would need a history rewrite and a force-push |
+| PUB-3 | settings | GitHub repository settings | Private vulnerability reporting (which `SECURITY.md` relies on), secret scanning with push protection, Dependabot alerts, `main` protection (required checks, no force-push) and approval for fork workflows are not yet turned on. | open (owner only; the list is in `ideas.md` §5) |

@@ -7,6 +7,28 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.61] - 2026-11-12
+
+Public-release preparation (`Bug_Backlog.md` batch 55, `ideas.md` §5). Documentation and
+repository hygiene only: no app, backend, API or ranking change. The git history was checked
+again before the repository goes public: no real secrets, no local data, no-reply commit emails.
+
+### Added
+
+- `CONTRIBUTING.md`: setup, where code goes, the checks to run, dependency and pull request rules
+  for outside contributors (linked from the README).
+
+### Removed
+
+- The version compare links at the end of this file: they stopped at 0.10.0 and pointed at git
+  tags that were never created, so every one returned 404 (PUB-1).
+
+### Changed
+
+- `.gitignore` also ignores private keys and certificates (`*.pem`, `*.key`, `*.p12`, `*.pfx`)
+  and `.envrc`, so a credential file cannot be committed by accident once the repository is
+  public.
+
 ## [0.12.60] - 2026-11-06
 
 CI fixes from the review sweep (`openspec/changes/archive/2026-11-06-ci-review-fixes/`; spec
@@ -2418,15 +2440,3 @@ Phase 1: Foundation (OpenSpec change `phase-1-foundation`; FR-AUTH-001..003).
   the development machine). This is carried over to Phase 2.
 - The API contract version (`/api/v1`, OpenAPI `1.0.0`) is versioned separately from the app
   version.
-
-[Unreleased]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.10.0...HEAD
-[0.10.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.9.0...v0.10.0
-[0.9.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.8.0...v0.9.0
-[0.8.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.7.0...v0.8.0
-[0.7.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/SanjayJoshi116/ContribFinder/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/SanjayJoshi116/ContribFinder/releases/tag/v0.1.0
