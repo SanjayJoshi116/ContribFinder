@@ -471,11 +471,12 @@ def test_issue_refresh_makes_recommendations_due(user, developer, pool, respx_mo
     from services.ranking import freshness
     from services.repositories.analysis import RepositoryAnalysisService
 
-    from .repo_fixtures import API, issue_payload
+    from .repo_fixtures import API, issue_payload, same_repository
     from .test_github_client import TOKEN
 
     repo = pool["django"]
     generate(user)
+    same_repository(respx_mock, repo.full_name, repo.github_id)
     respx_mock.get(f"{API}/repos/{repo.full_name}/issues").respond(200, json=[issue_payload(1)])
     with GitHubClient(TOKEN, cache_scope="public") as client:
         RepositoryAnalysisService(client).run(repo.pk, ["issues"])

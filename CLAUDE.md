@@ -1930,6 +1930,69 @@ No OpenSpec change (documentation and repository hygiene). `Bug_Backlog.md` batc
   protection, Dependabot alerts, `main` protection, approval for fork workflows, then flip to
   public (hard to undo: clones and forks persist).
 
+**Repository service fixes, review sweep: services/repositories** (MVP+, fix release)  ✅ shipped in v0.12.62 (ranking-visible through data)
+
+Archived: `openspec/changes/archive/2026-11-12-services-repositories-review-fixes/`. Specs: deltas
+to `github-data-sync` (new "Stored GitHub text"; "Profile README ingestion"), `repository-analysis`
+("Repository data collection"; new "Identity confirmed before a refresh without metadata",
+"Repository names compare case-insensitively", "Broker refusal while queuing a released name"),
+`repository-discovery` (new "Eligibility re-check stamped when made"). `Bug_Backlog.md` batch 56
+(RS-1…RS-10; RS-4 false positive), the first module of the low group. One `/simplify` and one fix-diff
+`/code-review` over the combined 0.12.62–0.12.63 code (batch 58, see 0.12.63). `/security-review`: nothing.
+- `services/github/client.storable(text)` (NUL removed, unpaired surrogates → U+FFFD) is the one
+  cleaner: `_Response.json()` walks every string (keys included), `_Response.content` serves raw
+  files (`get_readme`, `get_profile_readme`, `get_file`). The ETag cache keeps the raw body. A new
+  raw-file reader uses `.content`, never `.text`.
+- Analysis `_fetch`: a refresh without metadata calls `_identity` (by name, conditional)
+  first; another GitHub ID or a 404 adds the metadata part (by ID). `fetched_name` is decided
+  after the fetch. Tests of partial refreshes register `repo_fixtures.same_repository(router,
+  name, id)`; request-count assertions include that check.
+- `lifecycle.fail` returns whether it changed the row (`run` → SKIPPED when not);
+  `release_name` matches `full_name__iexact` and locks holders `order_by("github_id")` first,
+  served by `repository_full_name_upper_idx` (`repositories.0010`); `recheck_eligibility` stamps
+  transitions with `timezone.now()`.
+- `queue_released`: `on_commit(send, robust=True)`, refused sends `unmark_queued`.
+- Entry-label flags come from `services.issues.labels.category`; `normalize_label` is gone.
+  Benchmarks store the flags, so baselines did not move. `mark_stale` uses `.only(...)` and
+  grouped updates.
+
+**Issue analysis fixes, review sweep: services/issues** (MVP+, fix release)  ✅ shipped in v0.12.63 (ranking-visible through data)
+
+Archived: `openspec/changes/archive/2026-11-12-services-issues-review-fixes/`. Specs: deltas to
+`issue-analysis` ("Label normalization", "Difficulty estimate", "Issue technologies"),
+`issue-ingestion` ("Issue collection"). `Bug_Backlog.md` batch 57 (ISV-1…ISV-10; ISV-3 in part,
+ISV-9 accepted). One `/simplify` and one fix-diff `/code-review` over the combined
+0.12.62–0.12.63 code: batch 58 (CR4-1…CR4-10), fixed before commit. `/security-review`: nothing. `ISSUE_TAXONOMY_VERSION` 2026.11.1; baselines unchanged.
+- `labels.parts(name) -> LabelParts(full, scope, value)` (`lru_cache`) is the one label parser:
+  a punctuated scope (`type:`, `kind/`, `[type]`), else leading words in `labels.SCOPE_WORDS`
+  (`type-bug` → `bug`, `E-easy` → `easy`). `forms` and `category` read it. A test fails when an
+  alias or difficulty form starts with a scope word: a new scope word must not clash.
+- Difficulty votes: unscoped labels, or a scope in `labels.DIFFICULTY_SCOPES` (a subset of
+  `SCOPE_WORDS`, so `skill-easy` parses too); the
+  good-first-issue category votes beginner under any scope. Length after
+  `strip_code_fences(strip_html_comments(body))`.
+- `services/profiling/text.py` holds the one CommonMark fence rule (`FENCE`, `closes_fence`,
+  `strip_code_fences`); `readme.tech_sections` uses it.
+- Label technologies: `ALL_MATCHER` on the value (never the scope), `PLAIN_MATCHER` on the full
+  form; body technologies after `strip_html_comments`. `spring cleaning`/`good to go` still match
+  (the catalog marks `react` ambiguous too).
+- `IssueInput(..., max_chars=)` strips HTML comments, then caps, once for every consumer and the
+  stored body; `classify.difficulty` and `technologies.detect` read it as given (a test fails if
+  anything else in `services/` calls them). `backlog.send_refreshes(sends)` is the one
+  send-and-unmark loop (backlog task, released names).
+- `services/github/text.py` (`storable`, `storable_json`, `parse_json`; the JSON walk only when
+  the body holds a `\u0000` or lone-surrogate escape) serves the client and `oauth.fetch_identity`.
+- `labels.parts`: unpunctuated scope = run of leading `SCOPE_WORDS` (`DIFFICULTY_SCOPES` inside
+  it); a lone letter scopes only a known category or difficulty (`C-API` unscoped); `.` kept at
+  the start. `labels.scoped_by(scope, words)` decides difficulty votes and whether a scope can
+  be a technology (`Rust: async`). `text.FENCE`: a backtick run with a later backtick is no fence.
+- `analysis._identity` returns the lookup: a rename is stored as metadata, another ID or 404
+  goes to the ID lookup. `storage.lock_for_upsert(repos)` locks rows and name holders in GitHub
+  ID order; a batch of upserts calls it first. Tests: `repo_fixtures.take_name`.
+- The stored issue body is `strip_html_comments(body)[:ISSUE_BODY_MAX_CHARS]`. core.E040 refuses
+  `several_technologies >= many_technologies` and `long_body >= ISSUE_BODY_MAX_CHARS`.
+- `contribution_type_evidence` always carries `taxonomy`.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -1956,7 +2019,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63).
 
 ## 8. Release housekeeping
 

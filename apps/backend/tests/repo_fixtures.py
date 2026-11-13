@@ -9,7 +9,8 @@ import respx
 from django.utils import timezone
 
 from repositories.models import Repository
-from services.github.client import GitHubClient
+from services.github.client import GitHubClient, GitHubRepo
+from services.github.storage import upsert_repository
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import PART_FIELDS, stale_parts
 
@@ -37,6 +38,20 @@ def repo_payload(full_name: str, github_id: int, **extra: Any) -> dict[str, Any]
         "pushed_at": (timezone.now() - timedelta(days=3)).isoformat(),
         **extra,
     }
+
+
+def take_name(full_name: str = "org/tool", github_id: int = 2) -> Repository:
+    """A discovery search stores ``github_id`` as ``full_name`` (releasing it from a holder)."""
+    gh = GitHubRepo.from_api(repo_payload(full_name, github_id))
+    return upsert_repository(gh, timezone.now(), metadata_fetched=False)
+
+
+def same_repository(router: respx.MockRouter, full_name: str, github_id: int) -> respx.Route:
+    """GitHub still serves ``github_id`` as ``full_name``: the identity check a refresh without
+    metadata makes first (spec "Identity confirmed before a refresh without metadata")."""
+    return router.get(f"{API}/repos/{full_name}").respond(
+        200, json=repo_payload(full_name, github_id)
+    )
 
 
 def mock_repo_api(

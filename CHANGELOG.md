@@ -7,6 +7,85 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.63] - 2026-11-12
+
+Issue analysis fixes from the review sweep (`openspec/changes/archive/2026-11-12-services-issues-review-fixes/`;
+specs `issue-analysis`, `issue-ingestion`; `Bug_Backlog.md` batch 57). `ISSUE_TAXONOMY_VERSION`
+2026.11.1: stored issues are re-analyzed on their next fetch. No migration. OpenAPI stays `1.0.0`;
+baselines unchanged. One `/simplify` and one fix-diff `/code-review` over the combined
+0.12.62–0.12.63 code (`Bug_Backlog.md` batch 58, CR4-1…CR4-10), fixed before release.
+
+### Fixed
+
+- Hyphen-scoped labels such as `type-bug`, `C-feature-request` and `E-easy` are understood: a
+  first word from a fixed list of scope words is read as a scope (ISV-1).
+- Priority and severity labels (`Priority: Medium`, `severity: trivial`) no longer vote on
+  difficulty, so a good first issue with a priority label is no longer `unknown`. Only unscoped
+  labels and difficulty scopes (`difficulty:`, `level/`, `E-`) vote (ISV-2).
+- A label's scope word is no longer a technology: `C-bug` no longer means the C language (ISV-3,
+  in part: `spring cleaning` still matches Spring).
+- Template comments in an issue body no longer add technologies, also when they contain `>` or
+  are never closed (ISV-4).
+- A pasted log or stack trace in a fenced code block no longer makes a short report count as a
+  long description (ISV-6).
+- The stored issue body drops HTML comments before it is capped, so a long issue template no
+  longer pushes the report out (ISV-7).
+- Multi-word difficulty scopes (`Skill Level: Easy`, `skill-level-easy`) vote again; `C-API`,
+  `c extension`, `.NET`, `Rust: async` and `go/rust` keep their technologies; `e-commerce` is
+  not scoped (CR4-1…CR4-4).
+- A line starting with inline triple backticks no longer hides the rest of an issue body or
+  README section (CR4-5).
+- A refresh without metadata stores a rename seen by its identity check and no longer asks the
+  name twice; a sign-in with a NUL in the GitHub name no longer fails; a batch of repository
+  upserts locks name holders in GitHub ID order, so a sync and a discovery run cannot deadlock
+  (CR4-6…CR4-8).
+
+### Changed
+
+- Startup checks (core.E040) refuse a `several_technologies` equal to `many_technologies` (the
+  technology count could never vote intermediate) and a `long_body` at or above
+  `ISSUE_BODY_MAX_CHARS` (the length could never vote advanced) (ISV-5, ISV-7).
+- An `unknown` contribution type records the taxonomy version in its evidence (ISV-8).
+- One cached label parser serves categories, difficulty votes and technologies; the README
+  parser and issue difficulty share one code-fence rule (ISV-10).
+
+## [0.12.62] - 2026-11-12
+
+Repository service fixes from the review sweep, the first module of the low group
+(`openspec/changes/archive/2026-11-12-services-repositories-review-fixes/`; specs
+`github-data-sync`, `repository-analysis`, `repository-discovery`; `Bug_Backlog.md` batch 56).
+One index-only migration (`repositories.0010`). OpenAPI stays `1.0.0`; baselines unchanged.
+`/simplify` and the fix-diff `/code-review` ran over the combined 0.12.62–0.12.63 code (see
+0.12.63).
+
+### Fixed
+
+- A NUL character or a broken Unicode character in GitHub text (a README, an issue, a label, a
+  search result's description, the profile README) no longer makes the database write fail.
+  Before, one such repository failed every discovery job whose pool held it, and its refreshes
+  failed forever. The GitHub client now removes NUL characters and replaces unpaired surrogates
+  in everything it returns (RS-2).
+- A refresh that skips metadata first checks that GitHub still has the same repository under
+  the stored name. A repository renamed away, whose old name a new repository took, no longer
+  gets that repository's issues or README stored under it (RS-1).
+- Queuing the refresh of a repository that gave up its name no longer fails a sync, search or
+  analysis whose data was already saved when the broker refuses the task; the refused
+  repository is no longer marked as queued (RS-3).
+- An eligibility change made by discovery's pool step is stamped with the current time, so
+  other developers' recommendations notice it (RS-5).
+- A stored repository whose name differs only in letter case from a new repository's name now
+  gives the name up (RS-6). A new index keeps the case-insensitive lookup fast.
+- An analysis that lost its claim to another worker reports itself skipped, not failed (RS-7).
+
+### Changed
+
+- A repository's good-first-issue and help-wanted flags use the same label rule as issue
+  analysis, so scoped labels (`type: good first issue`) and aliases (`contributions welcome`)
+  count for the openness signal. Stored flags change on each repository's next community refresh
+  (RS-8).
+- The staleness sweep reads only the fields it needs and updates in groups (RS-9); name release
+  locks rows in GitHub ID order (RS-10).
+
 ## [0.12.61] - 2026-11-12
 
 Public-release preparation (`Bug_Backlog.md` batch 55, `ideas.md` §5). Documentation and

@@ -20,16 +20,13 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 from .inputs import Evidence
 from .taxonomy import AMBIGUOUS_PHRASES, PLAIN_PHRASES, skill_for_icon
-from .text import PhraseMatcher, plain_text
+from .text import FENCE, PhraseMatcher, closes_fence, plain_text
 
 SOURCE = "readme"
 
 _SECTION_TITLE = re.compile(r"skill|tech|stack|tool|language|framework|technolog", re.I)
 # A closing "#" sequence only after whitespace (CommonMark), so "## C#" keeps its "#" (PROF-7).
 _ATX = re.compile(r"^\s{0,3}(#{1,6})\s+(.*?)(?:\s+#+)?\s*$")
-# CommonMark fences: an opening run of 3+ backticks or tildes (an info string may follow); only
-# a run of the same character, at least as long and with nothing after it, closes it.
-_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})(.*)$")
 _HTML_HEADING = re.compile(r"<h([1-6])[^>]*>(.*?)</h\1>", re.I | re.S)
 _BOLD_LABEL = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*|__)([^*_]{1,60})(?:\*\*|__)\s*:?\s*(.*)$")
 _TAG = re.compile(r"<[^>]+>")
@@ -55,14 +52,9 @@ def tech_sections(readme: str) -> list[tuple[str, str]]:
     headings: list[tuple[int, int, str]] = []  # (line index, level, title)
     fence = ""  # the open fence's marker run; its lines are section text, never headings (PROF-2)
     for index, line in enumerate(lines):
-        marker = _FENCE.match(line)
+        marker = FENCE.match(line)
         if fence:
-            if (
-                marker
-                and marker.group(1)[0] == fence[0]
-                and len(marker.group(1)) >= len(fence)
-                and not marker.group(2).strip()
-            ):
+            if closes_fence(marker, fence):
                 fence = ""
             continue
         if marker:

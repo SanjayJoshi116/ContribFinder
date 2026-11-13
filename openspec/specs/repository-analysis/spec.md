@@ -10,7 +10,7 @@ For each candidate repository the system SHALL collect and store:
 - languages (bytes) and topics;
 - the README;
 - whether it has CONTRIBUTING documentation, a code of conduct, issue templates and a pull request template;
-- whether it has a `good first issue` and a `help wanted` label;
+- whether it has a label that the issue label normalization (`issue-analysis` "Label normalization") maps to `good first issue`, and one it maps to `help wanted`;
 - root dependency manifests, parsed into dependency names the same way as for the developer's own repositories;
 - setup facts: whether CI configuration, tests, a dev environment configuration and a Docker Compose file were found;
 - activity signals (see `repository-activity`);
@@ -37,6 +37,10 @@ A fact not found SHALL be stored as not found, which means only that nothing mat
 #### Scenario: Missing optional files
 - **WHEN** a repository has no README, no CONTRIBUTING file, no labels and no open issues
 - **THEN** it is analyzed successfully and records that each of these is absent
+
+#### Scenario: Entry labels with a scope or an alias
+- **WHEN** a repository's labels are `type: good first issue` and `contributions welcome`, and issue analysis maps them to `good first issue` and `help wanted`
+- **THEN** the repository is stored as having a `good first issue` and a `help wanted` label
 
 #### Scenario: Setup facts found
 - **WHEN** a repository's root holds `.github` (with `ci.yml` in `.github/workflows`), `tests/`, `.devcontainer/` and `docker-compose.yml`
@@ -255,3 +259,39 @@ Analysis during a developer's discovery run SHALL use that developer's token. Ba
 - **WHEN** any repository analysis or refresh runs, succeeds or fails
 - **THEN** stored repository fields, queued task arguments and log output contain no access token and no client secret
 
+### Requirement: Identity confirmed before a refresh without metadata
+A refresh that does not fetch a repository's metadata SHALL first look the repository up by its stored name and SHALL continue under that name only when GitHub answers with the same GitHub ID under the stored name. When GitHub answers with the same GitHub ID under another name (a rename it redirects), that answer SHALL be stored as the repository's metadata. When GitHub answers with another GitHub ID or not found, the refresh SHALL fetch the repository's metadata by GitHub ID, without asking for the name again. In both cases the other data types SHALL be fetched under the name GitHub gives for that ID. Data that GitHub serves for another GitHub ID SHALL NOT be stored under the repository.
+
+#### Scenario: Name taken before an issues refresh
+- **WHEN** stored repository `org/tool` (GitHub ID 1) was renamed on GitHub to `org/tool-legacy`, a new repository `org/tool` (GitHub ID 2) was created and is not stored, and an issues-only refresh of GitHub ID 1 runs
+- **THEN** the refresh fetches GitHub ID 1's metadata by ID, stores it as `org/tool-legacy`, and stores the issues of `org/tool-legacy`, never those of GitHub ID 2
+
+#### Scenario: Renamed before a README refresh
+- **WHEN** stored repository `org/tool` (GitHub ID 1) was renamed to `org/tool-new`, and a README-only refresh runs
+- **THEN** the lookup of `org/tool` answers GitHub ID 1 as `org/tool-new`, that answer is stored as the metadata (no lookup by ID), and the README of `org/tool-new` is stored
+
+#### Scenario: Same repository
+- **WHEN** an issues-only refresh runs and GitHub answers the lookup of the stored name with the same GitHub ID
+- **THEN** the refresh fetches and stores only the issues
+
+#### Scenario: Deleted before a README refresh
+- **WHEN** a README-only refresh runs, GitHub answers the stored name with not found, and answers the lookup by GitHub ID with not found
+- **THEN** the repository is FAILED with error code `not_found` and ineligible with the reason `repository_unavailable`
+
+### Requirement: Repository names compare case-insensitively
+When storing a repository looks for a stored repository holding the same name (see "Analysis failures are recorded"), names SHALL be compared case-insensitively, as GitHub compares them. A holder whose stored name differs only in letter case SHALL give the name up as any other holder.
+
+#### Scenario: Recreated with different case
+- **WHEN** stored repository `Org/Tool` (GitHub ID 1) was deleted on GitHub, a new repository `org/tool` (GitHub ID 2) was created, and a search stores GitHub ID 2
+- **THEN** GitHub ID 1 gives up its name, is ineligible as `name_released`, and its refresh is queued as for any released name
+
+#### Scenario: Same repository with a case change
+- **WHEN** a stored repository `org/Tool` is stored again under `org/tool` with the same GitHub ID
+- **THEN** no name is released and the repository is stored as `org/tool`
+
+### Requirement: Broker refusal while queuing a released name
+When the refresh of a repository that released its name cannot be sent because the broker refuses the task, the change that released the name SHALL still succeed with everything it stored. The repository whose task was refused SHALL NOT count as queued, so the periodic background task can queue it, and every other repository of that change SHALL still have its refresh sent.
+
+#### Scenario: Broker down after a search
+- **WHEN** a discovery search stores `org/tool` (GitHub ID 3) while pooled repositories `Org/Tool` (GitHub ID 1) and `ORG/TOOL` (GitHub ID 2) hold that name, and the broker refuses the first of their two refresh tasks
+- **THEN** the search's results stay stored and its step does not fail, the second task is sent, and the first repository is not stamped as queued

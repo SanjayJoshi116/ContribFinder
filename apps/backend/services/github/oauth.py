@@ -16,6 +16,7 @@ from services.github.errors import (
     GitHubTransientError,
     error_for_response,
 )
+from services.github.text import parse_json
 
 
 class OAuthError(Exception):
@@ -116,7 +117,7 @@ def fetch_identity(access_token: str) -> GitHubIdentity:
     if response.status_code != 200:
         raise OAuthError("identity_failed", f"GET /user returned {response.status_code}")
     try:
-        data = response.json()
+        data = parse_json(response.text)  # stored as the display name (spec "Stored GitHub text")
         login = data["login"]
         identity = GitHubIdentity(
             github_id=int(data["id"]),

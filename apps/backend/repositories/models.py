@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Upper
 from django.utils import timezone
 
 
@@ -111,6 +112,8 @@ class Repository(models.Model):
         indexes = [
             models.Index(fields=["-pushed_at"]),
             models.Index(fields=["lifecycle", "lifecycle_changed_at"], name="repo_lifecycle_idx"),
+            # Case-insensitive name lookups (``full_name__iexact``: GitHub names), on every upsert.
+            models.Index(Upper("full_name"), name="repository_full_name_upper_idx"),
         ]
 
     def __str__(self) -> str:

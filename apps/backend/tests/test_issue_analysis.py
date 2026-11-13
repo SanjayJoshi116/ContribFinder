@@ -201,11 +201,12 @@ def test_empty_body_and_no_technology_abstain() -> None:
 
 def test_template_comments_do_not_count_as_description() -> None:
     # Longer than long_body (4000) with the comments, short without them.
+    # Removed once by IssueInput, for every consumer.
     template = "<!-- Describe the bug in detail. Include steps, versions and logs. -->\n" * 60
-    _, evidence = difficulty(body=template + "Typo in README")
-    assert votes_of(evidence)["body_length"] == "beginner"
-    _, evidence = difficulty(body=template)
-    assert votes_of(evidence)["body_length"] is None
+    result = analyze(IssueInput("", template + "Typo in README", (), 0), THRESHOLDS)
+    assert votes_of(result.difficulty_evidence)["body_length"] == "beginner"
+    result = analyze(IssueInput("", template, (), 0), THRESHOLDS)
+    assert votes_of(result.difficulty_evidence)["body_length"] is None
 
 
 def test_thresholds_are_recorded() -> None:
@@ -307,6 +308,10 @@ def test_analysis_is_deterministic() -> None:
 
 def test_analysis_of_unclassifiable_issue() -> None:
     result = analyze(IssueInput("Rename module", "", [], 0), THRESHOLDS)
-    assert (result.contribution_type, result.contribution_type_evidence) == ("unknown", {})
+    # The taxonomy version is recorded for an unknown type too (ISV-8).
+    assert (result.contribution_type, result.contribution_type_evidence) == (
+        "unknown",
+        {"taxonomy": labels.ISSUE_TAXONOMY_VERSION},
+    )
     assert result.difficulty == "unknown"
     assert result.labels == [] and result.technologies == []

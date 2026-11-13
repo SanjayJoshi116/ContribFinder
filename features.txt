@@ -439,6 +439,40 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.63 - Issue analysis fixes (review sweep: services/issues)
+============================================================================
+
+Issue analysis (Bug_Backlog.md batch 57)
+  [x] Hyphen-scoped labels understood (type-bug, C-feature-request, E-easy)
+  [x] Priority and severity labels no longer vote on difficulty
+  [x] A label's scope word is never a technology (C-bug is not C)
+  [x] Template comments and pasted code blocks no longer count as the report
+  [x] Stored issue body drops template comments before the cap
+  [x] Startup checks refuse difficulty settings that can never vote
+
+Review fixes before release (Bug_Backlog.md batch 58)
+  [x] Multi-word difficulty scopes vote (Skill Level: Easy, skill-level-easy)
+  [x] Label technologies kept: C-API, .NET, Rust: async, go/rust; e-commerce not scoped
+  [x] Inline triple backticks no longer hide the rest of an issue body or README section
+  [x] Refresh stores a rename seen by its identity check; name asked once
+  [x] Sign-in with a NUL character in the GitHub name no longer fails
+  [x] Batch upserts lock name holders in GitHub ID order (no sync/discovery deadlock)
+
+============================================================================
+SHIPPED - v0.12.62 - Repository service fixes (review sweep: services/repositories)
+============================================================================
+
+Repository data (Bug_Backlog.md batch 56)
+  [x] GitHub text with NUL or broken Unicode characters is stored cleaned, never failing a
+      discovery job, refresh, search or sync
+  [x] A refresh without metadata confirms the repository's identity by name first
+  [x] Broker refusal while queuing a released name never fails saved work
+  [x] Eligibility re-check stamped with the current time (freshness sees it)
+  [x] Name release compares names case-insensitively (indexed)
+  [x] Entry-label flags use the issue label rule (scopes, aliases)
+  [x] Lost claim reported as skipped; lighter staleness sweep; ordered name-release locks
+
+============================================================================
 SHIPPED - v0.12.61 - Public-release preparation
 ============================================================================
 

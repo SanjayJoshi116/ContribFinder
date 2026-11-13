@@ -37,7 +37,7 @@ from repositories.models import (
 from services.errors import PermanentJobError
 from services.github.client import PUBLIC_SCOPE, GitHubClient, GitHubRepo
 from services.github.errors import GitHubValidationError
-from services.github.storage import replace_topics, upsert_repository
+from services.github.storage import lock_for_upsert, replace_topics, upsert_repository
 from services.job_guard import heartbeat, job_write, merge_metadata, save_progress
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.lifecycle import IN_PROGRESS, recheck_eligibility
@@ -162,7 +162,8 @@ class DiscoveryService:
                     kept.append((rank, gh))
             with job_write(self.job):
                 # GitHub ID order: concurrent runs storing overlapping results lock the shared
-                # rows in the same order and never deadlock.
+                # rows (and the rows holding their names) in the same order and never deadlock.
+                lock_for_upsert([gh for _, gh in kept])
                 for rank, gh in sorted(kept, key=lambda item: item[1].github_id):
                     repo = self._store_search_result(gh)
                     # Topics are the search result's (just stored); dependencies are stored.

@@ -251,10 +251,6 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   query cache special-cases the identity query by hash (`isMe`) and, since 0.12.47, by whether it
   held data; mutations use `meta.endsSession`. A query `meta` opt-out (set by `useMe` while it has
   no identity) would make both sides one mechanism.
-- **Bulk repository locks behind one helper** (same pass, `Bug_Backlog.md` FD-2).
-  `release_name` locks the holder of a name out of GitHub ID order inside the sorted upserts of
-  the sync and discovery; a `lock_repositories(ids)` in ID order, taken before the upserts, would
-  enforce the rule in one place. Belongs with the `services/repositories/` sweep.
 - **One traceback rule for job failures** (from the batches 36–38 `/simplify`, 2026-11-02).
   `revoke_later` and the repository refresh log `internal_error` with its traceback;
   `run_tracked_job` logs every final failure as a plain warning, so a sync or analysis bug loses
@@ -428,6 +424,8 @@ Newest first.
 
 | Idea | § | Shipped in |
 |---|---|---|
+| Bulk repository locks behind one helper (rows and name holders in GitHub ID order before a batch of upserts) | §15 | v0.12.63 (`storage.lock_for_upsert`; `Bug_Backlog.md` FD-2, CR4-8) |
+| Broker-refusal handling in one place (send each refresh, unmark the refused) | §15 | v0.12.63 (`backlog.send_refreshes`; the wider "dispatch after commit" helper stays open) |
 | Browser tests on the production build (`vite build` + `vite preview`, CSP violations fail a test) | §14 | v0.12.38 (`E2E_DEV_SERVER=1` keeps the dev server locally) |
 | Route-level id validation (`RouteId` wrapper for detail routes) | §14 | v0.12.37 (same dead ends; the page remounts per id) |
 | Released-name refresh queued at commit (`backlog.queue_released`) | §13 | v0.12.36 (pooled holders only, not inline) |

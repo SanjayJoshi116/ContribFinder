@@ -8,10 +8,12 @@ stay raw only.
 
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Iterable
+from typing import NamedTuple
 
-ISSUE_TAXONOMY_VERSION = "2026.10.4"
+ISSUE_TAXONOMY_VERSION = "2026.11.1"
 
 GOOD_FIRST_ISSUE = "good_first_issue"
 HELP_WANTED = "help_wanted"
@@ -106,11 +108,36 @@ ALIASES: dict[str, str] = {
     **dict.fromkeys(("design", "ux", "ui/ux", "ux design"), DESIGN),
 }
 
+# Difficulty-indicating label forms (normalized, without scope) → level (``Difficulty`` values).
+DIFFICULTY_FORMS: dict[str, str] = {
+    **dict.fromkeys(("easy", "beginner", "starter", "trivial", "low hanging fruit"), "beginner"),
+    **dict.fromkeys(("medium", "intermediate", "moderate"), "intermediate"),
+    **dict.fromkeys(("hard", "complex", "expert", "advanced", "difficult"), "advanced"),
+}
+
 _SEPARATORS = re.compile(r"[\s_-]+")
-_EDGES = re.compile(r"^[^a-z0-9]+|[^a-z0-9+#]+$")
+# A leading "." stays: ".NET" is a technology.
+_EDGES = re.compile(r"^[^a-z0-9.]+|[^a-z0-9+#]+$")
 # A leading scope such as "type:", "kind/", "area/" or "[type]" (its "[" is already dropped by
 # ``_EDGES``); "good first issue" has none.
-_SCOPE = re.compile(r"^[a-z ]{1,20}[:/\]]\s*")
+_SCOPE = re.compile(r"^([a-z ]{1,20})[:/\]]\s*")
+# Words under which a label states difficulty ("difficulty: easy", "E-easy", "Skill Level:
+# Easy"). Any other scope ("Priority: Medium", "severity: trivial") says nothing about the work.
+DIFFICULTY_SCOPES = frozenset(
+    {"difficulty", "level", "complexity", "effort", "e", "exp", "experience", "skill"}
+)
+# Words that scope a label without punctuation ("type-bug", "E-easy", "C-feature-request",
+# "skill-level-easy"; hyphens read as spaces). No alias or difficulty form starts with one (a
+# test checks it).
+SCOPE_WORDS = DIFFICULTY_SCOPES | {"type", "kind", "area", "category", "cat", "c", "t", "a", "lang"}
+
+
+class LabelParts(NamedTuple):
+    """A label read once: its normalized form, its scope ("" when none) and the rest."""
+
+    full: str
+    scope: str
+    value: str
 
 
 def normalize(name: str) -> str:
@@ -119,18 +146,35 @@ def normalize(name: str) -> str:
     return _EDGES.sub("", _SEPARATORS.sub(" ", name.lower()).strip())
 
 
-def forms(name: str) -> tuple[str, ...]:
-    """The normalized label, then the same without its scope prefix when it has one."""
+@functools.lru_cache(maxsize=4096)
+def parts(name: str) -> LabelParts:
+    """The one label parser (categories, difficulty votes, technologies): a punctuated scope
+    (``type:``, ``kind/``, ``[type]``), else the leading words in ``SCOPE_WORDS``. A lone
+    one-letter word scopes only a known category or difficulty ("C-bug", "E-easy"); "C-API",
+    "c extension" and "e-commerce" have no scope."""
     full = normalize(name)
-    stripped = _SCOPE.sub("", full, count=1).strip()
-    return (full, stripped) if stripped and stripped != full else (full,)
+    if (match := _SCOPE.match(full)) and (value := full[match.end() :].strip()):
+        return LabelParts(full, match.group(1).strip(), value)
+    words = full.split(" ")
+    n = 0
+    while n < len(words) - 1 and words[n] in SCOPE_WORDS:
+        n += 1
+    scope, value = " ".join(words[:n]), " ".join(words[n:])
+    if not n or (len(scope) == 1 and value not in ALIASES and value not in DIFFICULTY_FORMS):
+        return LabelParts(full, "", full)
+    return LabelParts(full, scope, value)
+
+
+def scoped_by(scope: str, words: frozenset[str]) -> bool:
+    """Whether ``scope`` is made only of ``words`` ("skill level" by ``DIFFICULTY_SCOPES``);
+    an empty scope is not."""
+    return bool(scope) and all(w in words for w in scope.split())
 
 
 def category(name: str) -> str | None:
-    for form in forms(name):
-        if found := ALIASES.get(form):
-            return found
-    return None
+    """The category of the normalized label, else of the same without its scope."""
+    p = parts(name)
+    return ALIASES.get(p.full) or ALIASES.get(p.value)
 
 
 def normalize_labels(raw: Iterable[str]) -> list[str]:

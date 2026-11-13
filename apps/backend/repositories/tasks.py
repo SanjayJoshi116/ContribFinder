@@ -41,17 +41,9 @@ def process_repository_backlog() -> int:
         logger.warning("GitHub client credentials are not configured; backlog not processed")
         return 0
     batch = backlog.queue_batch(timezone.now())
-    refused: list[int] = []
-    for repo_id, kind in batch:
-        try:
-            REFRESH_TASKS[kind].delay(repo_id)
-        except Exception:
-            logger.warning("Refresh of repository %s not queued", repo_id, exc_info=True)
-            refused.append(repo_id)
-    # Stamped by queue_batch, but no task will run: let the next run queue them again.
-    backlog.unmark_queued(refused)
-    logger.info("Queued %s repository refreshes", len(batch) - len(refused))
-    return len(batch) - len(refused)
+    sent = backlog.send_refreshes((repo_id, REFRESH_TASKS[kind].delay) for repo_id, kind in batch)
+    logger.info("Queued %s repository refreshes", sent)
+    return sent
 
 
 def _refresh(task: Any, repo_id: int, parts: list[str] | None) -> None:

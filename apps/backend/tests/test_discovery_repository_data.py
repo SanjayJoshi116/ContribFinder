@@ -38,7 +38,7 @@ from services.repositories import backlog, lifecycle
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 from services.repositories.staleness import stale_parts
 
-from .repo_fixtures import API, expire_parts, mock_repo_api, repo_payload
+from .repo_fixtures import API, expire_parts, mock_repo_api, repo_payload, same_repository
 from .shared_fixtures import developer, public_client, single_band  # noqa: F401
 from .test_discovery_service import mock_search, new_job, run
 
@@ -165,6 +165,7 @@ def test_eligibility_uses_data_stored_during_the_analysis(client, respx_mock) ->
         Repository.objects.filter(pk=repo.pk).update(is_archived=True)  # a search stored it
         return httpx.Response(200, json=[])
 
+    same_repository(respx_mock, "encode/httpx", 7)
     respx_mock.get(f"{API}/repos/encode/httpx/issues").mock(side_effect=archived_meanwhile)
 
     assert RepositoryAnalysisService(client).run(repo.pk, ["issues"]) == Outcome.ANALYZED
@@ -230,6 +231,7 @@ def test_name_released_during_the_fetch_discards_it(client, respx_mock) -> None:
         lifecycle.release_name("org/tool", 99)  # another repository took the name
         return httpx.Response(200, text="# Someone else's README")
 
+    same_repository(respx_mock, "org/tool", 7)
     respx_mock.get(f"{API}/repos/org/tool/readme").mock(side_effect=renamed_meanwhile)
 
     assert RepositoryAnalysisService(client).run(repo.pk, ["readme"]) == Outcome.SKIPPED

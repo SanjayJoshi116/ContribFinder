@@ -13,13 +13,10 @@ from django.utils import timezone
 
 from e2e.builders import add_candidate, fresh_repo
 from repositories import tasks
-from repositories.models import Repository
-from services.github.client import GitHubRepo
-from services.github.storage import upsert_repository
 from services.repositories import backlog
 from services.repositories.analysis import Outcome, RepositoryAnalysisService
 
-from .repo_fixtures import API, expire_parts, repo_payload
+from .repo_fixtures import API, expire_parts, same_repository, take_name
 from .shared_fixtures import developer, public_client, single_band  # noqa: F401
 
 
@@ -33,12 +30,6 @@ def sent(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     queued: list[int] = []
     monkeypatch.setattr(tasks.sync_repository, "delay", queued.append)
     return queued
-
-
-def take_name() -> Repository:
-    """A discovery search stores another repository (GitHub ID 2) as ``org/tool``."""
-    gh = GitHubRepo.from_api(repo_payload("org/tool", 2))
-    return upsert_repository(gh, timezone.now(), metadata_fetched=False)
 
 
 def test_released_name_refreshed_after_commit(
@@ -178,6 +169,7 @@ def test_name_released_during_its_analysis_queued_again(
         take_name()  # skipped: another analysis holds it
         return httpx.Response(200, text="# Someone else's README")
 
+    same_repository(respx_mock, "org/tool", 1)
     respx_mock.get(f"{API}/repos/org/tool/readme").mock(side_effect=renamed_meanwhile)
 
     with django_capture_on_commit_callbacks(execute=True):

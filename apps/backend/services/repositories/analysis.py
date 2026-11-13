@@ -15,7 +15,6 @@ and is re-raised for the caller's retry policy. A missing README, community file
 from __future__ import annotations
 
 import logging
-import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -51,6 +50,7 @@ from services.github.storage import (
     replace_topics,
     upsert_repository,
 )
+from services.issues import labels
 from services.issues.analysis import IssueInput, analyze
 from services.matching.activity import WINDOW_DAYS, ActivityData, compute_activity
 
@@ -93,8 +93,6 @@ ISSUE_FIELDS = (
     "technologies",
     "analyzed_at",
 )
-GOOD_FIRST_ISSUE = "good first issue"
-HELP_WANTED = "help wanted"
 
 
 class Outcome(StrEnum):
@@ -130,10 +128,6 @@ def merge_issue_pages(recent: IssuePage, labeled: list[IssuePage]) -> IssuePage:
     return IssuePage(issues=merged, truncated=recent.truncated)
 
 
-def normalize_label(name: str) -> str:
-    return re.sub(r"[\s_-]+", " ", name.lower()).strip()
-
-
 class RepositoryAnalysisService:
     def __init__(
         self,
@@ -166,17 +160,20 @@ class RepositoryAnalysisService:
                 # completing would stamp a transition that makes freshness regenerate.
                 lifecycle.release(repo)
                 return Outcome.SKIPPED
-        fetched_name = None if "metadata" in wanted else repo.full_name
         try:
             try:
                 fetched = self._fetch(repo, wanted, now)
             except REPOSITORY_ERRORS as exc:
                 code = next(code for cls, code in ERROR_CODES if isinstance(exc, cls))
+                if not lifecycle.fail(repo, code):
+                    return Outcome.SKIPPED  # reclaimed meanwhile: the other analysis decides
                 logger.info(
                     "Repository %s failed: %s (%s)", repo.full_name, code, type(exc).__name__
                 )
-                lifecycle.fail(repo, code)
                 return Outcome.FAILED
+            # Fetched by the stored name only when no metadata was fetched (an identity check
+            # may have added it): a rename in our database meanwhile discards the data.
+            fetched_name = None if fetched.metadata is not None else repo.full_name
             with transaction.atomic():
                 lifecycle.hold(repo, fetched_name=fetched_name)
                 topics, has_dependencies = self._store(repo, fetched, now)
@@ -204,9 +201,17 @@ class RepositoryAnalysisService:
 
     def _fetch(self, repo: Repository, parts: list[str], now: datetime) -> _Fetched:
         c, name, out = self.client, repo.full_name, _Fetched()
+        if parts and "metadata" not in parts:
+            confirmed, found = self._identity(repo)
+            if not confirmed:
+                # Renamed (the answer is this repository's metadata), or the name now serves
+                # another repository or none (fetched by GitHub ID, the name was just tried).
+                parts = ["metadata", *parts]
+                out.metadata = found or c.get_repository_by_id(repo.github_id)
         if "metadata" in parts:
-            self._between_parts(repo)
-            out.metadata = self._metadata(repo)
+            if out.metadata is None:
+                self._between_parts(repo)
+                out.metadata = self._metadata(repo)
             name = out.metadata.full_name  # the current name after a rename (redirect followed)
             out.languages = c.get_languages(name)
         if "readme" in parts:
@@ -258,6 +263,20 @@ class RepositoryAnalysisService:
             out.issues = merge_issue_pages(recent, labeled)
         return out
 
+    def _identity(self, repo: Repository) -> tuple[bool, GitHubRepo | None]:
+        """``(confirmed, found)``: confirmed when GitHub still serves this GitHub ID under the
+        stored name (spec "Identity confirmed before a refresh without metadata"); ``found`` is
+        the answer when it is this repository under a new name (a followed redirect), else
+        None. Conditional, so usually a 304."""
+        self._between_parts(repo)
+        try:
+            found = self.client.get_repository(repo.full_name)
+        except GitHubNotFound:
+            return False, None
+        if found.github_id != repo.github_id:
+            return False, None
+        return found.full_name == repo.full_name, found
+
     def _metadata(self, repo: Repository) -> GitHubRepo:
         """By name, or by GitHub ID when the name was given up, is gone, or now belongs to
         another repository. A 404 by ID means the repository no longer exists."""
@@ -294,13 +313,14 @@ class RepositoryAnalysisService:
             repo.readme_synced_at = now
             fields.append("readme_synced_at")
         if f.community is not None:
-            labels = {normalize_label(label) for label in f.labels or []}
+            # The same label rule as issue analysis (scopes, symbols, aliases).
+            categories = {labels.category(name) for name in f.labels or []}
             repo.has_contributing = f.community.has_contributing
             repo.has_code_of_conduct = f.community.has_code_of_conduct
             repo.has_issue_templates = f.community.has_issue_template
             repo.has_pull_request_template = f.community.has_pull_request_template
-            repo.has_good_first_issue_label = GOOD_FIRST_ISSUE in labels
-            repo.has_help_wanted_label = HELP_WANTED in labels
+            repo.has_good_first_issue_label = labels.GOOD_FIRST_ISSUE in categories
+            repo.has_help_wanted_label = labels.HELP_WANTED in categories
             repo.community_synced_at = now
             fields += [
                 "has_contributing",
@@ -375,13 +395,13 @@ class RepositoryAnalysisService:
         to_create: list[Issue] = []
         to_update: list[Issue] = []
         for data in fetched:
-            body = data.body[:limit]
-            result = analyze(IssueInput(data.title, body, data.labels, data.comments), thresholds)
+            given = IssueInput(data.title, data.body, data.labels, data.comments, max_chars=limit)
+            result = analyze(given, thresholds)
             values = {
                 "repository": repo,
                 "number": data.number,
                 "title": data.title[:1024],
-                "body": body,
+                "body": given.body,  # without template hints, capped (IssueInput)
                 "raw_labels": list(data.labels),
                 "state": data.state,
                 "is_locked": data.is_locked,
@@ -409,4 +429,4 @@ class RepositoryAnalysisService:
         Issue.objects.bulk_create(to_create)
 
 
-__all__ = ["PARTS", "Outcome", "RepositoryAnalysisService", "merge_issue_pages", "normalize_label"]
+__all__ = ["PARTS", "Outcome", "RepositoryAnalysisService", "merge_issue_pages"]

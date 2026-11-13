@@ -117,9 +117,14 @@ def release_name(full_name: str, github_id: int) -> list[int]:
     by GitHub ID. Until then its name and URL are wrong, so an eligible holder becomes
     ineligible (``name_released``) and INDEXED; that analysis decides eligibility again.
     Returns the pks of the holders (``backlog.queue_released`` queues that analysis)."""
+    # GitHub compares names case-insensitively. Holders are locked in GitHub ID order, the
+    # order of every bulk repository lock, before the updates below (a batch of upserts has
+    # locked them already, with its own rows: ``storage.lock_for_upsert``).
     holders = list(
-        Repository.objects.filter(full_name=full_name)
+        Repository.objects.filter(full_name__iexact=full_name)
         .exclude(github_id=github_id)
+        .select_for_update()
+        .order_by("github_id")
         .values_list("pk", flat=True)
     )
     if not holders:
@@ -152,20 +157,23 @@ def release(repo: Repository) -> None:
     )
 
 
-def fail(repo: Repository, code: str) -> None:
-    """Permanent failure (not found, blocked): recorded as state, never as empty data."""
-    _held(repo).update(
-        lifecycle=Lifecycle.FAILED,
-        lifecycle_error=code,
-        previous_lifecycle="",
-        stale_parts=[],
-        is_eligible=False,
-        ineligible_reason=REPOSITORY_UNAVAILABLE,
-        lifecycle_changed_at=timezone.now(),
-        claim_token=None,
-        claimed_at=None,
-        refresh_failed_at=None,  # the FAILED retry delay takes over
-        refresh_queued_at=None,
+def fail(repo: Repository, code: str) -> bool:
+    """Permanent failure (not found, blocked): recorded as state, never as empty data. False
+    when the claim was lost (nothing changed)."""
+    return bool(
+        _held(repo).update(
+            lifecycle=Lifecycle.FAILED,
+            lifecycle_error=code,
+            previous_lifecycle="",
+            stale_parts=[],
+            is_eligible=False,
+            ineligible_reason=REPOSITORY_UNAVAILABLE,
+            lifecycle_changed_at=timezone.now(),
+            claim_token=None,
+            claimed_at=None,
+            refresh_failed_at=None,  # the FAILED retry delay takes over
+            refresh_queued_at=None,
+        )
     )
 
 
@@ -238,6 +246,9 @@ def recheck_eligibility(repo_ids: Iterable[int], *, now: datetime) -> int:
     (a transition: freshness sees it); a STALE row keeps STALE, its refresh decides the state.
     Rows another transaction has locked are skipped, never waited for. Returns the changes."""
     cfg = FilterConfig.from_settings()
+    # ``now`` judges the rules (one run, one reference time); a transition is stamped with the
+    # wall clock, so freshness of a generation started after ``now`` still sees it.
+    changed_at = timezone.now()
     # One UPDATE per distinct outcome (a handful), not one per changed row: a settings change
     # can flip a whole pool.
     changes: dict[tuple[tuple[str, object], ...], list[int]] = {}
@@ -257,7 +268,7 @@ def recheck_eligibility(repo_ids: Iterable[int], *, now: datetime) -> int:
             if repo.lifecycle != Lifecycle.STALE:
                 update["lifecycle"] = Lifecycle.INDEXED if reason else Lifecycle.RECOMMENDABLE
                 if update["lifecycle"] != repo.lifecycle:
-                    update["lifecycle_changed_at"] = now
+                    update["lifecycle_changed_at"] = changed_at
             changes.setdefault(tuple(sorted(update.items())), []).append(repo.pk)
         for update_items, pks in changes.items():
             Repository.objects.filter(pk__in=pks).update(**dict(update_items))

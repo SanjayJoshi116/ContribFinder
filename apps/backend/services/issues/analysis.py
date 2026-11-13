@@ -7,6 +7,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from services.profiling.text import strip_html_comments
+
 from . import classify, labels, technologies
 
 
@@ -16,6 +18,13 @@ class IssueInput:
     body: str
     raw_labels: Sequence[str]
     comments: int
+    max_chars: int | None = None
+
+    def __post_init__(self) -> None:
+        # Normalized once for every consumer (technologies, difficulty, the stored body): issue
+        # templates leave their instructions as HTML comments, which are not the description.
+        # Removed before the cap, so a long template never pushes the report out.
+        object.__setattr__(self, "body", strip_html_comments(self.body)[: self.max_chars])
 
 
 @dataclass(frozen=True)
@@ -44,7 +53,7 @@ def analyze(issue: IssueInput, thresholds: Mapping[str, int]) -> IssueAnalysis:
     return IssueAnalysis(
         labels=canonical,
         contribution_type=ctype,
-        contribution_type_evidence={**ctype_evidence, **version} if ctype_evidence else {},
+        contribution_type_evidence={**ctype_evidence, **version},  # unknown too (ISV-8)
         difficulty=level,
         difficulty_evidence={**level_evidence, **version},
         technologies=techs,

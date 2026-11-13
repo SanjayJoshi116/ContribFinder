@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import functools
 import hashlib
-import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -41,6 +40,7 @@ from .errors import (
     error_for_response,
 )
 from .oauth import has_app_credentials
+from .text import parse_json, storable
 
 logger = logging.getLogger(__name__)
 _cache_backoff = Backoff("GITHUB_CACHE_BACKOFF_SECONDS", "GitHub response cache", logger)
@@ -246,12 +246,19 @@ class Page:
 
 @dataclass(frozen=True)
 class _Response:
+    """A GitHub answer. ``text`` is the raw body (what the ETag cache keeps); callers read
+    ``content`` or ``json()``, which are storable (spec "Stored GitHub text")."""
+
     status: int
     text: str
     link: str
 
+    @property
+    def content(self) -> str:
+        return storable(self.text)
+
     def json(self) -> Any:
-        return json.loads(self.text)
+        return parse_json(self.text)
 
 
 def _parses_response[**P, R](method: Callable[P, R]) -> Callable[P, R]:
@@ -344,7 +351,7 @@ class GitHubClient:
     @_parses_response
     def get_profile_readme(self, login: str) -> str | None:
         try:
-            return self._get(f"/repos/{login}/{login}/readme", accept=RAW).text
+            return self._get(f"/repos/{login}/{login}/readme", accept=RAW).content
         except GitHubNotFound:
             return None
 
@@ -378,7 +385,7 @@ class GitHubClient:
 
     @_parses_response
     def get_file(self, full_name: str, path: str) -> str:
-        return self._get(f"/repos/{full_name}/contents/{quote(path)}", accept=RAW).text
+        return self._get(f"/repos/{full_name}/contents/{quote(path)}", accept=RAW).content
 
     @_parses_response
     def search_merged_pull_requests(self, login: str) -> tuple[list[PullRequestRef], bool]:
@@ -427,7 +434,7 @@ class GitHubClient:
     @_parses_response
     def get_readme(self, full_name: str) -> str | None:
         try:
-            return self._get(f"/repos/{full_name}/readme", accept=RAW).text
+            return self._get(f"/repos/{full_name}/readme", accept=RAW).content
         except GitHubNotFound:
             return None
 

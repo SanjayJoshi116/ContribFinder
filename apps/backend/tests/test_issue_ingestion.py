@@ -23,12 +23,18 @@ from services.repositories.staleness import stale_parts
 
 from .checks_helpers import ids
 from .factories import UserFactory
-from .repo_fixtures import API, analyze, expire_parts, issue_payload, mock_repo_api
+from .repo_fixtures import API, analyze, expire_parts, issue_payload, mock_repo_api, same_repository
 from .shared_fixtures import public_client  # noqa: F401
 
 pytestmark = [pytest.mark.django_db, pytest.mark.respx(assert_all_called=False)]
 
 ISSUES = f"{API}/repos/encode/httpx/issues"
+
+
+@pytest.fixture(autouse=True)
+def identity(respx_mock) -> None:
+    """Issues-only refreshes of ``fresh_repo()`` first confirm its identity by name."""
+    same_repository(respx_mock, "encode/httpx", 7)
 
 
 @pytest.fixture
@@ -158,7 +164,8 @@ def test_issues_task_fetches_issues_only(respx_mock) -> None:
 
     assert routes["issues"].called
     called = [name for name, route in routes.items() if route.called]
-    assert called == ["issues"]
+    assert called == ["metadata", "issues"]  # the identity check, then the issues
+    assert routes["metadata"].call_count == 1
     assert Repository.objects.get(pk=repo.pk).lifecycle == "recommendable"
     assert Issue.objects.count() == 1
 
@@ -336,7 +343,8 @@ def test_no_entry_labels_configured(client, respx_mock) -> None:
     repo = fresh_repo()
     recent = capped_recent(respx_mock, [issue_payload(1)])
     analyze(client, repo, ["issues"])
-    assert len(respx_mock.calls) == recent.call_count == 1
+    assert recent.call_count == 1
+    assert len(respx_mock.calls) == 2  # the identity check and the recent listing
 
 
 def test_failed_labeled_listing_keeps_the_stored_issues(client, respx_mock) -> None:
@@ -395,4 +403,5 @@ def test_labeled_listings_renew_the_claim(client, respx_mock, monkeypatch) -> No
 
     monkeypatch.setattr(RepositoryAnalysisService, "_between_parts", counting)
     analyze(client, repo, ["issues"])
-    assert calls == [0, 1, 2]  # before the recent listing and before each labeled one
+    # Before the identity check, the recent listing and each labeled one.
+    assert calls == [0, 1, 2, 3]

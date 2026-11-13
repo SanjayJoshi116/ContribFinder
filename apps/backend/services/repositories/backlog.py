@@ -13,6 +13,8 @@ A repository that gave up its name is queued when the name is released
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
@@ -25,7 +27,9 @@ from services.github.oauth import has_app_credentials
 from services.job_guard import lost_before
 
 from .lifecycle import IN_PROGRESS, abandoned_claims
-from .staleness import stale_parts
+from .staleness import PART_FIELDS, stale_parts
+
+logger = logging.getLogger(__name__)
 
 Kind = Literal["all", "readme", "issues"]
 # Recorded when GitHub rejects the app's client credentials during a refresh.
@@ -42,16 +46,22 @@ def pooled() -> QuerySet[Repository]:
 
 def mark_stale(now: datetime) -> int:
     """Move pooled RECOMMENDABLE/INDEXED repositories with stale data types to STALE."""
-    marked = 0
-    candidates = pooled().filter(lifecycle__in=[Lifecycle.RECOMMENDABLE, Lifecycle.INDEXED])
+    candidates = (
+        pooled()
+        .filter(lifecycle__in=[Lifecycle.RECOMMENDABLE, Lifecycle.INDEXED])
+        .only("pk", "lifecycle", "full_name", *PART_FIELDS.values())  # what stale_parts reads
+    )
+    # One UPDATE per (state, stale parts) group, not one per repository.
+    groups: dict[tuple[str, tuple[str, ...]], list[int]] = {}
     for repo in candidates.order_by("pk").iterator(chunk_size=500):
-        parts = stale_parts(repo, now)
-        if not parts:
-            continue
-        marked += Repository.objects.filter(pk=repo.pk, lifecycle=repo.lifecycle).update(
+        if stale := stale_parts(repo, now):
+            groups.setdefault((repo.lifecycle, tuple(stale)), []).append(repo.pk)
+    marked = 0
+    for (state, parts), pks in groups.items():
+        marked += Repository.objects.filter(pk__in=pks, lifecycle=state).update(
             lifecycle=Lifecycle.STALE,
-            previous_lifecycle=repo.lifecycle,
-            stale_parts=parts,
+            previous_lifecycle=state,
+            stale_parts=list(parts),
             lifecycle_changed_at=now,
         )
     return marked
@@ -101,10 +111,10 @@ def queue_released(pks: list[int], now: datetime, *, requeue: bool = False) -> l
         def send() -> None:
             from repositories.tasks import sync_repository  # avoid import cycle
 
-            for pk in picked:
-                sync_repository.delay(pk)
+            # The caller's work is committed; a broker refusal must not fail it.
+            send_refreshes((pk, sync_repository.delay) for pk in picked)
 
-        transaction.on_commit(send)
+        transaction.on_commit(send, robust=True)
     return picked
 
 
@@ -112,6 +122,23 @@ def mark_queued(pks: list[int], now: datetime) -> None:
     """Renew the queued time: a refresh that scheduled a retry can still run until a full
     waiting period after the retry. Advisory: the analysis claim still fences the work."""
     Repository.objects.filter(pk__in=pks).update(refresh_queued_at=now)
+
+
+def send_refreshes(sends: Iterable[tuple[int, Callable[[int], Any]]]) -> int:
+    """Send each stamped refresh (``delay(pk)``); the ones the broker refuses are logged and
+    unmarked, so the next run may queue them. Returns the number sent."""
+    sent = 0
+    refused: list[int] = []
+    for pk, delay in sends:
+        try:
+            delay(pk)
+        except Exception:
+            logger.warning("Refresh of repository %s not queued", pk, exc_info=True)
+            refused.append(pk)
+        else:
+            sent += 1
+    unmark_queued(refused)
+    return sent
 
 
 def unmark_queued(pks: list[int]) -> None:

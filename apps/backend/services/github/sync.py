@@ -30,6 +30,7 @@ from services.profiling.analysis import ProfileAnalysisService
 from .client import GitHubClient, GitHubUser, PullRequestRef, PushRef, parse_dt
 from .errors import GitHubClientError, GitHubForbidden, GitHubNotFound, GitHubValidationError
 from .storage import (
+    lock_for_upsert,
     lock_repository,
     read_manifests,
     replace_dependencies,
@@ -141,6 +142,7 @@ class GitHubSyncService:
 
         now = timezone.now()
         with job_write(self.job):
+            lock_for_upsert(selected)  # name holders too, before any upsert
             stored = [upsert_repository(r, now) for r in selected]
             # Topics come with the listing: stored with their rows, so no later step can find
             # a row deleted or re-pointed meanwhile.

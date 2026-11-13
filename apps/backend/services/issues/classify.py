@@ -18,7 +18,7 @@ from typing import Any
 
 from issues.models import ContributionType as CT
 from issues.models import Difficulty
-from services.profiling.text import strip_html_comments
+from services.profiling.text import strip_code_fences
 
 from . import labels as L
 
@@ -59,11 +59,7 @@ _KEYWORDS = [(ctype, _keyword_pattern(words)) for ctype, words in KEYWORD_TYPES]
 
 # Difficulty-indicating label forms (after normalization and scope stripping).
 DIFFICULTY_LABELS: dict[str, str] = {
-    **dict.fromkeys(
-        ("easy", "beginner", "starter", "trivial", "low hanging fruit"), Difficulty.BEGINNER
-    ),
-    **dict.fromkeys(("medium", "intermediate", "moderate"), Difficulty.INTERMEDIATE),
-    **dict.fromkeys(("hard", "complex", "expert", "advanced", "difficult"), Difficulty.ADVANCED),
+    form: Difficulty(level) for form, level in L.DIFFICULTY_FORMS.items()
 }
 LEVELS = (Difficulty.BEGINNER, Difficulty.INTERMEDIATE, Difficulty.ADVANCED)
 
@@ -102,10 +98,11 @@ def _label_votes(raw: Sequence[str]) -> list[dict[str, Any]]:
     for name in raw:
         if L.category(name) == L.GOOD_FIRST_ISSUE:
             found.setdefault(Difficulty.BEGINNER, name)
-        for form in L.forms(name):
-            if (level := DIFFICULTY_LABELS.get(form)) is not None:
-                found.setdefault(level, name)
-                break
+        p = L.parts(name)
+        if p.scope and not L.scoped_by(p.scope, L.DIFFICULTY_SCOPES):
+            continue  # "Priority: Medium" is about urgency, not the work
+        if (level := DIFFICULTY_LABELS.get(p.value)) is not None:
+            found.setdefault(level, name)
     if not found:
         return [_vote("label", None, None)]
     return [_vote("label", level, found[level]) for level in LEVELS if level in found]
@@ -120,15 +117,17 @@ def difficulty(
     comments: int,
     thresholds: Mapping[str, int],
 ) -> tuple[str, dict[str, Any]]:
-    """``(level, evidence)``. Signals: difficulty labels; description length (short votes
+    """``(level, evidence)``. ``body`` is ``IssueInput.body`` (HTML comments removed): call
+    through ``analysis.analyze``. Signals: difficulty labels; description length (short votes
     beginner, long advanced, empty abstains); technologies mentioned (one votes beginner,
     ``several_technologies`` or more intermediate, ``many_technologies`` or more advanced, none
     or a count between one and ``several_technologies`` abstains); a documentation
     contribution votes beginner; a long discussion votes advanced."""
     signals = _label_votes(raw_labels)
 
-    # Issue templates leave their instructions as HTML comments; they are not the description.
-    length = len(strip_html_comments(body).strip())
+    # Pasted logs sit in fenced code blocks: not the description (HTML comments are already
+    # gone, ``IssueInput``).
+    length = len(strip_code_fences(body).strip())
     body_vote: str | None = None  # an empty description says nothing about the work
     if 0 < length < thresholds["short_body"]:
         body_vote = Difficulty.BEGINNER

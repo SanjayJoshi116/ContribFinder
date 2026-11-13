@@ -9,6 +9,8 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 from django.conf import settings
+from django.db.models import Q
+from django.db.models.functions import Upper
 from django.utils import timezone
 
 from repositories.models import (
@@ -25,10 +27,26 @@ from .client import ContentEntry, GitHubClient, GitHubRepo
 from .errors import GitHubNotFound
 
 
+def lock_for_upsert(repos: Sequence[GitHubRepo]) -> None:
+    """Lock, in GitHub ID order (the order of every bulk repository lock), the stored rows of
+    ``repos`` and the rows holding their names (``release_name`` renames those). A caller
+    storing several repositories calls it once first, so no upsert later locks a holder after a
+    higher row the transaction already holds."""
+    if not repos:
+        return
+    rows = Repository.objects.alias(upper_name=Upper("full_name")).filter(
+        Q(github_id__in=[r.github_id for r in repos])
+        | Q(upper_name__in={r.full_name.upper() for r in repos})
+    )
+    list(rows.select_for_update().order_by("github_id").values_list("pk", flat=True))
+
+
 def upsert_repository(gh: GitHubRepo, now: Any, *, metadata_fetched: bool = True) -> Repository:
     """Store ``gh`` by GitHub ID. ``metadata_fetched=False`` (a search result, which carries
     no languages) updates the fields but not ``synced_at`` of an existing row, so its metadata
-    still goes stale on schedule."""
+    still goes stale on schedule. Locks its row and the name's holders first, in GitHub ID
+    order (``lock_for_upsert``)."""
+    lock_for_upsert([gh])
     # Another repository that had this name (renamed away, or deleted and recreated) keeps its
     # row and links; its next analysis finds it by GitHub ID.
     # Stamped with the wall clock: ``now`` may be a long job's reference time.

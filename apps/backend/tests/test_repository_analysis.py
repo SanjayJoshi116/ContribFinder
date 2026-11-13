@@ -358,7 +358,8 @@ def test_readme_task_fetches_only_readme(respx_mock) -> None:
     routes = mock_repo_api(respx_mock, "encode/httpx", 7)
     tasks.sync_repository_readme.delay(repo.pk)
     assert routes["readme"].called
-    assert not routes["metadata"].called
+    assert routes["metadata"].call_count == 1  # the identity check, not a metadata fetch
+    assert not routes["languages"].called
     assert Repository.objects.get(pk=repo.pk).lifecycle == "recommendable"
 
 

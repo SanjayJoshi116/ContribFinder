@@ -50,6 +50,39 @@ def strip_html_comments(text: str) -> str:
     return _HTML_COMMENT.sub("", text)
 
 
+# CommonMark fences: an opening run of 3+ backticks or tildes (an info string may follow, without
+# a backtick after a backtick run: "```npm test``` fails" is inline code); only a run of the same
+# character, at least as long and with nothing after it, closes it.
+FENCE = re.compile(r"^\s{0,3}(`{3,}(?=[^`]*$)|~{3,})(.*)$")
+
+
+def closes_fence(marker: re.Match[str] | None, fence: str) -> bool:
+    """Whether the ``FENCE`` match ``marker`` closes the open fence ``fence`` (its marker run)."""
+    return bool(
+        marker
+        and marker.group(1)[0] == fence[0]
+        and len(marker.group(1)) >= len(fence)
+        and not marker.group(2).strip()
+    )
+
+
+def strip_code_fences(text: str) -> str:
+    """``text`` without fenced code blocks, fences included (pasted logs, stack traces); an
+    unclosed fence runs to the end, as CommonMark renders it."""
+    kept: list[str] = []
+    fence = ""
+    for line in text.splitlines():
+        marker = FENCE.match(line)
+        if fence:
+            if closes_fence(marker, fence):
+                fence = ""
+        elif marker:
+            fence = marker.group(1)
+        else:
+            kept.append(line)
+    return "\n".join(kept)
+
+
 def plain_text(markdown: str) -> str:
     """Markdown/HTML reduced to prose: URLs, link targets and tags removed."""
     text = _MD_LINK_TARGET.sub("]", markdown)

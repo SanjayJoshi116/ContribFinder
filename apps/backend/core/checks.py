@@ -369,11 +369,22 @@ def issue_config_check(app_configs: Any = None, **kwargs: Any) -> list[CheckMess
                     id="core.E040",
                 )
             )
-        if not 2 <= thresholds["several_technologies"] <= thresholds["many_technologies"]:
+        # Lower than many_technologies, or the advanced branch takes every count and the
+        # technology count never votes intermediate (ISV-5).
+        if not 2 <= thresholds["several_technologies"] < thresholds["many_technologies"]:
             errors.append(
                 Error(
-                    "ISSUE_DIFFICULTY: several_technologies must be at least 2 and at most "
+                    "ISSUE_DIFFICULTY: several_technologies must be at least 2 and lower than "
                     "many_technologies.",
+                    id="core.E040",
+                )
+            )
+        cap = settings.ISSUE_BODY_MAX_CHARS
+        # A stored body never exceeds the cap, so long_body at or above it can never vote (ISV-7).
+        if isinstance(cap, int) and cap > 0 and thresholds["long_body"] >= cap:
+            errors.append(
+                Error(
+                    "ISSUE_DIFFICULTY: long_body must be lower than ISSUE_BODY_MAX_CHARS.",
                     id="core.E040",
                 )
             )
