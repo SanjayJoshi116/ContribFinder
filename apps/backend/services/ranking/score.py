@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from services.matching.features import RepoData
@@ -41,6 +41,9 @@ class Scored:
     issues: IssueMatch = NO_MATCH
     relevance: float = 0.0  # the relevance signals' part of ``score``; never scaled
     relevant: bool = False  # passes the relevance gate (``has_relevance``)
+    # Each signal's contribution (``contributions``), unrounded: ``score`` is their rounded
+    # sum, and reasons are built from them.
+    parts: Mapping[str, float] = field(default_factory=dict)
 
 
 def contributions(
@@ -61,15 +64,6 @@ def contributions(
     return {
         name: value * strength if name in OFFER_SIGNALS else value for name, value in plain.items()
     }
-
-
-def weighted_score(
-    signals: Mapping[str, Signal],
-    weights: Mapping[str, float],
-    params: Mapping[str, Any] | None = None,
-) -> float:
-    """Internal ranking value in 0..1 (never shown as a percentage)."""
-    return _total(contributions(signals, weights, params or {}))
 
 
 def _total(parts: Mapping[str, float]) -> float:
@@ -93,7 +87,7 @@ def score_candidate(
     issues: IssueMatch = NO_MATCH,
 ) -> Scored:
     parts = contributions(signals, weights, params)
-    value = _total(parts)
+    value = _total(parts)  # internal ranking value in 0..1, never shown as a percentage
     relevance = _total({name: parts.get(name, 0.0) for name in RELEVANCE_SIGNALS})
     return Scored(
         repo,
@@ -104,6 +98,7 @@ def score_candidate(
         issues,
         relevance,
         has_relevance(signals, weights),
+        parts,
     )
 
 

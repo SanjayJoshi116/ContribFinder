@@ -9,7 +9,7 @@ from services.matching.issues import match_issues
 from services.matching.signals import Signal
 from services.ranking.config import V2_ISSUE_PARAMS, V2_PARAMS, V2_WEIGHTS, validate
 from services.ranking.explain import reasons
-from services.ranking.score import contributions, weighted_score
+from services.ranking.score import contributions
 
 from .test_issue_matching import dev, issue
 
@@ -93,32 +93,46 @@ def test_relevance_scaling_scales_offer_signals_only() -> None:
     assert strong["skill"] == pytest.approx(0.35 * 0.8)  # relevance signals unscaled
 
 
+def total(signals: dict[str, Signal], weights: dict[str, float], params: dict[str, Any]) -> float:
+    return round(sum(contributions(signals, weights, params).values()), 4)
+
+
 def test_scaling_off_reproduces_the_weighted_sum() -> None:
     plain = round(sum(V2_WEIGHTS[n] * s.value for n, s in SIGNALS.items()), 4)
-    assert weighted_score(SIGNALS, V2_WEIGHTS) == plain
-    assert weighted_score(SIGNALS, V2_WEIGHTS, V2_PARAMS) == plain
-    assert weighted_score(SIGNALS, V2_WEIGHTS, {**V2_PARAMS, "relevance_scaling": False}) == plain
+    assert total(SIGNALS, V2_WEIGHTS, {}) == plain
+    assert total(SIGNALS, V2_WEIGHTS, V2_PARAMS) == plain
+    assert total(SIGNALS, V2_WEIGHTS, {**V2_PARAMS, "relevance_scaling": False}) == plain
 
 
 def test_scaling_with_no_relevance_weight_is_zero() -> None:
     weights = {name: 0.0 for name in V2_WEIGHTS} | {"activity": 1.0}
-    assert weighted_score(SIGNALS, weights, {"relevance_scaling": True}) == 0.0
+    assert total(SIGNALS, weights, {"relevance_scaling": True}) == 0.0
 
 
 def test_reason_weights_follow_scaled_contributions() -> None:
     scaled = {**V2_PARAMS, "relevance_scaling": True}
     signals = with_relevance(0.3)
     expected = contributions(signals, V2_WEIGHTS, scaled)
-    found = reasons(signals, V2_WEIGHTS, scaled)
+    found = reasons(signals, expected)
     by_type = {r.type: r.weight for r in found}
     assert by_type["activity"] == round(expected["activity"], 4)
     assert by_type["difficulty"] == round(expected["difficulty_fit"], 4)
     weights = [r.weight for r in found]
     assert weights == sorted(weights, reverse=True)
     # Unscaled, activity (0.10) outranks language (0.15 x 0.3); scaled, it no longer does.
-    plain = [r.type for r in reasons(signals, V2_WEIGHTS, V2_PARAMS)]
+    plain = [r.type for r in reasons(signals, contributions(signals, V2_WEIGHTS, V2_PARAMS))]
     assert plain.index("activity") < plain.index("language")
     assert [r.type for r in found].index("activity") > [r.type for r in found].index("language")
+
+
+def test_contribution_rounding_to_zero_gives_no_reason() -> None:
+    """RNK-7: a reason is stored with its contribution at 4 decimals; 0.0000 is no reason."""
+    signals = with_relevance(0.0005)
+    parts = contributions(signals, V2_WEIGHTS, {**V2_PARAMS, "relevance_scaling": True})
+    assert 0 < parts["openness"] < 0.00005
+    found = reasons(signals, parts)
+    assert "openness" not in {r.type for r in found}
+    assert all(r.weight > 0 for r in found)
 
 
 def test_validation_of_new_parameters() -> None:

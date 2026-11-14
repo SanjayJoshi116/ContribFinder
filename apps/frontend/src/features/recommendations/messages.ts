@@ -1,9 +1,11 @@
 import type {
+  ActivityLabel,
   ContributionType,
   Difficulty,
   MatchLabel,
   Recommendation,
   RecommendationStatus,
+  RepositorySize,
 } from '@/api/types'
 import { isActive } from '@/app/jobTransitions'
 
@@ -42,17 +44,22 @@ export const MATCH_TEXT: Record<MatchLabel, string> = {
 }
 
 /** Observable signals, never a health verdict. */
-export const ACTIVITY_TEXT: Record<string, string> = {
+export const ACTIVITY_TEXT: Record<ActivityLabel, string> = {
   recently_active: 'Recently active',
   moderately_active: 'Moderately active',
   low_activity: 'Low recent activity',
 }
 
-export const SIZE_TEXT: Record<string, string> = {
+export const SIZE_TEXT: Record<RepositorySize, string> = {
   small: 'Small project',
   medium: 'Medium project',
   large: 'Large project',
   unknown: 'Size unknown',
+}
+
+/** A language's share of the code as text: a whole percentage, "under 1%" below 0.5%. */
+export function shareText(share: number): string {
+  return share < 0.005 ? 'under 1%' : `${Math.round(share * 100)}%`
 }
 
 /** Issue analysis is an estimate: "unknown" means the evidence was not enough, not an error. */
@@ -68,7 +75,7 @@ export const DIFFICULTY_TEXT: Record<Difficulty, string> = {
 /** An issue's estimated difficulty in words; "unknown" is a lack of evidence, not an error. */
 export function difficultyText(difficulty: Difficulty): string {
   return difficulty === 'unknown'
-    ? NOT_ENOUGH_EVIDENCE
+    ? DIFFICULTY_TEXT.unknown
     : `${DIFFICULTY_TEXT[difficulty]} (estimated)`
 }
 
@@ -110,11 +117,11 @@ export const ACTIVITY_OPTIONS: Option[] = Object.entries(ACTIVITY_TEXT).map(([va
   value,
   label,
 }))
-export const SIZE_OPTIONS: Option[] = [
-  { value: 'small', label: 'Small' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'large', label: 'Large' },
-]
+// Every size the backend filters on, "unknown" included.
+export const SIZE_OPTIONS: Option[] = Object.entries(SIZE_TEXT).map(([value, label]) => ({
+  value,
+  label,
+}))
 export const MATCH_OPTIONS: Option[] = Object.entries(MATCH_TEXT).map(([value, label]) => ({
   value,
   label,

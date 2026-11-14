@@ -1,10 +1,13 @@
 """How users acted on recommendations, per scoring configuration (spec:
 recommendation-evaluation "Feedback report"; changes feedback-report,
-feedback-report-labels and dismiss-reasons).
+feedback-report-labels, dismiss-reasons and services-evaluation-review-fixes).
 
 ``load`` is the one query; ``build`` is pure. There is no "shown" event, so shares are of
-decisive actions (positive or dismissed), not of recommendations shown. Aggregates only: user
-ids are used to count distinct users and never leave ``build``.
+decisive outcomes (positive or dismissed), not of recommendations shown. Shares count outcomes,
+not events: each user, repository and configuration version has at most one, its latest
+decisive event that was not undone (design D3). Action counts stay raw event counts.
+Aggregates only: user ids and repository names are used to group events and never leave
+``build``.
 """
 
 from __future__ import annotations
@@ -26,6 +29,11 @@ POSITIVE = frozenset(
     {FeedbackAction.SAVED, FeedbackAction.OPENED_REPOSITORY, FeedbackAction.OPENED_ISSUE}
 )
 DECISIVE = POSITIVE | {FeedbackAction.DISMISSED}
+# What an undo event takes back: the latest event of this action before it.
+UNDOES = {
+    str(FeedbackAction.UNSAVED): str(FeedbackAction.SAVED),
+    str(FeedbackAction.UNDISMISSED): str(FeedbackAction.DISMISSED),
+}
 ACTIONS = tuple(str(action) for action in FeedbackAction)
 DEFAULT_MINIMUM = 10
 # Best first; the calibration verdict expects shares in this order.
@@ -42,6 +50,7 @@ class Event(NamedTuple):
     rank: int | None
     match_label: str = ""  # "" when there was no recommendation
     dismiss_reason: str = ""  # dismissed only; "" when none was given
+    repository: str = ""  # the repository's full name; groups events into outcomes
 
 
 def bucket_label(bucket: tuple[int, int | None]) -> str:
@@ -58,12 +67,10 @@ def _share(positive: int, decisive: int, minimum: int) -> float | None:
     return positive / decisive if decisive >= minimum and decisive else None
 
 
-def _total(counts: Counter[str] | dict[str, int], actions: Iterable[str]) -> int:
-    return sum(counts.get(a, 0) for a in actions)
-
-
-# Per group key: the count of each action and the distinct users.
+# Per group key: the count of each action (every event) and the distinct users.
 Groups = dict[tuple[str, Any], tuple[Counter[str], set[int]]]
+# Per group key: [positive, decisive] outcomes.
+Outcomes = dict[tuple[str, Any], list[int]]
 
 
 def _add(groups: Groups, key: tuple[str, Any], event: Event) -> None:
@@ -72,38 +79,48 @@ def _add(groups: Groups, key: tuple[str, Any], event: Event) -> None:
     users.add(event.user_id)
 
 
-def _tally(group: Counter[str], minimum: int) -> tuple[dict[str, int], float | None]:
-    """A group's count of every action and its positive share."""
-    share = _share(_total(group, POSITIVE), _total(group, DECISIVE), minimum)
-    return {action: group[action] for action in ACTIONS}, share
+def _outcome(outcomes: Outcomes, key: tuple[str, Any], event: Event) -> None:
+    tally = outcomes.setdefault(key, [0, 0])
+    tally[0] += event.action in POSITIVE
+    tally[1] += 1
 
 
 def _rows[K](
-    groups: Groups, version: str, keys: Iterable[K], minimum: int
-) -> list[tuple[K, dict[str, int], int, float | None]]:
-    """``(key, counts, users, share)`` for each of a version's keys that has events."""
+    groups: Groups, outcomes: Outcomes, version: str, keys: Iterable[K], minimum: int
+) -> list[tuple[K, dict[str, int], int, float | None, int, int]]:
+    """``(key, counts, users, share, positive, decisive)`` for each of a version's keys that has
+    events; the share and the two outcome counts come from outcomes."""
     rows = []
     for key in keys:
         if (group := groups.get((version, key))) is not None:
             tally, users = group
-            counts, share = _tally(tally, minimum)
-            rows.append((key, counts, len(users), share))
+            positive, decisive = outcomes.get((version, key), (0, 0))
+            counts = {action: tally[action] for action in ACTIONS}
+            share = _share(positive, decisive, minimum)
+            rows.append((key, counts, len(users), share, positive, decisive))
     return rows
 
 
 def _reasons(tally: Counter[str]) -> dict[str, int]:
-    """Dismissals per reason, most frequent first, dismissals without one last."""
-    found = sorted(
+    """Dismissals per reason, most frequent first: the current reasons, then stored values that
+    are no longer offered, then dismissals without a reason."""
+    known = sorted(
         ((reason, tally[reason]) for reason in REASONS if tally[reason]),
         key=lambda item: -item[1],
     )
+    other = sorted(
+        ((reason, n) for reason, n in tally.items() if n and reason not in {*REASONS, NO_REASON}),
+        key=lambda item: (-item[1], item[0]),
+    )
+    found = [*known, *other]
     if tally[NO_REASON]:
         found.append((NO_REASON, tally[NO_REASON]))
     return dict(found)
 
 
 def calibration(rows: Iterable[LabelRow]) -> Calibration:
-    """``ordered`` when no label's share is below a lower label's (ties are ordered)."""
+    """``ordered`` when no label's share is below a lower label's (ties are ordered). Only the
+    current labels take part."""
     shares = {row.label: row.share for row in rows if row.share is not None}
     present = [label for label in LABELS if label in shares]
     if len(present) < 2:
@@ -118,17 +135,11 @@ def calibration(rows: Iterable[LabelRow]) -> Calibration:
 @dataclass(frozen=True)
 class BucketRow:
     bucket: tuple[int, int | None]
-    counts: dict[str, int]  # every action, 0 when absent
+    counts: dict[str, int]  # every action (raw events), 0 when absent
     users: int
     share: float | None  # None below the minimum
-
-    @property
-    def decisive(self) -> int:
-        return _total(self.counts, DECISIVE)
-
-    @property
-    def positive(self) -> int:
-        return _total(self.counts, POSITIVE)
+    positive: int = 0  # outcomes
+    decisive: int = 0
 
 
 @dataclass(frozen=True)
@@ -137,6 +148,8 @@ class LabelRow:
     counts: dict[str, int]
     users: int
     share: float | None  # not adjusted for rank
+    positive: int = 0
+    decisive: int = 0
 
 
 @dataclass(frozen=True)
@@ -156,6 +169,8 @@ class ConfigRows:
     calibration: Calibration = Calibration(NOT_ENOUGH)
     # Dismissals per reason (NO_REASON without one); never part of a share.
     dismiss_reasons: dict[str, int] = field(default_factory=dict)
+    # The part of the report's bucket weight carried by the buckets of the adjusted share.
+    coverage: float | None = None
 
 
 @dataclass(frozen=True)
@@ -176,6 +191,7 @@ class FeedbackReport:
                     "version": c.version,
                     "raw_share": _rounded(c.raw_share),
                     "adjusted_share": _rounded(c.adjusted_share),
+                    "coverage": _rounded(c.coverage),
                     "buckets": [
                         _row_dict("ranks", bucket_label(row.bucket), row) for row in c.buckets
                     ],
@@ -199,63 +215,123 @@ def _rounded(value: float | None) -> float | None:
 
 
 def _row_dict(name_key: str, name: str, row: BucketRow | LabelRow) -> dict[str, Any]:
-    return {name_key: name, "counts": row.counts, "users": row.users, "share": _rounded(row.share)}
+    return {
+        name_key: name,
+        "counts": row.counts,
+        "users": row.users,
+        "positive": row.positive,
+        "decisive": row.decisive,
+        "share": _rounded(row.share),
+    }
 
 
 def load(since: datetime | None, versions: Sequence[str] = ()) -> Iterator[Event]:
     """Every feedback event in the window (all time without ``since``), optionally only for
-    some configuration versions. One query, streamed in chunks and unordered: ``build`` only
-    counts."""
-    rows = RecommendationFeedback.objects.order_by()
+    some configuration versions, oldest first (``build`` reads undo events in order). One
+    query, streamed in chunks."""
+    rows = RecommendationFeedback.objects.order_by("created_at", "id")
     if since is not None:
         rows = rows.filter(created_at__gte=since)
     if versions:
         rows = rows.filter(config_version__in=versions)
-    fields = ("user_id", "action", "config_version", "rank", "match_label", "dismiss_reason")
+    fields = (
+        "user_id",
+        "action",
+        "config_version",
+        "rank",
+        "match_label",
+        "dismiss_reason",
+        "repository_full_name",
+    )
     return (Event(*row) for row in rows.values_list(*fields).iterator(chunk_size=2000))
+
+
+Stacks = dict[tuple[int, str, str], list[tuple[Event, int]]]  # (event, its rank)
+
+
+def _rank(event: Event) -> int | None:
+    """The event's rank when it is attributed (a version and a rank of at least 1)."""
+    if not event.config_version or event.rank is None or event.rank < 1:
+        return None  # a rank below 1 is no rank: generation ranks from 1
+    return event.rank
+
+
+def _settle(stacks: Stacks, event: Event, rank: int | None) -> None:
+    """Keep each (user, repository, version)'s decisive events that were not undone, in order.
+    An undo event takes back the latest event it undoes, also when it has no rank itself."""
+    if not event.config_version:
+        return
+    key = (event.user_id, event.repository, event.config_version)
+    if event.action in UNDOES:
+        stack = stacks.get(key, [])
+        undone = UNDOES[event.action]
+        for index in range(len(stack) - 1, -1, -1):
+            if stack[index][0].action == undone:
+                del stack[index]
+                break
+    elif rank is not None and event.action in DECISIVE:
+        stacks.setdefault(key, []).append((event, rank))
 
 
 def build(
     events: Iterable[Event], *, minimum: int = DEFAULT_MINIMUM, since_days: int | None = None
 ) -> FeedbackReport:
+    """``events`` in the order they happened."""
     if minimum < 1:
         raise ValueError("minimum must be at least 1")
     buckets: Groups = {}  # (version, bucket)
     labels: Groups = {}  # (version, match label)
+    stacks: Stacks = {}
     reasons: dict[str, Counter[str]] = {}
     unattributed: Counter[str] = Counter()
     unattributed_reasons: Counter[str] = Counter()
     for event in events:
         reason = event.dismiss_reason or NO_REASON
         dismissed = event.action == FeedbackAction.DISMISSED
-        # A rank below 1 is no rank: generation ranks from 1.
-        if not event.config_version or event.rank is None or event.rank < 1:
+        rank = _rank(event)
+        _settle(stacks, event, rank)
+        if rank is None:
             unattributed[event.action] += 1
             if dismissed:
                 unattributed_reasons[reason] += 1
             continue
-        _add(buckets, (event.config_version, _bucket(event.rank)), event)
+        _add(buckets, (event.config_version, _bucket(rank)), event)
         if event.match_label:
             _add(labels, (event.config_version, event.match_label), event)
         if dismissed:
             reasons.setdefault(event.config_version, Counter())[reason] += 1
 
-    # The common bucket mix for the position adjustment: decisive actions over every config.
+    bucket_outcomes: Outcomes = {}
+    label_outcomes: Outcomes = {}
+    for stack in stacks.values():
+        if stack:
+            last, rank = stack[-1]
+            _outcome(bucket_outcomes, (last.config_version, _bucket(rank)), last)
+            if last.match_label:
+                _outcome(label_outcomes, (last.config_version, last.match_label), last)
+
+    # The common bucket mix for the position adjustment: decisive outcomes over every config.
     weight: Counter[Any] = Counter()
-    for key, (tally, _) in buckets.items():
-        weight[key[1]] += _total(tally, DECISIVE)
+    for (_, bucket), (_, decisive) in bucket_outcomes.items():
+        weight[bucket] += decisive
+    everything = sum(weight.values())
 
     configs = []
     for version in sorted({key[0] for key in buckets}):
-        rows = [BucketRow(*row) for row in _rows(buckets, version, BUCKETS, minimum)]
-        label_rows = [LabelRow(*row) for row in _rows(labels, version, LABELS, minimum)]
+        rows = [
+            BucketRow(*row) for row in _rows(buckets, bucket_outcomes, version, BUCKETS, minimum)
+        ]
+        stored = sorted({key[1] for key in labels if key[0] == version} - set(LABELS))
+        label_keys = [*LABELS, *stored]
+        label_rows = [
+            LabelRow(*row) for row in _rows(labels, label_outcomes, version, label_keys, minimum)
+        ]
         shared = [(row.bucket, row.share) for row in rows if row.share is not None]
         total = sum(weight[bucket] for bucket, _ in shared)
-        adjusted = (
-            sum(weight[bucket] * share for bucket, share in shared) / total
-            if shared and total
-            else None
-        )
+        adjusted = coverage = None
+        if shared and total:
+            adjusted = sum(weight[bucket] * share for bucket, share in shared) / total
+            coverage = total / everything
         configs.append(
             ConfigRows(
                 version,
@@ -267,6 +343,7 @@ def build(
                 tuple(label_rows),
                 calibration(label_rows),
                 _reasons(reasons.get(version, Counter())),
+                coverage,
             )
         )
     return FeedbackReport(

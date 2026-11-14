@@ -7,7 +7,9 @@ import pytest
 from services.matching import signals
 from services.matching.features import DeveloperFeatures, RepoData, SkillFeature, SnapshotData
 from services.matching.technologies import repository_technologies
+from services.ranking import explain
 from services.ranking.config import V1_PARAMS
+from services.ranking.score import contributions
 
 SOURCES = V1_PARAMS["tech_sources"]
 
@@ -154,6 +156,29 @@ def test_skill_evidence_names_only_technologies_that_added_to_the_value() -> Non
     s = signals.skill_match(t, k8s_dev)
     assert [e["slug"] for e in s.evidence] == ["python"]
     assert s.value == pytest.approx(0.9)  # Kubernetes (weight 0) added nothing before either
+
+
+def test_framework_from_a_source_weighted_zero_does_not_count() -> None:
+    """RNK-3: tagged ``django`` but not depending on it, with topics weighted 0."""
+    tagged = repo(languages=(("Python", 900),), topics=("django",))
+    no_topics = {**SOURCES, "topic": 0.0}
+    t = repository_technologies(tagged.languages, tagged.topics, tagged.dependencies, no_topics)
+    assert t["django"].weight == 0
+    framework = signals.framework_match(t, PY_DEV)
+    assert framework == signals.ZERO
+    sigs = {"framework": framework}
+    assert explain.reasons(sigs, contributions(sigs, {"framework": 0.1}, {})) == []
+
+
+def test_openness_evidence_names_only_flags_worth_points() -> None:
+    """RNK-4: issue templates worth 0 points add nothing and are not named."""
+    points = {**V1_PARAMS["openness"], "issue_templates": 0.0}
+    s = signals.contribution_openness(repo(has_contributing=True, has_issue_templates=True), points)
+    assert s.value == pytest.approx(points["contributing"])
+    assert [e["flag"] for e in s.evidence] == ["contributing"]
+    sigs = {"openness": s}
+    (reason,) = explain.reasons(sigs, contributions(sigs, {"openness": 0.05}, {}))
+    assert reason.text == "Has a contributing guide"
 
 
 def test_language_share_rounding_to_zero_is_not_named() -> None:

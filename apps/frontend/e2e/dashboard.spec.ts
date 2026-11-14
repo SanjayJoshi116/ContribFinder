@@ -60,3 +60,20 @@ test('the relevant-issues link lands on the issues', async ({ page, signInAs }) 
   await expect(heading).toBeFocused()
   await expect(heading).toBeInViewport()
 })
+
+test('the way back from a detail page returns to the list page it was opened from', async ({
+  page,
+  signInAs,
+}) => {
+  await dashboard(page, signInAs)
+  await page.getByRole('button', { name: 'Next' }).click()
+  await expect(page).toHaveURL(/\/app\?page=2$/)
+  const card = page.getByRole('article').first()
+  await card.getByRole('heading').getByRole('link').click()
+  await expect(page).toHaveURL(/\/app\/recommendations\/\d+$/)
+
+  await page.getByRole('link', { name: '← Back to recommendations' }).click()
+
+  await expect(page).toHaveURL(/\/app\?page=2$/)
+  await expect(page.getByText('Page 2')).toBeVisible()
+})

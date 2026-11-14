@@ -232,6 +232,30 @@ def test_write_baseline_refuses_min_score(baseline_dir) -> None:
     assert out.getvalue() == "" and not baseline.BASELINES.exists()
 
 
+def test_write_baseline_failed_write_is_a_command_error(baseline_dir, monkeypatch) -> None:
+    run("--write-baseline")
+    before = baseline.BASELINES.read_bytes()
+
+    def refuse(*args: Any, **kwargs: Any) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("core.reports.os.replace", refuse)
+    with pytest.raises(CommandError, match=r"Baseline not written to .*disk full"):
+        run("--write-baseline")
+    assert baseline.BASELINES.read_bytes() == before
+    assert [p.name for p in baseline_dir.iterdir() if p.suffix == ".tmp"] == []
+
+
+def test_write_baseline_refuses_a_dataset_outside_the_folder(baseline_dir, tmp_path) -> None:
+    copy = tmp_path / "judging" / "benchmark-v1.json"
+    copy.parent.mkdir()
+    copy.write_bytes((baseline_dir / "benchmark-v1.json").read_bytes())
+    out = StringIO()
+    with pytest.raises(CommandError, match=r"benchmark-v1.json"):
+        call_command("evaluate_ranking", "--write-baseline", "--dataset", str(copy), stdout=out)
+    assert "Dataset" not in out.getvalue() and not baseline.BASELINES.exists()
+
+
 # --- export ---------------------------------------------------------------------------------
 
 
@@ -360,7 +384,11 @@ def test_uncertainty_block_for_each_candidate(dataset_path, tmp_path) -> None:
         "seed": 7,
     }
     assert set(comparison["metrics"]) == set(METRICS)
-    assert set(comparison["metrics"]["ndcg@10"]) == {"diff", "low", "high", "not_better", "marked"}
+    ndcg = comparison["metrics"]["ndcg@10"]
+    assert set(ndcg) == {"diff", "low", "high", "not_better", "marked", "developers", "too_few"}
+    assert (ndcg["developers"], ndcg["too_few"], ndcg["marked"]) == (1, True, False)
+    assert "  (too few developers to mark: 1 < 6)" in output
+    assert "the 95% interval excludes 0" not in output
     assert [r["config"] for r in report["reports"]] == ["v1-deterministic", "v2-deterministic"]
 
     assert "paired bootstrap" not in run(*args)  # a single configuration: nothing to compare

@@ -5,7 +5,7 @@
 Explains every recommendation with machine-readable reasons built only from the scoring evidence that produced it, and classifies each match with a label instead of a numeric score or percentage.
 ## Requirements
 ### Requirement: Reasons from scoring evidence
-Every recommendation SHALL have machine-readable reasons, each with a type, a human-readable text, its contribution to the score, and structured detail naming the evidence (for example the matched skills, languages with their code share, interests, activity label, openness affordances, relevant issue counts by contribution type, or issue difficulties). Reason types SHALL be `skill`, `language`, `framework`, `interest`, `activity`, `openness`, `issue_availability` and `difficulty`. A reason SHALL be created only for a signal that contributes to the score (its value is above 0 and the configuration weights it above 0), and its text and detail SHALL mention only evidence that signal actually used: a technology whose weight in the repository or whose confidence in the developer's profile is 0 SHALL NOT be named. A reason that counts "your repositories" SHALL count only repositories the developer owns, never repositories they only contributed to. Difficulty reasons SHALL describe difficulty as an estimate. An `issue_availability` reason SHALL say how its issues matched: through technologies the developer uses, only through `good first issue` or `help wanted` labels, or both, giving the number that mention the developer's technologies; it SHALL NOT claim a match with the developer's technologies for an issue that matched only by label. Reasons SHALL be ordered by their contribution to the score, highest first. Reasons SHALL be regenerated with their recommendation and SHALL NOT outlive it.
+Every recommendation SHALL have machine-readable reasons, each with a type, a human-readable text, its contribution to the score, and structured detail naming the evidence (for example the matched skills, languages with their code share, interests, activity label, openness affordances, relevant issue counts by contribution type, or issue difficulties). Reason types SHALL be `skill`, `language`, `framework`, `interest`, `activity`, `openness`, `issue_availability` and `difficulty`. A reason SHALL be created only for a signal that contributes to the score (its value is above 0, the configuration weights it above 0, and its contribution as stored, rounded to 4 decimals, is above 0), and its text and detail SHALL mention only evidence that signal actually used: a technology whose weight in the repository or whose confidence in the developer's profile is 0 SHALL NOT be named. A reason that counts "your repositories" SHALL count only repositories the developer owns, never repositories they only contributed to. Difficulty reasons SHALL describe difficulty as an estimate. An `issue_availability` reason SHALL say how its issues matched: through technologies the developer uses, only through `good first issue` or `help wanted` labels, or both, giving the number that mention the developer's technologies; it SHALL NOT claim a match with the developer's technologies for an issue that matched only by label. Reasons SHALL be ordered by their contribution to the score, highest first. Reasons SHALL be regenerated with their recommendation and SHALL NOT outlive it.
 
 #### Scenario: Reasons for a Django project
 - **WHEN** a recommendation's framework signal matched Django and its interest signal matched developer tooling
@@ -46,6 +46,18 @@ Every recommendation SHALL have machine-readable reasons, each with a type, a hu
 #### Scenario: Technology that added nothing
 - **WHEN** a configuration weights topic technologies 0 and a repository is tagged `kubernetes`, a technology the developer knows
 - **THEN** the `skill` reason does not name Kubernetes
+
+#### Scenario: Framework from a source weighted 0
+- **WHEN** a configuration weights topic technologies 0 and a repository is only tagged `django`, a framework the developer knows
+- **THEN** it has no `framework` reason naming Django
+
+#### Scenario: Openness affordance worth 0
+- **WHEN** a configuration gives issue templates 0 points and a repository has a contributing guide and issue templates
+- **THEN** its `openness` reason mentions the contributing guide and not issue templates
+
+#### Scenario: Contribution too small to store
+- **WHEN** relevance scaling makes a recommendation's openness contribution 0.00002
+- **THEN** it has no `openness` reason
 
 ### Requirement: Match labels
 Each recommendation SHALL carry a match label derived from its score and the active configuration's bands: `strong`, `good` or `partial`. With `v1-deterministic` the bands SHALL be: strong at 0.55 or more, good at 0.35 or more, partial below that. The label, not the score, SHALL be what users see. The system SHALL NOT present any score as a percentage, a probability of success, or a measure of expertise.

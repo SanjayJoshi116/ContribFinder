@@ -13,8 +13,6 @@ from typing import Any
 from services.matching.signals import Signal
 from services.text import join_names
 
-from .score import contributions
-
 ORDER = (
     "skill",
     "language",
@@ -175,24 +173,20 @@ TEMPLATES: dict[str, Callable[[Sequence[Mapping[str, Any]]], str]] = {
 }
 
 
-def reasons(
-    signals: Mapping[str, Signal],
-    weights: Mapping[str, float],
-    params: Mapping[str, Any] | None = None,
-) -> list[Reason]:
+def reasons(signals: Mapping[str, Signal], parts: Mapping[str, float]) -> list[Reason]:
     """Reasons for every signal that adds to the score and has evidence, highest contribution
-    first (the same contributions the score sums, relevance scaling included). A signal the
-    configuration weights 0 gets no reason, whatever its value."""
-    contribution = contributions(signals, weights, params or {})
+    first. ``parts`` are the contributions the score sums (``Scored.parts``, relevance scaling
+    included): a signal the configuration weights 0, or whose contribution rounds to 0 as
+    stored, gets no reason, whatever its value."""
     result = [
         Reason(
             type=REASON_TYPES.get(name, name),
             text=TEMPLATES[REASON_TYPES.get(name, name)](signal.evidence),
-            weight=round(contribution[name], 4),
+            weight=weight,
             detail={"items": [dict(item) for item in signal.evidence]},
         )
         for name, signal in signals.items()
-        if contribution[name] > 0 and signal.evidence
+        if (weight := round(parts.get(name, 0.0), 4)) > 0 and signal.evidence
     ]
     result.sort(key=lambda r: (-r.weight, ORDER.index(r.type)))
     return result

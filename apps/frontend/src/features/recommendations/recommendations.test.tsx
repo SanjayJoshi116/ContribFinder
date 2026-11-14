@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   ME,
@@ -13,6 +13,8 @@ import {
 } from '@/test/render'
 
 import { recommendationStatusKey, recommendationsPath } from './api'
+import { shareText } from './messages'
+import { listPath } from './navigation'
 
 const ME_ROUTE = { 'GET /api/v1/auth/me': () => json(ME) }
 
@@ -373,6 +375,10 @@ describe('recommendation detail page', () => {
     expect(within(github).getByText('200 contributors')).toBeInTheDocument()
     expect(within(github).getByText('BSD-3-Clause')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('encode/httpx')
+    // No score as a percentage: the only percentages are the language shares.
+    const languages = screen.getByRole('list', { name: 'Languages by amount of code' })
+    expect(within(languages).getByText('95%')).toBeInTheDocument()
+    languages.remove()
     expect(document.body.textContent).not.toMatch(/%/)
   })
 
@@ -526,5 +532,259 @@ describe('recommendation detail page', () => {
     })
     renderRoute('/app/recommendations/7')
     expect(await screen.findByRole('alert')).toHaveTextContent(/no longer exists/)
+  })
+})
+
+// --- review fixes (recommendations-view-review-fixes, REC-1…REC-9) -----------------------------
+
+const STARLETTE = {
+  ...RECOMMENDATION,
+  id: 8,
+  repository: { ...REPOSITORY, name: 'starlette', full_name: 'encode/starlette' },
+}
+
+const LIST_ROUTES = {
+  ...ME_ROUTE,
+  ...SYNCED_USER,
+  'GET /api/v1/recommendations/status': () => json({ ...GENERATED, count: 25 }),
+}
+
+describe('recommendation list review fixes', () => {
+  beforeEach(() => {
+    document.cookie = 'csrftoken=test-csrf-token'
+  })
+
+  it('shows a filter value outside the options and clears it', async () => {
+    mockFetch({
+      ...LIST_ROUTES,
+      'GET /api/v1/recommendations?language=ruby': () => page([]),
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION]),
+    })
+    const { router } = renderRoute('/app?language=ruby')
+    expect(await screen.findByText('No recommendations match these filters.')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('ruby')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    expect(await screen.findByRole('article', { name: 'httpx' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('')
+  })
+
+  it('offers Clear filters beside the invalid-filter message', async () => {
+    mockFetch({
+      ...LIST_ROUTES,
+      'GET /api/v1/recommendations?match=foo': () =>
+        json({ error: { code: 'validation_error', message: 'Invalid filter.' } }, 400),
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION]),
+    })
+    const { router } = renderRoute('/app?match=foo')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/filters are not valid/)
+
+    const [, inAlert] = screen.getAllByRole('button', { name: 'Clear filters' })
+    await userEvent.click(inAlert!)
+
+    expect(await screen.findByRole('article', { name: 'httpx' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('')
+  })
+
+  it('lists every size the backend filters on', async () => {
+    mockFetch({ ...LIST_ROUTES, 'GET /api/v1/recommendations': () => page([RECOMMENDATION]) })
+    renderRoute('/app')
+    await screen.findByRole('article', { name: 'httpx' })
+    const size = screen.getByRole('combobox', { name: 'Size' })
+    expect(
+      within(size)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Any', 'Small project', 'Medium project', 'Large project', 'Size unknown'])
+  })
+
+  it('shows the following recommendations once page 1 is emptied by a dismissal', async () => {
+    let dismissed = false
+    mockFetch({
+      ...LIST_ROUTES,
+      'GET /api/v1/recommendations': () =>
+        dismissed
+          ? page([STARLETTE])
+          : page([RECOMMENDATION], { count: 21, next: '/api/v1/recommendations?page=2' }),
+      'POST /api/v1/recommendations/7/dismiss': () => {
+        dismissed = true
+        return new Response(null, { status: 204 })
+      },
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+
+    expect(await screen.findByRole('article', { name: 'starlette' })).toBeInTheDocument()
+    expect(screen.queryByText(/no suitable projects/i)).not.toBeInTheDocument()
+  })
+
+  it('says Loading, not empty, while the dismissal of the only card is pending', async () => {
+    mockFetch({
+      ...LIST_ROUTES,
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION]),
+      'POST /api/v1/recommendations/7/dismiss': () => new Promise<Response>(() => {}),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('article', { name: 'httpx' })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    expect(screen.queryByText(/no suitable projects/i)).not.toBeInTheDocument()
+  })
+
+  it('offers the undo from the detail page once', async () => {
+    mockFetch({ ...LIST_ROUTES, 'GET /api/v1/recommendations': () => page([STARLETTE]) })
+    const { router } = renderRoute({
+      pathname: '/app',
+      state: { dismissed: { repositoryId: 70, name: 'encode/httpx' } },
+    })
+
+    expect(await screen.findByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    await waitFor(() => expect(router.state.location.state).toBeNull())
+
+    // Leave and come back through the history: the entry no longer carries the dismissal.
+    await act(() => router.navigate('/app/recommendations/abc'))
+    expect(await screen.findByText(/doesn't point to a recommendation/i)).toBeInTheDocument()
+    await act(() => router.navigate(-1))
+    expect(await screen.findByRole('article', { name: 'starlette' })).toBeInTheDocument()
+    expect(screen.queryByText(/hidden encode\/httpx/i)).not.toBeInTheDocument()
+  })
+
+  it('marks old results as loading and disables the page buttons until the page arrives', async () => {
+    let arrive: (response: Response) => void = () => {}
+    mockFetch({
+      ...LIST_ROUTES,
+      'GET /api/v1/recommendations': () =>
+        page([RECOMMENDATION], { count: 21, next: '/api/v1/recommendations?page=2' }),
+      'GET /api/v1/recommendations?page=2': () =>
+        new Promise<Response>((resolve) => {
+          arrive = resolve
+        }),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    expect(card.closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    expect(card.closest('[aria-busy]')).toHaveAttribute('aria-busy', 'true')
+
+    arrive(
+      new Response(
+        JSON.stringify({
+          count: 21,
+          next: null,
+          previous: '/api/v1/recommendations',
+          results: [STARLETTE],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    expect(await screen.findByRole('article', { name: 'starlette' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
+  })
+})
+
+describe('detail page review fixes', () => {
+  beforeEach(() => {
+    document.cookie = 'csrftoken=test-csrf-token'
+  })
+
+  it('returns to the list page and filters it was opened from, also after dismissing', async () => {
+    let dismissed = false
+    const listPage = '/api/v1/recommendations?language=rust&page=3'
+    mockFetch({
+      ...LIST_ROUTES,
+      [`GET ${listPage}`]: () =>
+        page(dismissed ? [STARLETTE] : [RECOMMENDATION], {
+          count: 41,
+          previous: '/api/v1/recommendations?language=rust&page=2',
+        }),
+      'GET /api/v1/recommendations/7': () => json(DETAIL),
+      'POST /api/v1/recommendations/7/feedback': () => new Response(null, { status: 204 }),
+      'POST /api/v1/recommendations/7/dismiss': () => {
+        dismissed = true
+        return new Response(null, { status: 204 })
+      },
+    })
+    const { router } = renderRoute('/app?language=rust&page=3')
+    await userEvent.click(await screen.findByRole('link', { name: 'httpx' }))
+
+    const back = await screen.findByRole('link', { name: '← Back to recommendations' })
+    expect(back).toHaveAttribute('href', '/app?language=rust&page=3')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(await screen.findByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app')
+    expect(router.state.location.search).toBe('?language=rust&page=3')
+    expect(await screen.findByRole('article', { name: 'starlette' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['without navigation state', null],
+    ['with a from that is not a search string', { from: '//example.com' }],
+  ])('goes back to the first page %s', async (_case, state) => {
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/recommendations/7': () => json(DETAIL),
+      'POST /api/v1/recommendations/7/feedback': () => new Response(null, { status: 204 }),
+    })
+    renderRoute({ pathname: '/app/recommendations/7', state })
+    const back = await screen.findByRole('link', { name: '← Back to recommendations' })
+    expect(back).toHaveAttribute('href', '/app')
+  })
+
+  it('gives each language share as text', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/recommendations/7': () =>
+        json({
+          ...DETAIL,
+          languages: [
+            { language: 'Python', share: 0.52 },
+            { language: 'Shell', share: 0.476 },
+            { language: 'Dockerfile', share: 0.004 },
+          ],
+        }),
+      'POST /api/v1/recommendations/7/feedback': () => new Response(null, { status: 204 }),
+    })
+    renderRoute('/app/recommendations/7')
+    const languages = await screen.findByRole('list', { name: 'Languages by amount of code' })
+    expect(
+      within(languages)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Python52%', 'Shell48%', 'Dockerfileunder 1%'])
+  })
+})
+
+describe('list return path and share text', () => {
+  it('builds the way back from navigation state', () => {
+    expect(listPath({ from: '?language=rust&page=3' })).toBe('/app?language=rust&page=3')
+    expect(listPath({ from: '' })).toBe('/app')
+    expect(listPath({ from: '//example.com' })).toBe('/app')
+    expect(listPath({ from: 3 })).toBe('/app')
+    expect(listPath(null)).toBe('/app')
+    expect(listPath(undefined)).toBe('/app')
+  })
+
+  it('writes shares as whole percentages, under 1% below half a percent', () => {
+    expect([0.52, 0.476, 0.005, 0.004, 0].map(shareText)).toEqual([
+      '52%',
+      '48%',
+      '1%',
+      'under 1%',
+      'under 1%',
+    ])
   })
 })

@@ -133,10 +133,16 @@ export function useDismiss() {
     onError: (_error, { id }, previous) => rollback(queryClient, id, previous),
     onSuccess: (_data, { id }) =>
       queryClient.removeQueries({ queryKey: recommendationDetailKey(id) }),
+    // The list is refetched once the last dismissal in flight settles, so a page emptied by
+    // dismissals shows the recommendations that followed it; an earlier refetch would bring
+    // back cards still being dismissed.
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: dismissedKey }),
         queryClient.invalidateQueries({ queryKey: savedKey }),
+        queryClient.isMutating({ mutationKey: dismissMutationKey }) === 1
+          ? queryClient.invalidateQueries({ queryKey: recommendationListKey })
+          : undefined,
       ]),
   })
 }

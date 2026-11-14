@@ -19,10 +19,10 @@ The system SHALL derive each candidate repository's technologies from its stored
 For each candidate, the system SHALL calculate these signals independently, each as a value from 0.0 to 1.0 together with the evidence that produced it:
 - **skill match**: how much of the repository's technology set the developer has demonstrated, weighted by the developer's confidence in each skill;
 - **language match**: the repository's code share in languages the developer knows, weighted by the developer's confidence in each language;
-- **framework match**: overlap between the repository's frameworks and the developer's framework skills;
+- **framework match**: overlap between the repository's frameworks and the developer's framework skills; a framework whose weight in the repository is 0 (found only through a source the configuration weights 0) SHALL NOT count;
 - **interest match**: overlap between the interests the repository's topics and description express and the developer's detected interests, weighted by interest strength;
 - **activity signal**: the repository's activity label at generation time (see `repository-activity` "Activity label"), mapped to a configured value; its evidence gives the days since the last push measured at generation and the latest snapshot's counts;
-- **contribution openness**: observable contribution affordances (contribution guidelines, issue templates, `good first issue` and `help wanted` labels), each worth a configured amount;
+- **contribution openness**: observable contribution affordances (contribution guidelines, issue templates, `good first issue` and `help wanted` labels), each worth a configured amount; its evidence SHALL name only affordances worth more than 0;
 - **issue fit**: the availability of relevant issues for the developer in the repository (see `issue-matching`), growing with their number and scores up to a configured saturation count;
 - **difficulty fit**: how well the estimated difficulty of the repository's relevant issues suits the developer's internal experience level; issues with `unknown` difficulty SHALL NOT contribute. The configuration SHALL choose the mode: `best` (the default when the configuration names none) takes the best difficulty-table value among the relevant issues with known difficulty; `weighted` takes the mean of their table values weighted by issue score, multiplied by the issue fit value.
 
@@ -59,6 +59,14 @@ A signal with no supporting data SHALL be 0 with no evidence; it SHALL NOT be gu
 #### Scenario: Mixed difficulties, weighted mode
 - **WHEN** an intermediate developer's repository has two relevant issues with known difficulty, one beginner (table value 0.7, issue score 0.6) and one intermediate (table value 1.0, issue score 0.3), issue fit is 0.3, and the mode is `weighted`
 - **THEN** its difficulty fit is ((0.7 × 0.6 + 1.0 × 0.3) / 0.9) × 0.3 = 0.24
+
+#### Scenario: Framework from a source weighted 0
+- **WHEN** a configuration weights topic technologies 0, and a repository is tagged `django` without depending on Django, for a developer with a Django skill
+- **THEN** its framework match is 0 with no evidence
+
+#### Scenario: Openness point worth 0
+- **WHEN** a configuration gives issue templates 0 points and a repository has a contributing guide and issue templates
+- **THEN** its openness evidence names the contributing guide only
 
 ### Requirement: Versioned scoring configuration
 The system SHALL keep scoring configurations as versioned records, each with a unique version name, a weight per signal, match-label score bands, the parameters of the activity, openness and issue signals, and a creation time. Exactly one configuration SHALL be active at a time whenever any is stored, also after the seeding migrations are applied, reversed and re-applied in any order. The initial configuration `v1-deterministic` SHALL use the weights skill 0.40, language 0.20, interest 0.15, framework 0.10, activity 0.10 and contribution openness 0.05, and SHALL be described as experimental; it SHALL remain stored unchanged, and scoring under it SHALL treat the issue fit and difficulty fit weights as 0. The configuration `v2-deterministic` SHALL use the weights skill 0.35, language 0.15, interest 0.15, framework 0.10, activity 0.10, contribution openness 0.05, issue fit 0.05 and difficulty fit 0.05, SHALL include the issue matching parameters (issue score weights, minimum issue score, relevant issues kept per recommendation, difficulty fit table, issue fit saturation count), SHALL be described as experimental, and SHALL become the active configuration when seeding creates it while no configuration or only `v1-deterministic` is active; when an operator has activated any other configuration, seeding SHALL store `v2-deterministic` inactive and leave the operator's choice active. When `v2-deterministic` is already stored as seeding runs (it was kept by a rollback because it produced recommendations, or an operator deactivated it), seeding SHALL NOT change which configuration is active. Every configuration seeded after `v2-deterministic` SHALL be stored inactive, and its seed SHALL NOT change which configuration is active, whether or not the version is already stored; the operator activates it under "Activating a configuration" in `recommendation-evaluation`. Reversing such a seed SHALL delete its version only when that version is inactive and produced no recommendations, and SHALL otherwise leave it stored and the active configuration unchanged. A configuration MAY set the difficulty fit mode (`best` or `weighted`), enable relevance scaling, and set a minimum score with its basis; a configuration that sets none of them SHALL score exactly as before these options existed, and neither `v1-deterministic` nor `v2-deterministic` sets them. A new configuration SHALL replace the active one only under the rule in `recommendation-evaluation` ("Replacing the active configuration"). A new configuration SHALL be rejected when a weight is negative, a signal is missing, a parameter is missing or out of range, an optional parameter has an unknown value, the weights do not sum to 1, or the openness points sum to more than 1. A configuration that produced recommendations SHALL NOT be deletable. Once stored, a configuration's version name, weights and parameters SHALL NOT change, whether or not it produced recommendations; different numbers SHALL need a new version. Activation SHALL remain possible.
@@ -241,7 +249,7 @@ The system SHALL generate recommendations in a background job per user, tracked 
 - **THEN** another generation runs after it, and the restored repository can be among its recommendations
 
 ### Requirement: Recommendation freshness
-The system SHALL periodically (configured interval, default 30 minutes) start a generation job for every developer whose recommendations are older than their profile analysis, older than the latest analysis of a repository in their pool, or produced by a configuration that is no longer active. A repository being marked stale or picked up for a refresh SHALL NOT by itself make recommendations outdated; new data fetched for it (even if it was marked stale since), a completed refresh, a failure or any other analysis SHALL. After a failed generation, the next one SHALL wait a configured delay (default 6 hours) unless the user or a pipeline step starts it. A developer who has recommendations but no candidates left SHALL also get a generation job. It SHALL NOT start a job for a developer whose recommendations are current, or who has an active generation job.
+The system SHALL periodically (configured interval, default 30 minutes) start a generation job for every developer whose recommendations are older than their profile analysis, older than the latest analysis of a repository in their pool, or produced by a configuration that is no longer active; a developer whose last completed generation ran under a configuration that is no longer active SHALL be due even when it stored no recommendations. A repository being marked stale or picked up for a refresh SHALL NOT by itself make recommendations outdated; new data fetched for it (even if it was marked stale since), a completed refresh, a failure or any other analysis SHALL. When the developer's latest finished generation failed, the next one SHALL wait a configured delay (default 6 hours) after that failure unless the user or a pipeline step starts it; a failure followed by a completed generation SHALL NOT delay the sweep. A developer who has recommendations but no candidates left SHALL also get a generation job. It SHALL NOT start a job for a developer whose recommendations are current, or who has an active generation job. A job that cannot be queued for one developer SHALL NOT stop the run for the others.
 
 #### Scenario: Repository refreshed
 - **WHEN** the backlog refreshes a pooled repository after the developer's recommendations were generated
@@ -275,3 +283,14 @@ The system SHALL periodically (configured interval, default 30 minutes) start a 
 - **WHEN** a developer has recommendations and their candidate pool became empty
 - **THEN** the next freshness run starts a generation job, which leaves them with no recommendations
 
+#### Scenario: Failure followed by a success
+- **WHEN** a developer's generation failed 30 minutes ago, a later generation completed 20 minutes ago, and their profile was re-analyzed 10 minutes ago
+- **THEN** the next freshness run starts a generation job
+
+#### Scenario: New configuration for a developer with no recommendations
+- **WHEN** a developer's last completed generation under `v2` stored no recommendations and an operator activates `v3`
+- **THEN** the next freshness run starts a generation job for that developer
+
+#### Scenario: Queuing fails for one developer
+- **WHEN** two developers are due and queuing the first one's job fails
+- **THEN** the freshness run still starts the second one's job

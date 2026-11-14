@@ -7,6 +7,105 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.68] - 2026-11-14
+
+Recommendations view fixes from the review sweep
+(`openspec/changes/archive/2026-11-14-recommendations-view-review-fixes/`; specs
+`recommendations-view`, `recommendation-feedback`; `Bug_Backlog.md` batch 65, REC-1…REC-10).
+Frontend only: no backend, API, OpenAPI or migration change. No separate `/simplify` or
+fix-diff `/code-review` run (owner's call); `/security-review` found nothing.
+
+### Fixed
+
+- A filter from a link that is not one of the options (for example `?language=ruby`) shows as
+  selected instead of "Any", and "Clear filters" appears whenever a filter is active and beside
+  the "filters are not valid" message (REC-1).
+- Dismissing every card on page 1 shows the recommendations that followed, not "No suitable
+  projects yet": the list is reloaded once the dismissals are confirmed (REC-2). While a
+  dismissal or that reload is pending, an emptied page says "Loading…" (REC-3).
+- The Undo notice after dismissing from the detail page is offered once: a reload or Back no
+  longer brings it back (REC-4).
+- While the next page loads, the shown results are marked as loading and dimmed, and Previous
+  and Next are disabled, so a second click cannot skip a page (REC-5).
+- "Back to recommendations" and dismissing on the detail page return to the list page and filters
+  it was opened from (REC-6).
+- Language shares on the detail page are given as text ("52%", "under 1%"), not only as bars
+  (REC-7).
+- The size filter offers "Size unknown", which the backend already accepted (REC-9).
+
+### Changed
+
+- Activity and size wording is typed with the generated API enums (REC-8); the difficulty text
+  reuses its constant (REC-10).
+- Tests: `renderRoute` accepts a location with navigation state; a browser test checks that Back
+  returns to the list page.
+
+## [0.12.67] - 2026-11-14
+
+Evaluation fixes from the review sweep (`openspec/changes/archive/2026-11-14-services-evaluation-review-fixes/`;
+spec `recommendation-evaluation`; `Bug_Backlog.md` batch 64, EVL-1…EVL-10, EVL-8 accepted). No
+ranking change, no scoring configuration change, no migration, no setting. OpenAPI stays `1.0.0`;
+`baselines.json` is byte-identical. No separate `/simplify` or fix-diff `/code-review` run
+(owner's call); `/security-review` reported one candidate (formula cells in the judging CSV,
+3/10), fixed as hardening under EVL-6.
+
+**Feedback report shares from before and after this release are not comparable:** shares now
+count one outcome per user, repository and configuration, not every event.
+
+### Fixed
+
+- Feedback report: shares count outcomes, not events. Each user, repository and configuration
+  version has at most one, its latest decisive action that was not undone (an unsave undoes the
+  latest save, an undismiss the latest dismissal), placed in that action's rank bucket and match
+  label. Repeated opens no longer inflate a share; action counts stay every event (EVL-3).
+- Feedback report: the position-adjusted share reports its coverage, the part of the bucket
+  weight behind it; compare adjusted shares at similar coverage (EVL-2).
+- Feedback report: dismiss reasons and match labels no longer offered are listed after the current
+  ones instead of disappearing; calibration still uses the current labels only (EVL-7).
+- `evaluate_ranking`: a bootstrap difference is marked only with at least 6 developers, the fewest
+  for which an exact sign test can reach 5%; with fewer the block says so and gives the count.
+  Holdouts (4 developers) are never marked. Intervals are unchanged (EVL-1).
+- `--write-baseline` writes `baselines.json` whole or not at all, a failed write is a command
+  error (EVL-4), and it refuses a dataset that is not `evaluation/<name>.json`, where the baseline
+  test looks (EVL-5).
+- Datasets: an issue `updated_at` without a UTC offset is rejected, so issue order cannot depend
+  on the machine's time zone (EVL-9).
+- Judging sheets: text cells starting with `=`, `+`, `-`, `@`, a tab or a carriage return get a
+  leading `'`, so a spreadsheet shows them instead of evaluating them (EVL-6). `build_benchmark`
+  and `benchmark_sheet` reject badly shaped input with an error naming it, not a traceback; a
+  repository resolved by `--on-conflict first` is listed once (EVL-10).
+
+## [0.12.66] - 2026-11-14
+
+Ranking fixes from the review sweep (`openspec/changes/archive/2026-11-14-ranking-review-fixes/`;
+specs `recommendation-engine`, `recommendation-explanations`, `recommendation-evaluation`;
+`Bug_Backlog.md` batch 63, RNK-1…RNK-10). No scoring configuration change, no migration, no
+setting. OpenAPI stays `1.0.0`; baselines unchanged (stored configurations hit none of RNK-3,
+RNK-4, RNK-9). No separate `/simplify` or fix-diff `/code-review` run (owner's call);
+`/security-review` found nothing.
+
+### Fixed
+
+- The freshness sweep waits after a failed generation only while the latest finished generation
+  is that failure: a failure followed by a completed generation no longer delays a re-analysis
+  by up to 6 hours (RNK-1).
+- Activating a new configuration regenerates developers whose last generation stored no
+  recommendations: due when the last completed generation ran under another version (RNK-2).
+- One developer whose job cannot be queued no longer stops the freshness sweep for the others;
+  the failure is logged and job recovery re-sends the pending job (RNK-6).
+- Activation fails, changing and auditing nothing, when the configuration being activated is
+  deleted before the switch, instead of leaving no active configuration (RNK-5).
+- Framework match ignores a framework found only through a source weighted 0 (RNK-3), and
+  openness evidence names only affordances worth more than 0 points (RNK-4).
+- A reason whose contribution rounds to 0 at 4 decimals is not stored (RNK-7).
+
+### Changed
+
+- Contributions are computed once: scoring carries them and reasons reuse them; the unused
+  `weighted_score` is removed and `reasons` has no default that dropped relevance scaling
+  (RNK-8, RNK-10).
+- Issues are loaded and matched only when issue fit or difficulty fit is weighted above 0 (RNK-9).
+
 ## [0.12.65] - 2026-11-14
 
 Matching fixes from the review sweep (`openspec/changes/archive/2026-11-14-services-matching-review-fixes/`;

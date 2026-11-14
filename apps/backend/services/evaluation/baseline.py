@@ -9,6 +9,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from core.reports import write_json
+
 from . import dataset as datasets
 from .runner import Report
 
@@ -33,7 +35,10 @@ def write(reports: Sequence[Report], path: Path | None = None) -> None:
     """Format 4: one entry per dataset with its top N. Each evaluated configuration replaces its
     recorded entry; configurations not evaluated and other datasets keep theirs (design D3). A
     run at a different top N must cover every configuration recorded for the dataset. Raises
-    ``BaselineError`` before writing anything."""
+    ``BaselineError`` before writing anything, also for a dataset whose file
+    ``<name>.json`` is not next to the baselines file, since the baseline test and the default
+    rewrite look only there. The file is written whole or not at all; an OS error is a
+    ``CommandError`` naming it."""
     path = path or BASELINES
     existing = read(path) if path.exists() else {}
     recorded: dict[str, dict[str, Any]] = {
@@ -43,6 +48,12 @@ def write(reports: Sequence[Report], path: Path | None = None) -> None:
     groups: dict[str, list[Report]] = {}
     for report in reports:
         groups.setdefault(report.dataset, []).append(report)
+    for name in groups:
+        if not (path.parent / f"{name}.json").is_file():
+            raise BaselineError(
+                f"{name}: no dataset file {path.parent / f'{name}.json'}; the baseline test "
+                "reads recorded datasets only from there."
+            )
     for name, group in groups.items():
         sizes = {r.top_n for r in group}
         if len(sizes) != 1:
@@ -66,7 +77,7 @@ def write(reports: Sequence[Report], path: Path | None = None) -> None:
             }
         recorded[name] = {"top_n": size, "configs": dict(sorted(configs.items()))}
     data = {"format": FORMAT, "datasets": dict(sorted(recorded.items()))}
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    write_json(path, data, what="Baseline")
 
 
 def default_datasets(path: Path | None = None, datasets_dir: Path | None = None) -> list[Path]:

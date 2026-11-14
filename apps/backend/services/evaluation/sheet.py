@@ -41,6 +41,18 @@ CONTRIBUTION_FLAGS = (
 )
 
 
+# A spreadsheet evaluates a cell starting with one of these (change
+# services-evaluation-review-fixes, EVL-6).
+FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _cell(value: Any) -> Any:
+    """Repository text as a spreadsheet shows it, never a formula: a leading ``'``."""
+    if isinstance(value, str) and value.startswith(FORMULA_STARTS):
+        return f"'{value}"
+    return value
+
+
 # Replaces the export's request to add judgments (design D6).
 JUDGED = "Real developer judged blind from a judging sheet."
 
@@ -95,24 +107,31 @@ def write_sheet(export: Mapping[str, Any]) -> str:
     """The sheet as CSV text; write it with ``encoding="utf-8-sig"`` (BOM for spreadsheets)."""
     developer = _single_developer(export)
     repositories = export.get("repositories", {})
+    if not isinstance(repositories, Mapping):
+        raise SheetError("An export's repositories must be a JSON object.")
+    names = sorted(_candidate_names(developer))
+    for name in names:
+        if not isinstance(repositories.get(name), Mapping):
+            raise SheetError(f"Candidate {name} is not described in the export's repositories.")
     out = io.StringIO()
     for line in (f"developer: {developer.get('id', '')}", *GUIDE):
         out.write(f"# {line}\n")
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(COLUMNS)
-    names = sorted(_candidate_names(developer))
     for name in names:
         repo = repositories[name]
         snapshot = repo.get("snapshot") or {}
         writer.writerow(
             [
+                # A GitHub full name starts with a letter or digit; kept as-is so that
+                # import_sheet matches it.
                 name,
                 f"https://github.com/{name}",
-                repo.get("description", ""),
-                _languages(repo.get("languages", [])),
-                "; ".join(repo.get("topics", [])),
+                _cell(repo.get("description", "")),
+                _cell(_languages(repo.get("languages", []))),
+                _cell("; ".join(repo.get("topics", []))),
                 "; ".join(text for flag, text in CONTRIBUTION_FLAGS if repo.get(flag)),
-                snapshot.get("activity_label", ""),
+                _cell(snapshot.get("activity_label", "")),
                 len(repo.get("issues", [])),
                 "",
                 "",

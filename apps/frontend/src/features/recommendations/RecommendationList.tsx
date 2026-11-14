@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { dismissMutationKey } from '@/features/feedback/api'
 import { type DismissedProject, DismissUndo } from '@/features/feedback/RecommendationActions'
+import { cn } from '@/lib/utils'
 
 import {
   FILTER_KEYS,
@@ -56,14 +57,14 @@ export function RecommendationList() {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
-  // A dismissal from the detail page arrives as navigation state.
-  const [dismissed, setDismissed] = useState<DismissedProject | null>(
-    () => (location.state as { dismissed?: DismissedProject } | null)?.dismissed ?? null,
-  )
-  const closeUndo = () => {
-    setDismissed(null)
-    if (location.state) void navigate(location, { replace: true, state: null })
-  }
+  // A dismissal from the detail page arrives as navigation state. It is taken once: the state
+  // is cleared at once, so a reload or Back does not offer the undo again.
+  const arrived = (location.state as { dismissed?: DismissedProject } | null)?.dismissed
+  const [dismissed, setDismissed] = useState<DismissedProject | null>(() => arrived ?? null)
+  useEffect(() => {
+    if (arrived) void navigate(location, { replace: true, state: null })
+  }, [arrived, location, navigate])
+  const closeUndo = () => setDismissed(null)
   const filters = readFilters(params)
   const filtered = FILTER_KEYS.some((key) => filters[key])
   const status = useRecommendationStatus()
@@ -80,11 +81,27 @@ export function RecommendationList() {
     if (key !== 'page') next.delete('page')
     setParams(next, { replace: true })
   }
+  const clearFilters = () => {
+    const next = new URLSearchParams(params)
+    for (const key of [...FILTER_KEYS, 'page']) next.delete(key)
+    setParams(next, { replace: true })
+  }
+  const clearButton = (
+    <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+      Clear filters
+    </Button>
+  )
 
   const page = filters.page ?? 1
   const results = list.data?.results ?? []
   // A dismissal empties its page at once; only once it is confirmed is the page really empty.
   const dismissing = useIsMutating({ mutationKey: dismissMutationKey }) > 0
+  // The previous page's or filter's results, kept on screen until the new ones arrive.
+  const stale = list.isPlaceholderData
+  // An empty page is known to be empty only from a server response with nothing pending: a
+  // dismissal in flight, old results shown meanwhile or a refetch under way (after a dismissal
+  // the list is refetched) may still fill it.
+  const settling = dismissing || stale || list.isFetching
 
   // A page that no longer exists (dismissals or a regeneration shrank the list, an old link)
   // moves to one that does: past the end → page 1 (the 404 does not say which page is last);
@@ -92,13 +109,7 @@ export function RecommendationList() {
   let recoverTo: number | null = null
   if (page > 1) {
     if (list.isError && list.error.status === 404) recoverTo = 1
-    else if (
-      list.isSuccess &&
-      !list.isPlaceholderData &&
-      !dismissing &&
-      results.length === 0 &&
-      list.data.previous
-    )
+    else if (list.isSuccess && !settling && results.length === 0 && list.data.previous)
       recoverTo = page - 1
   }
   useEffect(() => {
@@ -132,7 +143,7 @@ export function RecommendationList() {
       </div>
 
       {showFilters && (
-        <form className="flex flex-wrap gap-3" aria-label="Filter recommendations">
+        <form className="flex flex-wrap items-end gap-3" aria-label="Filter recommendations">
           {FILTERS.map(({ key, label, options }) => (
             <label key={key} className="flex flex-col gap-1 text-xs">
               {label}
@@ -147,9 +158,14 @@ export function RecommendationList() {
                     {option.label}
                   </option>
                 ))}
+                {/* A value from a link that is not an option is still shown as selected. */}
+                {filters[key] && !options.some((option) => option.value === filters[key]) && (
+                  <option value={filters[key]}>{filters[key]}</option>
+                )}
               </select>
             </label>
           ))}
+          {filtered && clearButton}
         </form>
       )}
 
@@ -164,18 +180,29 @@ export function RecommendationList() {
       {list.isPending || recoverTo !== null ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : !list.data ? (
-        <p role="alert" className="text-sm">
-          {list.error?.code === 'validation_error'
-            ? 'These filters are not valid. Clear them and try again.'
-            : 'Could not load recommendations. Please refresh the page.'}
-        </p>
+        list.error?.code === 'validation_error' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <p role="alert" className="text-sm">
+              These filters are not valid. Clear them and try again.
+            </p>
+            {clearButton}
+          </div>
+        ) : (
+          <p role="alert" className="text-sm">
+            Could not load recommendations. Please refresh the page.
+          </p>
+        )
       ) : results.length === 0 ? (
-        !generating && (
-          <p className="text-muted-foreground text-sm">{emptyReason(status.data, filtered)}</p>
+        settling ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : (
+          !generating && (
+            <p className="text-muted-foreground text-sm">{emptyReason(status.data, filtered)}</p>
+          )
         )
       ) : (
         <>
-          <div className="space-y-3">
+          <div className={cn('space-y-3', stale && 'opacity-60')} aria-busy={stale}>
             {results.map((recommendation) => (
               <RecommendationCard
                 key={recommendation.id}
@@ -189,7 +216,7 @@ export function RecommendationList() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={!list.data.previous}
+                disabled={stale || !list.data.previous}
                 onClick={() => update('page', page > 2 ? String(page - 1) : '')}
               >
                 Previous
@@ -198,7 +225,7 @@ export function RecommendationList() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={!list.data.next}
+                disabled={stale || !list.data.next}
                 onClick={() => update('page', String(page + 1))}
               >
                 Next

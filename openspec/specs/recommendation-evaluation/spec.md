@@ -18,7 +18,11 @@ The system SHALL read benchmark datasets from versioned, checked-in files. A dat
 - **THEN** metrics treat it as not relevant and the report counts it as unjudged
 
 ### Requirement: Dataset validation
-Loading a dataset SHALL fail with a message naming the developer and field when: the format version is unknown; an identifier is duplicated; a value is outside its allowed range (confidence and strength 0..1, judgment 0..2, experience level and issue difficulty outside their choice sets); a skill, interest or issue technology is not in the current catalog; a judgment names a repository that is not in that developer's pool; or a developer has no judgment of 1 or more. Evaluation SHALL NOT run on an invalid dataset.
+Loading a dataset SHALL fail with a message naming the developer and field when: the format version is unknown; an identifier is duplicated; a value is outside its allowed range (confidence and strength 0..1, judgment 0..2, experience level and issue difficulty outside their choice sets); a skill, interest or issue technology is not in the current catalog; a judgment names a repository that is not in that developer's pool; an issue's update time is not an ISO 8601 time with a UTC offset; or a developer has no judgment of 1 or more. Evaluation SHALL NOT run on an invalid dataset.
+
+#### Scenario: Update time without an offset
+- **WHEN** an issue's `updated_at` is `2026-09-20T12:00:00`
+- **THEN** loading fails naming the issue and the field, so issue order cannot depend on the machine's time zone
 
 #### Scenario: Judgment outside the pool
 - **WHEN** a developer's judgments name a repository that is not one of their candidates
@@ -92,7 +96,7 @@ A configuration SHALL count as an improvement over the baseline only when its me
 - **THEN** it is not an improvement
 
 ### Requirement: Uncertainty of a comparison
-For every configuration after the baseline, evaluation SHALL estimate the uncertainty of each metric's difference from the baseline with a paired bootstrap over developers: each resample draws as many developers as the dataset holds, with replacement, and takes the mean over the drawn developers of the candidate's value minus the baseline's value for the same developer, from unrounded per-developer values. The report SHALL give, per metric, the observed mean difference, the 2.5th and 97.5th percentiles of the resampled differences as a 95% interval, and the share of resamples whose difference is 0 or below, and SHALL mark a difference whose interval lies entirely above or entirely below 0. The number of resamples (default 10,000) and the random seed (default fixed) SHALL be settable, and the same dataset, configurations, resample count and seed SHALL always give the same figures. A dataset with one developer SHALL report an interval of zero width at the observed difference. These figures SHALL NOT change the improvement verdict, the regression baseline or activation.
+For every configuration after the baseline, evaluation SHALL estimate the uncertainty of each metric's difference from the baseline with a paired bootstrap over developers: each resample draws as many developers as the dataset holds, with replacement, and takes the mean over the drawn developers of the candidate's value minus the baseline's value for the same developer, from unrounded per-developer values. The report SHALL give, per metric, the observed mean difference, the 2.5th and 97.5th percentiles of the resampled differences as a 95% interval, and the share of resamples whose difference is 0 or below, and SHALL mark a difference whose interval lies entirely above or entirely below 0 only when the dataset holds at least 6 developers, the fewest for which an exact two-sided sign test can reach 5%. With fewer developers no difference SHALL be marked, and the report SHALL give the developer count and say that there are too few developers to mark. The number of resamples (default 10,000) and the random seed (default fixed) SHALL be settable, and the same dataset, configurations, resample count and seed SHALL always give the same figures. A dataset with one developer SHALL report an interval of zero width at the observed difference, not marked. These figures SHALL NOT change the improvement verdict, the regression baseline or activation.
 
 #### Scenario: Reproducible interval
 - **WHEN** the same comparison is evaluated twice with the default resample count and seed
@@ -103,8 +107,12 @@ For every configuration after the baseline, evaluation SHALL estimate the uncert
 - **THEN** its NDCG@10 interval includes 0 and the difference is not marked
 
 #### Scenario: Consistent improvement
-- **WHEN** a candidate's NDCG@10 is higher than the baseline's for every developer
+- **WHEN** a candidate's NDCG@10 is higher than the baseline's for every one of six developers
 - **THEN** its interval lies above 0, the difference is marked, and the share of resamples not better is 0
+
+#### Scenario: Too few developers to mark
+- **WHEN** a candidate's NDCG@10 is higher than the baseline's for every one of four developers
+- **THEN** its interval lies above 0, the difference is not marked, and the report says four developers are too few to mark
 
 #### Scenario: Verdict unchanged
 - **WHEN** a candidate meets the improvement rule but its NDCG@10 interval includes 0
@@ -114,24 +122,30 @@ For every configuration after the baseline, evaluation SHALL estimate the uncert
 A management command SHALL report how users acted on recommendations, per scoring configuration
 version, from the stored feedback events and their snapshots, without changing any stored data.
 It SHALL group events by configuration version and by rank bucket (1–5, 6–10, 11–20, 21 and
-below), and SHALL give per group the count of each action and the number of distinct users.
+below), and SHALL give per group the count of each action (every event) and the number of distinct users.
 Saved, opened repository and opened issue SHALL count as positive actions; these and dismissed
 SHALL count as decisive actions; viewed, unsaved and undismissed SHALL be counted but be neither.
-Per group the report SHALL give the positive share, positive actions divided by decisive
-actions. Per configuration it SHALL give the raw positive share over all its groups and a
+Shares SHALL count outcomes, not events: each user, repository and configuration version SHALL
+have at most one outcome, its latest decisive event that was not undone, where unsaved undoes the
+latest save before it and undismissed the latest dismissal before it; the outcome SHALL be
+positive or dismissed by that event's action and SHALL fall in that event's rank bucket and match
+label. Per group the report SHALL give the positive share, positive outcomes divided by decisive
+outcomes. Per configuration it SHALL give the raw positive share over all its groups and a
 position-adjusted share: the mean of its bucket shares weighted by the number of decisive
-actions per bucket over all configurations in the report, using only the buckets where the
-configuration has a share and renormalizing the weights over them; a configuration with no such
-bucket SHALL have no adjusted share. Per configuration the report SHALL also give one row per
+outcomes per bucket over all configurations in the report, using only the buckets where the
+configuration has a share and renormalizing the weights over them, together with its coverage,
+the part of the total weight those buckets carry; a configuration with no such
+bucket SHALL have no adjusted share and no coverage. Per configuration the report SHALL also give one row per
 match label (strong, good, partial) with the same counts, distinct users and positive share, not
 adjusted for position, and a calibration verdict: `ordered` when the share of every label that
 has one is at least the share of every lower label that has one, `not ordered` naming the first
 higher label whose share is below a lower label's, or `not enough data` when fewer than two
-labels have a share. A group with fewer decisive actions than a minimum
+labels have a share; a stored label outside these SHALL get its own row after them and SHALL NOT
+enter the calibration verdict. A group with fewer decisive outcomes than a minimum
 (configurable, default 10) SHALL show its counts but no share and SHALL be left out of the
 adjusted share. Events without a configuration version or rank (a rank below 1 counts as none) SHALL be counted on their own
 line and left out of every share; events without a match label SHALL be left out of the label
-rows only. Per configuration it SHALL also count dismissals by reason (including those without one), and the dismissals without a configuration version or rank SHALL be counted by reason on their own line; reasons SHALL NOT change any share. The command SHALL accept a time window in days, the
+rows only. Per configuration it SHALL also count dismissals by reason (including those without one), and the dismissals without a configuration version or rank SHALL be counted by reason on their own line, a stored reason outside the current choices under its own value; reasons SHALL NOT change any share. The command SHALL accept a time window in days, the
 configuration versions to include and a JSON output file. The report SHALL contain aggregates
 only: no user, repository, recommendation or issue identifiers. It SHALL NOT change any ranking.
 
@@ -141,7 +155,15 @@ only: no user, repository, recommendation or issue identifiers. It SHALL NOT cha
 
 #### Scenario: Position adjustment
 - **WHEN** configuration A has 32 positive of 40 decisive actions at ranks 1–5 and 4 of 10 at ranks 6–10, and configuration B has 8 of 10 at ranks 1–5 and 16 of 40 at ranks 6–10
-- **THEN** A's raw positive share is 0.72 and B's 0.48, and both have a position-adjusted share of 0.60
+- **THEN** A's raw positive share is 0.72 and B's 0.48, and both have a position-adjusted share of 0.60 with coverage 1.00
+
+#### Scenario: Partial coverage
+- **WHEN** configuration A has a share only at ranks 1–5, which carry 50 of the report's 100 decisive outcomes
+- **THEN** A's adjusted share equals its ranks 1–5 share and its coverage is 0.50
+
+#### Scenario: Repeated and undone actions
+- **WHEN** under `v2-deterministic` one user opened one recommended repository 6 times, dismissed two others, and saved then unsaved a fourth
+- **THEN** the counts show 6 opened, 2 dismissed, 1 saved and 1 unsaved, and the positive share is 1 of 3 decisive outcomes
 
 #### Scenario: Too few actions
 - **WHEN** a group has 4 decisive actions and the minimum is 10
@@ -171,6 +193,10 @@ only: no user, repository, recommendation or issue identifiers. It SHALL NOT cha
 - **WHEN** under `v2-deterministic` users dismissed 6 recommendations as `inactive`, 3 as `not_my_stack` and 4 without a reason
 - **THEN** the report shows those counts for `v2-deterministic`, and its shares are the same as if no reason had been given
 
+#### Scenario: Reason no longer offered
+- **WHEN** 2 stored dismissals carry a reason that is no longer one of the choices
+- **THEN** the reasons line lists that value with 2 after the current reasons, so the reasons add up to the dismissals
+
 ### Requirement: Regression baseline
 The repository SHALL keep recorded dataset-level metrics of each seeded scoring configuration on `benchmark-v1` and, once it exists, on `benchmark-v2`, each dataset with the top N its metrics were computed at. The test suite SHALL recompute them at each dataset's recorded top N and fail when any differs, naming the configuration and metric, so a change that moves the ranking fails until the recorded values are updated deliberately in the same change.
 
@@ -179,6 +205,8 @@ The evaluation command's baseline option SHALL write the recorded values, at the
 - It SHALL record stored configurations only (all of them unless versions are given). A configuration evaluated in the run SHALL replace its recorded entry; configurations recorded for the dataset but not evaluated SHALL keep theirs, and other datasets SHALL stay unchanged.
 - A run at a top N different from the one recorded for a dataset SHALL cover every configuration recorded for it, otherwise the command SHALL fail before writing anything.
 - It SHALL refuse a minimum score override, because the test recomputes each configuration at its own minimum score.
+- It SHALL refuse, before evaluating, a dataset that is not the file named after the dataset in the evaluation data folder (`<name>.json`), because the test and the default rewrite find recorded datasets only there.
+- It SHALL write the file whole or not at all; a failed write SHALL end the command with an error naming the file, not a traceback.
 
 #### Scenario: Ranking change detected
 - **WHEN** a code change alters a signal so that v2's NDCG@10 on `benchmark-v1` moves
@@ -199,6 +227,10 @@ The evaluation command's baseline option SHALL write the recorded values, at the
 #### Scenario: Minimum score override refused
 - **WHEN** the baseline is written with a minimum score override
 - **THEN** the command fails and the file is unchanged
+
+#### Scenario: Dataset outside the evaluation folder
+- **WHEN** the baseline is written with a dataset option pointing to a judged export in `judging/`
+- **THEN** the command fails naming the expected file, evaluates nothing and the file is unchanged
 
 ### Requirement: Export a developer snapshot
 A management command SHALL export one user's stored developer features and candidate pool (with eligible issues) into the dataset format, for a person to judge. The exported pool SHALL be the candidates a generation would score, including repositories whose stored data is stale, plus the candidates the user dismissed, so the export does not depend on when the staleness sweep last ran. It SHALL make no GitHub calls. The export SHALL contain no username, name, email, GitHub id, avatar or token; the developer identifier SHALL be given by the person exporting. By default it SHALL also leave out every candidate the user interacted with (a repository they contributed to or that entered the pool as previously interacted with), because the set of those repositories identifies the person; an explicit option SHALL include them for private use. Every candidate SHALL be left unjudged, and the export SHALL say that judgments must be added by hand. A user without an analyzed profile SHALL produce an error, not an empty export.
@@ -263,8 +295,8 @@ metric and changing nothing. Forcing SHALL require a non-empty reason. When the 
 cannot run (unusable benchmark, invalid active configuration), an unforced activation SHALL fail
 with an error and a forced one SHALL proceed, recording that it was not compared. An activation
 SHALL be recorded as forced only when the improvement rule was not met or not evaluated. When
-the active configuration changes between the comparison and the switch, the activation SHALL
-fail and change nothing. A successful activation SHALL deactivate the previous configuration and
+the active configuration changes between the comparison and the switch, or the configuration
+being activated no longer exists at the switch, the activation SHALL fail and change nothing. A successful activation SHALL deactivate the previous configuration and
 activate the new one in one step, so that exactly one configuration is active at every moment,
 and SHALL record an audit event with the new and previous versions, whether it was forced, the
 reason and any failed metrics. Activating the configuration that is already active SHALL change
@@ -300,8 +332,20 @@ command SHALL NOT read a holdout.
 - **WHEN** an administrator opens the admin page of the stored configuration `v1-deterministic` while `v2-deterministic` is active
 - **THEN** the page shows `npm run manage -- activate_scoring_config v1-deterministic`, offers no activation action, and no benchmark comparison runs
 
+#### Scenario: Configuration removed before the switch
+- **WHEN** the configuration being activated is deleted after it was judged and before the switch
+- **THEN** the activation fails with an error, the previously active configuration stays the only active one, and no audit event is recorded
+
 ### Requirement: Blind judging sheet
-A management command SHALL turn an exported developer snapshot into a judging sheet (CSV) with one row per candidate: repository full name, link, description, main languages with their share, topics, contribution files present, activity label, number of eligible open issues, an empty grade column and an empty note column, preceded by a grading guide (0 not relevant, 1 relevant, 2 highly relevant; blank = not judged). Rows SHALL be in alphabetical order of repository name. A language without a byte count SHALL count as zero for the shares; when no language of a repository has a byte count, its languages SHALL be listed by name without shares. The sheet SHALL NOT contain any score, signal value, rank, match label or reason computed by any scoring configuration, and SHALL NOT contain identifying data of the developer.
+A management command SHALL turn an exported developer snapshot into a judging sheet (CSV) with one row per candidate: repository full name, link, description, main languages with their share, topics, contribution files present, activity label, number of eligible open issues, an empty grade column and an empty note column, preceded by a grading guide (0 not relevant, 1 relevant, 2 highly relevant; blank = not judged). Rows SHALL be in alphabetical order of repository name. A language without a byte count SHALL count as zero for the shares; when no language of a repository has a byte count, its languages SHALL be listed by name without shares. The sheet SHALL NOT contain any score, signal value, rank, match label or reason computed by any scoring configuration, and SHALL NOT contain identifying data of the developer. A text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return SHALL be written with a leading `'`, so a spreadsheet shows repository text instead of evaluating it. An export whose catalog is not an object or lacks a candidate SHALL fail naming the repository, with no traceback and no file written.
+
+#### Scenario: Description that looks like a formula
+- **WHEN** a candidate's description is `=HYPERLINK("https://example.com")`
+- **THEN** its cell is `'=HYPERLINK("https://example.com")`, and importing the graded sheet reads the grades as usual
+
+#### Scenario: Candidate missing from the catalog
+- **WHEN** an export lists a candidate that its repositories do not describe
+- **THEN** writing the sheet fails naming that repository
 
 #### Scenario: Blind sheet
 - **WHEN** a sheet is written for an export with 30 candidates
@@ -335,7 +379,7 @@ A management command SHALL read a filled judging sheet back into its export. Gui
 - **THEN** the import fails naming that repository, and the export is unchanged
 
 ### Requirement: Benchmark with real developers
-A management command SHALL build a dataset from several datasets and judged exports: developers are concatenated (identifiers must be unique, otherwise the build fails naming them); repository catalogs are merged, identical entries once, and the build SHALL fail naming the repository when two entries with the same name differ, unless the person building chooses which source wins. An input that is not a dataset object, or whose format version differs from the current one, SHALL fail the build naming that input, with no traceback and no file written. `benchmark-v2` SHALL be built from `benchmark-v1` and at least one judged real developer; until one is judged it does not exist and `benchmark-v1` remains the selection benchmark. Real developers SHALL be exported only from accounts whose owner agreed. Committing `benchmark-v2` SHALL be a deliberate decision of the person who judged, since it holds real public repository names and anonymized skill profiles.
+A management command SHALL build a dataset from several datasets and judged exports: developers are concatenated (identifiers must be unique, otherwise the build fails naming them); repository catalogs are merged, identical entries once, and the build SHALL fail naming the repository when two entries with the same name differ, unless the person building chooses which source wins. An input that is not a dataset object, whose format version differs from the current one, whose repositories are not an object or whose developers are not a list of objects SHALL fail the build naming that input, with no traceback and no file written. A repository resolved by choosing a source SHALL be reported once. `benchmark-v2` SHALL be built from `benchmark-v1` and at least one judged real developer; until one is judged it does not exist and `benchmark-v1` remains the selection benchmark. Real developers SHALL be exported only from accounts whose owner agreed. Committing `benchmark-v2` SHALL be a deliberate decision of the person who judged, since it holds real public repository names and anonymized skill profiles.
 
 #### Scenario: Build
 - **WHEN** `benchmark-v1` and two judged exports with distinct identifiers are built

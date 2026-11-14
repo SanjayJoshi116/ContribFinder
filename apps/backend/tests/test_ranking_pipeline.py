@@ -10,7 +10,7 @@ from developers.models import DeveloperProfile
 from e2e.builders import add_candidate
 from recommendations.models import Recommendation, ScoringConfig
 from services.matching.features import load_candidates, load_developer
-from services.matching.issues import IssueFeature, load_issues
+from services.matching.issues import NO_MATCH, IssueFeature, load_issues
 from services.ranking.pipeline import rank_pool
 
 from .test_issue_matching import django_issues
@@ -65,6 +65,27 @@ def test_no_issue_lookup_without_issue_params(developer, pool) -> None:
         top_n=50,
     )
     assert ranked
+
+
+def test_no_issue_lookup_when_issue_signals_weigh_zero(developer, pool) -> None:
+    """RNK-9: issue params present, but issue fit and difficulty fit are weighted 0."""
+    v2 = config("v2-deterministic")
+    weights = {**v2.weights, "issue_fit": 0.0, "difficulty_fit": 0.0}
+
+    def issues_for(ids: Sequence[int]) -> dict[int, list[IssueFeature]]:
+        raise AssertionError("no issue signal is weighted")
+
+    ranked = rank_pool(
+        load_developer(developer),
+        load_candidates(developer),
+        weights,
+        v2.params,
+        issues_for,
+        min_score=0.0,
+        top_n=50,
+    )
+    assert ranked
+    assert all(s.issues == NO_MATCH for s in ranked)
 
 
 def test_generation_and_rank_pool_agree(user, developer, pool) -> None:

@@ -48,6 +48,30 @@ def test_conflicting_repository() -> None:
     assert result["repositories"]["bench/django-kit"]["snapshot"]["days_since_push"] == 2
 
 
+def test_repository_resolved_by_choice_is_listed_once() -> None:
+    inputs = [("a", minimal())]
+    for index, days in enumerate((40, 50), start=1):
+        other = real(f"real-{index}")
+        other["repositories"]["bench/django-kit"]["snapshot"]["days_since_push"] = days
+        inputs.append((f"r{index}", other))
+    _, resolved = build("b", "", inputs, on_conflict="first")
+    assert resolved == ["bench/django-kit"]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"repositories": []}, "bad: repositories must be a JSON object"),
+        ({"developers": ["dev-x"]}, "bad: developers must be a list of JSON objects"),
+        ({"developers": {"id": "dev-x"}}, "bad: developers must be a list of JSON objects"),
+    ],
+    ids=["repositories-list", "developer-string", "developers-object"],
+)
+def test_badly_shaped_input(change: dict[str, Any], message: str) -> None:
+    with pytest.raises(BuildError, match=message):
+        build("b", "", [("a", minimal()), ("bad", real("real-a") | change)])
+
+
 def test_input_not_a_dataset(tmp_path) -> None:
     with pytest.raises(BuildError, match=r"report\.json is not a format 1 dataset"):
         build("b", "", [("a", minimal()), ("report.json", [])])  # type: ignore[list-item]

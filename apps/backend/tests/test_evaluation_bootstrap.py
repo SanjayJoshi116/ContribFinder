@@ -2,7 +2,7 @@
 
 import pytest
 
-from services.evaluation.bootstrap import DEFAULT_RESAMPLES, paired
+from services.evaluation.bootstrap import DEFAULT_RESAMPLES, MIN_MARKED_DEVELOPERS, paired
 
 BASE = [0.5, 0.6, 0.7, 0.4, 0.8, 0.9]
 
@@ -43,6 +43,21 @@ def test_one_developer_has_a_zero_width_interval() -> None:
     found = paired([0.4], [0.7])
     assert found.low == found.high == found.diff == pytest.approx(0.3)
     assert found.not_better == 0
+    assert not found.marked and found.too_few
+
+
+def test_four_developers_all_better_are_too_few_to_mark() -> None:
+    found = paired(BASE[:4], [v + 0.1 for v in BASE[:4]])
+    assert found.low > 0 and found.not_better == 0
+    assert not found.marked and found.too_few
+    assert found.as_dict()["developers"] == 4 and found.as_dict()["too_few"] is True
+
+
+def test_six_developers_is_the_minimum_to_mark() -> None:
+    assert MIN_MARKED_DEVELOPERS == 6
+    found = paired(BASE, [v + 0.1 for v in BASE])
+    assert found.marked and not found.too_few
+    assert found.as_dict()["developers"] == 6 and found.as_dict()["too_few"] is False
 
 
 def test_interval_depends_only_on_its_own_inputs() -> None:

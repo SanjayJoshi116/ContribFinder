@@ -1,5 +1,7 @@
 """Blind judging sheets and judgment import (benchmark-real-judgments, group 2)."""
 
+import csv
+import io
 import json
 from io import StringIO
 from typing import Any
@@ -59,6 +61,46 @@ def test_round_trip_sets_judgments_and_kind() -> None:
     developer = judged["developers"][0]
     assert developer["judgments"] == {"bench/django-kit": 2} and developer["kind"] == "real"
     assert developer["description"] == JUDGED and judged["description"] == JUDGED
+
+
+def sheet_rows(text: str) -> list[list[str]]:
+    """The header and data rows of a written sheet, as a CSV reader reads them."""
+    lines = text.splitlines(keepends=True)
+    body = "".join(line for line in lines if not line.startswith("#"))
+    return list(csv.reader(io.StringIO(body)))
+
+
+def test_formula_like_text_is_quoted_and_still_imports() -> None:
+    raw = export()
+    raw["repositories"]["bench/django-kit"]["description"] = '=HYPERLINK("https://example.com")'
+    sheet = write_sheet(raw)
+    rows = sheet_rows(sheet)
+    assert rows[1][2] == '\'=HYPERLINK("https://example.com")'
+    judged = import_sheet(raw, read_sheet(filled(sheet, {"bench/django-kit": "2"})))
+    assert judged["developers"][0]["judgments"] == {"bench/django-kit": 2}
+
+
+def test_normal_text_is_unchanged() -> None:
+    rows = sheet_rows(write_sheet(export()))
+    assert rows[1][2] == "Django forms toolkit"
+    assert rows[1][3] == "Python 100%"
+
+
+@pytest.mark.parametrize("start", ["=", "+", "-", "@", "\t", "\r"])
+def test_every_formula_start_is_quoted(start: str) -> None:
+    raw = export()
+    raw["repositories"]["bench/django-kit"]["description"] = f"{start}1"
+    assert sheet_rows(write_sheet(raw))[1][2] == f"'{start}1"
+
+
+def test_candidate_missing_from_the_catalog() -> None:
+    raw = export()
+    del raw["repositories"]["bench/go-proxy"]
+    with pytest.raises(SheetError, match="bench/go-proxy"):
+        write_sheet(raw)
+    raw["repositories"] = []
+    with pytest.raises(SheetError, match="repositories must be a JSON object"):
+        write_sheet(raw)
 
 
 def test_hash_line_inside_a_quoted_description() -> None:

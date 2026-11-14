@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from services.evaluation.dataset import DatasetError, load, parse
+from services.evaluation.dataset import DATASETS_DIR, DatasetError, load, parse
 
 
 def minimal() -> dict[str, Any]:
@@ -140,6 +140,21 @@ def test_unknown_issue_difficulty_and_technology() -> None:
     errors = errors_of(raw)
     assert any("unknown difficulty 'trivial'" in e for e in errors)
     assert any("unknown technology 'cobol-on-cogs'" in e for e in errors)
+
+
+@pytest.mark.parametrize("value", ["2026-09-20T12:00:00", "yesterday"])
+def test_issue_update_time_needs_a_utc_offset(value: str) -> None:
+    raw = minimal()
+    raw["repositories"]["bench/django-kit"]["issues"][0]["updated_at"] = value
+    assert errors_of(raw) == [
+        "repository bench/django-kit issue 0: updated_at must be an ISO 8601 time with a UTC offset"
+    ]
+
+
+def test_committed_datasets_have_offsets() -> None:
+    for path in sorted(DATASETS_DIR.glob("*.json")):
+        if path.name != "baselines.json":
+            load(path)
 
 
 def test_unknown_skill_and_interest() -> None:

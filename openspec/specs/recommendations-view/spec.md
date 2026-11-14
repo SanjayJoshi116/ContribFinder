@@ -68,7 +68,7 @@ The system SHALL provide `GET /api/v1/recommendations/status` with the user's la
 - **THEN** the status has no job, no generation time and a count of 0
 
 ### Requirement: Recommendations on the dashboard
-The signed-in dashboard SHALL show the user's recommendations as cards. Each card SHALL show the repository name and owner, description, technologies (matched ones highlighted), the match label as text (Strong match, Good match, Partial match), the top reasons, the activity indicator as an observable signal (for example "Recently active", never "healthy"), the setup facts found as one short line (for example "CI · tests · dev container"; nothing when none was found or they are unknown), the number of relevant issues when there are any, and a link that opens the repository on GitHub. The dashboard SHALL offer the language, framework, activity, size, match, difficulty and contribution type filters when the user has more recommendations than fit on one page (20), or when a filter is already active; it SHALL keep them in the URL and update the list without a page reload. With one page or fewer and no active filter, the filters SHALL be hidden. While recommendations are being generated it SHALL say so; with none it SHALL explain why (for example discovery still running or no eligible projects). It SHALL NOT show percentages or numeric scores. A page number in the URL past the last page SHALL move to the first page instead of showing an error, and a page left empty by dismissals while earlier pages exist SHALL move to the previous page instead of saying there are no recommendations; both SHALL replace the URL, not add a history entry.
+The signed-in dashboard SHALL show the user's recommendations as cards. Each card SHALL show the repository name and owner, description, technologies (matched ones highlighted), the match label as text (Strong match, Good match, Partial match), the top reasons, the activity indicator as an observable signal (for example "Recently active", never "healthy"), the setup facts found as one short line (for example "CI · tests · dev container"; nothing when none was found or they are unknown), the number of relevant issues when there are any, and a link that opens the repository on GitHub. The dashboard SHALL offer the language, framework, activity, size, match, difficulty and contribution type filters when the user has more recommendations than fit on one page (20), or when a filter is already active; it SHALL keep them in the URL and update the list without a page reload. A filter value in the URL that is not one of a control's options SHALL be shown as the selected value of that control, not as "Any", and whenever a filter is active the dashboard SHALL offer one action that clears every filter. While a new page or filter is loading, the previous results MAY stay visible but SHALL be marked as loading, and the page controls SHALL be disabled until the new page arrives. With one page or fewer and no active filter, the filters SHALL be hidden. While recommendations are being generated it SHALL say so; with none it SHALL explain why (for example discovery still running or no eligible projects). It SHALL NOT show percentages or numeric scores. A page number in the URL past the last page SHALL move to the first page instead of showing an error, and a page left empty by dismissals while earlier pages exist SHALL move to the previous page instead of saying there are no recommendations; both SHALL replace the URL, not add a history entry. Once a dismissal is confirmed, the list SHALL be reloaded, so a first page emptied by dismissals shows the recommendations that followed it. While a dismissal is still in flight, a page it emptied SHALL NOT say that there are no recommendations.
 
 #### Scenario: Cards with reasons
 - **WHEN** the user has recommendations
@@ -98,6 +98,22 @@ The signed-in dashboard SHALL show the user's recommendations as cards. Each car
 - **WHEN** the user is on page 2, which holds one recommendation, and dismisses it
 - **THEN** page 1 is shown, with the Undo notice still visible
 
+#### Scenario: First page emptied by dismissals
+- **WHEN** the user has 30 recommendations and dismisses all 20 cards on page 1
+- **THEN** once the dismissals are confirmed, page 1 shows the remaining 10 recommendations, not a message that there are none
+
+#### Scenario: Filter value outside the options
+- **WHEN** the user opens `/app?language=ruby` and Ruby is not one of the language options
+- **THEN** the language control shows "ruby" as selected, and Clear filters removes it from the URL and shows the unfiltered list
+
+#### Scenario: Invalid filter value
+- **WHEN** the user opens `/app?match=foo`
+- **THEN** the dashboard says the filters are not valid and offers Clear filters, which restores the unfiltered list
+
+#### Scenario: Next page loading
+- **WHEN** the user clicks Next on page 1
+- **THEN** until page 2 arrives the shown results are marked as loading and Previous and Next are disabled, so a second click cannot skip a page
+
 #### Scenario: Setup line on a card
 - **WHEN** a recommended repository has CI and tests found, no dev environment and no Docker Compose found
 - **THEN** its card shows "CI · tests" and does not mention the facts not found
@@ -107,7 +123,7 @@ The signed-in dashboard SHALL show the user's recommendations as cards. Each car
 - **THEN** its card shows no setup line
 
 ### Requirement: Repository detail page
-Selecting a recommendation SHALL open a repository detail page with: an overview (name, owner, description, stars, license, GitHub link), why it matches (all reasons), technologies, topics, activity signals, contribution guidelines, setup facts, the README excerpt, and its relevant issues, each showing title, contribution type, estimated difficulty and its top reason and linking to the issue detail page. Each setup fact SHALL read "Found", "Not found" or "Not available" (unknown), never "No", because detection only looks at the repository root. Content that comes directly from GitHub SHALL be visually distinguishable from ContribFinder's analysis. A missing README, unknown signal or absence of relevant issues SHALL be shown as unavailable, not as an error. Following a card's relevant-issue count SHALL open the page scrolled to its relevant issues, with keyboard focus on that section once it has loaded; the scroll SHALL NOT animate when the user prefers reduced motion. A detail URL whose id is not a positive integer SHALL say that the link does not point to a recommendation and offer the way back to the dashboard, without requesting anything.
+Selecting a recommendation SHALL open a repository detail page with: an overview (name, owner, description, stars, license, GitHub link), why it matches (all reasons), technologies, topics, activity signals, contribution guidelines, setup facts, the README excerpt, and its relevant issues, each showing title, contribution type, estimated difficulty and its top reason and linking to the issue detail page. Each setup fact SHALL read "Found", "Not found" or "Not available" (unknown), never "No", because detection only looks at the repository root. Content that comes directly from GitHub SHALL be visually distinguishable from ContribFinder's analysis. A missing README, unknown signal or absence of relevant issues SHALL be shown as unavailable, not as an error. Each language's share SHALL be given as text (a whole percentage, "under 1%" for a smaller share), not only as a bar. The way back to the recommendations SHALL return to the list page and filters the detail page was opened from, and to the unfiltered first page when it was opened directly. Following a card's relevant-issue count SHALL open the page scrolled to its relevant issues, with keyboard focus on that section once it has loaded; the scroll SHALL NOT animate when the user prefers reduced motion. A detail URL whose id is not a positive integer SHALL say that the link does not point to a recommendation and offer the way back to the dashboard, without requesting anything.
 
 #### Scenario: Detail page
 - **WHEN** the user opens a recommendation
@@ -132,3 +148,11 @@ Selecting a recommendation SHALL open a repository detail page with: an overview
 #### Scenario: Setup facts on the detail page
 - **WHEN** the repository has tests found, CI not found and its dev environment and Docker Compose facts unknown
 - **THEN** the Setup group reads tests "Found", CI "Not found", dev environment "Not available" and Docker Compose "Not available"
+
+#### Scenario: Language shares as text
+- **WHEN** a repository's code is 52% Python, 47.6% Shell and 0.4% Dockerfile
+- **THEN** the languages read "Python 52%", "Shell 48%" and "Dockerfile under 1%"
+
+#### Scenario: Back keeps the list's filters
+- **WHEN** the user filters by language Rust, goes to page 3, opens a recommendation and follows the way back
+- **THEN** page 3 of the Rust-filtered list is shown

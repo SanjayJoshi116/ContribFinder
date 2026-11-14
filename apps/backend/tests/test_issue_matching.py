@@ -22,7 +22,9 @@ from services.matching.issues import (
 )
 from services.matching.signals import Signal
 from services.ranking.config import V2_ISSUE_PARAMS
-from services.ranking.explain import reasons
+from services.ranking.explain import Reason
+from services.ranking.explain import reasons as explain_reasons
+from services.ranking.score import contributions
 
 from .test_recommendation_generation import (  # noqa: F401 - pytest fixtures
     developer,
@@ -30,6 +32,11 @@ from .test_recommendation_generation import (  # noqa: F401 - pytest fixtures
     pool,
     ready_repo,
 )
+
+
+def reasons(signals: dict[str, Signal], weights: dict[str, float]) -> list[Reason]:
+    return explain_reasons(signals, contributions(signals, weights, {}))
+
 
 pytestmark = [pytest.mark.respx(assert_all_called=False)]
 

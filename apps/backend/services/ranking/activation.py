@@ -114,6 +114,8 @@ def activate(
             raise ActivationError(
                 f"The active configuration changed to {now_active or 'none'} meanwhile; try again."
             )
+        if not ScoringConfig.objects.filter(version=version).exists():
+            raise ActivationError(f"{version} no longer exists; nothing was changed.")
         ScoringConfig.objects.filter(is_active=True).exclude(version=version).update(
             is_active=False
         )

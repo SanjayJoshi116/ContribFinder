@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 
 import type { RecommendationDetail } from '@/api/types'
 import { DeadEnd } from '@/components/DeadEnd'
@@ -12,7 +12,8 @@ import { DismissButton, SaveButton } from '@/features/feedback/RecommendationAct
 
 import { useRecommendation } from './api'
 import { RelevantIssues } from './RelevantIssues'
-import { ACTIVITY_TEXT, SETUP_LABELS, SIZE_TEXT } from './messages'
+import { ACTIVITY_TEXT, SETUP_LABELS, SIZE_TEXT, shareText } from './messages'
+import { listPath } from './navigation'
 import { MatchBadge, TechnologyChips } from './RecommendationCard'
 
 const UNAVAILABLE = 'Not available'
@@ -84,6 +85,7 @@ function LanguageBar({ languages }: { languages: RecommendationDetail['languages
               style={{ width: `${Math.max(2, Math.round(lang.share * 100))}%` }}
             />
           </span>
+          <span className="w-16 shrink-0 text-right tabular-nums">{shareText(lang.share)}</span>
         </li>
       ))}
     </ul>
@@ -93,6 +95,8 @@ function LanguageBar({ languages }: { languages: RecommendationDetail['languages
 /** One recommendation: GitHub's facts kept visibly apart from ContribFinder's analysis. */
 export function RecommendationDetailPage({ id }: { id: number }) {
   const navigate = useNavigate()
+  // The list page and filters this page was opened from (a card link), else the first page.
+  const back = listPath(useLocation().state)
   const recommendation = useRecommendation(id)
   const loadedId = recommendation.data?.id
   const viewed = useRef<number | null>(null)
@@ -124,7 +128,7 @@ export function RecommendationDetailPage({ id }: { id: number }) {
   const { repository } = rec
   return (
     <>
-      <Link to="/app" className="text-muted-foreground text-sm hover:underline">
+      <Link to={back} className="text-muted-foreground text-sm hover:underline">
         ← Back to recommendations
       </Link>
 
@@ -147,7 +151,7 @@ export function RecommendationDetailPage({ id }: { id: number }) {
           <SaveButton recommendation={rec} />
           <DismissButton
             recommendation={rec}
-            onDismissed={(project) => navigate('/app', { state: { dismissed: project } })}
+            onDismissed={(project) => navigate(back, { state: { dismissed: project } })}
           />
         </div>
       </header>

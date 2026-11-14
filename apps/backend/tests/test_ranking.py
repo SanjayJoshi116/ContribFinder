@@ -6,10 +6,16 @@ from services.matching.features import RepoData
 from services.matching.signals import ZERO, Signal
 from services.ranking import explain
 from services.ranking.config import V1_PARAMS, V1_WEIGHTS
-from services.ranking.score import Scored, match_label, rank, weighted_score
+from services.ranking.score import Scored, contributions, match_label, rank
 from services.text import join_names
 
 BANDS = V1_PARAMS["bands"]
+
+
+def reasons_for(
+    signals: dict[str, Signal], weights: dict[str, float], params=V1_PARAMS
+) -> list[explain.Reason]:
+    return explain.reasons(signals, contributions(signals, weights, params))
 
 
 def sigs(**values: float) -> dict[str, Signal]:
@@ -44,7 +50,9 @@ def scored(name: str, score: float, rank_: int | None = None, relevant: bool = T
 
 def test_weighted_sum_with_seed_weights() -> None:
     s = sigs(skill=1.0, language=0.5, interest=0.0, framework=1.0, activity=1.0, openness=0.4)
-    assert weighted_score(s, V1_WEIGHTS) == pytest.approx(0.40 + 0.10 + 0.10 + 0.10 + 0.02)
+    assert sum(contributions(s, V1_WEIGHTS, V1_PARAMS).values()) == pytest.approx(
+        0.40 + 0.10 + 0.10 + 0.10 + 0.02
+    )
 
 
 @pytest.mark.parametrize(
@@ -108,7 +116,7 @@ def all_signals(**overrides: Signal) -> dict[str, Signal]:
 
 
 def test_reason_texts() -> None:
-    texts = {r.type: r.text for r in explain.reasons(all_signals(), V1_WEIGHTS)}
+    texts = {r.type: r.text for r in reasons_for(all_signals(), V1_WEIGHTS)}
     assert texts == {
         "skill": "Shares Python and Django with your profile",
         "language": "Written mainly in Python, one of your strongest languages",
@@ -120,18 +128,18 @@ def test_reason_texts() -> None:
 
 
 def test_zero_signal_gives_no_reason() -> None:
-    reasons = explain.reasons(all_signals(interest=ZERO), V1_WEIGHTS)
+    reasons = reasons_for(all_signals(interest=ZERO), V1_WEIGHTS)
     assert "interest" not in {r.type for r in reasons}
 
 
 def test_weight_zero_signal_gives_no_reason() -> None:
-    reasons = explain.reasons(all_signals(), {**V1_WEIGHTS, "interest": 0.0})
+    reasons = reasons_for(all_signals(), {**V1_WEIGHTS, "interest": 0.0})
     assert "interest" not in {r.type for r in reasons}
     assert "skill" in {r.type for r in reasons}
 
 
 def test_reasons_ordered_by_contribution_with_detail() -> None:
-    reasons = explain.reasons(all_signals(), V1_WEIGHTS)
+    reasons = reasons_for(all_signals(), V1_WEIGHTS)
     weights = [r.weight for r in reasons]
     assert weights == sorted(weights, reverse=True)
     assert reasons[0].type == "skill"  # 0.40 * 0.6
@@ -149,7 +157,7 @@ def test_no_percent_in_any_text() -> None:
             for s in ("django", "celery", "flask")
         ),
     )
-    reasons = explain.reasons(all_signals(language=low, framework=many), V1_WEIGHTS)
+    reasons = reasons_for(all_signals(language=low, framework=many), V1_WEIGHTS)
     assert all("%" not in r.text for r in reasons)
     texts = {r.type: r.text for r in reasons}
     assert texts["language"] == "Written partly in Go, a language you have touched"
@@ -158,7 +166,7 @@ def test_no_percent_in_any_text() -> None:
 
 def test_activity_without_details() -> None:
     bare = Signal(0.2, ({"label": "low_activity", "days_since_push": None},))
-    [reason] = explain.reasons({**{k: ZERO for k in V1_WEIGHTS}, "activity": bare}, V1_WEIGHTS)
+    [reason] = reasons_for({**{k: ZERO for k in V1_WEIGHTS}, "activity": bare}, V1_WEIGHTS)
     assert reason.text == "Low recent activity"
 
 

@@ -66,7 +66,8 @@ class Command(BaseCommand):
             self._table("ranks", [(bucket_label(row.bucket), row) for row in config.buckets])
             self.stdout.write(
                 f"  positive share: raw {_share(config.raw_share)}, "
-                f"position-adjusted {_share(config.adjusted_share)}"
+                f"position-adjusted {_share(config.adjusted_share)} "
+                f"(coverage {_share(config.coverage)})"
             )
             if config.labels:
                 self._table("label", [(row.label, row) for row in config.labels])
@@ -87,8 +88,11 @@ class Command(BaseCommand):
                 listed = _counts(report.unattributed_dismiss_reasons)
                 self.stdout.write(f"  dismiss reasons: {listed}")
         self.stdout.write(
-            "\nShare = saved + opened (repository or issue) out of those plus dismissed: a share "
-            "of decisive actions, not of recommendations shown. '-' = below the minimum. Label "
+            "\nShare = saved + opened (repository or issue) out of those plus dismissed, counting "
+            "one outcome per user, repository and configuration (its latest decisive action not "
+            "undone): a share of decisive outcomes, not of recommendations shown. Action counts "
+            "are every event. '-' = below the minimum. Coverage = the part of the bucket weight "
+            "behind the adjusted share; compare adjusted shares at similar coverage. Label "
             "shares are not adjusted for rank; read the calibration with the user counts."
         )
 

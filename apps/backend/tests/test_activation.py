@@ -139,6 +139,19 @@ def test_active_changed_after_judging_is_refused() -> None:
     assert events() == []
 
 
+def test_candidate_deleted_after_judging_is_refused() -> None:
+    """RNK-5: the configuration is gone at the switch; nothing changes, nothing is audited."""
+
+    def deleting(candidate: ConfigSpec, current: ConfigSpec) -> Verdict:
+        ScoringConfig.objects.filter(version="v1-deterministic").delete()
+        return Verdict(candidate.label, True, ())
+
+    with pytest.raises(ActivationError, match="no longer exists"):
+        activate("v1-deterministic", judge=deleting)
+    assert active() == ["v2-deterministic"]
+    assert events() == []
+
+
 @override_settings(RECOMMENDATION_MIN_SCORE=0.9, RECOMMENDATIONS_TOP_N=3)
 def test_benchmark_judge_ignores_local_settings(monkeypatch) -> None:
     seen: list[tuple[float, int]] = []

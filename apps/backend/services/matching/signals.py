@@ -70,11 +70,13 @@ def language_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
 
 def framework_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
     """Noisy-OR of the developer's confidence in the repository's frameworks: one strong
-    match counts by itself. 0 when the repository has no detected framework."""
+    match counts by itself. 0 when the repository has no detected framework. A framework
+    found only through a source weighted 0 (``Tech.weight`` 0) does not count, as in
+    ``skill_match``."""
     matched = [
         (t, dev.skills[t.slug])
         for t in techs.values()
-        if t.category == FRAMEWORK and dev.confidence(t.slug) > 0
+        if t.category == FRAMEWORK and t.weight > 0 and dev.confidence(t.slug) > 0
     ]
     value = _noisy_or([s.confidence for _, s in matched])
     matched.sort(key=lambda ts: (-ts[1].confidence, ts[0].slug))
@@ -140,7 +142,8 @@ OPENNESS_FLAGS = (
 def contribution_openness(repo: RepoData, points: Mapping[str, float]) -> Signal:
     present = [key for key, attr in OPENNESS_FLAGS if getattr(repo, attr)]
     value = sum(points[key] for key in present)
-    return signal_of(value, [{"flag": key} for key in present])
+    # Only affordances worth points are evidence: a 0-point flag added nothing.
+    return signal_of(value, [{"flag": key} for key in present if points[key] > 0])
 
 
 def compute(

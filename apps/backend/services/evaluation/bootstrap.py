@@ -4,7 +4,8 @@ comparison"; change evaluation-confidence, design D1). Pure.
 Each resample draws as many developers as there are, with replacement, and takes the mean of
 the candidate's minus the baseline's value for the drawn developers. The interval is the 2.5th
 and 97.5th percentile of the resampled means (nearest rank, rounded outwards). Information only:
-it never changes the improvement verdict.
+it never changes the improvement verdict. A difference is marked only with at least
+``MIN_MARKED_DEVELOPERS`` developers (change services-evaluation-review-fixes, design D1).
 """
 
 from __future__ import annotations
@@ -21,6 +22,9 @@ from .metrics import PLACES
 DEFAULT_RESAMPLES = 10_000
 DEFAULT_SEED = 20261024
 LOW, HIGH = 0.025, 0.975
+# The fewest developers for which an exact two-sided sign test can reach 5%: n of n agreeing
+# gives p = 2 * 0.5**n, 0.0625 at 5 and 0.031 at 6.
+MIN_MARKED_DEVELOPERS = 6
 
 
 @dataclass(frozen=True)
@@ -29,11 +33,17 @@ class Interval:
     low: float
     high: float
     not_better: float  # share of resamples whose difference is 0 or below
+    developers: int
+
+    @property
+    def too_few(self) -> bool:
+        """Too few developers for any difference to be marked."""
+        return self.developers < MIN_MARKED_DEVELOPERS
 
     @property
     def marked(self) -> bool:
-        """The interval lies entirely above or entirely below 0."""
-        return self.low > 0 or self.high < 0
+        """Enough developers, and the interval lies entirely above or entirely below 0."""
+        return not self.too_few and (self.low > 0 or self.high < 0)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -42,6 +52,8 @@ class Interval:
             "high": round(self.high, PLACES),
             "not_better": round(self.not_better, PLACES),
             "marked": self.marked,
+            "developers": self.developers,
+            "too_few": self.too_few,
         }
 
 
@@ -81,4 +93,5 @@ def paired(
         low=means[math.floor(LOW * last)],
         high=means[math.ceil(HIGH * last)],
         not_better=bisect_right(means, 0) / len(means),
+        developers=n,
     )

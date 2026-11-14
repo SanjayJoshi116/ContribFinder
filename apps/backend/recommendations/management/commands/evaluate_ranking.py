@@ -8,6 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from core.reports import write_json
 from recommendations.models import ScoringConfig
 from services.evaluation import baseline, bootstrap
+from services.evaluation import dataset as evaluation_data
 from services.evaluation.dataset import DatasetError, load, selection_dataset
 from services.evaluation.metrics import METRICS
 from services.evaluation.runner import (
@@ -106,6 +107,15 @@ class Command(BaseCommand):
             specs = self._specs(options)
         except (DatasetError, ConfigError) as exc:
             raise CommandError(str(exc)) from exc
+        if pinned:
+            for path, dataset in zip(paths, datasets, strict=True):
+                expected = evaluation_data.DATASETS_DIR / f"{dataset.name}.json"
+                if path.resolve() != expected.resolve():
+                    raise CommandError(
+                        f"--write-baseline records only datasets in the evaluation folder: "
+                        f"{path} is not {expected}, where the baseline test reads "
+                        f"{dataset.name}."
+                    )
         override = options["min_score"] is not None
         min_score = options["min_score"]
         if min_score is None:
@@ -203,7 +213,13 @@ class Command(BaseCommand):
                 f"  {name:<13} {i.diff:+.4f}  [{i.low:+.4f}, {i.high:+.4f}]  "
                 f"not better {i.not_better:6.1%}{mark}"
             )
-        self.stdout.write("  * the 95% interval excludes 0; unmarked = inconclusive, not zero")
+        if any(i.too_few for i in intervals.values()):
+            developers = next(iter(intervals.values())).developers
+            self.stdout.write(
+                f"  (too few developers to mark: {developers} < {bootstrap.MIN_MARKED_DEVELOPERS})"
+            )
+        else:
+            self.stdout.write("  * the 95% interval excludes 0; unmarked = inconclusive, not zero")
 
     def _print(self, dataset: str, developers: int, reports: list[Report]) -> None:
         first = reports[0]

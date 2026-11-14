@@ -588,3 +588,86 @@ def test_failed_generation_waits_before_the_next(user, developer, pool, settings
     assert freshness.due_profiles() == []
     SyncJob.objects.filter(pk=failed.pk).update(completed_at=timezone.now() - timedelta(minutes=61))
     assert freshness.due_profiles() == [developer]
+
+
+# --- ranking-review-fixes ------------------------------------------------------------------
+
+
+def finished_job(user, status: str, minutes_ago: int, **fields) -> SyncJob:
+    when = timezone.now() - timedelta(minutes=minutes_ago)
+    return SyncJob.objects.create(
+        user=user,
+        job_type="recommendation_generation",
+        status=status,
+        started_at=when,
+        completed_at=when,
+        **fields,
+    )
+
+
+def test_failure_followed_by_a_success_does_not_wait(user, developer, pool, settings) -> None:
+    """RNK-1: only the latest finished generation's failure delays the sweep."""
+    settings.RECOMMENDATION_FAILED_RETRY_MINUTES = 360
+    finished_job(user, "FAILED", 30, error_code="no_scoring_config")
+    finished_job(user, "COMPLETED", 20)
+    DeveloperProfile.objects.filter(pk=developer.pk).update(
+        analyzed_at=timezone.now() - timedelta(minutes=10)
+    )
+    assert freshness.due_profiles() == [developer]
+
+
+def test_latest_failure_still_waits(user, developer, pool, settings) -> None:
+    settings.RECOMMENDATION_FAILED_RETRY_MINUTES = 360
+    finished_job(user, "COMPLETED", 30)
+    failed = finished_job(user, "FAILED", 10, error_code="no_scoring_config")
+    DeveloperProfile.objects.filter(pk=developer.pk).update(
+        analyzed_at=timezone.now() - timedelta(minutes=20)
+    )
+    assert freshness.due_profiles() == []
+    SyncJob.objects.filter(pk=failed.pk).update(
+        completed_at=timezone.now() - timedelta(minutes=361)
+    )
+    assert freshness.due_profiles() == [developer]
+
+
+def test_new_config_is_due_without_recommendations(user, developer, pool, settings) -> None:
+    """RNK-2: the last generation under v2 stored nothing; activating v3 makes it due."""
+    settings.RECOMMENDATION_MIN_SCORE = 1.1  # nothing is kept
+    job = generate(user)
+    assert job.metadata["config_version"] == ScoringConfig.objects.get(is_active=True).version
+    assert not Recommendation.objects.filter(developer=developer).exists()
+    assert freshness.due_profiles() == []
+    ScoringConfig.objects.update(is_active=False)
+    ScoringConfig.objects.create(version="v3", weights=V2_WEIGHTS, params=V2_PARAMS, is_active=True)
+    assert freshness.due_profiles() == [developer]
+
+
+def test_job_without_config_version_is_not_due_by_itself(user, developer, pool) -> None:
+    generate(user)
+    SyncJob.objects.filter(job_type="recommendation_generation").update(metadata={})
+    assert freshness.due_profiles() == []
+
+
+def test_sweep_continues_past_a_failing_start(user, developer, pool, monkeypatch) -> None:
+    """RNK-6: queuing one developer's job fails; the next developer still gets one."""
+    other = cast(User, UserFactory())
+    other_profile = DeveloperProfile.objects.create(
+        user=other, analyzed_at=timezone.now() - timedelta(days=1)
+    )
+    add_candidate(other_profile, pool["go"], rank=1)
+    monkeypatch.setattr("recommendations.tasks.generate_recommendations.delay", lambda pk: None)
+    real_start = jobs.start_recommendations
+    tried: list[int] = []
+
+    def start(user, **kwargs):
+        # Outside a transaction (the beat sweep) the send runs inside this call and a broker
+        # error raises out of it; tests run inside one, so it is raised here.
+        tried.append(user.pk)
+        if len(tried) == 1:
+            raise ConnectionError("broker down")
+        return real_start(user, **kwargs)
+
+    monkeypatch.setattr(freshness, "start_recommendations", start)
+    assert freshness.start_due_generations() == 1
+    assert sorted(tried) == sorted([user.pk, other.pk])
+    assert SyncJob.objects.filter(job_type="recommendation_generation").count() == 1

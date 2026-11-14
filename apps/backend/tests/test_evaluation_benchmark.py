@@ -104,8 +104,16 @@ def report(config: str, ndcg: float, top_n: int = 50, dataset: str = "d") -> Rep
     )
 
 
-def test_baseline_write_merges(tmp_path) -> None:
-    path = tmp_path / "baselines.json"
+@pytest.fixture
+def folder(tmp_path):
+    """A baselines folder holding the dataset files ``d`` and ``e`` the reports name."""
+    for name in ("d", "e"):
+        (tmp_path / f"{name}.json").write_text("{}", encoding="utf-8")
+    return tmp_path
+
+
+def test_baseline_write_merges(folder) -> None:
+    path = folder / "baselines.json"
     baseline.write([report("v1", 0.5), report("v2", 0.6), report("v1", 0.4, dataset="e")], path)
     baseline.write([report("v2", 0.7)], path)  # only v2 rewritten
     data = baseline.read(path)
@@ -118,8 +126,8 @@ def test_baseline_write_merges(tmp_path) -> None:
     assert baseline.entries(data, "e")["v1"]["metrics"] == {"ndcg@10": 0.4}
 
 
-def test_baseline_write_upgrades_format_3(tmp_path) -> None:
-    path = tmp_path / "baselines.json"
+def test_baseline_write_upgrades_format_3(folder) -> None:
+    path = folder / "baselines.json"
     entry = {"min_score": 0.1, "min_score_basis": "score", "metrics": {"ndcg@10": 0.5}}
     old = {"format": 3, "top_n": 50, "datasets": {"d": {"configs": {"v1": entry}}}}
     path.write_text(json.dumps(old), encoding="utf-8")
@@ -136,8 +144,8 @@ def test_baseline_write_upgrades_format_3(tmp_path) -> None:
     }
 
 
-def test_baseline_write_different_top_n(tmp_path) -> None:
-    path = tmp_path / "baselines.json"
+def test_baseline_write_different_top_n(folder) -> None:
+    path = folder / "baselines.json"
     baseline.write([report("v1", 0.5), report("v2", 0.6)], path)
     before = path.read_text(encoding="utf-8")
     with pytest.raises(baseline.BaselineError, match="missing: v1"):
@@ -145,3 +153,35 @@ def test_baseline_write_different_top_n(tmp_path) -> None:
     assert path.read_text(encoding="utf-8") == before
     baseline.write([report("v1", 0.3, top_n=20), report("v2", 0.4, top_n=20)], path)
     assert baseline.top_n(baseline.read(path), "d") == 20
+
+
+def test_baseline_write_refuses_a_dataset_without_its_file(folder) -> None:
+    path = folder / "baselines.json"
+    baseline.write([report("v1", 0.5)], path)
+    before = path.read_bytes()
+    with pytest.raises(baseline.BaselineError, match="no dataset file"):
+        baseline.write([report("v1", 0.6), report("v1", 0.4, dataset="judged")], path)
+    assert path.read_bytes() == before
+
+
+def test_rewriting_the_committed_baselines_keeps_their_bytes(tmp_path) -> None:
+    recorded = baseline.read()
+    reports = [
+        Report(
+            config=config,
+            dataset=name,
+            min_score=entry["min_score"],
+            min_score_basis=entry["min_score_basis"],
+            top_n=baseline.top_n(recorded, name),
+            metrics=entry["metrics"],
+            developers=(),
+        )
+        for name in baseline.dataset_names(recorded)
+        for config, entry in baseline.entries(recorded, name).items()
+    ]
+    path = tmp_path / "baselines.json"
+    path.write_bytes(baseline.BASELINES.read_bytes())
+    for name in baseline.dataset_names(recorded):
+        (tmp_path / f"{name}.json").write_text("{}", encoding="utf-8")
+    baseline.write(reports, path)
+    assert path.read_bytes() == baseline.BASELINES.read_bytes()

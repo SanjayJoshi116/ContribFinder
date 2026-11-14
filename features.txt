@@ -439,6 +439,45 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.68 - Recommendations view fixes (review sweep: features/recommendations)
+============================================================================
+
+Recommendations view (Bug_Backlog.md batch 65)
+  [x] Filter values outside the options shown as selected; Clear filters
+  [x] Page 1 emptied by dismissals shows the next recommendations; Loading while pending
+  [x] Undo after a detail-page dismissal offered once
+  [x] Loading results marked busy; page buttons disabled until the page arrives
+  [x] Back and dismiss return to the list page and filters
+  [x] Language shares as text; size filter includes "Size unknown"
+
+============================================================================
+SHIPPED - v0.12.67 - Evaluation fixes (review sweep: services/evaluation)
+============================================================================
+
+Evaluation and feedback report (Bug_Backlog.md batch 64)
+  [x] Feedback shares count one outcome per user, repository and configuration; undone actions
+      do not count
+  [x] Coverage beside the position-adjusted share
+  [x] Reasons and labels no longer offered still reported
+  [x] Bootstrap marks only with at least 6 developers
+  [x] Baseline written atomically; only datasets in evaluation/ recorded
+  [x] Issue update times need a UTC offset
+  [x] Judging sheet quotes formula-like cells; build and sheet reject bad shapes
+
+============================================================================
+SHIPPED - v0.12.66 - Ranking fixes (review sweep: services/ranking)
+============================================================================
+
+Ranking (Bug_Backlog.md batch 63)
+  [x] Failure backoff only while the latest finished generation failed
+  [x] New active configuration regenerates developers with no recommendations
+  [x] One developer failing to queue does not stop the freshness sweep
+  [x] Activation fails cleanly when the candidate configuration is deleted before the switch
+  [x] Framework match and openness evidence skip sources and affordances worth 0
+  [x] No reason stored with a contribution that rounds to 0
+  [x] Contributions computed once; issues skipped when issue signals weigh 0
+
+============================================================================
 SHIPPED - v0.12.65 - Matching fixes (review sweep: services/matching)
 ============================================================================
 

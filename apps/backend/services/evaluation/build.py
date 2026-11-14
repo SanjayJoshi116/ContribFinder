@@ -29,11 +29,17 @@ def build(
     origin: dict[str, str] = {}
     developers: list[dict[str, Any]] = []
     seen: dict[str, str] = {}
-    resolved: list[str] = []
+    resolved: dict[str, None] = {}  # ordered, each repository once
     for label, raw in inputs:
         if not isinstance(raw, dict) or raw.get("format") != FORMAT:
             raise BuildError(f"{label} is not a format {FORMAT} dataset.")
-        for full_name, entry in raw.get("repositories", {}).items():
+        catalog = raw.get("repositories", {})
+        if not isinstance(catalog, dict):
+            raise BuildError(f"{label}: repositories must be a JSON object.")
+        people = raw.get("developers", [])
+        if not isinstance(people, list) or not all(isinstance(d, dict) for d in people):
+            raise BuildError(f"{label}: developers must be a list of JSON objects.")
+        for full_name, entry in catalog.items():
             if full_name not in repositories:
                 repositories[full_name], origin[full_name] = entry, label
             elif repositories[full_name] != entry:
@@ -42,8 +48,8 @@ def build(
                         f"Repository {full_name} differs between {origin[full_name]} and {label}; "
                         "use --on-conflict first to keep the first."
                     )
-                resolved.append(full_name)
-        for developer in raw.get("developers", []):
+                resolved[full_name] = None
+        for developer in people:
             dev_id = developer.get("id")
             if dev_id in seen:
                 raise BuildError(f"Developer {dev_id} appears in {seen[dev_id]} and {label}.")
@@ -60,4 +66,4 @@ def build(
         parse(result)
     except DatasetError as exc:
         raise BuildError(str(exc)) from exc
-    return result, resolved
+    return result, list(resolved)

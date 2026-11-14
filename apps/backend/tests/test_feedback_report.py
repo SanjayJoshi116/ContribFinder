@@ -1,5 +1,6 @@
 """Feedback report (change feedback-report): ``build`` on plain events, then the command."""
 
+import itertools
 import json
 from datetime import timedelta
 from io import StringIO
@@ -10,19 +11,27 @@ from django.core.management.base import CommandError
 from django.utils import timezone
 
 from feedback.models import RecommendationFeedback
+from services.evaluation import feedback_report
 from services.evaluation.feedback_report import Event, build
 
 from .factories import UserFactory
 
+# Every helper event concerns its own repository, so each decisive one is its own outcome.
+_repositories = itertools.count(1)
+
+
+def repo() -> str:
+    return f"owner/repo-{next(_repositories)}"
+
 
 def events(version: str, rank: int, action: str, n: int, *, user: int = 1) -> list[Event]:
-    return [Event(user, action, version, rank) for _ in range(n)]
+    return [Event(user, action, version, rank, repository=repo()) for _ in range(n)]
 
 
 def test_shares_per_configuration_and_bucket() -> None:
     found = [
-        *[Event(u, "saved", "v2-deterministic", 3) for u in range(12)],
-        *[Event(u, "dismissed", "v2-deterministic", 1) for u in range(8)],
+        *[Event(u, "saved", "v2-deterministic", 3, repository=repo()) for u in range(12)],
+        *[Event(u, "dismissed", "v2-deterministic", 1, repository=repo()) for u in range(8)],
     ]
     report = build(found)
 
@@ -50,6 +59,123 @@ def test_position_adjustment() -> None:
 
     assert a.raw_share == pytest.approx(0.72) and b.raw_share == pytest.approx(0.48)
     assert a.adjusted_share == pytest.approx(0.60) and b.adjusted_share == pytest.approx(0.60)
+    assert a.coverage == pytest.approx(1.0) and b.coverage == pytest.approx(1.0)
+
+
+def test_partial_coverage() -> None:
+    found = [
+        *events("a", 1, "saved", 30),
+        *events("a", 1, "dismissed", 20),  # a: a share at ranks 1-5 only, 50 of 100 decisive
+        *events("a", 7, "saved", 2),  # below the minimum
+        *events("b", 8, "saved", 24),
+        *events("b", 8, "dismissed", 24),
+    ]
+    a, b = build(found).configs
+    assert a.adjusted_share == pytest.approx(0.60) and a.coverage == pytest.approx(0.50)
+    assert b.coverage == pytest.approx(0.50)  # ranks 6-10: 2 of a plus 48 of b
+
+
+def test_no_adjusted_share_has_no_coverage() -> None:
+    (config,) = build(events("a", 1, "saved", 3)).configs
+    assert config.adjusted_share is None and config.coverage is None
+
+
+# --- outcomes, not events (services-evaluation-review-fixes, EVL-3) ---------------------------
+
+
+def test_repeated_and_undone_actions() -> None:
+    v2 = "v2-deterministic"
+    found = [
+        *[Event(1, "opened_repository", v2, 2, repository="o/x") for _ in range(6)],
+        Event(1, "dismissed", v2, 3, repository="o/y"),
+        Event(1, "dismissed", v2, 4, repository="o/z"),
+        Event(1, "saved", v2, 5, repository="o/w"),
+        Event(1, "unsaved", v2, 5, repository="o/w"),
+    ]
+    (config,) = build(found, minimum=1).configs
+    (row,) = config.buckets
+    counts = {k: v for k, v in row.counts.items() if v}
+    assert counts == {"opened_repository": 6, "dismissed": 2, "saved": 1, "unsaved": 1}
+    assert (row.positive, row.decisive) == (1, 3)
+    assert row.share == pytest.approx(1 / 3) and config.raw_share == pytest.approx(1 / 3)
+
+
+def test_save_then_unsave_leaves_no_outcome() -> None:
+    found = [
+        Event(1, "saved", "a", 1, repository="o/w"),
+        Event(1, "unsaved", "a", 1, repository="o/w"),
+    ]
+    (row,) = build(found, minimum=1).configs[0].buckets
+    assert (row.positive, row.decisive, row.share) == (0, 0, None)
+
+
+def test_undo_without_a_rank_still_undoes() -> None:
+    found = [
+        Event(1, "saved", "a", 1, repository="o/w"),
+        Event(1, "unsaved", "a", None, repository="o/w"),
+    ]
+    report = build(found, minimum=1)
+    assert report.configs[0].buckets[0].decisive == 0
+    assert report.unattributed == {"unsaved": 1}
+
+
+def test_dismiss_undismiss_then_open_is_positive() -> None:
+    found = [
+        Event(1, "dismissed", "a", 1, repository="o/w"),
+        Event(1, "undismissed", "a", 1, repository="o/w"),
+        Event(1, "opened_repository", "a", 1, repository="o/w"),
+    ]
+    (row,) = build(found, minimum=1).configs[0].buckets
+    assert (row.positive, row.decisive, row.share) == (1, 1, 1.0)
+
+
+def test_outcome_falls_in_the_bucket_and_label_of_its_event() -> None:
+    found = [
+        Event(1, "saved", "a", 3, "strong", repository="o/w"),
+        Event(1, "dismissed", "a", 8, "good", repository="o/w"),
+    ]
+    (config,) = build(found, minimum=1).configs
+    top, lower = config.buckets
+    assert (top.bucket, top.decisive) == ((1, 5), 0)
+    assert (lower.bucket, lower.positive, lower.decisive) == ((6, 10), 0, 1)
+    strong, good = config.labels
+    assert (strong.decisive, good.decisive) == (0, 1)
+
+
+def test_outcomes_are_per_user_repository_and_version() -> None:
+    found = [
+        Event(1, "saved", "a", 1, repository="o/w"),
+        Event(2, "dismissed", "a", 1, repository="o/w"),
+        Event(1, "dismissed", "b", 1, repository="o/w"),
+    ]
+    a, b = build(found, minimum=1).configs
+    assert (a.buckets[0].positive, a.buckets[0].decisive) == (1, 2)
+    assert (b.buckets[0].positive, b.buckets[0].decisive) == (0, 1)
+
+
+# --- stored values no longer offered (EVL-7) --------------------------------------------------
+
+
+def test_reason_no_longer_offered_is_listed_after_the_current_ones() -> None:
+    found = [
+        *dismissed("a", "inactive", 1),
+        *dismissed("a", "not_interested", 2),
+        *dismissed("a", "", 1),
+    ]
+    (config,) = build(found).configs
+    assert list(config.dismiss_reasons.items()) == [
+        ("inactive", 1),
+        ("not_interested", 2),
+        ("none", 1),
+    ]
+
+
+def test_label_no_longer_offered_gets_a_row_outside_calibration() -> None:
+    found = [*labeled("strong", 7, 3), *labeled("good", 5, 5), *labeled("weak", 10, 0)]
+    (config,) = build(found).configs
+    assert [row.label for row in config.labels] == ["strong", "good", "weak"]
+    assert config.labels[2].share == 1.0
+    assert config.calibration.verdict == "ordered"
 
 
 def test_group_below_the_minimum() -> None:
@@ -111,8 +237,8 @@ def test_minimum_must_be_positive() -> None:
 
 def labeled(label: str, positive: int, dismissed: int, *, rank: int = 1) -> list[Event]:
     return [
-        *[Event(1, "saved", "a", rank, label) for _ in range(positive)],
-        *[Event(2, "dismissed", "a", rank, label) for _ in range(dismissed)],
+        *[Event(1, "saved", "a", rank, label, repository=repo()) for _ in range(positive)],
+        *[Event(2, "dismissed", "a", rank, label, repository=repo()) for _ in range(dismissed)],
     ]
 
 
@@ -231,11 +357,13 @@ def stored(
     *,
     label: str = "",
     reason: str = "",
+    repository: str = "",
 ) -> None:
+    """``n`` events, each on its own repository unless ``repository`` is given."""
     for _ in range(n):
         RecommendationFeedback.objects.create(
             user=user,
-            repository_full_name="secret-owner/secret-repo",
+            repository_full_name=repository or f"secret-owner/secret-repo-{next(_repositories)}",
             action=action,
             config_version=version,
             rank=rank,
@@ -348,6 +476,7 @@ def test_json_report_is_aggregates_only(tmp_path) -> None:
         "version",
         "raw_share",
         "adjusted_share",
+        "coverage",
         "buckets",
         "labels",
         "calibration",
@@ -356,7 +485,14 @@ def test_json_report_is_aggregates_only(tmp_path) -> None:
     assert config["dismiss_reasons"] == {"too_big": 2}
     assert config["calibration"] == {"verdict": "not enough data", "higher": None, "lower": None}
     assert [b["ranks"] for b in config["buckets"]] == ["1-5", "21+"]
-    assert set(config["buckets"][0]) == {"ranks", "counts", "users", "share"}
+    assert set(config["buckets"][0]) == {
+        "ranks",
+        "counts",
+        "users",
+        "positive",
+        "decisive",
+        "share",
+    }
     assert "secret" not in raw and user.username not in raw
     identifying = {"user", "user_id", "repository", "repository_full_name", "recommendation"}
     assert not keys(report) & (identifying | {"issue", "issue_number"})
@@ -368,3 +504,14 @@ def keys(value: object) -> set[str]:
     if isinstance(value, list):
         return {k for v in value for k in keys(v)}
     return set()
+
+
+@pytest.mark.django_db
+def test_command_reads_undo_events_in_order() -> None:
+    user = UserFactory()
+    for action in ("saved", "unsaved", "dismissed", "undismissed", "opened_repository"):
+        stored(user, "v2-deterministic", 1, action, repository="owner/one")
+    (config,) = feedback_report.build(feedback_report.load(None), minimum=1).configs
+    (row,) = config.buckets
+    assert (row.positive, row.decisive) == (1, 1)
+    assert "position-adjusted 1.0000 (coverage 1.0000)" in run("--minimum", "1")

@@ -74,14 +74,14 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | Low | `apps/backend/services/issues/` | labels, classification, technologies | [x] batch 57 | [x] no findings |
 | Low | `apps/backend/services/discovery/` | queries, filters, ordering, yield report | [x] batch 59 | [x] no findings |
 | Low | `apps/backend/services/matching/` | activity, technologies, features, signals | [x] batch 60 | [x] no findings |
-| Low | `apps/backend/services/ranking/` | config, pipeline, score, explain, freshness, activation | [ ] | [ ] |
-| Low | `apps/backend/services/evaluation/` | benchmark, metrics, bootstrap, feedback report (offline) | [ ] | [ ] |
-| Low | `apps/frontend/src/features/recommendations/` | list, cards, detail, filters | [ ] | [ ] |
-| Low | `apps/frontend/src/features/feedback/` | save/dismiss, saved and hidden lists | [ ] | [ ] |
-| Low | `apps/frontend/src/features/profile/` | profile, skills | [ ] | [ ] |
-| Low | `apps/frontend/src/features/sync/ + discovery/` | onboarding progress | [ ] | [ ] |
-| Low | `apps/frontend/src/components/ + src/lib/` | DeadEnd, utilities | [ ] | [ ] |
-| Low | `docker-compose.yml, .env.example, package.json` | root config | [ ] | [ ] |
+| Low | `apps/backend/services/ranking/` | config, pipeline, score, explain, freshness, activation | [x] batch 63 | [x] no findings |
+| Low | `apps/backend/services/evaluation/` | benchmark, metrics, bootstrap, feedback report (offline) | [x] batch 64 | [x] no findings |
+| Low | `apps/frontend/src/features/recommendations/` | list, cards, detail, filters | [x] batch 65 | [x] no findings |
+| Low | `apps/frontend/src/features/feedback/` | save/dismiss, saved and hidden lists | [x] batch 66 | [x] no findings |
+| Low | `apps/frontend/src/features/profile/` | profile, skills | [x] batch 67 | [x] no findings |
+| Low | `apps/frontend/src/features/sync/ + discovery/` | onboarding progress | [x] batch 68 | [x] no findings |
+| Low | `apps/frontend/src/components/ + src/lib/` | DeadEnd, utilities | [x] batch 69 | [x] no findings |
+| Low | `docker-compose.yml, .env.example, package.json` | root config | [x] batch 70 | [x] no findings |
 
 ## Open items
 
@@ -224,6 +224,9 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 60 | **Sweep: `services/matching/`** | MAT-1…MAT-8 | Full review sweep (low group), 2026-11-13: verified by reading; MAT-1…MAT-5, MAT-7, MAT-8 fixed in 0.12.65 (`services-matching-review-fixes`), MAT-6 rejected (ranks restart per band by design). `/simplify` in batch 61, fix-diff `/code-review` in batch 62. `/security-review` found nothing. |
 | 61 | **`/simplify` of 0.12.64–0.12.65** | SIM4-1…SIM4-8 | `/simplify` (4 agents: reuse, simplification, efficiency, altitude; one combined diff of the uncommitted 0.12.64–0.12.65 code), 2026-11-14; SIM4-1…SIM4-6 fixed before commit, SIM4-7, SIM4-8 skipped (reasons in its section; later covered by CR5-4, CR5-7). |
 | 62 | **Fix-diff review of 0.12.64–0.12.65** | CR5-1…CR5-8 | `/code-review` (high) of the uncommitted 0.12.64–0.12.65 code after batch 61, 2026-11-14; each row checked by reading (CR5-1 by hand); all fixed before commit (owner: fix all), CR5-6 as a test, CR5-5 within what is stored. |
+| 63 | **Sweep: `services/ranking/`** | RNK-1…RNK-10 | Full review sweep (low group), 2026-11-14: verified by reading; all fixed in 0.12.66 (`ranking-review-fixes`), RNK-8 and RNK-10 together; baselines unchanged. `/security-review` found nothing. |
+| 64 | **Sweep: `services/evaluation/`** | EVL-1…EVL-10 | Full review sweep (low group), 2026-11-14: verified by reading; fixed in 0.12.67 (`services-evaluation-review-fixes`), EVL-8 accepted; baselines unchanged. `/security-review`: one candidate (CSV formula cells, 3/10), fixed as hardening under EVL-6. |
+| 65 | **Sweep: `frontend/src/features/recommendations/`** | REC-1…REC-10 | Full review sweep (low group), 2026-11-14: verified by reading; all fixed in 0.12.68 (`recommendations-view-review-fixes`). `/security-review` found nothing. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -1762,3 +1765,193 @@ after batch 61. Each row checked against the code; owner: fix all.
 | CR5-6 | robustness | `discovery/queries.py` | Topic queries skip the `seen` dedup. | fixed as a test: filtering by `seen` would hide the topic of a cut skill query again (CR5-1); a planned query covers its topic, so no core repeats (`test_topic_of_a_query_cut_in_a_later_pass_is_still_searched` asserts unique cores) |
 | CR5-7 | efficiency | `discovery/service.py:_record` | ISO parse per record. | fixed: `_seen_since`, cached per service (one attempt) |
 | CR5-8 | simplification | `discovery/filters.py:stored_result_not_code` | Repeated `stored_not_code`. | fixed: `suspected_list`, then `stored_not_code(repo, cfg, topics=)` |
+
+
+## Sweep: `services/ranking/` (2026-11-14)
+
+Batch 63. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/backend/services/ranking/` (no diff; config, pipeline, score, explain, freshness,
+activation as they stand, plus `matching/signals.py`). Each row checked against the code by
+reading. `/security-review`: nothing (ORM only, field names from constants; no eval, pickle or
+YAML; reason text rendered as React text; generation and API scoped to the user's profile; no
+logging; activation only from the management command). Note: the activation audit metadata also
+carries `reason`, which the 0.12.13 notes in `CLAUDE_HISTORY.md` omit (doc only). OpenSpec change
+`ranking-review-fixes`; fixed in 0.12.66.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| RNK-1 | bug | `freshness.py:failed_recently` | Any failed generation in the last 6 h excludes the developer, even after a later completed one: a re-analysis after a fail-then-succeed waits up to 6 h. | fixed: `failed_recently` reads the latest finished generation (COMPLETED or FAILED by `completed_at`) |
+| RNK-2 | bug | `freshness.py:outdated_config` | Config change seen only through stored recommendations: a developer with candidates and 0 recommendations is never regenerated on activation. | fixed: due when the last completed generation's `metadata.config_version` differs from the active version |
+| RNK-3 | bug (latent) | `matching/signals.py:framework_match` | Ignores `Tech.weight`: a topic-only framework counts and passes the relevance gate when topics weigh 0. Stored configs weigh topics 0.6. | fixed: `framework_match` skips `Tech.weight` 0 |
+| RNK-4 | bug (latent) | `matching/signals.py:contribution_openness` | Evidence lists 0-point flags; the reason claims them (spec: only evidence the signal used). Stored configs give every flag points. | fixed: evidence lists flags with points above 0; value unchanged |
+| RNK-5 | bug | `activation.py:activate` | `update(is_active=True)` count unchecked: candidate deleted between judging and the switch leaves no active config and audits success. Needs a concurrent delete. | fixed: candidate re-checked under the row locks; `ActivationError`, nothing changed or audited |
+| RNK-6 | bug | `freshness.py:start_due_generations` | A broker error from one `on_commit` send (no outer transaction in the beat task) stops the sweep for every later profile. | fixed: `start_due_generations` logs and continues; the PENDING job is re-sent by recovery |
+| RNK-7 | bug | `explain.py:reasons` | Kept on the unrounded contribution, stored rounded: a reason with weight 0.0. | fixed: a reason needs `round(part, 4) > 0` |
+| RNK-8 | simplification | `score.py:weighted_score` | Unused outside tests; its and `reasons`' `params=None` default drops relevance scaling. | fixed: `weighted_score` removed; `reasons(signals, parts)` has no params default |
+| RNK-9 | efficiency | `pipeline.py:rank_pool` | Issues loaded and matched when both issue weights are 0. No stored config hits it. | fixed: issues loaded only when issue fit or difficulty fit weighs above 0 |
+| RNK-10 | efficiency | `explain.py:reasons` | Recomputes `contributions` already summed by `score_candidate`. | fixed: `Scored.parts` carries the contributions; reasons reuse them |
+
+## Sweep: `services/evaluation/` (2026-11-14)
+
+Batch 64. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/backend/services/evaluation/` (no diff; dataset, metrics, runner, bootstrap, baseline,
+export, sheet, build, feedback report as they stand, plus the evaluation commands). Each row
+checked against the code and spec by reading. `/security-review`: nothing at the bar. Inputs are
+parsed with `json.loads` only (no pickle, YAML, eval or subprocess), paths come from operator
+flags, the export holds no username, email or token, the feedback report outputs aggregates only,
+and import reads grades 0–2 for pool repositories only. Its one candidate, formula injection in
+the judging CSV, was rated 3/10 by the false-positive check (only the owner opens the sheet, it
+holds public names only, and spreadsheets prompt before fetching external data); it is fixed as
+hardening under EVL-6. OpenSpec change `services-evaluation-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| EVL-1 | bug | `bootstrap.py:Interval.marked` | Percentile bootstrap marks 4-of-4 holdout wins (sign test p = 0.125) and any non-zero 1-developer difference. As specified, but the 95% claim is not supported. | fixed: marked only with at least 6 developers (`MIN_MARKED_DEVELOPERS`); fewer get a too-few note |
+| EVL-2 | bug | `feedback_report.py:build` | The adjusted share renormalizes over the buckets that have a share, so configurations are adjusted over different mixes. | fixed: `coverage` beside the adjusted share (config line, JSON) |
+| EVL-3 | bug | `feedback_report.py:build` | Every event counts: repeated opens add positives, and an undone save or dismissal still counts (only `viewed` is deduplicated at write time). | fixed: one outcome per user, repository and version (latest decisive event not undone); counts stay raw |
+| EVL-4 | rule | `baseline.py:write` | Bare `write_text`, not `core.reports.write_json`: non-atomic, and an `OSError` is a traceback. | fixed: `baseline.write` through `core.reports.write_json`; same bytes |
+| EVL-5 | bug | `baseline.py:write` / `default_datasets` | Keyed by dataset name, looked up as `evaluation/<name>.json`; `--dataset ../../judging/x.json --write-baseline` records an entry the test silently skips. | fixed: `--write-baseline` refuses a dataset that is not `evaluation/<name>.json`; `write` refuses a name without its file |
+| EVL-6 | hardening | `sheet.py:write_sheet` | Descriptions from GitHub written unescaped to a CSV opened in spreadsheets (formula cells). | fixed: text cells starting with `= + - @`, tab or CR get a leading `'` (the repository column is a GitHub full name and stays as-is for import) |
+| EVL-7 | bug (latent) | `feedback_report.py:_reasons`, label rows | Stored reasons and labels outside the current choices vanish; reasons stop adding up. Choices are validated at write time today. | fixed: other stored reasons after the current ones, other labels after the current ones; calibration uses the current labels only |
+| EVL-8 | efficiency | `runner.py:uncertainty` | Draws rebuilt per candidate and dataset. | accepted: drawn once per comparison already; ≤ 6 developers × 10,000 is negligible |
+| EVL-9 | bug (latent) | `dataset.py:_issue` | Naive `updated_at` accepted; issue order then depends on the machine's time zone. All 72 committed values carry `+00:00`. | fixed: `updated_at` needs a UTC offset; committed datasets load unchanged |
+| EVL-10 | robustness | `build.py:build`, `sheet.py:write_sheet` | Wrong shapes raise `AttributeError`/`KeyError` tracebacks; `resolved` repeats a repository. | fixed: `BuildError` / `SheetError` for wrong shapes; `resolved` lists each repository once |
+
+## Sweep: `frontend/src/features/recommendations/` (2026-11-14)
+
+Batch 65. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/features/recommendations/` (no diff; list, cards, detail, filters, messages as
+they stand). Each row checked against the code, the backend filters and the specs.
+`/security-review`: nothing. Text is rendered by React (no raw HTML), the only external link is
+GitHub's `html_url` through `ExternalLink`, detail ids go through `RouteId`, filters are sent as
+query parameters under a fixed list of keys, list, detail, feedback, save and dismiss are scoped
+to the user, and CSRF is sent on every request that changes data. OpenSpec change
+`recommendations-view-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| REC-1 | bug | `RecommendationList.tsx` filter selects | A URL value outside the options (`?language=ruby`, `?size=unknown`, `?match=foo`) shows as "Any" and can't be cleared; there is no Clear control although the alert says "Clear them". | fixed: a URL value outside the options shown as its own option; Clear filters in the form and beside the invalid-filter alert |
+| REC-2 | bug | `RecommendationList.tsx` recovery, `feedback/api.ts:useDismiss` | Recovery runs only on pages after the first, and a dismissal never refetches the list: page 1 emptied by dismissals says "No suitable projects yet" while more exist. | fixed: the list is invalidated once the last dismissal in flight settles |
+| REC-3 | bug | `RecommendationList.tsx` empty branch | The empty-state message shows while the dismissal is still pending (wrong if it fails). | fixed: an emptied page shows Loading while a dismissal, placeholder or refetch is pending (recovery waits for it too) |
+| REC-4 | bug | `RecommendationList.tsx` undo state | History state is cleared only when the notice closes; Back or a reload offers Undo again with a fresh 10 s. | fixed: the dismissal is taken from navigation state on mount and the state cleared at once |
+| REC-5 | bug | `api.ts:useRecommendations` placeholder | The previous page's results show under the new page label with no loading cue; Next stays enabled from the old `next`, so a double click skips a page. | fixed: placeholder results `aria-busy` and dimmed, Previous/Next disabled |
+| REC-6 | bug | `RecommendationDetailPage.tsx` Back link, after-dismiss navigation | Both go to a bare `/app`, dropping the list's filters and page. | fixed: card links pass the list's search string; Back and after-dismiss use `/app${from}` (`navigation.listPath`) |
+| REC-7 | a11y | `RecommendationDetailPage.tsx:LanguageBar` | Shares only as `aria-hidden` bar widths: no amounts for screen readers or sighted users. | fixed: share as text (`shareText`: whole percent, under 1%) |
+| REC-8 | types | `messages.ts` `ACTIVITY_TEXT`, `SIZE_TEXT` | `Record<string, string>`: a new backend value compiles and renders blank or "undefined". | fixed: `ActivityLabel`, `RepositorySize` from `src/api/types.ts` |
+| REC-9 | structure | `messages.ts:SIZE_OPTIONS` | Second hand-written size wording; omits `unknown`, which the backend accepts (feeds REC-1). | fixed: `SIZE_OPTIONS` from `SIZE_TEXT`, `unknown` included |
+| REC-10 | simplification | `messages.ts:difficultyText` | Repeats `NOT_ENOUGH_EVIDENCE` instead of `DIFFICULTY_TEXT.unknown`. | fixed: `DIFFICULTY_TEXT.unknown` |
+
+## Sweep: `frontend/src/features/feedback/` (2026-11-14)
+
+Batch 66. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/features/feedback/` (no diff; `api.ts`, `RecommendationActions.tsx`,
+`SavedPage.tsx`, `messages.ts` as they stand). Each row checked against the code; the review's
+line numbers were off, so rows name functions. `/security-review`: nothing. Save, unsave,
+dismiss, restore, feedback and both lists are scoped to the user (foreign ids get 404 or delete
+nothing); CSRF is enforced and sent; the dismiss body takes only a reason from a fixed list;
+feedback takes client actions only; ids are integer routes; text is rendered by React; the paging
+cursor is URL-encoded and `next` is never followed. OpenSpec change `feedback-ui-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| FBK-1 | bug | `api.ts:rollback` | A failed save, unsave or dismiss writes back every cached list page from its start: save A (slow), dismiss B (succeeds), A fails → B is listed again until the data versions refetch. | confirmed: open, per-item rollback (D1) |
+| FBK-2 | bug | `RecommendationList` → `DismissUndo` | No key: `useRestore` state carries over to the next dismissed project ("Undo didn't work." on B; B's Undo disabled while A's restore runs). | confirmed: open (D2) |
+| FBK-3 | bug | `DismissButton.run` + detail page `onDismissed` | `mutateAsync` resolves after the user left the detail page and `navigate('/app')` pulls them back. | confirmed: open, mounted guard on the detail page (D3) |
+| FBK-4 | bug | `DismissUndo` timer | Closes at 10 s while a restore is pending; a later failure is never shown. | confirmed: open (D2) |
+| FBK-5 | ux | cards, `SavedPage` entries, `ShowMore` | Failed save, dismiss, remove, restore and "Show more" are silent; the control just re-enables. | confirmed: open, inline errors (D4) |
+| FBK-6 | bug | `api.ts:useDismiss` | Lists never invalidated after a dismissal. | duplicate of REC-2 (`recommendations-view-review-fixes`) |
+| FBK-7 | bug | `RecommendationList` undo state | Undo notice comes back on Back. | duplicate of REC-4 (`recommendations-view-review-fixes`) |
+| FBK-8 | rule | `SavedPage.tsx` | Hand-written pending/error gate twice instead of `Loaded` (CLAUDE.md frontend rule). | confirmed: open (D5) |
+| FBK-9 | structure | `api.ts` `useRestore`, `useUnsaveRepository` | `['profile', 'recommendations']` typed out instead of the recommendations root key. | confirmed: open (D5) |
+| FBK-10 | efficiency | `api.ts:snapshot` | Two independent `cancelQueries` awaited one after the other. | confirmed: open (D5) |
+
+## Sweep: `frontend/src/features/profile/` (2026-11-14)
+
+Batch 67. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/features/profile/` (no diff; as it stands). Each row checked against the code
+and the backend analysis. `/security-review`: nothing (three read-only endpoints without ids,
+filtered by the user; explicit serializer fields, no token, email or account data; text rendered
+by React; links are GitHub's `html_url` through `ExternalLink`). OpenSpec change
+`profile-ui-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| PRF-1 | bug | `SkillGroups.tsx`, `InterestList.tsx` keys | Keyed by row id; every analysis deletes and recreates the rows, so expanded skills and interests collapse after Refresh. | confirmed: open, key by slug (D1) |
+| PRF-2 | bug (latent) | `evidence.ts:CATEGORY_ORDER` | Unchecked list; a category missing from it hides those skills (empty section, no message). All 7 categories listed today. | partial (latent): open, derive from `CATEGORY_LABELS` (D2) |
+| PRF-3 | a11y | `SkillGroups.tsx`, `LanguageChart.tsx` | Two lists named "Languages". | confirmed: open (D6) |
+| PRF-4 | bug (latent) | `evidence.ts:evidenceLabel` | Language evidence without a repository gives a blank label. App code never deletes repository rows (only an admin delete). | partial (latent): open, non-empty fallback (D4) |
+| PRF-5 | a11y | `SkillGroups.tsx:SkillBar` | `aria-controls` points at a list that is not mounted while collapsed. | confirmed: open, `<details>` (D3) |
+| PRF-6 | bug | `languages.ts:languageRows` | A single 9th language folds into "Other" instead of its name. Unsorted input assumed sorted (the backend sorts, so latent). | partial: open (D5) |
+| PRF-7 | structure | `InterestList.tsx` | Copied evidence row and source labels; drifted: interest rows omit `observed_at`. | confirmed: open, shared `EvidenceItem` (D4) |
+| PRF-8 | simplification | `SkillGroups.tsx:SkillBar` | Hand-built disclosure beside native `<details>`. | confirmed: open, with PRF-5 (D3) |
+| PRF-9 | ux | `SkillGroups.tsx` skill name | Truncated to 8rem with no way to read the full name. | confirmed: open, `title` (D3) |
+| PRF-10 | structure | `app/dataVersions.ts:AREA_KEYS.profile` | Profile keys typed out instead of imported. | confirmed: open (D6) |
+
+## Sweep: `frontend/src/features/sync/ + discovery/` (2026-11-14)
+
+Batch 68. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/features/sync/` and `features/discovery/` plus `routes/OnboardingPage.tsx` (no
+diff; as they stand). Each row checked against the code and `services/jobs.py`.
+`/security-review`: nothing (start and status act on the signed-in user, no client ids; CSRF
+enforced; job responses omit metadata and error detail, codes map to fixed text; fixed sign-in
+URL and post-login redirects; the repositories `next` link keeps only its query). OpenSpec change
+`pipeline-progress-review-fixes` (includes one backend fix).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| PIPE-1 | bug | `services/jobs.py:run_tracked_job` ← `sync/api.ts` | A job commits COMPLETED before its `on_completed` hook creates the next job: the discovery status refetched on the sync's completion can return the previous finished run, so polling never starts and the new stages run unobserved. | confirmed: open, completion and follow-up in one transaction (D1) |
+| PIPE-2 | bug | same, `discovery/api.ts` | Same gap between discovery and generation, and for the generation rerun. | confirmed: open (D1) |
+| PIPE-3 | bug | `sync/pipeline.ts:usePipelineStage` | Passive observers: discovery and generation are fetched only while `DiscoveryCard`/`RecommendationList` are mounted (`developer.data`). | partial (short window): open (D2) |
+| PIPE-4 | bug | `routes/OnboardingPage.tsx` | A start rejected `github_not_connected` shows only the message; sign-in is offered only for a failed job, so Start sync fails forever. | confirmed: open (D5) |
+| PIPE-5 | bug | `discovery/messages.ts:describeDiscovery` | A stalled discovery reads "Finding projects…" while the header says work stopped. | confirmed: open (D3) |
+| PIPE-6 | bug | `discovery/messages.ts:timeAgo` | Computed per render; an idle status never re-renders ("this minute" an hour later); server time ahead → "in 2 minutes". | confirmed: open (D4) |
+| PIPE-7 | bug | `sync/SyncSteps.tsx` | A stalled job's running step spins "In progress" beside the stalled notice. | confirmed: open (D3) |
+| PIPE-8 | robustness | `sync/SyncSteps.tsx:ICONS` | Unknown step state → undefined component → page crash. Types rule it out; a cached older SPA can meet a newer backend. | partial: open, fall back to pending (D3) |
+| PIPE-9 | rule | `discovery/messages.ts:timeAgo` | Date formatting outside `src/lib/format`, hard-coded English. | confirmed: open, with PIPE-6 (D4) |
+| PIPE-10 | structure | `discovery/messages.ts:FAILURES` | Second GitHub failure table, drifted (no `github_not_connected`). | confirmed: open, one table (D5) |
+
+## Sweep: `frontend/src/components/ + src/lib/` (2026-11-14)
+
+Batch 69. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/frontend/src/components/` and `src/lib/` (no diff; as they stand, with their callers). Each
+row checked against the code. `/security-review`: nothing (`ExternalLink` sets `noopener
+noreferrer` and every href is GitHub's `html_url`; CSP blocks inline script; the hash only feeds
+`getElementById`, scroll and focus; no unsafe sinks; `cn` merges no objects). OpenSpec change
+`shared-components-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CMP-1 | bug | `lib/format.ts`, `routes` | An invalid time throws `RangeError` in render, and no route has an `errorElement`: any render error shows the router's default error screen. Times are ISO from DRF (format crash latent); the missing error screen is real. | partial: open, "Unknown" plus root `RouteError` (D1) |
+| CMP-2 | bug (latent) | `ExternalLink.tsx` | `onClick={onOpen}` passes the event to a `() => void` callback; a caller with an optional parameter would receive it. All callers use arrows. | confirmed (latent): open (D4) |
+| CMP-3 | ux | `lib/useScrollToHash.ts` | Per-component ref: Back to a hash URL scrolls and focuses again. | confirmed: open, module-level handled keys (D2) |
+| CMP-4 | bug (latent) | `lib/useScrollToHash.ts` | A target missing when `ready` turns true is never retried. The one caller renders it synchronously. | accepted: no caller needs it |
+| CMP-5 | ux | `components/Loaded.tsx` | After a failed first load, a running refetch still shows "Please refresh the page". | confirmed: open (D3) |
+| CMP-6 | rule | `SavedPage.tsx` | Hand-written gate instead of `Loaded`. | duplicate of FBK-8 |
+| CMP-7 | structure | both detail pages | Same pending/404/failed gate copied; order differs from `Loaded`. | confirmed: open, `DetailLoaded` (D3) |
+| CMP-8 | a11y | `components/DeadEnd.tsx` | No heading; focus lost to `<body>` when a page turns into a dead end; no retry for a failed load. | confirmed: open (D3) |
+| CMP-9 | layout | `components/Fact.tsx` | `<dd>` cannot shrink: a long unbroken value widens the page. | confirmed: open (D4) |
+| CMP-10 | structure | 11 "Loading…" paragraphs | Copied with differing classes. | confirmed: open, `Loading` component (D3) |
+
+## Sweep: root config (2026-11-14)
+
+Batch 70, the last module of the full review sweep. Source: `/code-review` (high, no verify pass)
+of `docker-compose.yml`, `.env.example`, `package.json` (no diff; as they stand, with the
+Dockerfiles, Vite config, settings and runners). Each row checked against the files.
+`/security-review`: nothing at its bar. Docker's DEBUG dev server on all interfaces has no
+concrete path to data (API needs a session and never returns tracebacks, no usable admin account,
+debug pages mask secrets), so it is hardening (ROOT-1). Vite `host: true` in `npm start` is
+accepted (LAN phone testing). Placeholder secrets are replaced by `npm run setup`, and production
+defaults are safe. OpenSpec change `root-config-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| ROOT-1 | hardening | `docker-compose.yml` backend `ports` | `8000:8000` on all interfaces with `DEBUG=True`: the dev server is reachable from the LAN (Postgres and Redis are loopback). | confirmed (hardening): open, loopback (D1) |
+| ROOT-2 | hardening | same, `NUM_PROXIES=1` | A direct client sets `X-Forwarded-For` (throttle and audit IP). | confirmed: open, fixed by ROOT-1 |
+| ROOT-3 | bug | `docker-compose.yml` redis `ports` | Host port 6379 collides with the WSL Redis `npm start` uses (either compose fails or `npm start` silently uses the container). | confirmed: open, unpublished (D1) |
+| ROOT-4 | bug | `docker-compose.yml` `/app/node_modules` | Anonymous volume keeps old dependencies after `up --build`. | confirmed: open, documented `--renew-anon-volumes` (D4) |
+| ROOT-5 | bug | `vite.config.ts` | No polling: Windows bind mounts give no file events, so no HMR in Docker. | confirmed: open, `VITE_WATCH_POLLING` (D4) |
+| ROOT-6 | bug | `.env.example` / settings | `DJANGO_DEBUG` ignored: development forces True, production False. | confirmed: open, development honors it (D2) |
+| ROOT-7 | docs | `.env.example` | 17 settings read by `base.py`/`production.py` missing (SECURE_SSL_REDIRECT, throttles, sync limits, ...). | confirmed: open, template plus test (D3) |
+| ROOT-8 | bug | `docker-compose.yml` `DJANGO_SETTINGS_MODULE` | Interpolated from the shell before `.env`; an exported value overrides it. | confirmed: open, from `.env` only (D2) |
+| ROOT-9 | structure | `docker-compose.yml` | Postgres credentials written three times. | confirmed: open (D5) |
+| ROOT-10 | tooling | `package.json` | `format:scripts` checks only; no `engines` for the Node the runners need. | confirmed: open (D5) |

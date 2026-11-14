@@ -246,10 +246,14 @@ def _issue(
                 errors.append(f"{where}: unknown technology {slug!r}")
     updated_at = None
     if (raw_updated := data.get("updated_at")) is not None:
+        # A naive time would be read in the machine's time zone, so issue order could differ
+        # between machines (change services-evaluation-review-fixes, EVL-9).
         try:
             updated_at = datetime.fromisoformat(str(raw_updated))
         except ValueError:
-            errors.append(f"{where}: updated_at must be an ISO 8601 time")
+            updated_at = None
+        if updated_at is None or updated_at.tzinfo is None:
+            errors.append(f"{where}: updated_at must be an ISO 8601 time with a UTC offset")
     if len(errors) > before:
         return None
     return IssueFeature(

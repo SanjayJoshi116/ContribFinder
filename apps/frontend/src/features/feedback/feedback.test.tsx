@@ -238,9 +238,15 @@ describe('save and dismiss', () => {
   })
 
   it('dismisses with a chosen reason, with the same Undo', async () => {
+    // The server stops listing a dismissed recommendation; the list is refetched after it.
+    let dismissed = false
     const fetchMock = mockFetch({
       ...WITH_RECOMMENDATION,
-      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+      'GET /api/v1/recommendations': () => page(dismissed ? [] : [RECOMMENDATION]),
+      'POST /api/v1/recommendations/7/dismiss': () => {
+        dismissed = true
+        return noContent()
+      },
     })
     renderRoute('/app')
     const card = await screen.findByRole('article', { name: 'httpx' })
@@ -308,6 +314,7 @@ describe('save and dismiss', () => {
   })
 
   it('moves back a page when the last card on it is dismissed', async () => {
+    let dismissed = false
     const other = {
       ...RECOMMENDATION,
       id: 8,
@@ -325,12 +332,15 @@ describe('save and dismiss', () => {
         }),
       'GET /api/v1/recommendations?page=2': () =>
         json({
-          count: 21,
+          count: dismissed ? 20 : 21,
           next: null,
           previous: '/api/v1/recommendations',
-          results: [RECOMMENDATION],
+          results: dismissed ? [] : [RECOMMENDATION],
         }),
-      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+      'POST /api/v1/recommendations/7/dismiss': () => {
+        dismissed = true
+        return noContent()
+      },
     })
     const { router } = renderRoute('/app?page=2')
     const card = await screen.findByRole('article', { name: 'httpx' })

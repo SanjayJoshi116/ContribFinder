@@ -1,6 +1,6 @@
 {
   "name": "contribfinder",
-  "version": "0.12.65",
+  "version": "0.12.68",
   "private": true,
   "description": "ContribFinder monorepo: local dev runner (Docker alternative: docker compose up)",
   "type": "module",
