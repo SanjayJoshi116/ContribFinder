@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -10,6 +11,7 @@ from recommendations.serializers import ReasonSerializer
 from repositories.models import ActivityLabel
 from repositories.serializers import CandidateRepositorySerializer
 from services.feedback import CLIENT_ACTIONS
+from services.matching.features import current_activity
 
 from .models import DismissedRepository, DismissReason, FeedbackAction, SavedRepository
 
@@ -73,7 +75,9 @@ class SavedRepositorySerializer(serializers.ModelSerializer[SavedRepository]):
     @extend_schema_field(serializers.ChoiceField(choices=ActivityLabel.choices, allow_blank=True))
     def get_activity_label(self, obj: SavedRepository) -> str:
         snapshots = obj.repository.latest_snapshots  # type: ignore[attr-defined]
-        return str(snapshots[0].activity_label) if snapshots else ""
+        if not snapshots:
+            return ""
+        return current_activity(snapshots[0], obj.repository.pushed_at, timezone.now())[1]
 
     @extend_schema_field(SavedRecommendationSerializer(allow_null=True))
     def get_recommendation(self, obj: SavedRepository) -> dict[str, Any] | None:

@@ -185,8 +185,8 @@ def test_dismissed_repository_absent_after_regeneration(user, recs, pool) -> Non
 def test_dismissal_during_a_run_is_honored(user, recs, pool, monkeypatch) -> None:
     from services.matching.features import load_candidates as real_load
 
-    def load_then_dismiss(profile):
-        candidates = real_load(profile)  # the run already loaded the repository
+    def load_then_dismiss(profile, **kwargs):
+        candidates = real_load(profile, **kwargs)  # the run already loaded the repository
         DismissedRepository.objects.create(user=user, repository=pool["django"])
         return candidates
 
@@ -504,3 +504,28 @@ def test_writes_require_csrf(user, recs, method: str, path: str) -> None:
 )
 def test_signed_out_is_401(api_client: APIClient, method: str, path: str) -> None:
     assert getattr(api_client, method)(path).status_code == 401
+
+
+def test_every_reader_shows_the_activity_generation_scored(
+    signed_in_client: APIClient, user, developer, pool
+) -> None:
+    """CR5-2: a snapshot captured 40 days ago, pushed that day, never refreshed: the
+    recommendation, its detail facts, the saved list and the discovery list agree."""
+    from repositories.models import RepositorySnapshot
+
+    repo = pool["django"]
+    then = timezone.now() - timedelta(days=40)
+    Repository.objects.filter(pk=repo.pk).update(pushed_at=then)
+    RepositorySnapshot.objects.filter(repository=repo).update(captured_at=then, days_since_push=0)
+    generate(user)
+    rec = Recommendation.objects.get(repository=repo)
+    assert rec.activity_label == "moderately_active"
+    detail = signed_in_client.get(f"{RECS}/{rec.pk}").json()
+    assert detail["activity_signals"]["days_since_push"] == 40
+    feedback.save(user, rec)
+    saved = signed_in_client.get("/api/v1/saved").json()["results"][0]
+    assert saved["activity_label"] == "moderately_active"
+    pool_list = signed_in_client.get("/api/v1/discovery/candidates").json()["results"]
+    [listed] = [c for c in pool_list if c["repository"]["full_name"] == repo.full_name]
+    assert listed["activity_label"] == "moderately_active"
+    assert RepositorySnapshot.objects.get(repository=repo).activity_label == "recently_active"

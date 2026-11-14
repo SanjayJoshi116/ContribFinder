@@ -144,3 +144,32 @@ def test_signals_are_deterministic() -> None:
     first = [signals.skill_match(techs(), PY_DEV), signals.interest_match(DJANGO_REPO, PY_DEV)]
     second = [signals.skill_match(techs(), PY_DEV), signals.interest_match(DJANGO_REPO, PY_DEV)]
     assert first == second
+
+
+def test_skill_evidence_names_only_technologies_that_added_to_the_value() -> None:
+    k8s_dev = dev({"python": (0.9, "language", 3), "kubernetes": (0.7, "devops", 2)})
+    tagged = repo(languages=(("Python", 900),), topics=("kubernetes",))
+    no_topics = {**SOURCES, "topic": 0.0}
+    t = repository_technologies(tagged.languages, tagged.topics, tagged.dependencies, no_topics)
+    s = signals.skill_match(t, k8s_dev)
+    assert [e["slug"] for e in s.evidence] == ["python"]
+    assert s.value == pytest.approx(0.9)  # Kubernetes (weight 0) added nothing before either
+
+
+def test_language_share_rounding_to_zero_is_not_named() -> None:
+    go_dev = dev({"python": (0.9, "language", 3), "go": (0.9, "language", 1)})
+    tiny = repo(languages=(("Python", 1_000_000), ("Go", 1)))
+    t = repository_technologies(tiny.languages, tiny.topics, tiny.dependencies, SOURCES)
+    assert [e["slug"] for e in signals.language_match(t, go_dev).evidence] == ["python"]
+    assert [e["slug"] for e in signals.skill_match(t, go_dev).evidence] == ["python"]
+
+
+def test_matching_key_lists_match_configuration_validation() -> None:
+    """MAT-7: a key added on one side only would raise KeyError in generation or never score."""
+    from repositories.models import ActivityLabel
+    from services.matching.technologies import DEPENDENCY_SOURCE, TOPIC_SOURCE
+    from services.ranking import config
+
+    assert {key for key, _ in signals.OPENNESS_FLAGS} == set(config.OPENNESS_KEYS)
+    assert set(ActivityLabel.values) == set(config.ACTIVITY_KEYS)
+    assert {DEPENDENCY_SOURCE, TOPIC_SOURCE} == set(config.TECH_SOURCE_KEYS)

@@ -1,7 +1,7 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since; current through 0.12.63. Order: the full review sweep (top priority),
+each fix release since; current through 0.12.65. Order: the full review sweep (top priority),
 open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
@@ -72,8 +72,8 @@ a full re-review after fixing mostly repeats recorded rows, so step 7 reviews on
 | Medium | `.github/workflows/` | ci.yml, audit.yml (token permissions) | [x] batch 49 | [x] no findings |
 | Low | `apps/backend/services/repositories/` | analysis, lifecycle, staleness, backlog, setup | [x] batch 56 | [x] no findings |
 | Low | `apps/backend/services/issues/` | labels, classification, technologies | [x] batch 57 | [x] no findings |
-| Low | `apps/backend/services/discovery/` | queries, filters, ordering, yield report | [ ] | [ ] |
-| Low | `apps/backend/services/matching/` | activity, technologies, features, signals | [ ] | [ ] |
+| Low | `apps/backend/services/discovery/` | queries, filters, ordering, yield report | [x] batch 59 | [x] no findings |
+| Low | `apps/backend/services/matching/` | activity, technologies, features, signals | [x] batch 60 | [x] no findings |
 | Low | `apps/backend/services/ranking/` | config, pipeline, score, explain, freshness, activation | [ ] | [ ] |
 | Low | `apps/backend/services/evaluation/` | benchmark, metrics, bootstrap, feedback report (offline) | [ ] | [ ] |
 | Low | `apps/frontend/src/features/recommendations/` | list, cards, detail, filters | [ ] | [ ] |
@@ -92,7 +92,9 @@ no security findings); `frontend/src/features/auth/` reviewed and fixed (batch 3
 findings); the medium group (`jobs/` … `.github/workflows/`) reviewed as batches 36–49 (no security
 findings), batches 36–49 fixed in 0.12.48–0.12.60 (the medium group done); low group started 2026-11-12:
 `services/repositories/` reviewed as batch 56 (no security findings), fixed in 0.12.62;
-`services/issues/` reviewed as batch 57 (no security findings), fixed in 0.12.63; 10 low-priority
+`services/issues/` reviewed as batch 57 (no security findings), fixed in 0.12.63;
+`services/discovery/` reviewed as batch 59 (no security findings), fixed in 0.12.64;
+`services/matching/` reviewed as batch 60 (no security findings), fixed in 0.12.65; 8 low-priority
 modules to go.
 Batches 44–46 (0.12.55–0.12.57): one `/simplify` (batch 51; SIM2-9…SIM2-12 skipped, SIM2-9 then
 fixed as CR-1) and one fix-diff `/code-review` (batch 52, all fixed) over their combined diff.
@@ -218,6 +220,10 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 55 | **Public-release check** | PUB-1…PUB-3 | History and repository check before going public, 2026-11-12; PUB-1 fixed in 0.12.61, PUB-2 accepted, PUB-3 open (GitHub settings, owner only). |
 | 56 | **Sweep: `services/repositories/`** | RS-1…RS-10 | Full review sweep (low group), 2026-11-12: verified by reading; RS-1…RS-3, RS-5…RS-10 fixed in 0.12.62 (`services-repositories-review-fixes`), RS-4 false positive. `/security-review` found nothing. |
 | 57 | **Sweep: `services/issues/`** | ISV-1…ISV-10 | Full review sweep (low group), 2026-11-12: verified (ISV-1…ISV-4 reproduced); ISV-1, ISV-2, ISV-4…ISV-8, ISV-10 fixed and ISV-3 in part in 0.12.63 (`services-issues-review-fixes`), ISV-9 accepted. `/security-review` found nothing. |
+| 59 | **Sweep: `services/discovery/`** | DSC-1…DSC-8 | Full review sweep (low group), 2026-11-13: verified by reading; DSC-1, DSC-2, DSC-4…DSC-8 fixed in 0.12.64 (`services-discovery-review-fixes`), DSC-3 false positive. `/simplify` in batch 61, fix-diff `/code-review` in batch 62. `/security-review` found nothing. |
+| 60 | **Sweep: `services/matching/`** | MAT-1…MAT-8 | Full review sweep (low group), 2026-11-13: verified by reading; MAT-1…MAT-5, MAT-7, MAT-8 fixed in 0.12.65 (`services-matching-review-fixes`), MAT-6 rejected (ranks restart per band by design). `/simplify` in batch 61, fix-diff `/code-review` in batch 62. `/security-review` found nothing. |
+| 61 | **`/simplify` of 0.12.64–0.12.65** | SIM4-1…SIM4-8 | `/simplify` (4 agents: reuse, simplification, efficiency, altitude; one combined diff of the uncommitted 0.12.64–0.12.65 code), 2026-11-14; SIM4-1…SIM4-6 fixed before commit, SIM4-7, SIM4-8 skipped (reasons in its section; later covered by CR5-4, CR5-7). |
+| 62 | **Fix-diff review of 0.12.64–0.12.65** | CR5-1…CR5-8 | `/code-review` (high) of the uncommitted 0.12.64–0.12.65 code after batch 61, 2026-11-14; each row checked by reading (CR5-1 by hand); all fixed before commit (owner: fix all), CR5-6 as a test, CR5-5 within what is stored. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -240,8 +246,8 @@ positive) in 0.12.46 (`api-client-review-fixes`); batch 34 (AUTH-1…AUTH-9) in 
 (`developers-review-fixes`); batch 38 (REPO-1…REPO-7; REPO-8 accepted) in 0.12.50
 (`repositories-review-fixes`); batch 39 (`/simplify`, SIM-1…SIM-7) in 0.12.50; batch 40 (ISS-1, ISS-2, ISS-5, ISS-7, ISS-8; ISS-3, ISS-4, ISS-6
 accepted) in 0.12.51 (`issues-review-fixes`); batch 41 (REC-1…REC-4, REC-6…REC-10; REC-5 false
-positive) and SIM-8 in 0.12.52 (`recommendations-review-fixes`); batch 42 (FB-1, FB-3, FB-5; FB-2, FB-6 accepted, FB-4 false positive, FB-7 wontfix) in 0.12.53 (`feedback-review-fixes`); batch 43 (PROF-1…PROF-9) in 0.12.54 (`profiling-review-fixes`); batch 50 (fix-diff review of 0.12.51–0.12.54, FD2-1…FD2-9) folded into 0.12.53 and 0.12.54; batch 44 (APP-1…APP-6, APP-9, APP-10; APP-7, APP-8 accepted) in 0.12.55 (`app-review-fixes`); batch 45 (ROUTE-1…ROUTE-10, ROUTE-10 in part) in 0.12.56 (`routes-review-fixes`); batch 46 (FI-1…FI-3, FI-6, FI-7, FI-10; FI-4 guard) in 0.12.57 (`issue-detail-review-fixes`); batch 51 (`/simplify`, SIM2-1…SIM2-8) and batch 52 (fix-diff review, CR-1…CR-7, CR-10) folded into 0.12.55–0.12.57; batch 47 (E2EC-1, E2EC-3, E2EC-4, E2EC-6, E2EC-7; E2EC-2, E2EC-5 accepted) in 0.12.58 (`e2e-config-review-fixes`); batch 48 (SCR-1…SCR-4, SCR-6…SCR-10; SCR-5 accepted) in 0.12.59 (`scripts-review-fixes`); batch 49 (CI-1…CI-10) in 0.12.60 (`ci-review-fixes`); PUB-1 of batch 55 in 0.12.61 (no OpenSpec change, docs only); batch 56 (RS-1…RS-3, RS-5…RS-10; RS-4 false positive) in 0.12.62 (`services-repositories-review-fixes`); batch 57 (ISV-1, ISV-2, ISV-4…ISV-8, ISV-10, ISV-3 in part; ISV-9 accepted) in 0.12.63 (`services-issues-review-fixes`).
-Next: the full review sweep (the medium group done, batch 49 fixed in 0.12.60; low group started, batches 56 and 57 fixed in 0.12.62 and 0.12.63; next `services/discovery/`, one change each as batch 42); RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
+positive) and SIM-8 in 0.12.52 (`recommendations-review-fixes`); batch 42 (FB-1, FB-3, FB-5; FB-2, FB-6 accepted, FB-4 false positive, FB-7 wontfix) in 0.12.53 (`feedback-review-fixes`); batch 43 (PROF-1…PROF-9) in 0.12.54 (`profiling-review-fixes`); batch 50 (fix-diff review of 0.12.51–0.12.54, FD2-1…FD2-9) folded into 0.12.53 and 0.12.54; batch 44 (APP-1…APP-6, APP-9, APP-10; APP-7, APP-8 accepted) in 0.12.55 (`app-review-fixes`); batch 45 (ROUTE-1…ROUTE-10, ROUTE-10 in part) in 0.12.56 (`routes-review-fixes`); batch 46 (FI-1…FI-3, FI-6, FI-7, FI-10; FI-4 guard) in 0.12.57 (`issue-detail-review-fixes`); batch 51 (`/simplify`, SIM2-1…SIM2-8) and batch 52 (fix-diff review, CR-1…CR-7, CR-10) folded into 0.12.55–0.12.57; batch 47 (E2EC-1, E2EC-3, E2EC-4, E2EC-6, E2EC-7; E2EC-2, E2EC-5 accepted) in 0.12.58 (`e2e-config-review-fixes`); batch 48 (SCR-1…SCR-4, SCR-6…SCR-10; SCR-5 accepted) in 0.12.59 (`scripts-review-fixes`); batch 49 (CI-1…CI-10) in 0.12.60 (`ci-review-fixes`); PUB-1 of batch 55 in 0.12.61 (no OpenSpec change, docs only); batch 56 (RS-1…RS-3, RS-5…RS-10; RS-4 false positive) in 0.12.62 (`services-repositories-review-fixes`); batch 57 (ISV-1, ISV-2, ISV-4…ISV-8, ISV-10, ISV-3 in part; ISV-9 accepted) in 0.12.63 (`services-issues-review-fixes`); batch 59 (DSC-1, DSC-2, DSC-4…DSC-8; DSC-3 false positive) in 0.12.64 (`services-discovery-review-fixes`); batch 60 (MAT-1…MAT-5, MAT-7, MAT-8; MAT-6 rejected) in 0.12.65 (`services-matching-review-fixes`).
+Next: the full review sweep (the medium group done, batch 49 fixed in 0.12.60; low group started, batches 56, 57, 59 and 60 fixed in 0.12.62–0.12.65; next `services/ranking/`, one change each as batch 42); RT-3…RT-5 of batch 24 (open, design-level; see its section); the known gaps K-1…K-5 remain.
 
 Not in a batch: K-1…K-5 (roadmap items, tracked elsewhere). K-1's prerequisites (batches 2 and
 3, E-3) shipped in 0.12.2 and 0.12.3.
@@ -1682,3 +1688,77 @@ folded into `category`, GitHub JSON walked only when it holds an unstorable esca
 | CR4-8 | bug | `lifecycle.release_name`, `storage` | Inside an ID-ordered batch, each upsert locks its name's holders before its own row: the transaction does not lock in GitHub ID order (deadlock with a concurrent batch). | fixed: `storage.lock_for_upsert(repos)` locks the rows and their holders (case-insensitive) in GitHub ID order; sync and discovery call it once per batch, `upsert_repository` for its one row |
 | CR4-9 | efficiency | `repositories/analysis.py:_store_issues` | HTML comments stripped twice per issue (store and `IssueInput`). | fixed: `IssueInput(max_chars=)` strips then caps; the stored body is `IssueInput.body` |
 | CR4-10 | robustness | `classify.difficulty`, `technologies.detect` | Both rely on `IssueInput` having removed comments; a direct caller would count template text. | fixed: docstrings state it; a test fails when anything under `services/` other than `issues/analysis.py` calls them |
+
+## Sweep: `services/discovery/` (2026-11-13)
+
+Batch 59. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/backend/services/discovery/` (no diff; the module as it stands). Each row checked against the
+code by reading. `/security-review`: nothing (skill and interest terms come from the catalog only;
+own topics are GitHub-restricted and searched with the developer's own token; the query sits in `q`
+via `urlencode`, token in the header only; candidates scoped by developer; job metadata never
+serialized; the yield report holds aggregates only). OpenSpec change
+`services-discovery-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| DSC-1 | bug | `queries.py:plan_queries` | Every skill and interest topic counts as covered, also when the budget cuts its query: a recurring own-repository topic (e.g. `fastapi`, skill #6 of 3 slots) is never searched. | fixed: covered only by skill/interest queries planned in pass 1 of two `allocate` passes (design D1) |
+| DSC-2 | bug | `service.py:_record` | "Same run" compares `last_seen_at == self.now`; a retry resets `now`, so the second band's worse rank overwrites the better one and the pool order depends on band order. | fixed: `_search_started()` (`search_started_at`, else the attempt clock) is the boundary (D3) |
+| DSC-3 | bug | `queries.py:_qualifiers` | Empty login yields `-user:`; every query refused. | false positive: `run()` needs a GitHub account (`for_user`), sign-in requires a non-empty username, deletion cancels the run first |
+| DSC-4 | bug | `queries.py:allocate` | Leftover slots go to the first strategies, not the largest remainders: shares 1/1/1/9 at budget 5 give topic 3, not 4. Default shares divide exactly. | fixed: leftover by largest remainder, ties in `STRATEGIES` order, positive shares only (D2) |
+| DSC-5 | bug | `yield_report.py:load` | Window on nullable `started_at`: never-started cancelled runs count all-time but not in a window, and runs that never searched are labelled "without per-query yield". | fixed: window on `Coalesce(started_at, created_at)`; `runs_without_search` (no plan, or search step pending/skipped) apart from `runs_without_yield` (D4) |
+| DSC-6 | efficiency | `yield_report.py:load` | Fetches every job's whole metadata to read `query_yield`. | fixed: `values_list` of `metadata__query_yield`, `metadata__plan__0`, `steps__search` (D4) |
+| DSC-7 | efficiency | `filters.py:prefilter` | Stored dependencies read before checking an earlier rejection (only for unannotated callers; the one stored caller annotates). | fixed: dependencies read only after every other rule passed (D5) |
+| DSC-8 | structure | `service.py:_step_search` | The search step repeats the not-code rule (`suspected_list` twice) outside `filters.py`. | fixed: `filters.stored_result_not_code(result, repo, cfg)` (D5) |
+
+## Sweep: `services/matching/` (2026-11-13)
+
+Batch 60. Source: full review sweep, `/code-review` (high, no verify pass) of
+`apps/backend/services/matching/` (no diff; the module as it stands). Each row checked against the
+code by reading. `/security-review`: nothing (profile and candidate loads scoped to the developer;
+issues are shared public data limited to the candidates; ORM only; config and evidence read as
+JSON data; reason text rendered as React text, no raw HTML in the SPA; links from GitHub's
+`html_url`; no logging). OpenSpec change `services-matching-review-fixes`.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| MAT-1 | bug | `features.py:_snapshot` | Push age and label as captured, never aged: a stale repository whose refresh keeps failing reads "pushed today" weeks later and scores as recently active. | fixed: `activity.current` at load: days from `Repository.pushed_at` (else snapshot days aged since capture), label under current thresholds; score, reason and filter share it (design D1) |
+| MAT-2 | bug | `features.py:load_developer` | `repo_count` counts contribution evidence: "appears in 3 of your repositories" for 1 owned + 2 contributed. | fixed: `features.OWN_REPOSITORY_SOURCES` (language, topic, dependency) filter the count; collector test guards it (D3) |
+| MAT-3 | bug | `signals.py:skill_match` | Evidence keeps technologies with weight 0 (topic source weight 0, a share rounding to 0): the reason names technologies that added nothing. | fixed: evidence keeps `weight * confidence > 0`; value unchanged (D4) |
+| MAT-4 | bug | `activity.py:activity_label` | One unknown count is treated as 0: pushed 5 days ago, commits unknown, 0 merged PRs → `low_activity`; both unknown → moderate. | fixed: `meets(count, key)` per count; unknown never 0 (D2) |
+| MAT-5 | bug | `activity.py` / `features.py` | `thresholds_version` is never compared: after a threshold change one list mixes labels until each refresh. | fixed: by MAT-1 (label under current thresholds at load) |
+| MAT-6 | bug | `features.py:best_rank` | Best rank compares ranks across star bands. | rejected: ranks restart per band on purpose (`discovery-size-mix`), the tie-break shares the pool order |
+| MAT-7 | structure | `signals.py:OPENNESS_FLAGS` | Openness flags, activity labels and tech sources duplicate `ranking/config.py` key lists, unchecked; a one-sided addition raises `KeyError` in generation. | fixed: guard test `test_matching_key_lists_match_configuration_validation` (D5) |
+| MAT-8 | efficiency | `signals.py:skill_match`, `language_match` | Confidence looked up twice per technology. | fixed: walrus, one lookup (D4) |
+
+## `/simplify` of 0.12.64–0.12.65 (2026-11-14)
+
+Batch 61. Source: `/simplify` with four agents (reuse, simplification, efficiency, altitude) over
+one combined diff of the uncommitted 0.12.64–0.12.65 code (`services/discovery`,
+`services/matching`, `services/ranking/service.py`, tests). Findings deduplicated across agents.
+
+| ID | Type | Where | Finding | Status |
+|---|---|---|---|---|
+| SIM4-1 | reuse | `discovery/service.py:_prune_discoveries` | Parsed `search_started_at` itself although `_search_started` claimed to be the shared boundary. | fixed: `_search_started()` returns None without the key; pruning uses it, `_record` falls back to `self.now` |
+| SIM4-2 | simplification | `discovery/queries.py:plan_queries` | Three closures (`topic_queries`, `quotas_for`, `topics_of`, one reading `budget` assigned after it) and `(key, core, topic)` triples with `""` for languages. | fixed: `searched_topic` (key → topic), `available` once, both passes inline |
+| SIM4-3 | reuse | `matching/activity.py` | "Whole days since, never negative" written three times. | fixed: `_days_since(then, now)` (`current`, `compute_activity`) |
+| SIM4-4 | simplification | `activity.activity_label`, `features._snapshot` | Closure `meets` per call; seven positional arguments to `current`. | fixed: module-level `_meets(count, threshold)`; `_snapshot` calls `current` by keyword |
+| SIM4-5 | simplification | `matching/signals.py:skill_match` | `matched` rebuilt after the sum to drop weight-0 technologies. | fixed: one filter `t.weight > 0 and c > 0` (same value and evidence) |
+| SIM4-6 | reuse, altitude | tests | `stored()` duplicated `make_candidate_repo`; `ACTIVITY_DATA` copied the default thresholds unchecked. | fixed: `stored()` wraps `make_candidate_repo`; `test_activity_data_gives_its_label` |
+| SIM4-7 | altitude | `discovery/yield_report.py:Run.searched` | Inferred from the plan and step states; `search_started_at` suggested instead. | skipped as proposed (the key alone counts empty-plan runs as searched); superseded by CR5-4 (searched = a query finished) |
+| SIM4-8 | efficiency, simplification | `service._record`, `yield_report.load` | ISO parse per `_record` call; `Run(*row)` positional; `Coalesce` window bypasses a `started_at` index. | skipped; the parse later fixed by CR5-7 (`_seen_since`) |
+
+## Fix-diff review of 0.12.64–0.12.65 (2026-11-14)
+
+Batch 62. Source: `/code-review` (high, no verify pass) of the uncommitted 0.12.64–0.12.65 code
+after batch 61. Each row checked against the code; owner: fix all.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CR5-1 | bug | `discovery/queries.py:plan_queries` | Pass 2 can plan fewer skill/interest queries than pass 1 (a longer topic list wraps less back), so a topic covered in pass 1 whose query pass 2 cuts is searched by nothing (shares 2/4/2/2, budget 10: skill 9, then 8). Breaks the spec of DSC-1. | fixed: allocate until the covered set is the planned one; it only shrinks, so it ends (design D1's oscillation worry does not hold) |
+| CR5-2 | bug | `recommendations/serializers.py`, `feedback/serializers.py`, `repositories/api.py` | Only generation recomputed activity: the detail facts said "Last push: today" beside "last push 40 days ago"; the saved list and the discovery pool showed the stored label. | fixed: `features.current_activity` (saved list; detail facts at `generated_at`), `repositories.queries.with_current_activity` (pool, SQL), parity test; spec `repository-activity` edited directly |
+| CR5-3 | bug | `evaluation/export.py:export_developer` | `load_candidates` called without the export's `now`. | fixed: passes `now` |
+| CR5-4 | bug | `discovery/yield_report.py:Run.searched` | A run cancelled in its first request counted as "without yield" (the legacy bucket). | fixed: searched = a query finished (`query_yield`, `queries_done`, `queries_skipped`); no step-state inference (also answers SIM4-7); spec edited directly |
+| CR5-5 | bug | `matching/activity.py:current` | Ageing floors twice: up to a day short. | fixed in part: snapshots store no push time, so the fallback (no repository push time) rounds the time since capture up and never claims a younger push; the usual path reads `Repository.pushed_at` |
+| CR5-6 | robustness | `discovery/queries.py` | Topic queries skip the `seen` dedup. | fixed as a test: filtering by `seen` would hide the topic of a cut skill query again (CR5-1); a planned query covers its topic, so no core repeats (`test_topic_of_a_query_cut_in_a_later_pass_is_still_searched` asserts unique cores) |
+| CR5-7 | efficiency | `discovery/service.py:_record` | ISO parse per record. | fixed: `_seen_since`, cached per service (one attempt) |
+| CR5-8 | simplification | `discovery/filters.py:stored_result_not_code` | Repeated `stored_not_code`. | fixed: `suspected_list`, then `stored_not_code(repo, cfg, topics=)` |

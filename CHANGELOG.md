@@ -7,6 +7,69 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.65] - 2026-11-14
+
+Matching fixes from the review sweep (`openspec/changes/archive/2026-11-14-services-matching-review-fixes/`;
+specs `repository-activity`, `recommendation-engine`, `recommendation-explanations`;
+`Bug_Backlog.md` batch 60, MAT-1…MAT-8, MAT-6 rejected by design). No scoring configuration
+change, no migration. OpenAPI stays `1.0.0`; baselines unchanged (evaluation datasets give
+activity and repository counts directly). MAT-1, MAT-4 and MAT-5 can change activity values, and
+so scores and order, for recommendations generated after the release.
+One `/simplify` (`Bug_Backlog.md` batch 61, SIM4-1…SIM4-8) and one fix-diff `/code-review` (batch 62, CR5-1…CR5-8) over the combined 0.12.64–0.12.65 code, fixed before release.
+
+### Fixed
+
+- Activity is measured when recommendations are generated: days since the repository's last
+  known push (or the snapshot's days aged since capture) and the label under the current
+  thresholds. A repository whose refresh keeps failing no longer reads "pushed today" weeks
+  later, and a threshold change applies before the next refresh. The score, the activity reason
+  and the activity filter use the same label; stored snapshots are unchanged (MAT-1, MAT-5).
+- An unknown activity count is never treated as 0: pushed 5 days ago with an unknown commit
+  count and no merged pull requests is moderately active, not low activity (MAT-4).
+- "Appears in N of your repositories" counts only repositories you own, not ones you contributed
+  to (MAT-2).
+- The skill reason no longer names technologies that added nothing to the score (weight 0);
+  the value is unchanged (MAT-3).
+- The saved list and the discovery pool show the activity label as of now, and a
+  recommendation's "Last push" fact is measured when it was generated, so no page contradicts
+  its activity label (CR5-2). The benchmark export measures activity at its `now` (CR5-3).
+
+### Changed
+
+- A test keeps matching's openness flags, activity labels and technology sources in step with
+  the configuration validation keys (MAT-7); confidence is read once per technology (MAT-8).
+
+## [0.12.64] - 2026-11-14
+
+Discovery fixes from the review sweep (`openspec/changes/archive/2026-11-14-services-discovery-review-fixes/`;
+spec `repository-discovery`; `Bug_Backlog.md` batch 59, DSC-1…DSC-8, DSC-3 a false positive).
+No scoring or configuration change, no migration. OpenAPI stays `1.0.0`; baselines unchanged
+(benchmarks store their candidates). DSC-1, DSC-2 and DSC-4 change which search requests a run
+makes or which rank a discovery record holds, so a developer's pool can differ after the next
+run. One `/simplify` (`Bug_Backlog.md` batch 61, SIM4-1…SIM4-8) and one fix-diff `/code-review` (batch 62, CR5-1…CR5-8) over the combined 0.12.64–0.12.65 code, fixed before release.
+
+### Fixed
+
+- A topic that recurs across your own repositories is searched again when the budget cuts the
+  skill or interest query for the same topic: only a planned query covers a topic (DSC-1).
+- When a retried discovery run finds a repository in two star bands through one query, the
+  record keeps the better rank. "This run" is the run's recorded search start, not the
+  attempt's clock (DSC-2).
+- Leftover budget slots go to the strategies with the largest remainder of their share, ties in
+  strategy order, so non-default shares are respected. The default split is unchanged (DSC-4).
+- `discovery_report --since` also counts runs that were cancelled before they started (window
+  on start, or creation). Runs that finished no search request are counted on their own line
+  (`runs_without_search` in the JSON), apart from runs from before the yield was recorded (DSC-5,
+  CR5-4).
+- A topic counted as covered in one allocation round is searched again when a later round cuts
+  its query: the plan repeats until the covered topics are the planned ones (CR5-1).
+
+### Changed
+
+- `discovery_report` reads only the three metadata keys it needs (DSC-6).
+- The pre-filter reads a stored repository's dependencies only when no other rule rejected it
+  (DSC-7); the search step's not-code check is `filters.stored_result_not_code` (DSC-8).
+
 ## [0.12.63] - 2026-11-12
 
 Issue analysis fixes from the review sweep (`openspec/changes/archive/2026-11-12-services-issues-review-fixes/`;

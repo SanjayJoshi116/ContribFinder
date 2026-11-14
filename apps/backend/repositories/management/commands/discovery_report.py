@@ -38,7 +38,8 @@ class Command(BaseCommand):
         window = f"last {report.since_days} days" if report.since_days else "all time"
         self.stdout.write(
             f"Discovery search yield, {window}: {report.runs} finished runs, "
-            f"{report.runs_without_yield} without per-query yield (in no figure)"
+            f"{report.runs_without_search} without a search, "
+            f"{report.runs_without_yield} without per-query yield (neither in any figure)"
         )
         if report.total.requests == 0:
             self.stdout.write("No recorded search requests.")

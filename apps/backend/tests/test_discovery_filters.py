@@ -4,8 +4,15 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from django.utils import timezone
 
+from e2e.builders import make_candidate_repo
 from repositories.models import Repository, RepositoryDependency, RepositoryTopic
-from services.discovery.filters import FilterConfig, eligibility, prefilter, suspected_list
+from services.discovery.filters import (
+    FilterConfig,
+    eligibility,
+    prefilter,
+    stored_result_not_code,
+    suspected_list,
+)
 from services.github.client import GitHubRepo
 
 NOW = datetime(2026, 9, 29, tzinfo=UTC)
@@ -153,20 +160,48 @@ def test_repository_rules_win_over_not_code() -> None:
     assert check(replace(BASE, primary_language="", is_archived=True)) == "archived"
 
 
+def stored(full_name: str = "EbookFoundation/free-programming-books", **fields) -> Repository:
+    return make_candidate_repo(
+        2,
+        full_name,
+        **{
+            "license_spdx": "CC-BY-4.0",
+            "pushed_at": NOW - timedelta(days=3),
+            "dependencies_synced_at": timezone.now(),
+            **fields,
+        },
+    )
+
+
+@pytest.mark.django_db
+def test_stored_result_not_code() -> None:
+    result = replace(BASE, full_name="vinta/awesome-python")
+    repo = stored(result.full_name)
+    assert stored_result_not_code(result, repo, CFG)  # an analysis found no dependencies
+    RepositoryDependency.objects.create(
+        repository=repo, ecosystem="pypi", name="requests", manifest_path="requirements.txt"
+    )
+    assert not stored_result_not_code(result, repo, CFG)
+
+
+@pytest.mark.django_db
+def test_stored_result_not_a_list_reads_no_dependencies(django_assert_num_queries) -> None:
+    repo = stored("encode/httpx")
+    with django_assert_num_queries(0):
+        assert not stored_result_not_code(BASE, repo, CFG)
+
+
+@pytest.mark.django_db
+def test_rejected_stored_repository_reads_no_dependencies(django_assert_num_queries) -> None:
+    repo = stored("vinta/awesome-python", is_archived=True)  # not annotated
+    with django_assert_num_queries(0):
+        reason = prefilter(repo, login="octocat", owned=set(), now=NOW, cfg=CFG, check_stars=False)
+        assert reason == "archived"
+
+
 @pytest.mark.django_db
 def test_list_already_in_pool_becomes_ineligible() -> None:
-    repo = Repository.objects.create(
-        github_id=2,
-        owner_login="EbookFoundation",
-        name="free-programming-books",
-        full_name="EbookFoundation/free-programming-books",
-        html_url="https://github.com/EbookFoundation/free-programming-books",
-        license_spdx="CC-BY-4.0",
-        primary_language="Python",
-        pushed_at=NOW - timedelta(days=3),
-        synced_at=timezone.now(),
-        dependencies_synced_at=timezone.now(),
-    )
+    repo = stored()
     assert eligibility(repo, now=NOW, cfg=CFG) is None
     RepositoryTopic.objects.create(repository=repo, topic="books")
     assert eligibility(repo, now=NOW, cfg=CFG) == "not_code"

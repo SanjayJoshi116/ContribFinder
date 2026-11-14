@@ -53,6 +53,21 @@ def developer(user) -> DeveloperProfile:
     return profile
 
 
+# label -> (days since push, commits in 90 days) that give it under the default thresholds
+ACTIVITY_DATA = {
+    "recently_active": (3, 40),
+    "moderately_active": (60, 3),
+    "low_activity": (200, 0),
+}
+
+
+def test_activity_data_gives_its_label(settings) -> None:
+    from services.matching.activity import activity_label
+
+    for label, (days, commits) in ACTIVITY_DATA.items():
+        assert activity_label(days, commits, None, settings.ACTIVITY_THRESHOLDS) == label
+
+
 def ready_repo(
     github_id: int,
     full_name: str,
@@ -63,6 +78,9 @@ def ready_repo(
     label="recently_active",
     **fields,
 ) -> Repository:
+    # Activity is relabeled from the data at generation (MAT-1), so the data matches the label.
+    days, commits = ACTIVITY_DATA[label]
+    fields.setdefault("pushed_at", timezone.now() - timedelta(days=days))
     repo = make_candidate_repo(
         github_id, full_name, lifecycle="recommendable", is_eligible=True, **fields
     )
@@ -82,8 +100,8 @@ def ready_repo(
         open_issues=0,
         activity_label=label,
         thresholds_version="x",
-        days_since_push=3,
-        commits_90d=40,
+        days_since_push=days,
+        commits_90d=commits,
         contributors=25,
     )
     return repo
@@ -320,6 +338,23 @@ class TestFreshness:
 
 
 # --- recommendation-consistency ------------------------------------------------------------
+
+
+def test_activity_measured_at_generation(user, developer, pool) -> None:
+    """A snapshot captured 40 days ago, pushed that day, never refreshed since (MAT-1)."""
+    then = timezone.now() - timedelta(days=40)
+    Repository.objects.filter(pk=pool["django"].pk).update(pushed_at=then)
+    RepositorySnapshot.objects.filter(repository=pool["django"]).update(
+        captured_at=then, days_since_push=0
+    )
+    generate(user)
+    rec = Recommendation.objects.get(repository=pool["django"])
+    assert rec.activity_label == "moderately_active"  # the label scored, also for the filter
+    assert rec.signal_scores["activity"] == V2_PARAMS["activity"]["moderately_active"]
+    activity = rec.reasons.get(type="activity")
+    assert "last push 40 days ago" in activity.text
+    stored = RepositorySnapshot.objects.get(repository=pool["django"])
+    assert (stored.activity_label, stored.days_since_push) == ("recently_active", 0)
 
 
 def test_stale_repository_keeps_its_recommendation(user, developer, pool) -> None:

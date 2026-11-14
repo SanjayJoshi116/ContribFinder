@@ -16,6 +16,7 @@ import threading
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime, timedelta
+from functools import cached_property
 from typing import Any
 
 from django.conf import settings
@@ -47,11 +48,9 @@ from .filters import (
     NOT_CODE,
     FilterConfig,
     has_dependencies_annotation,
-    not_code,
     prefilter,
-    stored_has_dependencies,
     stored_not_code,
-    suspected_list,
+    stored_result_not_code,
 )
 from .ordering import pool_order
 from .queries import (
@@ -166,14 +165,7 @@ class DiscoveryService:
                 lock_for_upsert([gh for _, gh in kept])
                 for rank, gh in sorted(kept, key=lambda item: item[1].github_id):
                     repo = self._store_search_result(gh)
-                    # Topics are the search result's (just stored); dependencies are stored.
-                    if suspected_list(gh.full_name, gh.topics, cfg) and not_code(
-                        gh.full_name,
-                        gh.topics,
-                        gh.primary_language,
-                        cfg,
-                        has_dependencies=stored_has_dependencies(repo),
-                    ):
+                    if stored_result_not_code(gh, repo, cfg):
                         rejected[NOT_CODE] += 1  # an analysis already found it is a list
                         continue
                     self._record(repo, query.source, query.core, rank)
@@ -377,15 +369,14 @@ class DiscoveryService:
         query that no longer finds the repository must not order the pool. Candidates stay
         (retention removes them). A run that searched nothing (no plan) proves nothing about
         the old records, and a query GitHub rejected this run keeps its records."""
-        started = self.job.metadata.get("search_started_at")
-        if not started or self.job.steps.get("search") == Step.SKIPPED:
+        started = self._search_started()
+        if started is None or self.job.steps.get("search") == Step.SKIPPED:
             return 0
         skipped = set(self.job.metadata.get("queries_skipped", []))
         kept_queries = {q["core"] for q in self.job.metadata.get("plan", []) if q["key"] in skipped}
         deleted, _ = (
             CandidateDiscovery.objects.filter(
-                candidate__developer=self.profile,
-                last_seen_at__lt=datetime.fromisoformat(started),
+                candidate__developer=self.profile, last_seen_at__lt=started
             )
             .exclude(query__in=kept_queries)
             .delete()
@@ -479,13 +470,29 @@ class DiscoveryService:
         )
         if not created:
             previous = discovery.search_rank
-            if discovery.last_seen_at == self.now and rank is not None and previous is not None:
-                # The same query in another band this run (stars changed between requests):
-                # keep the better rank, never the order the bands ran in.
+            if (
+                discovery.last_seen_at >= self._seen_since
+                and rank is not None
+                and previous is not None
+            ):
+                # The same query in another band this run, also in an earlier attempt (stars
+                # changed between requests): keep the better rank, never the band order.
                 rank = min(rank, previous)
             CandidateDiscovery.objects.filter(pk=discovery.pk).update(
                 search_rank=rank, last_seen_at=self.now
             )
+
+    @cached_property
+    def _seen_since(self) -> datetime:
+        """ "Seen this run" for ``_record``, read once: the search start (written before any
+        record), or the attempt's clock for a run from before the key existed."""
+        return self._search_started() or self.now
+
+    def _search_started(self) -> datetime | None:
+        """When this run's search started: the one boundary of "seen this run" (``_record``,
+        pruning). None before the search step (or for a run from before the key existed)."""
+        started = self.job.metadata.get("search_started_at")
+        return datetime.fromisoformat(started) if started else None
 
     def _pool_repositories(self) -> list[Repository]:
         """The developer's candidate repositories in the pool order (ordering.py)."""

@@ -145,27 +145,28 @@ def plan_queries(data: DiscoveryInput, cfg: QueryConfig) -> list[PlannedQuery]:
     top_language = languages[0].slug if languages else None
 
     cores: dict[str, list[tuple[str, str]]] = {}
+    searched_topic: dict[str, str] = {}  # skill and interest query key -> the topic it searches
     seen: set[str] = set()
 
-    def add(strategy: str, key: str, core: str) -> None:
+    def add(strategy: str, key: str, core: str, topic: str = "") -> None:
         if core not in seen:
             seen.add(core)
             cores.setdefault(strategy, []).append((key, core))
+            if topic:
+                searched_topic[key] = topic
 
     for skill in languages:
         if linguist := _linguist(SKILLS_BY_SLUG[skill.slug]):
             add("language", f"language:{skill.slug}", f"language:{_quote(linguist)}")
 
-    covered_topics: set[str] = set()
     for skill in skills:
         definition = SKILLS_BY_SLUG[skill.slug]
         if definition.category == LANGUAGE:
             continue
         topic = _primary_topic(definition)
-        covered_topics.add(topic)
         language = _paired_language(definition, languages)
         core = f"topic:{topic}" + (f" language:{_quote(language)}" if language else "")
-        add("skill", f"skill:{skill.slug}", core)
+        add("skill", f"skill:{skill.slug}", core, topic)
 
     interests = sorted(data.interests, key=lambda i: (-i.strength, i.slug))
     top_language_name = _linguist(SKILLS_BY_SLUG[top_language]) if top_language else None
@@ -175,23 +176,43 @@ def plan_queries(data: DiscoveryInput, cfg: QueryConfig) -> list[PlannedQuery]:
         if i.slug in INTERESTS_BY_SLUG and INTERESTS_BY_SLUG[i.slug].topics
     ]
     for slug, topic in interest_topics:
-        covered_topics.add(topic)
         suffix = f" language:{_quote(top_language_name)}" if top_language_name else ""
-        add("interest", f"interest:{slug}", f"topic:{topic}{suffix}")
+        add("interest", f"interest:{slug}", f"topic:{topic}{suffix}", topic)
     if top_language_name:
         # Language-free variants come last and are only used when budget remains.
         for slug, topic in interest_topics:
-            add("interest", f"interest:{slug}:any", f"topic:{topic}")
+            add("interest", f"interest:{slug}:any", f"topic:{topic}", topic)
 
     counts = Counter(t.lower() for topics in data.own_repository_topics for t in set(topics))
-    for topic, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
-        if count >= TOPIC_MIN_REPOSITORIES and topic not in covered_topics:
-            add("topic", f"topic:{topic}", f"topic:{topic}")
+    recurring = [
+        topic
+        for topic, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        if count >= TOPIC_MIN_REPOSITORIES
+    ]
 
     # Every query runs in every star band (design D1, D2): the budget counts requests, and a
     # query is planned in all bands or not at all. With one band the plan is the pre-band one.
     budget = cfg.max_queries // len(cfg.bands)
-    quotas = allocate(budget, cfg.shares, {s: len(cores.get(s, [])) for s in STRATEGIES})
+    available = {s: len(cores.get(s, [])) for s in STRATEGIES}
+
+    # A topic counts as covered only by a skill or interest query the budget plans (change
+    # services-discovery-review-fixes, D1; CR5-1). Start with every such topic covered and
+    # allocate until the covered set is the one the quotas plan. Each round the topic list can
+    # only grow, so less budget wraps back and the covered set can only shrink: it ends within
+    # as many rounds as there are topics. A topic query never repeats a planned core: a planned
+    # skill or interest query covers its topic.
+    covered = set(searched_topic.values())
+    while True:
+        cores["topic"] = [(f"topic:{t}", f"topic:{t}") for t in recurring if t not in covered]
+        quotas = allocate(budget, cfg.shares, {**available, "topic": len(cores["topic"])})
+        planned = {
+            searched_topic[key]
+            for s in ("skill", "interest")
+            for key, _ in cores.get(s, [])[: quotas[s]]
+        }
+        if planned == covered:
+            break
+        covered = planned
     banded = len(cfg.bands) > 1
     return [
         PlannedQuery(
@@ -218,11 +239,15 @@ def allocate(
     if budget <= 0 or total_share <= 0:
         return quotas
     base = {s: budget * shares.get(s, 0) // total_share for s in STRATEGIES}
-    remainder = budget - sum(base.values())
-    for s in STRATEGIES:
-        if remainder and shares.get(s, 0):
-            base[s] += 1
-            remainder -= 1
+    leftover = budget - sum(base.values())
+    # Largest remainder, ties in strategy order. The leftover is the sum of the fractional
+    # parts, so it never exceeds the strategies with one (all of positive share).
+    by_remainder = sorted(
+        (s for s in STRATEGIES if shares.get(s, 0) > 0),
+        key=lambda s: (-(budget * shares.get(s, 0) % total_share), STRATEGIES.index(s)),
+    )
+    for s in by_remainder[:leftover]:
+        base[s] += 1
     carry = 0
     for s in STRATEGIES:
         want = base[s] + carry

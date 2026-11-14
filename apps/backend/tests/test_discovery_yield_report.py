@@ -11,7 +11,7 @@ from django.core.management.base import CommandError
 from django.utils import timezone
 
 from jobs.models import SyncJob
-from services.discovery.yield_report import build
+from services.discovery.yield_report import Run, build, load
 
 from .factories import UserFactory
 
@@ -32,6 +32,11 @@ def queries(*entries: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {f"q{i}": e for i, e in enumerate(entries)}
 
 
+def searched(yields: dict[str, dict[str, Any]] | None) -> Run:
+    """A run that finished a query, with this query yield."""
+    return Run(yields, "q0")
+
+
 def test_rejections_per_strategy() -> None:
     # Spec: 10 language requests, 300 results, 90 no_license, 150 recorded; 10 interest
     # requests, 200 results, 20 no_license, 170 recorded.
@@ -39,7 +44,7 @@ def test_rejections_per_strategy() -> None:
         *[ran("language_search", 30, {"no_license": 9, "archived": 6}, 15) for _ in range(10)],
         *[ran("interest_search", 20, {"no_license": 2, "inactive": 1}, 17) for _ in range(10)],
     )
-    report = build([run])
+    report = build([searched(run)])
 
     language, interest = report.strategies
     assert (language.name, interest.name) == ("language_search", "interest_search")
@@ -58,7 +63,7 @@ def test_yield_per_band_and_strategy_band() -> None:
         ran("language_search", 30, {"no_license": 2}, 27, band="1000+"),
         ran("skill_search", 10, {}, 10, band="1000+"),
     )
-    report = build([run])
+    report = build([searched(run)])
     small, large = report.bands
     assert (small.name, large.name) == ("20..999", "1000+")  # by lower star bound
     assert small.recorded_share == pytest.approx(0.6)
@@ -71,7 +76,7 @@ def test_yield_per_band_and_strategy_band() -> None:
 
 
 def test_single_band_reads_all() -> None:
-    report = build([queries(ran("topic_search", 5, {}, 5))])
+    report = build([searched(queries(ran("topic_search", 5, {}, 5)))])
     assert [row.name for row in report.bands] == ["all"]
 
 
@@ -80,36 +85,72 @@ def test_refused_requests_count_but_have_no_results() -> None:
         ran("skill_search", 30, {}, 30),
         {"source": "skill_search", "band": "", "refused": True},
     )
-    (skill,) = build([run]).strategies
+    (skill,) = build([searched(run)]).strategies
     assert (skill.requests, skill.refused, skill.results) == (2, 1, 30)
     assert skill.results_per_request == pytest.approx(30.0)  # per request that ran
 
 
 def test_runs_without_yield_enter_no_figure() -> None:
-    report = build([None, {}, queries(ran("language_search", 10, {}, 10))])
-    assert (report.runs, report.runs_without_yield) == (3, 2)
+    report = build(
+        [searched(None), searched({}), searched(queries(ran("language_search", 10, {}, 10)))]
+    )
+    assert (report.runs, report.runs_without_search, report.runs_without_yield) == (3, 0, 2)
     assert report.total.requests == 1
 
 
+@pytest.mark.parametrize(
+    "run",
+    [
+        Run(None, None),  # cancelled before it started, or planned no query
+        Run({}, None),  # ended during its first request (CR5-4)
+    ],
+)
+def test_runs_without_a_search_are_not_runs_without_yield(run: Run) -> None:
+    report = build([run])
+    assert (report.runs, report.runs_without_search, report.runs_without_yield) == (1, 1, 0)
+    assert report.total.requests == 0
+
+
 def test_no_results_has_no_share() -> None:
-    (row,) = build([queries(ran("topic_search", 0, {}, 0))]).strategies
+    (row,) = build([searched(queries(ran("topic_search", 0, {}, 0)))]).strategies
     assert (row.recorded_share, row.results_per_request) == (None, 0.0)
 
 
 # --- loading and the command ---------------------------------------------------------------
 
 
-def discovery_job(user, status: str, yields: dict[str, Any] | None, *, days_ago: int = 1) -> None:
-    metadata: dict[str, Any] = {"plan": [{"q": "language:Python secret-query"}]}
+def discovery_job(
+    user,
+    status: str,
+    yields: dict[str, Any] | None,
+    *,
+    days_ago: int = 1,
+    started: bool = True,
+    plan: list[dict[str, Any]] | None = None,
+    finished: bool | None = None,
+) -> SyncJob:
+    """A finished run that planned (``plan``, default one query) and finished its queries
+    (``finished``, default: whenever it planned one), unless it never ``started`` (no plan,
+    every step pending, no start time, created ``days_ago``)."""
+    metadata: dict[str, Any] = {}
+    if started:
+        metadata["plan"] = [{"q": "language:Python secret-query"}] if plan is None else plan
+        if finished if finished is not None else bool(metadata["plan"]):
+            metadata["queries_done"] = ["language:python"]
     if yields is not None:
         metadata["query_yield"] = yields
-    SyncJob.objects.create(
+    search = ("done" if metadata["plan"] else "skipped") if started else "pending"
+    when = timezone.now() - timedelta(days=days_ago)
+    job = SyncJob.objects.create(
         user=user,
         job_type="repository_discovery",
         status=status,
-        started_at=timezone.now() - timedelta(days=days_ago),
+        started_at=when if started else None,
+        steps={"queries": "done" if started else "pending", "search": search},
         metadata=metadata,
     )
+    SyncJob.objects.filter(pk=job.pk).update(created_at=when)  # auto_now_add on create
+    return job
 
 
 def run_command(*args: str) -> str:
@@ -128,7 +169,7 @@ def test_command_reads_finished_runs_only() -> None:
 
     output = run_command()
 
-    assert "3 finished runs, 1 without per-query yield" in output
+    assert "3 finished runs, 0 without a search, 1 without per-query yield" in output
     assert "language_search" in output and "interest_search" in output
     assert "topic_search" not in output  # an active run is left out
     assert "no_license 9" in output
@@ -142,6 +183,32 @@ def test_command_window() -> None:
     output = run_command("--since", "30")
     assert "skill_search" in output and "language_search" not in output
     assert "No recorded search requests." in run_command("--since", "1")
+
+
+@pytest.mark.django_db
+def test_window_includes_never_started_runs() -> None:
+    user = UserFactory()
+    discovery_job(user, "CANCELLED", None, days_ago=2, started=False)
+    discovery_job(user, "CANCELLED", None, days_ago=40, started=False)
+    assert "1 finished runs, 1 without a search, 0 without" in run_command("--since", "7")
+    assert "2 finished runs, 2 without a search, 0 without" in run_command()
+
+
+@pytest.mark.django_db
+def test_load_tells_runs_without_a_search_from_runs_without_yield(
+    django_assert_num_queries,
+) -> None:
+    user = UserFactory()
+    discovery_job(user, "CANCELLED", None, started=False)
+    discovery_job(user, "COMPLETED", None, plan=[])  # planned no query
+    discovery_job(user, "FAILED", None)  # searched before the yield was recorded
+    discovery_job(user, "CANCELLED", None, finished=False)  # cancelled in its first request
+    discovery_job(user, "COMPLETED", queries(ran("skill_search", 30, {}, 30)))
+    with django_assert_num_queries(1):
+        runs = load(timezone.now() - timedelta(days=7))
+    report = build(runs)
+    assert (report.runs, report.runs_without_search, report.runs_without_yield) == (5, 3, 1)
+    assert report.total.requests == 1
 
 
 @pytest.mark.django_db
@@ -168,6 +235,7 @@ def test_json_report_is_aggregates_only(tmp_path) -> None:
     assert set(report) == {
         "since_days",
         "runs",
+        "runs_without_search",
         "runs_without_yield",
         "total",
         "strategies",

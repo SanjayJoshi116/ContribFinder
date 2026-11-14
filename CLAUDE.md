@@ -1993,6 +1993,60 @@ ISV-9 accepted). One `/simplify` and one fix-diff `/code-review` over the combin
   `several_technologies >= many_technologies` and `long_body >= ISSUE_BODY_MAX_CHARS`.
 - `contribution_type_evidence` always carries `taxonomy`.
 
+**Discovery fixes, review sweep: services/discovery** (MVP+, fix release)  ✅ shipped in v0.12.64 (ranking-visible through data)
+
+Archived: `openspec/changes/archive/2026-11-14-services-discovery-review-fixes/`. Spec: delta to
+`repository-discovery` ("Search queries from the developer profile", "Discovery provenance",
+"Discovery yield report"). `Bug_Backlog.md` batch 59 (DSC-1, DSC-2, DSC-4…DSC-8 fixed; DSC-3
+false positive). One `/simplify` (`Bug_Backlog.md` batch 61, SIM4-1…SIM4-8) and one fix-diff `/code-review` (batch 62, CR5-1…CR5-8) over the combined 0.12.64–0.12.65 code, fixed before release.
+`/security-review`: nothing. Baselines unchanged (benchmarks store candidates).
+- `queries.allocate`: leftover slots by largest remainder (`budget * share % total`), ties in
+  `STRATEGIES` order, positive shares only; carry and wrap unchanged.
+- `plan_queries` maps each skill/interest query key to its topic (`searched_topic`) and
+  allocates until the covered topics are the planned ones (starts with all covered; the set
+  only shrinks, CR5-1).
+- `DiscoveryService._search_started() -> datetime | None` (`search_started_at`) is the one
+  "seen this run" boundary: pruning returns 0 without it; `_record` reads the cached
+  `_seen_since` (else `self.now`), so a retry or later run is a new service in tests.
+- `filters.stored_result_not_code(result, repo, cfg)` (`suspected_list`, then
+  `stored_not_code`) is the search step's not-code check (dependencies read only for a
+  suspected list); `prefilter` returns before reading stored
+  dependencies when another rule rejected.
+- `yield_report.load` returns `Run(query_yield, first_finished)` from three JSON key transforms
+  (`query_yield`, `queries_done[0]`, `queries_skipped[0]`), window on
+  `Coalesce(started_at, created_at)`. A run searched when a query finished (CR5-4):
+  `runs_without_search` apart from `runs_without_yield`. Tests build inputs with
+  `searched(yields)`.
+
+**Matching fixes, review sweep: services/matching** (MVP+, fix release)  ✅ shipped in v0.12.65 (ranking-visible through data)
+
+Archived: `openspec/changes/archive/2026-11-14-services-matching-review-fixes/`. Specs: deltas to
+`repository-activity` ("Activity label"), `recommendation-engine` ("Relevance signals"),
+`recommendation-explanations` ("Reasons from scoring evidence"). `Bug_Backlog.md` batch 60
+(MAT-1…MAT-5, MAT-7, MAT-8 fixed; MAT-6 rejected by design). One `/simplify` (`Bug_Backlog.md` batch 61, SIM4-1…SIM4-8) and one fix-diff `/code-review` (batch 62, CR5-1…CR5-8) over the combined 0.12.64–0.12.65 code, fixed before release. `/security-review`: nothing. Baselines unchanged.
+- `activity.activity_label`: `_meets(count, threshold)` per count; `recently_active` needs a known count
+  meeting its threshold, `moderately_active` accepts an unknown one.
+- `activity.current(snapshot_days, captured_at, pushed_at, commits, merged, now, thresholds) ->
+  (days, label)`: days from `Repository.pushed_at`, else snapshot days plus whole days since
+  capture (`_days_since`, also used by `compute_activity`). `load_candidates(profile, *, include_dismissed=False, now=None)` builds `SnapshotData`
+  from it under the current `ACTIVITY_THRESHOLDS`; generation passes its `now` and stores
+  `Recommendation.activity_label` from the loaded data. Stored snapshots are never relabeled.
+  A test double of `load_candidates` must accept `**kwargs`.
+- `features.OWN_REPOSITORY_SOURCES` (language, topic, dependency) is what `repo_count` counts;
+  `test_own_repository_sources_read_only_owned_repositories` guards the collectors.
+- `skill_match` evidence keeps `weight * confidence > 0`. Guard test
+  `test_matching_key_lists_match_configuration_validation` (openness flags, activity labels, tech
+  sources vs `ranking/config.py`).
+- Every reader shows activity as generation scores it (CR5-2): `features.current_activity(
+  snapshot, pushed_at, now)` for the saved list and the detail facts (`now` = `generated_at`
+  there); `repositories.queries.with_current_activity(snapshots, now, thresholds)`
+  (`current_days`, `current_label`) is its SQL form for the discovery pool (filter and paging
+  in SQL); `test_sql_activity_matches_python` keeps the two in step. A fixture storing a label
+  must also store data that gives it (`test_discovery_api.snapshot`).
+- Test fixture `test_recommendation_generation.ready_repo(label=...)` stores activity data that
+  gives its label (`ACTIVITY_DATA`, checked by `test_activity_data_gives_its_label`), since
+  labels are recomputed at generation.
+
 **K-1 no longer gates ranking changes** (owner decision, 2026-10-28). Judging `real-a-v2` and
 building `benchmark-v2` is optional. A ranking change (B-6, D-11, T-11, † ideas) still needs an
 OpenSpec change, must be an improvement on the selection benchmark (`benchmark-v1` until
@@ -2019,7 +2073,7 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63), services/discovery review fixes (0.12.64), services/matching review fixes (0.12.65).
 
 ## 8. Release housekeeping
 

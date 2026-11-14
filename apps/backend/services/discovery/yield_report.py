@@ -2,7 +2,8 @@
 repository-discovery "Discovery yield report"; change discovery-search-yield, design D3).
 
 ``load`` is the one query; ``build`` is pure. Reads only each finished run's ``query_yield``
-(written by the search step): never query text, users, jobs or repositories, so the report holds
+(written by the search step) and its first finished query key, to tell runs without a search
+apart: never query text, users, jobs or repositories, so the report holds
 aggregates only.
 """
 
@@ -13,7 +14,9 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, NamedTuple
+
+from django.db.models.functions import Coalesce
 
 from jobs.models import SyncJob
 from services.evaluation.metrics import PLACES
@@ -78,7 +81,8 @@ class YieldRow:
 @dataclass(frozen=True)
 class YieldReport:
     runs: int  # finished runs in the window
-    runs_without_yield: int  # finished before query yield was recorded; in no figure
+    runs_without_search: int  # planned nothing or ended before searching; in no figure
+    runs_without_yield: int  # searched before query yield was recorded; in no figure
     total: YieldRow
     strategies: tuple[YieldRow, ...]
     bands: tuple[YieldRow, ...]
@@ -89,6 +93,7 @@ class YieldReport:
         return {
             "since_days": self.since_days,
             "runs": self.runs,
+            "runs_without_search": self.runs_without_search,
             "runs_without_yield": self.runs_without_yield,
             "total": self.total.as_dict(),
             "strategies": [row.as_dict() for row in self.strategies],
@@ -119,33 +124,50 @@ def _band_key(band: str) -> tuple[int, str]:
     return (int(low.group()) if low else 10**12, band)
 
 
-def load(since: datetime | None) -> list[dict[str, Any] | None]:
-    """The ``query_yield`` of every finished discovery run in the window (by start), None for a
-    run that recorded none. One query; active runs are left out."""
+class Run(NamedTuple):
+    """What the report reads of one finished run: its query yield and the first query it
+    finished (done, or refused by GitHub), None when no query finished."""
+
+    query_yield: Mapping[str, QueryYield] | None
+    first_finished: str | None
+
+    @property
+    def searched(self) -> bool:
+        # A run that planned nothing, or ended before its first query finished, made no search;
+        # one that finished queries without a yield ran before the yield was recorded (CR5-4).
+        return bool(self.query_yield) or self.first_finished is not None
+
+
+def load(since: datetime | None) -> list[Run]:
+    """Every finished discovery run in the window (by start, or creation for a run that never
+    started). One query, reading three JSON keys (never the rest of the metadata); active runs
+    are left out."""
     jobs = SyncJob.objects.filter(
         job_type=SyncJob.JobType.REPOSITORY_DISCOVERY, status__in=SyncJob.TERMINAL_STATUSES
     ).order_by()
     if since is not None:
-        jobs = jobs.filter(started_at__gte=since)
-    return [
-        (metadata or {}).get("query_yield") for metadata in jobs.values_list("metadata", flat=True)
-    ]
+        jobs = jobs.alias(window=Coalesce("started_at", "created_at")).filter(window__gte=since)
+    rows = jobs.values_list(
+        "metadata__query_yield", "metadata__queries_done__0", "metadata__queries_skipped__0"
+    )
+    return [Run(found, done if done is not None else refused) for found, done, refused in rows]
 
 
-def build(
-    runs: Iterable[Mapping[str, QueryYield] | None], *, since_days: int | None = None
-) -> YieldReport:
+def build(runs: Iterable[Run], *, since_days: int | None = None) -> YieldReport:
     total = _Tally()
     by_strategy: dict[str, _Tally] = {}
     by_band: dict[str, _Tally] = {}
     by_both: dict[tuple[str, str], _Tally] = {}
-    count = without = 0
+    count = without_search = without = 0
     for run in runs:
         count += 1
-        if not run:
+        if not run.searched:
+            without_search += 1
+            continue
+        if not run.query_yield:
             without += 1
             continue
-        for found in run.values():
+        for found in run.query_yield.values():
             source = str(found.get("source", ""))
             band = str(found.get("band") or ALL_BANDS)
             for tally in (
@@ -157,6 +179,7 @@ def build(
                 tally.add(found)
     return YieldReport(
         runs=count,
+        runs_without_search=without_search,
         runs_without_yield=without,
         total=_row("total", total),
         strategies=tuple(_row(s, by_strategy[s]) for s in sorted(by_strategy, key=_strategy_key)),

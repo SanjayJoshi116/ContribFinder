@@ -439,6 +439,32 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.65 - Matching fixes (review sweep: services/matching)
+============================================================================
+
+Matching (Bug_Backlog.md batch 60)
+  [x] Activity measured at generation: push age now, label under current thresholds
+  [x] Score, activity reason and activity filter share one label; snapshots unchanged
+  [x] An unknown activity count is never treated as 0
+  [x] "Your repositories" counts only owned repositories, not contributions
+  [x] Skill reason names only technologies that added to the score
+  [x] Saved list, discovery pool and detail facts show the same activity as the recommendation
+  [x] Guard test keeps matching key lists in step with configuration validation
+
+============================================================================
+SHIPPED - v0.12.64 - Discovery fixes (review sweep: services/discovery)
+============================================================================
+
+Repository discovery (Bug_Backlog.md batch 59)
+  [x] A recurring own-repository topic is searched when its skill or interest query is cut,
+      also when a later allocation round cuts it
+  [x] Better rank kept for one query in two bands, also across a retried run
+  [x] Leftover budget slots by largest remainder (default split unchanged)
+  [x] Yield report window counts never-started runs; runs without a search on their own line
+  [x] Yield report reads only the metadata keys it needs
+  [x] Stored dependencies read only when no other filter rule rejected the repository
+
+============================================================================
 SHIPPED - v0.12.63 - Issue analysis fixes (review sweep: services/issues)
 ============================================================================
 

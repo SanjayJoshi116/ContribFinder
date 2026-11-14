@@ -3,15 +3,24 @@ database; everything downstream works on these frozen values."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 
-from django.db.models import Count, Exists, Min, OuterRef
+from django.db.models import Count, Exists, Min, OuterRef, Q
+from django.utils import timezone
 
-from developers.models import DeveloperInterest, DeveloperProfile, DeveloperSkill
+from developers.models import DeveloperInterest, DeveloperProfile, DeveloperSkill, SkillSource
 from feedback.models import DismissedRepository
 from repositories.models import RepositoryCandidate, RepositorySnapshot
 from repositories.queries import latest_snapshot
 from services.repositories.lifecycle import SCORABLE
+
+from .activity import current, default_thresholds
+
+# Evidence collectors that read the developer's own repositories (D3): only these count as
+# "your repositories"; contributions are someone else's.
+OWN_REPOSITORY_SOURCES = (SkillSource.LANGUAGE, SkillSource.TOPIC, SkillSource.DEPENDENCY)
 
 
 @dataclass(frozen=True)
@@ -19,7 +28,7 @@ class SkillFeature:
     confidence: float
     category: str
     name: str
-    repo_count: int  # repositories the developer's evidence for it comes from
+    repo_count: int  # the developer's own repositories its evidence comes from
 
 
 @dataclass(frozen=True)
@@ -62,7 +71,13 @@ def load_developer(profile: DeveloperProfile) -> DeveloperFeatures:
     skills = (
         DeveloperSkill.objects.filter(profile=profile)
         .select_related("skill")
-        .annotate(repo_count=Count("evidence__repository", distinct=True))
+        .annotate(
+            repo_count=Count(
+                "evidence__repository",
+                distinct=True,
+                filter=Q(evidence__source__in=OWN_REPOSITORY_SOURCES),
+            )
+        )
     )
     interests = DeveloperInterest.objects.filter(profile=profile).select_related("interest")
     return DeveloperFeatures(
@@ -76,11 +91,14 @@ def load_developer(profile: DeveloperProfile) -> DeveloperFeatures:
 
 
 def load_candidates(
-    profile: DeveloperProfile, *, include_dismissed: bool = False
+    profile: DeveloperProfile, *, include_dismissed: bool = False, now: datetime | None = None
 ) -> list[RepoData]:
     """The developer's scorable candidates: eligible repositories that finished analysis
     (stale data included) and, unless ``include_dismissed``, that the user has not dismissed.
+    Activity is measured at ``now`` under the current thresholds (``activity.current``).
     A fixed number of queries whatever the pool size."""
+    now = now or timezone.now()
+    thresholds = default_thresholds()
     candidates = RepositoryCandidate.objects.filter(
         developer=profile, repository__lifecycle__in=SCORABLE, repository__is_eligible=True
     )
@@ -116,19 +134,45 @@ def load_candidates(
                 has_issue_templates=bool(repo.has_issue_templates),
                 has_good_first_issue_label=bool(repo.has_good_first_issue_label),
                 has_help_wanted_label=bool(repo.has_help_wanted_label),
-                snapshot=_snapshot(latest),
+                snapshot=_snapshot(latest, repo.pushed_at, now, thresholds),
                 best_search_rank=candidate.best_rank,
             )
         )
     return result
 
 
-def _snapshot(snapshot: RepositorySnapshot | None) -> SnapshotData | None:
+def current_activity(
+    snapshot: RepositorySnapshot,
+    pushed_at: datetime | None,
+    now: datetime,
+    thresholds: Mapping[str, int] | None = None,
+) -> tuple[int | None, str]:
+    """A stored snapshot's push age and label as of ``now`` under the current thresholds
+    (``activity.current``): the one way every reader shows activity (generation, saved list,
+    detail facts; the discovery list uses its SQL form, ``repositories.queries``)."""
+    return current(
+        snapshot_days=snapshot.days_since_push,
+        captured_at=snapshot.captured_at,
+        pushed_at=pushed_at,
+        commits=snapshot.commits_90d,
+        merged_prs=snapshot.prs_merged_90d,
+        now=now,
+        thresholds=default_thresholds() if thresholds is None else thresholds,
+    )
+
+
+def _snapshot(
+    snapshot: RepositorySnapshot | None,
+    pushed_at: datetime | None,
+    now: datetime,
+    thresholds: Mapping[str, int],
+) -> SnapshotData | None:
     if snapshot is None:
         return None
+    days, label = current_activity(snapshot, pushed_at, now, thresholds)
     return SnapshotData(
-        activity_label=snapshot.activity_label,
-        days_since_push=snapshot.days_since_push,
+        activity_label=label,
+        days_since_push=days,
         commits_90d=snapshot.commits_90d,
         prs_merged_90d=snapshot.prs_merged_90d,
         contributors=snapshot.contributors,

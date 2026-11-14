@@ -14,6 +14,7 @@ from issues.models import ContributionType, Difficulty, RecommendedIssue
 from jobs.serializers import SyncJobSerializer
 from repositories.models import ActivityLabel, Repository, RepositorySnapshot
 from repositories.serializers import CandidateRepositorySerializer
+from services.matching.features import current_activity
 from services.profiling.text import plain_text
 
 from .models import MatchLabel, Recommendation, RecommendationReason, RepositorySize
@@ -230,8 +231,13 @@ class RecommendationDetailSerializer(RecommendationSerializer):
 
     @extend_schema_field(ActivitySignalsSerializer(allow_null=True))
     def get_activity_signals(self, obj: Recommendation) -> dict[str, Any] | None:
+        """The latest snapshot's signals, with the push age as the recommendation's activity
+        label and reason measured it (at generation), so the page never contradicts itself."""
         snapshots = obj.repository.latest_snapshots  # type: ignore[attr-defined]
-        return ActivitySignalsSerializer(snapshots[0]).data if snapshots else None
+        if not snapshots:
+            return None
+        days, _ = current_activity(snapshots[0], obj.repository.pushed_at, obj.generated_at)
+        return {**ActivitySignalsSerializer(snapshots[0]).data, "days_since_push": days}
 
 
 class RecommendationStatusSerializer(serializers.Serializer[dict[str, Any]]):

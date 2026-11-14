@@ -112,7 +112,7 @@ class RecommendationService:
         try:
             dev = load_developer(profile)
             # Only matched issues can make an attempt fail, so candidates are loaded once.
-            candidates = load_candidates(profile)
+            candidates = load_candidates(profile, now=now)
             for _ in range(MAX_ATTEMPTS):
                 self._check_cancelled()
                 # Uncut: dismissals made while ranking are dropped before the top N is taken.

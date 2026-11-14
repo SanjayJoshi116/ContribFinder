@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from django.conf import settings
 from django.db.models import (
     Case,
     Count,
@@ -14,6 +15,7 @@ from django.db.models import (
     Value,
     When,
 )
+from django.utils import timezone
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import ListAPIView
@@ -35,7 +37,7 @@ from .models import (
     RepositoryCandidate,
     RepositorySnapshot,
 )
-from .queries import SNAPSHOT_NEWEST_FIRST
+from .queries import SNAPSHOT_NEWEST_FIRST, with_current_activity
 from .serializers import DiscoveryStatusSerializer, RepositoryCandidateSerializer
 
 
@@ -105,11 +107,14 @@ class CandidateListView(ListAPIView[RepositoryCandidate]):
     def get_queryset(self) -> QuerySet[RepositoryCandidate]:
         if getattr(self, "swagger_fake_view", False):  # schema generation: no request user
             return RepositoryCandidate.objects.none()
-        latest_label = (
-            RepositorySnapshot.objects.filter(repository=OuterRef("repository"))
-            .order_by(*SNAPSHOT_NEWEST_FIRST)
-            .values("activity_label")[:1]
-        )
+        # The label as of now under the current thresholds, as generation scores it (CR5-2).
+        latest_label = with_current_activity(
+            RepositorySnapshot.objects.filter(repository=OuterRef("repository")).order_by(
+                *SNAPSHOT_NEWEST_FIRST
+            ),
+            timezone.now(),
+            settings.ACTIVITY_THRESHOLDS,
+        ).values("current_label")[:1]  # type: ignore[misc]  # annotated by the helper
         state = Case(
             When(repository__is_eligible=True, then=Value(0)),
             When(repository__is_eligible__isnull=True, then=Value(1)),

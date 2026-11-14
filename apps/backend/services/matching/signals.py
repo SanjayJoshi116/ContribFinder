@@ -44,7 +44,8 @@ def skill_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
     total = sum(t.weight for t in techs.values())
     if total <= 0:
         return ZERO
-    matched = [(t, dev.confidence(t.slug)) for t in techs.values() if dev.confidence(t.slug) > 0]
+    # Only technologies that add to the value (a weight-0 source adds nothing) are evidence.
+    matched = [(t, c) for t in techs.values() if t.weight > 0 and (c := dev.confidence(t.slug)) > 0]
     value = sum(t.weight * c for t, c in matched) / total
     matched.sort(key=lambda tc: (-tc[0].weight * tc[1], tc[0].slug))
     evidence = [
@@ -57,7 +58,7 @@ def skill_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
 def language_match(techs: Mapping[str, Tech], dev: DeveloperFeatures) -> Signal:
     """Code share in languages the developer knows, weighted by their confidence."""
     languages = [t for t in techs.values() if t.category == LANGUAGE and t.share]
-    matched = [(t, dev.confidence(t.slug)) for t in languages if dev.confidence(t.slug) > 0]
+    matched = [(t, c) for t in languages if (c := dev.confidence(t.slug)) > 0]
     value = sum((t.share or 0.0) * c for t, c in matched)
     matched.sort(key=lambda tc: (-(tc[0].share or 0.0), tc[0].slug))
     evidence = [

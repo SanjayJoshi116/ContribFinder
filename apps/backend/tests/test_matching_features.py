@@ -56,6 +56,7 @@ def test_latest_snapshot_languages_and_topics(profile) -> None:
             activity_label=label,
             thresholds_version="x",
             contributors=12,
+            commits_90d=42 if label == "recently_active" else 0,
         )
     add_candidate(profile, repo)
     [data] = load_candidates(profile)
@@ -63,6 +64,55 @@ def test_latest_snapshot_languages_and_topics(profile) -> None:
     assert data.topics == ("django",)
     assert data.has_contributing is True
     assert data.snapshot is not None and data.snapshot.activity_label == "recently_active"
+
+
+def snapshot_of(repo, captured_at, **fields: Any) -> RepositorySnapshot:
+    return RepositorySnapshot.objects.create(
+        **{
+            "repository": repo,
+            "captured_at": captured_at,
+            "stars": 1,
+            "forks": 0,
+            "open_issues": 0,
+            "days_since_push": 0,
+            "commits_90d": 42,
+            "prs_merged_90d": 9,
+            "activity_label": "recently_active",
+            "thresholds_version": "x",
+            **fields,
+        }
+    )
+
+
+def test_activity_measured_at_load(profile) -> None:
+    now = timezone.now()
+    captured = now - timedelta(days=40)
+    repo = ready_repo(1, pushed_at=captured)  # refresh kept failing since
+    stored = snapshot_of(repo, captured)
+    add_candidate(profile, repo)
+    [data] = load_candidates(profile, now=now)
+    assert data.snapshot is not None
+    assert (data.snapshot.days_since_push, data.snapshot.activity_label) == (
+        40,
+        "moderately_active",
+    )
+    stored.refresh_from_db()
+    assert (stored.days_since_push, stored.activity_label) == (0, "recently_active")
+
+
+def test_threshold_change_applies_before_a_refresh(profile, settings) -> None:
+    now = timezone.now()
+    repo = ready_repo(1, pushed_at=now - timedelta(days=3))
+    snapshot_of(repo, now - timedelta(hours=1), days_since_push=3)
+    add_candidate(profile, repo)
+    settings.ACTIVITY_THRESHOLDS = {
+        **settings.ACTIVITY_THRESHOLDS,
+        "recent_commits": 50,
+        "recent_merged_prs": 50,
+    }
+    [data] = load_candidates(profile, now=now)
+    assert data.snapshot is not None and data.snapshot.activity_label == "moderately_active"
+    assert RepositorySnapshot.objects.get().activity_label == "recently_active"
 
 
 def test_query_count_does_not_grow(profile) -> None:
@@ -92,3 +142,60 @@ def test_developer_features(profile) -> None:
     assert features.skills["python"].confidence == 0.9
     assert features.skills["python"].repo_count == 2
     assert features.confidence("rust") == 0.0
+
+
+def test_repository_count_is_own_repositories_only(profile) -> None:
+    skill = Skill.objects.create(slug="django", name="Django", category="framework")
+    ds = DeveloperSkill.objects.create(profile=profile, skill=skill, confidence=0.8)
+    SkillEvidence.objects.create(
+        developer_skill=ds, source="dependency", repository=make_candidate_repo(1)
+    )
+    for i, source in ((2, "pull_request"), (3, "repeated_contribution")):
+        SkillEvidence.objects.create(
+            developer_skill=ds, source=source, repository=make_candidate_repo(i)
+        )
+    assert load_developer(profile).skills["django"].repo_count == 1
+
+
+def test_sql_activity_matches_python(settings) -> None:
+    """`repositories.queries.with_current_activity` (discovery list) and
+    `features.current_activity` (generation, saved list, detail) agree (CR5-2)."""
+    from itertools import product
+
+    from repositories.queries import with_current_activity
+    from services.matching.features import current_activity
+
+    now = timezone.now()
+    thresholds = settings.ACTIVITY_THRESHOLDS
+    pushes = [None, now - timedelta(days=3), now - timedelta(days=40, hours=12)]
+    rows = []
+    for i, pushed_at in enumerate(pushes, start=1):
+        repo = ready_repo(i, pushed_at=pushed_at)
+        for days, captured, commits, merged in product(
+            (None, 0, 5),
+            (now - timedelta(hours=1), now - timedelta(days=7, hours=12), now - timedelta(days=95)),
+            (None, 0, 42),
+            (None, 0, 9),
+        ):
+            rows.append(
+                RepositorySnapshot(
+                    repository=repo,
+                    captured_at=captured,
+                    stars=1,
+                    forks=0,
+                    open_issues=0,
+                    days_since_push=days,
+                    commits_90d=commits,
+                    prs_merged_90d=merged,
+                    activity_label="low_activity",
+                    thresholds_version="x",
+                )
+            )
+    RepositorySnapshot.objects.bulk_create(rows)
+    annotated = with_current_activity(
+        RepositorySnapshot.objects.select_related("repository"), now, thresholds
+    )
+    for snapshot in annotated:
+        expected = current_activity(snapshot, snapshot.repository.pushed_at, now, thresholds)
+        got = (snapshot.current_days, snapshot.current_label)  # type: ignore[attr-defined]
+        assert got == expected, snapshot.pk

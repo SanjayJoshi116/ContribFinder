@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.conf import settings
 
@@ -68,32 +69,67 @@ def activity_label(
     merged_prs: int | None,
     thresholds: Mapping[str, int],
 ) -> str:
+    """An unknown count (None) is never 0: ``recently_active`` needs a known count meeting its
+    threshold; ``moderately_active`` accepts an unknown count, as with both unknown."""
     if days_since_push is None:
         return ActivityLabel.LOW_ACTIVITY
-    counts_unknown = commits is None and merged_prs is None
-    commits_n, merged_n = commits or 0, merged_prs or 0
-    if (
-        not counts_unknown
-        and days_since_push <= thresholds["recent_push_days"]
-        and (
-            commits_n >= thresholds["recent_commits"] or merged_n >= thresholds["recent_merged_prs"]
-        )
+    if days_since_push <= thresholds["recent_push_days"] and (
+        _meets(commits, thresholds["recent_commits"])
+        or _meets(merged_prs, thresholds["recent_merged_prs"])
     ):
         return ActivityLabel.RECENTLY_ACTIVE
     if days_since_push <= thresholds["moderate_push_days"] and (
-        counts_unknown
-        or commits_n >= thresholds["moderate_commits"]
-        or merged_n >= thresholds["moderate_merged_prs"]
+        commits is None
+        or merged_prs is None
+        or _meets(commits, thresholds["moderate_commits"])
+        or _meets(merged_prs, thresholds["moderate_merged_prs"])
     ):
         return ActivityLabel.MODERATELY_ACTIVE
     return ActivityLabel.LOW_ACTIVITY
+
+
+def current(
+    snapshot_days: int | None,
+    captured_at: datetime,
+    pushed_at: datetime | None,
+    commits: int | None,
+    merged_prs: int | None,
+    now: datetime,
+    thresholds: Mapping[str, int],
+) -> tuple[int | None, str]:
+    """Days since the last push measured at ``now`` and the label under ``thresholds``
+    (change services-matching-review-fixes, D1). The repository's ``pushed_at`` when known;
+    otherwise the snapshot's days aged by the days since its capture, rounded up."""
+    if pushed_at is not None:
+        days: int | None = _days_since(pushed_at, now)
+    elif snapshot_days is not None:
+        # The capture floored its push age, so the true age may be a day more: round the time
+        # since capture up, never claiming a push younger than it was (CR5-5).
+        days = snapshot_days + _whole_days_up(captured_at, now)
+    else:
+        days = None
+    return days, activity_label(days, commits, merged_prs, thresholds)
+
+
+def _meets(count: int | None, threshold: int) -> bool:
+    return count is not None and count >= threshold
+
+
+def _days_since(then: datetime, now: datetime) -> int:
+    """Whole days from ``then`` to ``now``, never negative."""
+    return max((now - then).days, 0)
+
+
+def _whole_days_up(then: datetime, now: datetime) -> int:
+    """Days from ``then`` to ``now`` with any part of a day counted whole, never negative."""
+    return max(math.ceil((now - then) / timedelta(days=1)), 0)
 
 
 def compute_activity(
     data: ActivityData, now: datetime, thresholds: Mapping[str, int] | None = None
 ) -> ActivitySignals:
     thresholds = thresholds if thresholds is not None else default_thresholds()
-    days = max((now - data.pushed_at).days, 0) if data.pushed_at else None
+    days = _days_since(data.pushed_at, now) if data.pushed_at else None
     return ActivitySignals(
         captured_at=now,
         stars=data.stars,

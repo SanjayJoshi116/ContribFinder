@@ -44,7 +44,10 @@ Round 6 (2026-10-22), from the `performance-cleanup` review and `/simplify` pass
   runs as `ROW_NUMBER()` over every snapshot of the prefetched repositories. The `-id` index
   tie-break shipped (v0.12.11) and the remaining sort was accepted as bounded (Q-10, v0.12.13:
   0.4 ms; `DISTINCT ON` still sorts on PostgreSQL 18). Keeping the activity fields (or a
-  pointer to the newest snapshot) on `Repository` would remove the read entirely.
+  pointer to the newest snapshot) on `Repository` would remove the read entirely. Since
+  v0.12.65 every reader computes the label when it reads (`features.current_activity`, SQL form
+  `repositories.queries.with_current_activity`; `Bug_Backlog.md` MAT-1, CR5-2): store the counts
+  and the capture time, never a label, and keep the parity test.
 
 ## Freshness and client
 
@@ -388,6 +391,8 @@ discovery run; also §12 and §13.
   move budget between strategies or bands, or give a high-yield query a second page. Each of these
   changes what users are recommended, so it must win on the benchmark and show its gain in the
   report.
+  Since v0.12.64 shares split by largest remainder and the report counts runs without a search
+  apart (`Bug_Backlog.md` DSC-4, DSC-5), so a share change behaves as configured.
 
 ### 6. Retrieval sources
 

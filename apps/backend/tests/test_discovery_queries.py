@@ -149,6 +149,53 @@ def test_shares_are_weights_when_budget_differs() -> None:
     assert sum(allocate(5, CFG.shares, dict.fromkeys(CFG.shares, 10)).values()) == 5
 
 
+def test_leftover_slots_go_by_largest_remainder() -> None:
+    shares = {"language": 1, "skill": 1, "interest": 1, "topic": 9}
+    assert allocate(5, shares, dict.fromkeys(shares, 10)) == {
+        "language": 1,  # ties with skill and interest: strategy order
+        "skill": 0,
+        "interest": 0,
+        "topic": 4,
+    }
+
+
+def test_leftover_slots_skip_zero_shares() -> None:
+    shares = {"language": 0, "skill": 1, "interest": 1, "topic": 0}
+    assert allocate(3, shares, dict.fromkeys(shares, 10)) == {
+        "language": 0,
+        "skill": 2,
+        "interest": 1,
+        "topic": 0,
+    }
+
+
+# Skill strategy room for 3 queries; topic room for 1.
+CUT = replace(CFG, max_queries=5, shares={"language": 1, "skill": 3, "interest": 0, "topic": 1})
+CUT_SKILLS = [
+    skill(s, 0.9 - i * 0.01)
+    for i, s in enumerate(["python", "django", "react", "docker", "fastapi"])
+]
+CUT_TOPICS = [("fastapi", "cli")] * 2 + [("fastapi",)]
+
+
+def test_cut_skill_query_does_not_hide_its_topic() -> None:
+    plan = plan_queries(data(CUT_SKILLS, topics=CUT_TOPICS), CUT)
+    assert [c for c in cores(plan) if c[0] != "language_search"] == [
+        ("skill_search", "topic:django language:Python"),
+        ("skill_search", "topic:react"),
+        ("skill_search", "topic:docker"),
+        ("topic_search", "topic:fastapi"),  # before: excluded, so `cli` took the slot
+    ]
+
+
+def test_planned_skill_query_covers_its_topic() -> None:
+    cfg = replace(CUT, max_queries=6, shares={"language": 1, "skill": 4, "interest": 0, "topic": 1})
+    plan = plan_queries(data(CUT_SKILLS, topics=CUT_TOPICS), cfg)
+    assert ("skill_search", "topic:fastapi language:Python") in cores(plan)
+    assert [c for c in cores(plan) if c[0] == "topic_search"] == [("topic_search", "topic:cli")]
+    assert plan == plan_queries(data(CUT_SKILLS, topics=CUT_TOPICS), cfg)
+
+
 def test_deterministic() -> None:
     d = data([skill("python"), skill("django")], [("ai-ml", 0.5)], [("cli", "x")] * 2)
     assert plan_queries(d, CFG) == plan_queries(d, CFG)
@@ -212,3 +259,23 @@ def test_default_settings_plan_ten_queries_in_two_bands() -> None:
     cfg = QueryConfig.from_settings()
     assert cfg.max_queries == 20 and cfg.bands == ((20, 999), (1000, None))
     assert [band_label(b) for b in cfg.bands] == ["20..999", "1000+"]
+
+
+def test_topic_of_a_query_cut_in_a_later_pass_is_still_searched() -> None:
+    """CR5-1: a topic counted as covered by a skill query that a later allocation round cuts
+    must come back to topic search."""
+    from services.discovery.queries import _primary_topic
+    from services.profiling.taxonomy import SKILLS_BY_SLUG
+
+    slugs = [
+        "django", "react", "fastapi", "docker", "kubernetes",
+        "redis", "flask", "terraform", "postgresql", "mongodb",
+    ]  # fmt: skip
+    skills = [skill(s, 0.9 - i * 0.01) for i, s in enumerate(slugs)]
+    ninth, tenth = (_primary_topic(SKILLS_BY_SLUG[s]) for s in slugs[8:])
+    recurring = ("x-topic", ninth, tenth)
+    cfg = replace(CFG, shares={"language": 2, "skill": 4, "interest": 2, "topic": 2})
+    plan = plan_queries(data(skills, topics=[recurring] * 2), cfg)
+    searched = {q.core.split()[0].removeprefix("topic:") for q in plan}
+    assert set(recurring) <= searched
+    assert len({q.core for q in plan}) == len(plan)  # no core planned twice

@@ -26,12 +26,16 @@ def profile(user) -> DeveloperProfile:
 
 
 def snapshot(repo, label: str) -> None:
+    """A snapshot whose counts give ``label`` for a repository pushed 3 days ago (the list
+    labels activity as of now from the data, not the stored label)."""
     RepositorySnapshot.objects.create(
         repository=repo,
         captured_at=timezone.now(),
         stars=1,
         forks=0,
         open_issues=0,
+        commits_90d=42 if label == "recently_active" else 0,
+        prs_merged_90d=0,
         activity_label=label,
         thresholds_version="x",
     )

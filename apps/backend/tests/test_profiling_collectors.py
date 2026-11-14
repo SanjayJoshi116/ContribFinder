@@ -1,4 +1,5 @@
 from collections import Counter
+from typing import Any
 
 from services.profiling.collectors import (
     contribution_skills,
@@ -26,6 +27,23 @@ def test_language_evidence_per_repository() -> None:
 def test_minor_language_ignored_primary_kept() -> None:
     r = repo(languages={"Python": 9800, "Shell": 200, "Go": 50}, primary_language="Go")
     assert set(keys(language_skills(profile(owned=(r,)), 0.10))) == {"python", "go"}
+
+
+def test_own_repository_sources_read_only_owned_repositories() -> None:
+    """`features.OWN_REPOSITORY_SOURCES` count as "your repositories" (MAT-2): their
+    collectors must never pass a repository the developer only contributed to."""
+    from services.matching.features import OWN_REPOSITORY_SOURCES
+
+    stack: dict[str, Any] = {
+        "languages": {"Python": 900},
+        "topics": ("django",),
+        "deps": (("pypi", "django", "requirements.txt"),),
+    }
+    owned = repo(**stack)
+    p = profile(owned=(owned,), contributions=(contribution(prs=3, **stack),))
+    collected = language_skills(p, 0.10) + topic_skills(p) + dependency_skills(p)
+    assert {e.source for e in collected} == set(OWN_REPOSITORY_SOURCES)
+    assert {e.repository_id for e in collected} == {owned.id}
 
 
 def test_unmapped_language_ignored() -> None:

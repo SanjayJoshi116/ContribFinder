@@ -87,16 +87,16 @@ def prefilter(
         now=now,
         cfg=cfg,
     )
-    if reason is None and check_stars and repo.stars < cfg.min_stars:
+    if reason is not None:
+        return reason
+    if check_stars and repo.stars < cfg.min_stars:
         return FEW_STARS
     # A stored repository (previously interacted) brings its dependencies; a search result has
-    # none, so a suspected list passes here and the stored row is checked after storing.
+    # none, so a suspected list passes here and ``stored_result_not_code`` checks it once stored.
     stored = stored_has_dependencies(repo) if isinstance(repo, Repository) else None
-    if reason is None and not_code(
-        repo.full_name, _topics(repo), repo.primary_language, cfg, has_dependencies=stored
-    ):
+    if not_code(repo.full_name, _topics(repo), repo.primary_language, cfg, has_dependencies=stored):
         return NOT_CODE
-    return reason
+    return None
 
 
 def eligibility(
@@ -167,6 +167,16 @@ def stored_not_code(
         has_dependencies=(
             stored_has_dependencies(repo) if has_dependencies is None else has_dependencies
         ),
+    )
+
+
+def stored_result_not_code(result: RepoLike, repo: Repository, cfg: FilterConfig) -> bool:
+    """``not_code`` for a search result that passed ``prefilter`` and was just stored as
+    ``repo``: the result's topics, the stored row's dependencies (an earlier analysis may have
+    found it is a list). Dependencies are read only for a suspected list."""
+    topics = _topics(result)  # the row's topic rows are the result's, without a query
+    return suspected_list(result.full_name, topics, cfg) and stored_not_code(
+        repo, cfg, topics=topics
     )
 
 

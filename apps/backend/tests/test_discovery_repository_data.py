@@ -14,6 +14,7 @@ from core.checks import discovery_config_check
 from developers.models import DeveloperInterest, DeveloperSkill
 from e2e.builders import add_candidate, fresh_repo, make_candidate_repo
 from feedback.models import DismissedRepository, SavedRepository
+from jobs.models import SyncJob
 from repositories.models import (
     CandidateDiscovery,
     Repository,
@@ -449,16 +450,40 @@ def test_cancelled_run_writes_nothing_in_the_pool_step(user, developer) -> None:
     assert RepositoryCandidate.objects.filter(repository=stale).exists()
 
 
+def service_at(job, developer, now) -> DiscoveryService:
+    """One attempt of ``job`` (a retry or a later run is a new service, with its own clock)."""
+    service = DiscoveryService(job)
+    service.profile, service.now = developer, now
+    return service
+
+
 def test_same_query_in_two_bands_keeps_the_better_rank(user, developer) -> None:
     repo = make_candidate_repo(953, "o/edge")
-    job = new_job(user)
-    service = DiscoveryService(job)
-    service.profile, service.now = developer, timezone.now()
+    now = timezone.now()
+    first = new_job(user)
+    service = service_at(first, developer, now)
     service._record(repo, "language_search", "language:Python", 2)  # 20..999 band
     service._record(repo, "language_search", "language:Python", 25)  # 1000+ band, same run
     assert CandidateDiscovery.objects.get().search_rank == 2
-    service.now += timedelta(days=1)  # a later run: its rank replaces the old one
-    service._record(repo, "language_search", "language:Python", 25)
+    SyncJob.objects.filter(pk=first.pk).update(status="COMPLETED")
+    later = service_at(new_job(user), developer, now + timedelta(days=1))
+    later._record(repo, "language_search", "language:Python", 25)  # its rank replaces the old
+    assert CandidateDiscovery.objects.get().search_rank == 25
+
+
+def test_better_rank_kept_across_a_retry(user, developer) -> None:
+    repo = make_candidate_repo(954, "o/retried")
+    started = timezone.now()
+    job = new_job(user, metadata={"search_started_at": started.isoformat()})
+    service_at(job, developer, started)._record(repo, "skill_search", "topic:django", 2)
+    retry = service_at(job, developer, started + timedelta(minutes=5))  # after a rate limit
+    retry._record(repo, "skill_search", "topic:django", 25)  # 1000+ band
+    assert CandidateDiscovery.objects.get().search_rank == 2
+    # A rank from an earlier run is still replaced.
+    next_day = started + timedelta(days=1)
+    SyncJob.objects.filter(pk=job.pk).update(status="COMPLETED")
+    later = new_job(user, metadata={"search_started_at": next_day.isoformat()})
+    service_at(later, developer, next_day)._record(repo, "skill_search", "topic:django", 25)
     assert CandidateDiscovery.objects.get().search_rank == 25
 
 
