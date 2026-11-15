@@ -7,6 +7,191 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.75] - 2026-11-15
+
+Fixes from the fix-diff review of 0.12.70–0.12.74 (`Bug_Backlog.md` batch 72, CR7-1…CR7-10).
+The fixes follow the existing specs, so there is no OpenSpec change. No API, OpenAPI, migration or
+ranking change. No e2e run.
+
+### Fixed
+
+- `feedback_report --config V` takes back undone decisions again. A restore (no version) and an
+  unsave under a later version undo a decision of `V`. Before, the version filter in the query
+  dropped those undo events (CR7-1).
+- Errors from a job's follow-up task, sent after the commit, are logged and no longer escape
+  the finished job. One example is an inline task failing in eager mode. The job stays
+  COMPLETED and job recovery re-sends the PENDING follow-up (CR7-2).
+- A job with a follow-up hook locks the user's active jobs in pk order before it finishes.
+  The hook's expiry of stale jobs can no longer deadlock with job recovery or a cancel (CR7-3).
+- Onboarding offers "Sign in with GitHub again" when Try again is rejected for a missing GitHub
+  connection, even after the last sync failed for another reason (CR7-4).
+- A second dismissal counts as in flight from the start of its optimistic update, so the first
+  one no longer refetches the list and briefly brings the second card back (CR7-5).
+- "Couldn't hide." shows only on the page visit where the dismissal failed. Before, it also
+  showed on the recommendation's detail page and on a later visit of the list (CR7-6).
+- A failed dismissal is not put back on a list page when a refetch has moved it to another page
+  of the same list. Before, it was listed twice and counted one too many (CR7-7).
+- A relative time picks its unit after rounding: "1 hour ago", not "60 minutes ago" (CR7-9).
+
+### Changed
+
+- `usePipelineStage` doc matches its caller (CR7-8). The category headings and list names come
+  from one record (CR7-10).
+
+## [0.12.74] - 2026-11-15
+
+Root config fixes from the review sweep, its last module
+(`openspec/changes/archive/2026-11-15-root-config-review-fixes/`; spec `developer-tooling`;
+`Bug_Backlog.md` batch 70, ROOT-1…ROOT-10). No API, OpenAPI, migration or ranking change.
+`/simplify` and fix-diff `/code-review` skipped (owner's call). No e2e run (no browser flow
+change). `docker compose up` not run (Docker not installed here); the compose file parses.
+
+### Fixed
+
+- Docker mode publishes the backend and the frontend on `127.0.0.1` only, so the debug dev
+  server is not reachable from the network (ROOT-1, ROOT-2).
+- The Redis container is no longer published on host port 6379, where it collided with the WSL
+  Redis that `npm start` uses (ROOT-3).
+- Docker mode takes `DJANGO_SETTINGS_MODULE` from `.env`, never from the shell (ROOT-8).
+- Frontend edits on a Windows host reach Vite in the container (`VITE_WATCH_POLLING`) (ROOT-5);
+  the README says how to rebuild after a dependency change (`--renew-anon-volumes`) (ROOT-4).
+- `DJANGO_DEBUG=false` turns debug off with the development settings (ROOT-6).
+- `.env.example` lists the 19 settings it was missing (throttles, sync limits, session age,
+  `SECURE_SSL_REDIRECT`, `GITHUB_OAUTH_REDIRECT_URI`, `EXPERIENCE_THRESHOLDS`, ...), and a test
+  keeps it complete (ROOT-7).
+
+### Changed
+
+- Postgres credentials defined once in the compose file (ROOT-9).
+- Root `package.json`: `npm run format:scripts:write`, and `engines.node >=22` (ROOT-10).
+
+## [0.12.73] - 2026-11-15
+
+Shared component fixes from the review sweep (`openspec/changes/archive/2026-11-15-shared-components-review-fixes/`;
+spec `web-client`; `Bug_Backlog.md` batch 69, CMP-1…CMP-10). Frontend only: no backend, API,
+OpenAPI or migration change. `/simplify` and fix-diff `/code-review` skipped (owner's call).
+`npm run e2e` 11/11 (one new dead-end spec).
+
+### Fixed
+
+- A page that throws while rendering shows "Something went wrong" with Reload and the way back
+  to the dashboard, instead of the router's default error screen; a time the browser cannot read
+  shows as "Unknown" (CMP-1).
+- While a failed first load is retried, the page shows "Loading…", not the failure (CMP-5).
+- A dead end (a recommendation or issue that is gone, a failed load, an invalid link) is a
+  heading that takes keyboard focus; a failed load offers "Try again" (CMP-8).
+- Back to a page opened at a section (`#relevant-issues`) no longer scrolls to and focuses it
+  again; a new visit or a reload still does (CMP-3).
+- A long detail value wraps instead of widening the page (CMP-9).
+
+### Changed
+
+- Both detail pages use one gate, `DetailLoaded` (CMP-7); one `Loading` element replaces the
+  copied "Loading…" paragraphs (CMP-10); `ExternalLink` calls `onOpen` without arguments (CMP-2,
+  latent).
+
+## [0.12.72] - 2026-11-15
+
+Pipeline progress fixes from the review sweep (`openspec/changes/archive/2026-11-15-pipeline-progress-review-fixes/`;
+specs `sync-jobs`, `web-client`; `Bug_Backlog.md` batch 68, PIPE-1…PIPE-10). One backend fix
+(`services/jobs.py`); no API, OpenAPI or migration change. `/simplify` and fix-diff
+`/code-review` skipped (owner's call). `npm run e2e` run (onboarding and dashboard progress).
+
+### Fixed
+
+- A finished job and the follow-up job it starts (discovery after a sync or analysis, a
+  generation after discovery, the generation rerun) are committed together. Before, the SPA could
+  read the previous finished stage, stop polling, and leave the new stage running unobserved
+  (PIPE-1, PIPE-2). A failing follow-up still keeps the job's outcome.
+- The dashboard follows discovery and generation while the profile has no data yet (PIPE-3,
+  partial).
+- Onboarding offers "Sign in with GitHub again" when Start sync is refused because GitHub needs a
+  new sign-in (PIPE-4).
+- A stalled discovery shows the stalled notice instead of "Finding projects…" (PIPE-5); a stalled
+  sync step shows "Stopped" without spinning (PIPE-7).
+- "Last checked" times update each minute, use the browser's language, and never read "in 2
+  minutes" when the server clock is ahead (PIPE-6).
+- An unknown step state reads as pending instead of crashing the page (PIPE-8).
+
+### Changed
+
+- Relative times live in `src/lib/format` (`formatRelative`) (PIPE-9); one GitHub failure table
+  for sync and discovery messages (PIPE-10).
+
+## [0.12.71] - 2026-11-14
+
+Profile page fixes from the review sweep (`openspec/changes/archive/2026-11-14-profile-ui-review-fixes/`; spec `developer-profile`;
+`Bug_Backlog.md` batch 67, PRF-1…PRF-10). Frontend only: no backend, API, OpenAPI or migration
+change. `/simplify` and fix-diff `/code-review` skipped (owner's call). No e2e run (no browser
+flow change).
+
+### Fixed
+
+- Expanded skills and interests stay expanded when a re-analysis refreshes the profile: they are
+  keyed by slug, since each analysis recreates the rows with new ids (PRF-1).
+- The language skill list and the languages chart have distinct names ("Language skills",
+  "Languages by code") (PRF-3).
+- Skills expand with a native disclosure, like interests: no `aria-controls` pointing at a
+  missing element (PRF-5, PRF-8). A truncated skill name shows in full on hover (PRF-9).
+- The languages chart orders rows by bytes and folds into "Other" only when two or more
+  languages are left; a single leftover is shown by name (PRF-6).
+- Interest evidence shows when it was observed, as skill evidence does (PRF-7).
+- A skill's evidence label is never empty (PRF-4, latent).
+
+### Changed
+
+- Category order comes from the category labels, so every category is shown (PRF-2, latent);
+  one shared evidence row for skills and interests (PRF-7); the profile data version uses the
+  profile query keys (PRF-10).
+
+## [0.12.70] - 2026-11-14
+
+Feedback interface fixes from the review sweep (`openspec/changes/archive/2026-11-14-feedback-ui-review-fixes/`; spec `recommendation-feedback`;
+`Bug_Backlog.md` batch 66, FBK-1…FBK-10). Frontend only: no backend, API, OpenAPI or migration
+change. `/simplify` and fix-diff `/code-review` skipped (owner's call). `npm run e2e` 10/10.
+
+### Fixed
+
+- A failed save, unsave or dismiss reverts only its own card. Before, it wrote back every cached
+  list page, so another card's confirmed dismissal came back (FBK-1).
+- A failed dismissal puts the card back at its place, with its count (FBK-1).
+- Each dismissal gets its own undo notice: a failed undo of one project no longer shows on the
+  next (FBK-2).
+- The undo notice stays open while an undo is pending; a failed undo keeps it 10 seconds from the
+  failure, so "Undo didn't work." is always seen (FBK-4).
+- A dismissal confirmed after the user left the detail page no longer pulls them back to the
+  list (FBK-3).
+- Failed save, unsave, dismiss, remove, restore and "Show more" now say so next to the control
+  ("Couldn't save.", "Couldn't hide.", ...); trying again clears it (FBK-5).
+
+### Changed
+
+- The saved page gates both lists with `Loaded`; `recommendationsRootKey` replaces the typed-out
+  key; both query cancels run together (FBK-8…FBK-10).
+
+## [0.12.69] - 2026-11-14
+
+Fixes from the fix-diff `/code-review` (high) of the uncommitted 0.12.66–0.12.68 code
+(`Bug_Backlog.md` batch 71, CR6-1…CR6-6; owner: fix all). No OpenSpec change, as batch 62: the
+fixes follow the existing specs. No API, OpenAPI or migration change; baselines unchanged.
+
+### Fixed
+
+- Feedback report: an undo cancels the action it undoes whatever its version. A restore records
+  no version and an unsave after a regeneration a later one, so before, undone dismissals and
+  saves still counted as outcomes.
+- Two overlapping dismissals could each leave the list refetch to the other, so neither
+  refetched it. The list is now refetched once no dismissal awaits its answer.
+- An empty recommendation list no longer shows "Loading…" during every background refetch or
+  next to a running generation.
+- The freshness sweep skips only broker errors; a database error fails the beat task.
+
+### Changed
+
+- Issues are matched again when issue fit and difficulty fit both weigh 0: matched issues are
+  shown, not only scored (reverts RNK-9).
+- `baseline.write` no longer checks dataset locations itself; `check_source` is the one rule.
+
 ## [0.12.68] - 2026-11-14
 
 Recommendations view fixes from the review sweep

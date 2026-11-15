@@ -56,7 +56,9 @@ describe('RouteId', () => {
     'renders the dead end for %s',
     (param) => {
       renderAt(`/things/${param}`)
-      expect(screen.getByRole('alert')).toHaveTextContent('No such thing.')
+      const heading = screen.getByRole('heading', { level: 1 })
+      expect(heading).toHaveTextContent('No such thing.')
+      expect(heading).toHaveFocus()
       expect(screen.getByRole('link', { name: 'Back to your dashboard' })).toHaveAttribute(
         'href',
         '/app',

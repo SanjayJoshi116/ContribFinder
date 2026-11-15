@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
 
-import { DeadEnd } from '@/components/DeadEnd'
+import type { IssueDetail } from '@/api/types'
 import { ExternalLink } from '@/components/ExternalLink'
 import { Fact } from '@/components/Fact'
+import { DetailLoaded } from '@/components/Loaded'
 import { recordFeedback } from '@/features/feedback/api'
 import { CONTRIBUTION_TYPE_TEXT, difficultyText } from '@/features/recommendations/messages'
 import { MatchBadge } from '@/features/recommendations/RecommendationCard'
@@ -17,23 +18,20 @@ const NO_TECHNOLOGIES = 'No technologies mentioned'
 /** One relevant issue: GitHub's data kept visibly apart from ContribFinder's analysis. The
  * description is shown as plain text (React escapes it), never rendered as HTML. */
 export function IssueDetailPage({ id }: { id: number }) {
-  const issue = useIssue(id)
-
-  if (issue.isPending) return <p className="text-muted-foreground">Loading…</p>
   // A failed refetch keeps the issue shown; a 404 means it left the recommendation (FI-3).
-  if (!issue.data || issue.error?.status === 404) {
-    return (
-      <DeadEnd
-        message={
-          issue.error?.status === 404
-            ? 'This issue is no longer among your relevant issues. Issues change as projects are refreshed.'
-            : 'Could not load this issue. Please refresh the page.'
-        }
-      />
-    )
-  }
+  return (
+    <DetailLoaded
+      query={useIssue(id)}
+      gone="This issue is no longer among your relevant issues. Issues change as projects are refreshed."
+      failed="Could not load this issue."
+    >
+      {(issue) => <IssueView issue={issue} />}
+    </DetailLoaded>
+  )
+}
 
-  const { github, analysis, id: issueId } = issue.data
+function IssueView({ issue }: { issue: IssueDetail }) {
+  const { github, analysis, id: issueId } = issue
   const { recommendation } = analysis
   const basis = difficultyBasis(analysis)
   return (

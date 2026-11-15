@@ -77,3 +77,15 @@ test('the way back from a detail page returns to the list page it was opened fro
   await expect(page).toHaveURL(/\/app\?page=2$/)
   await expect(page.getByText('Page 2')).toBeVisible()
 })
+
+test('a missing recommendation is a dead end with a focused heading', async ({
+  page,
+  signInAs,
+}) => {
+  await signInAs('e2e-dashboard')
+  await page.goto('/app/recommendations/999999999')
+  const heading = page.getByRole('heading', { level: 1, name: /no longer exists/ })
+  await expect(heading).toBeFocused()
+  await page.getByRole('link', { name: 'Back to your dashboard' }).click()
+  await expect(page.getByRole('heading', { name: 'Skills' })).toBeVisible()
+})

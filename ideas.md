@@ -446,7 +446,7 @@ Newest first.
 | Setup readiness (CI, tests, dev container, Docker Compose at the root) | §8 | v0.12.24 (shown, never scored; root only) |
 | Dismiss reasons (optional, reported per config) | §4 | v0.12.23 (never scored) |
 | Match-label calibration in the feedback report | §4 | v0.12.21 (raw shares per label; bands unchanged) |
-| Online feedback report per config (`feedback_report`) | §4 | v0.12.20 (shares of decisive actions; no impressions) |
+| Online feedback report per config (`feedback_report`) | §4 | v0.12.20 (shares of decisive actions; no impressions); undo across versions v0.12.69, also with `--config` v0.12.75 |
 | Bootstrap intervals in the evaluation report | §3 | v0.12.19 (information only; no gate) |
 | Activation off the request path (admin points to the command) | §17 | v0.12.18 (S-6; no tracked job) |
 | Job status keys outside `['profile']` | §17 | v0.12.15 (S-9) |

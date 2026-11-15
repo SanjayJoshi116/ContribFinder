@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router'
 import { useDataVersions } from '@/app/dataVersions'
 import { Button } from '@/components/ui/button'
 import { useAccountActionPending, useLogout, useSignedInUser } from '@/features/auth/api'
+import { PageVisit, useVisitOf } from '@/features/feedback/visit'
 
 export function SignedInLayout() {
   const me = useSignedInUser()
@@ -13,6 +14,7 @@ export function SignedInLayout() {
   const { pathname, search, hash } = useLocation()
   const route = pathname + search + hash
   const previousRoute = useRef(route)
+  const visit = useVisitOf(route)
 
   // Every route change asks which derived data changed; the mount fetch covers the first one.
   // Compared with the previous route, so Back to the first page counts (ROUTE-1), and a
@@ -46,7 +48,9 @@ export function SignedInLayout() {
         </p>
       )}
       <main className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
-        <Outlet context={me} />
+        <PageVisit value={visit}>
+          <Outlet context={me} />
+        </PageVisit>
       </main>
     </div>
   )

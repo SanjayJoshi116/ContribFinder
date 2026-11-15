@@ -32,9 +32,9 @@ def rank_pool(
 ) -> list[Scored]:
     """Rank a developer's candidates under one configuration. ``issues_for`` is called once,
     with the ids of the candidates that pass the relevance gate, and only when the
-    configuration matches issues (v1 does not) and weights issue fit or difficulty fit above
-    0. ``min_score`` is the installation default: a configuration's own ``min_score`` (and
-    ``min_score_basis``) wins."""
+    configuration matches issues (v1 does not). Also when both issue weights are 0: matched
+    issues are shown, not only scored. ``min_score`` is the installation default: a
+    configuration's own ``min_score`` (and ``min_score_basis``) wins."""
     computed = []
     for repo in candidates:
         techs = repository_technologies(
@@ -42,8 +42,6 @@ def rank_pool(
         )
         computed.append((repo, techs, sig.compute(repo, techs, dev, params)))
     issue_params = params.get("issues")
-    if not (weights.get("issue_fit", 0.0) > 0 or weights.get("difficulty_fit", 0.0) > 0):
-        issue_params = None  # nothing to gain from matching issues: every candidate NO_MATCH
     issues = (
         issues_for([repo.id for repo, _, signals in computed if has_relevance(signals, weights)])
         if issue_params

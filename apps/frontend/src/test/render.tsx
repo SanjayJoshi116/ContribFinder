@@ -266,8 +266,9 @@ export function discoveryJob(status: string, error_code = '') {
   }
 }
 
-const page = (results: unknown[]) =>
-  json({ count: results.length, next: null, previous: null, results })
+/** One page of a paginated list response with `results`; `extra` overrides fields. */
+export const page = (results: unknown[], extra: Record<string, unknown> = {}) =>
+  json({ count: results.length, next: null, previous: null, results, ...extra })
 
 /** Handlers for a user whose GitHub data has been synced and analyzed. */
 export const SYNCED_USER: Record<string, Handler> = {

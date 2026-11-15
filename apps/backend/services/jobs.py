@@ -16,6 +16,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import F, Q, QuerySet
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from kombu.exceptions import OperationalError as BrokerError
 
 from accounts.models import User
 from github.models import GitHubAccount
@@ -126,7 +127,9 @@ def run_tracked_job(
     """Claim a job, run it, and translate failures through ``decide_retry`` into a Celery
     retry or a terminal FAILED state. ``on_completed`` runs once the job is COMPLETED,
     ``on_failed`` once it is FAILED for good (never on a scheduled retry or a cancel); their
-    errors are logged and never change the job's outcome.
+    errors are logged and never change the job's outcome. The hook runs in the transaction that
+    ends the job, so the follow-up job it starts is committed with the outcome: a status read
+    never sees the job finished without its follow-up (PIPE-1). Its tasks are sent on commit.
 
     Without a worker (eager mode) nothing is retried inline: a retryable error fails the job
     with the code it would get after its last attempt (D4)."""
@@ -166,28 +169,72 @@ def run_tracked_job(
                 raise task.retry(countdown=decision.countdown) from None
             return
         logger.warning("Job %s failed: %s (%s)", job_id, decision.code, type(exc).__name__)
-        failed = finish_job(
+        _finish_and_follow_up(
             job,
             Status.FAILED,
+            on_failed,
             error_code=decision.code,
             error_detail=_safe_detail(exc),
             completed_at=timezone.now(),
         )
-        if failed:
-            _follow_up(on_failed, job)
         return
 
-    if finish_job(
-        job, Status.COMPLETED, error_code="", error_detail="", completed_at=timezone.now()
-    ):
-        _follow_up(on_completed, job)
+    _finish_and_follow_up(
+        job,
+        Status.COMPLETED,
+        on_completed,
+        error_code="",
+        error_detail="",
+        completed_at=timezone.now(),
+    )
+
+
+def _finish_and_follow_up(
+    job: SyncJob, status: str, hook: Callable[[SyncJob], None] | None, **fields: Any
+) -> None:
+    """End the job and run its hook in one transaction (job lock first, as `services/locks.py`).
+
+    With a hook, every active job of the user is locked first, in pk order, as ``_end_jobs``
+    does: the hook may expire the user's stale jobs (``_expire_stale``), and taking those locks
+    after the finishing job's own would deadlock with recovery or a cancel.
+
+    The hook's tasks are sent on commit, outside its savepoint: any error from sending (a broker
+    that refuses it) or from running one inline (eager mode) is logged, as a failing hook is.
+    The job is ended, and job recovery re-sends a PENDING follow-up."""
+    committed = False
+
+    def mark_committed() -> None:
+        nonlocal committed
+        committed = True
+
+    try:
+        with transaction.atomic():
+            transaction.on_commit(mark_committed)  # runs before the hook's callbacks
+            if hook is not None:
+                list(
+                    SyncJob.objects.filter(user_id=job.user_id, status__in=SyncJob.ACTIVE_STATUSES)
+                    .order_by("pk")
+                    .select_for_update()
+                    .values_list("pk", flat=True)
+                )
+            if finish_job(job, status, **fields):
+                _follow_up(hook, job)
+    except Exception as exc:
+        if not committed:
+            raise
+        if isinstance(exc, BrokerError):
+            logger.exception("Follow-up task of job %s not queued", job.pk)
+        else:
+            logger.exception("Follow-up of job %s failed", job.pk)
 
 
 def _follow_up(hook: Callable[[SyncJob], None] | None, job: SyncJob) -> None:
+    """Run ``hook`` in a savepoint: a failing hook rolls back only its own writes."""
     if hook is None:
         return
     try:
-        hook(job)
+        with transaction.atomic():
+            hook(job)
     except Exception:
         logger.exception("Follow-up of job %s failed", job.pk)
 

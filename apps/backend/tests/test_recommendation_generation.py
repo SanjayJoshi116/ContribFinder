@@ -4,7 +4,9 @@ from datetime import timedelta
 from typing import cast
 
 import pytest
+from django.db import OperationalError as DatabaseOperationalError
 from django.utils import timezone
+from kombu.exceptions import OperationalError as BrokerError
 
 from accounts.models import User
 from developers.models import (
@@ -664,10 +666,21 @@ def test_sweep_continues_past_a_failing_start(user, developer, pool, monkeypatch
         # error raises out of it; tests run inside one, so it is raised here.
         tried.append(user.pk)
         if len(tried) == 1:
-            raise ConnectionError("broker down")
+            raise BrokerError("broker down")
         return real_start(user, **kwargs)
 
     monkeypatch.setattr(freshness, "start_recommendations", start)
     assert freshness.start_due_generations() == 1
     assert sorted(tried) == sorted([user.pk, other.pk])
     assert SyncJob.objects.filter(job_type="recommendation_generation").count() == 1
+
+
+def test_sweep_fails_on_a_database_error(user, developer, pool, monkeypatch) -> None:
+    """Only broker errors are skipped: a database error fails the beat task."""
+
+    def start(user, **kwargs):
+        raise DatabaseOperationalError("connection lost")
+
+    monkeypatch.setattr(freshness, "start_recommendations", start)
+    with pytest.raises(DatabaseOperationalError):
+        freshness.start_due_generations()

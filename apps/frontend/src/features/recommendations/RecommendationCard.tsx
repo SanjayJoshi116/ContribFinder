@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router'
+import { Link } from 'react-router'
 
 import type { Recommendation } from '@/api/types'
 import { ExternalLink } from '@/components/ExternalLink'
@@ -11,7 +11,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { ACTIVITY_TEXT, MATCH_TEXT, setupLine } from './messages'
-import { listState } from './navigation'
+import type { FromList } from './navigation'
 
 const MAX_TECHNOLOGIES = 8
 const MAX_REASONS = 3
@@ -61,12 +61,14 @@ export function TechnologyChips({
 export function RecommendationCard({
   recommendation,
   onDismissed,
+  back,
 }: {
   recommendation: Recommendation
   onDismissed: (project: DismissedProject) => void
+  /** Navigation state for the detail links: the list page and filters to return to. */
+  back: FromList
 }) {
   const { repository, reasons, activity_label } = recommendation
-  const back = listState(useLocation().search)
   const headingId = `recommendation-${recommendation.id}`
   const setup = setupLine(recommendation.setup)
   return (

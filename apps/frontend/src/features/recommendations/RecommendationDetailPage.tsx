@@ -2,13 +2,17 @@ import { useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
 import type { RecommendationDetail } from '@/api/types'
-import { DeadEnd } from '@/components/DeadEnd'
 import { ExternalLink } from '@/components/ExternalLink'
 import { Fact } from '@/components/Fact'
+import { DetailLoaded } from '@/components/Loaded'
 import { recordFeedback } from '@/features/feedback/api'
 import { formatDate } from '@/lib/format'
 import { useScrollToHash } from '@/lib/useScrollToHash'
-import { DismissButton, SaveButton } from '@/features/feedback/RecommendationActions'
+import {
+  type DismissedProject,
+  DismissButton,
+  SaveButton,
+} from '@/features/feedback/RecommendationActions'
 
 import { useRecommendation } from './api'
 import { RelevantIssues } from './RelevantIssues'
@@ -101,6 +105,14 @@ export function RecommendationDetailPage({ id }: { id: number }) {
   const loadedId = recommendation.data?.id
   const viewed = useRef<number | null>(null)
   useScrollToHash(recommendation.isSuccess)
+  // A dismissal confirmed after the user left this page must not pull them back to the list.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   // One view per page visit (the backend also de-duplicates within a window).
   useEffect(() => {
@@ -110,21 +122,35 @@ export function RecommendationDetailPage({ id }: { id: number }) {
     }
   }, [loadedId])
 
-  if (recommendation.isPending) return <p className="text-muted-foreground">Loading…</p>
   // A failed refetch keeps the page; a 404 means the recommendation is gone (CR-1).
-  if (!recommendation.data || recommendation.error?.status === 404) {
-    return (
-      <DeadEnd
-        message={
-          recommendation.error?.status === 404
-            ? 'This recommendation no longer exists. Recommendations change as your profile and projects are refreshed.'
-            : 'Could not load this recommendation. Please refresh the page.'
-        }
-      />
-    )
-  }
+  return (
+    <DetailLoaded
+      query={recommendation}
+      gone="This recommendation no longer exists. Recommendations change as your profile and projects are refreshed."
+      failed="Could not load this recommendation."
+    >
+      {(rec) => (
+        <RecommendationView
+          rec={rec}
+          back={back}
+          onDismissed={(project) => {
+            if (mounted.current) void navigate(back, { state: { dismissed: project } })
+          }}
+        />
+      )}
+    </DetailLoaded>
+  )
+}
 
-  const rec = recommendation.data
+function RecommendationView({
+  rec,
+  back,
+  onDismissed,
+}: {
+  rec: RecommendationDetail
+  back: string
+  onDismissed: (project: DismissedProject) => void
+}) {
   const { repository } = rec
   return (
     <>
@@ -149,10 +175,7 @@ export function RecommendationDetailPage({ id }: { id: number }) {
             Open on GitHub
           </ExternalLink>
           <SaveButton recommendation={rec} />
-          <DismissButton
-            recommendation={rec}
-            onDismissed={(project) => navigate(back, { state: { dismissed: project } })}
-          />
+          <DismissButton recommendation={rec} onDismissed={onDismissed} />
         </div>
       </header>
 

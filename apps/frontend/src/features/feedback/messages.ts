@@ -9,3 +9,15 @@ export const DISMISS_REASON_TEXT: Record<DismissReason, string> = {
 }
 
 export const DISMISS_REASONS = Object.keys(DISMISS_REASON_TEXT) as DismissReason[]
+
+/** Shown next to the control whose request failed; cleared when it is tried again. */
+export const FAILED_TEXT = {
+  save: "Couldn't save.",
+  // Unsaving takes the project off the saved list, the same as Remove there.
+  unsave: "Couldn't remove.",
+  dismiss: "Couldn't hide.",
+  remove: "Couldn't remove.",
+  restore: "Couldn't restore.",
+  undo: "Undo didn't work.",
+  more: "Couldn't load more.",
+} as const

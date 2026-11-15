@@ -47,8 +47,12 @@ class Command(BaseCommand):
         if options["minimum"] < 1:
             raise CommandError("--minimum must be at least 1.")
         since = timezone.now() - timedelta(days=since_days) if since_days else None
-        events = feedback_report.load(since, options["config"])
-        report = feedback_report.build(events, minimum=options["minimum"], since_days=since_days)
+        report = feedback_report.build(
+            feedback_report.load(since),
+            minimum=options["minimum"],
+            since_days=since_days,
+            versions=options["config"],
+        )
         self._print(report)
         if options["json"]:
             out = options["json"]

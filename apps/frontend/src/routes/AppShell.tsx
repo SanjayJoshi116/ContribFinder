@@ -5,6 +5,7 @@ import { isActive, isStalled } from '@/app/jobTransitions'
 import { lazyLoaders } from '@/app/lazyLoaders'
 import { formatDateTime } from '@/lib/format'
 import { Loaded } from '@/components/Loaded'
+import { Loading } from '@/components/Loading'
 import { Button } from '@/components/ui/button'
 import { useSignedInUser } from '@/features/auth/api'
 import { DataSection } from '@/features/auth/DataSection'
@@ -41,9 +42,11 @@ export function AppShell() {
   const skills = useSkills(!!developer.data)
   const interests = useInterests(!!developer.data)
   const start = useStartSync()
-  const stage = usePipelineStage()
+  // The discovery card and recommendation list (which poll the stages) need the profile. Not
+  // while it loads: the cards would mount right after and refetch on mount a second time.
+  const stage = usePipelineStage(!developer.isPending && !developer.data)
 
-  if (status.isPending) return <p className="text-muted-foreground">Loading…</p>
+  if (status.isPending) return <Loading />
   // Only without data: a failed poll keeps the page (ROUTE-2).
   if (!status.data) {
     return <p role="alert">Could not load your profile. Please refresh the page.</p>
@@ -138,7 +141,7 @@ export function AppShell() {
             <h2 id="languages-heading" className="font-medium">
               Languages
             </h2>
-            <Suspense fallback={<p className="text-muted-foreground text-sm">Loading…</p>}>
+            <Suspense fallback={<Loading />}>
               <LanguageChart languages={developer.data.languages} />
             </Suspense>
           </section>

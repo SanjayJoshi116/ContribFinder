@@ -1,6 +1,6 @@
 {
   "name": "contribfinder",
-  "version": "0.12.68",
+  "version": "0.12.75",
   "private": true,
   "description": "ContribFinder monorepo: local dev runner (Docker alternative: docker compose up)",
   "type": "module",
@@ -14,6 +14,7 @@
     "test:scripts": "node --test \"scripts/*.test.mjs\"",
     "lint:scripts": "eslint scripts",
     "format:scripts": "prettier --check scripts",
+    "format:scripts:write": "prettier --write scripts",
     "start:redis": "node scripts/redis.mjs",
     "start:worker": "node scripts/worker.mjs",
     "start:beat": "node scripts/beat.mjs",
@@ -26,5 +27,8 @@
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.9"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

@@ -2,6 +2,7 @@ import { useIsMutating } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 
+import { Loading } from '@/components/Loading'
 import { Button } from '@/components/ui/button'
 import { dismissMutationKey } from '@/features/feedback/api'
 import { type DismissedProject, DismissUndo } from '@/features/feedback/RecommendationActions'
@@ -26,6 +27,7 @@ import {
   emptyReason,
   isGenerating,
 } from './messages'
+import { listState } from './navigation'
 import { RecommendationCard } from './RecommendationCard'
 
 const FILTERS: { key: FilterKey; label: string; options: Option[] }[] = [
@@ -93,23 +95,32 @@ export function RecommendationList() {
   )
 
   const page = filters.page ?? 1
+  // Detail links return here: this page and these filters.
+  const back = listState(location.search)
   const results = list.data?.results ?? []
   // A dismissal empties its page at once; only once it is confirmed is the page really empty.
   const dismissing = useIsMutating({ mutationKey: dismissMutationKey }) > 0
   // The previous page's or filter's results, kept on screen until the new ones arrive.
   const stale = list.isPlaceholderData
-  // An empty page is known to be empty only from a server response with nothing pending: a
-  // dismissal in flight, old results shown meanwhile or a refetch under way (after a dismissal
-  // the list is refetched) may still fill it.
-  const settling = dismissing || stale || list.isFetching
+  // An empty page shows "Loading…" while a dismissal is in flight or old results are shown,
+  // not during every background refetch (focus, data versions, generation polling).
+  const settling = dismissing || stale
 
   // A page that no longer exists (dismissals or a regeneration shrank the list, an old link)
   // moves to one that does: past the end → page 1 (the 404 does not say which page is last);
-  // emptied by confirmed dismissals with earlier pages → the previous page.
+  // emptied by confirmed dismissals with earlier pages → the previous page. Moving off an
+  // emptied page also waits for a refetch under way: after a dismissal the list is refetched,
+  // and that may still fill it.
   let recoverTo: number | null = null
   if (page > 1) {
     if (list.isError && list.error.status === 404) recoverTo = 1
-    else if (list.isSuccess && !settling && results.length === 0 && list.data.previous)
+    else if (
+      list.isSuccess &&
+      !settling &&
+      !list.isFetching &&
+      results.length === 0 &&
+      list.data.previous
+    )
       recoverTo = page - 1
   }
   useEffect(() => {
@@ -169,7 +180,9 @@ export function RecommendationList() {
         </form>
       )}
 
-      {dismissed && <DismissUndo project={dismissed} onClose={closeUndo} />}
+      {dismissed && (
+        <DismissUndo key={dismissed.repositoryId} project={dismissed} onClose={closeUndo} />
+      )}
 
       {generating && (
         <p role="status" className="text-muted-foreground text-sm">
@@ -178,7 +191,7 @@ export function RecommendationList() {
       )}
 
       {list.isPending || recoverTo !== null ? (
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <Loading />
       ) : !list.data ? (
         list.error?.code === 'validation_error' ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -193,12 +206,10 @@ export function RecommendationList() {
           </p>
         )
       ) : results.length === 0 ? (
-        settling ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+        generating ? null : settling ? (
+          <Loading />
         ) : (
-          !generating && (
-            <p className="text-muted-foreground text-sm">{emptyReason(status.data, filtered)}</p>
-          )
+          <p className="text-muted-foreground text-sm">{emptyReason(status.data, filtered)}</p>
         )
       ) : (
         <>
@@ -208,6 +219,7 @@ export function RecommendationList() {
                 key={recommendation.id}
                 recommendation={recommendation}
                 onDismissed={setDismissed}
+                back={back}
               />
             ))}
           </div>

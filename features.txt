@@ -439,6 +439,89 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.75 - Fix-diff review of 0.12.70-0.12.74
+============================================================================
+
+Review follow-ups (Bug_Backlog.md batch 72, CR7-1..CR7-10; no OpenSpec change)
+  [x] feedback_report --config keeps undos across versions (restore, later unsave)
+  [x] Job follow-up: send errors after commit logged; user's active jobs locked in pk order
+  [x] Onboarding sign-in after a rejected Try again, whatever the last failure
+  [x] Dismiss: in-flight count from onMutate; rollback skips a list it moved within;
+      inline failure text per page visit (PageVisit)
+  [x] Relative times round before picking the unit; category names from one record
+
+============================================================================
+SHIPPED - v0.12.74 - Root config fixes (review sweep: compose, env template, package.json)
+============================================================================
+
+Docker mode and configuration (Bug_Backlog.md batch 70; last module of the review sweep)
+  [x] Backend and frontend published on loopback only; Redis not published
+  [x] Settings module from .env, not the shell; Postgres credentials once
+  [x] Vite polling in Docker; README rebuild note (--renew-anon-volumes)
+  [x] DJANGO_DEBUG honored by development settings
+  [x] .env.example complete (19 settings added), kept so by a test
+  [x] format:scripts:write; engines.node >=22
+  [~] docker compose up --build from a fresh .env (manual check, Docker not installed here)
+
+============================================================================
+SHIPPED - v0.12.73 - Shared component fixes (review sweep: components + lib)
+============================================================================
+
+Error screen, dead ends and loading (Bug_Backlog.md batch 69)
+  [x] Render errors show "Something went wrong" with Reload and the dashboard link
+  [x] Unreadable times show as "Unknown"
+  [x] Dead ends are focused headings; a failed load offers Try again
+  [x] Loading shown while a failed first load is retried
+  [x] Back to a section link does not scroll again
+  [x] Detail values wrap; one Loading element; one detail-page gate
+
+============================================================================
+SHIPPED - v0.12.72 - Pipeline progress fixes (review sweep: features/sync + discovery)
+============================================================================
+
+Onboarding and dashboard progress (Bug_Backlog.md batch 68)
+  [x] Follow-up job committed with the finished job: no unobserved stage
+  [~] Stages followed while the profile has no data (not while it loads)
+  [x] Onboarding sign-in when Start sync needs it
+  [x] Stalled discovery and stalled sync step say so; unknown step state reads as pending
+  [x] Relative times tick each minute, browser locale, future clamped
+  [x] One GitHub failure table for sync and discovery
+
+============================================================================
+SHIPPED - v0.12.71 - Profile page fixes (review sweep: features/profile)
+============================================================================
+
+Profile page (Bug_Backlog.md batch 67)
+  [x] Expanded skills and interests stay open after a re-analysis
+  [x] Distinct list names: "Language skills", "Languages by code"
+  [x] Skills use a native disclosure; full name on hover
+  [x] Languages sorted by bytes; one leftover language shown by name, not as "Other"
+  [x] Interest evidence shows its observed date; evidence label never empty
+
+============================================================================
+SHIPPED - v0.12.70 - Feedback interface fixes (review sweep: features/feedback)
+============================================================================
+
+Save, dismiss and undo (Bug_Backlog.md batch 66)
+  [x] A failed action reverts only its own card; a failed dismissal returns to its place
+  [x] Failed save, unsave, dismiss, remove, restore and "Show more" say so; retry clears it
+  [x] One undo notice per dismissal; open while an undo runs; a failed undo shown 10 s
+  [x] Detail-page dismissal does not navigate once the user has left the page
+  [x] Saved page gated by Loaded
+
+============================================================================
+SHIPPED - v0.12.69 - Fix-diff review of 0.12.66–0.12.68
+============================================================================
+
+Feedback, ranking and evaluation (Bug_Backlog.md batch 71)
+  [x] Feedback report: undo cancels its action whatever the version (restore, later unsave)
+  [x] Overlapping dismissals always refetch the list once the last is answered
+  [x] Empty list keeps its reason during background refetches and generations
+  [x] Relevant issues matched when both issue weights are 0 (RNK-9 reverted)
+  [x] Freshness sweep skips only broker errors; database errors fail the task
+  [x] One dataset-location rule for baselines (check_source)
+
+============================================================================
 SHIPPED - v0.12.68 - Recommendations view fixes (review sweep: features/recommendations)
 ============================================================================
 

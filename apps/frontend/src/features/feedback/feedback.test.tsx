@@ -12,6 +12,7 @@ import {
   json,
   mockFetch,
   noContent,
+  page,
   renderRoute,
   unauthenticated,
 } from '@/test/render'
@@ -71,9 +72,6 @@ const GENERATED = {
   count: 1,
   config_version: 'v1-deterministic',
 }
-
-const page = (results: unknown[]) =>
-  json({ count: results.length, next: null, previous: null, results })
 
 const WITH_RECOMMENDATION = {
   ...ME_ROUTE,
@@ -801,8 +799,11 @@ describe('pipeline stage line', () => {
         json({ ...NEVER_DISCOVERED, job: { ...discoveryJob('RUNNING'), stalled: true } }),
     })
     renderRoute('/app')
-    expect(await screen.findByText(/Background work stopped/)).toBeInTheDocument()
-    expect(screen.queryByText('Finding projects…')).not.toBeInTheDocument()
+    // The header and the discovery card both say so (PIPE-5).
+    const card = await screen.findByRole('region', { name: 'Project discovery' })
+    expect(await within(card).findByText(/Background work stopped/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Background work stopped/)).toHaveLength(2)
+    expect(screen.queryByText(/finding projects/i)).not.toBeInTheDocument()
   })
 
   it('shows nothing when idle', async () => {
@@ -932,5 +933,382 @@ describe('privacy page', () => {
       'href',
       '/privacy',
     )
+  })
+})
+
+// --- feedback-ui-review-fixes (FBK-1…FBK-5) --------------------------------------------------
+
+const FAIL = () => json({ error: { code: 'server_error', message: 'Down.' } }, 500)
+
+/** A response the test answers later. */
+function later() {
+  let answer: (response: Response) => void = () => {}
+  const response = new Promise<Response>((resolve) => {
+    answer = resolve
+  })
+  return { response, answer: (r: Response) => act(async () => answer(r)) }
+}
+
+const OTHER = {
+  ...RECOMMENDATION,
+  id: 8,
+  repository_id: 80,
+  repository: { ...REPOSITORY, name: 'starlette', full_name: 'encode/starlette' },
+}
+
+const cardNames = () =>
+  screen.getAllByRole('article').map((article) => within(article).getByRole('heading').textContent)
+
+describe('failed feedback actions', () => {
+  it("a failed save does not bring back another card's confirmed dismissal", async () => {
+    const save = later()
+    let dismissed = false
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () =>
+        page(dismissed ? [RECOMMENDATION] : [RECOMMENDATION, OTHER]),
+      'POST /api/v1/recommendations/7/save': () => save.response,
+      'POST /api/v1/recommendations/8/dismiss': () => {
+        dismissed = true
+        return noContent()
+      },
+    })
+    renderRoute('/app')
+    const a = await screen.findByRole('article', { name: 'httpx' })
+    const b = screen.getByRole('article', { name: 'starlette' })
+
+    await userEvent.click(within(a).getByRole('button', { name: 'Save' }))
+    await userEvent.click(within(b).getByRole('button', { name: 'Dismiss' }))
+    expect(await screen.findByText(/hidden encode\/starlette/i)).toBeInTheDocument()
+    await save.answer(FAIL())
+
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    expect(await within(card).findByText("Couldn't save.")).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.queryByRole('article', { name: 'starlette' })).not.toBeInTheDocument()
+  })
+
+  it('puts a card whose dismissal failed back at its place, with an error', async () => {
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION, OTHER]),
+      'POST /api/v1/recommendations/7/dismiss': FAIL,
+    })
+    renderRoute('/app')
+    const a = await screen.findByRole('article', { name: 'httpx' })
+
+    await userEvent.click(within(a).getByRole('button', { name: 'Dismiss' }))
+
+    const back = await screen.findByRole('article', { name: 'httpx' })
+    expect(await within(back).findByText("Couldn't hide.")).toBeInTheDocument()
+    expect(cardNames()).toEqual(['httpx', 'starlette'])
+    expect(within(back).getByRole('button', { name: 'Dismiss' })).toBeEnabled()
+  })
+
+  it("a failed save does not undo another card's unsave", async () => {
+    const save = later()
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION, { ...OTHER, saved: true }]),
+      'POST /api/v1/recommendations/7/save': () => save.response,
+      'DELETE /api/v1/saved/80': () => noContent(),
+    })
+    renderRoute('/app')
+    const a = await screen.findByRole('article', { name: 'httpx' })
+    const c = screen.getByRole('article', { name: 'starlette' })
+
+    await userEvent.click(within(a).getByRole('button', { name: 'Save' }))
+    await userEvent.click(within(c).getByRole('button', { name: 'Saved' }))
+    await waitFor(() => expect(within(c).getByRole('button', { name: 'Save' })).toBeEnabled())
+    await save.answer(FAIL())
+
+    expect(await within(a).findByText("Couldn't save.")).toBeInTheDocument()
+    expect(within(c).getByRole('button', { name: 'Save' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('clears the save error when a retry succeeds', async () => {
+    let calls = 0
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'POST /api/v1/recommendations/7/save': () => (calls++ === 0 ? FAIL() : json({ saved: true })),
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Save' }))
+    expect(await within(card).findByText("Couldn't save.")).toBeInTheDocument()
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Save' }))
+
+    expect(await within(card).findByRole('button', { name: 'Saved' })).toBeEnabled()
+    expect(within(card).queryByText("Couldn't save.")).not.toBeInTheDocument()
+  })
+
+  it('says when unsaving from a card fails', async () => {
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () => page([{ ...RECOMMENDATION, saved: true }]),
+      'DELETE /api/v1/saved/70': FAIL,
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Saved' }))
+    expect(await within(card).findByText("Couldn't remove.")).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Saved' })).toBeEnabled()
+  })
+
+  it('clears the dismiss error when a retry succeeds', async () => {
+    let calls = 0
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () => page(calls > 1 ? [] : [RECOMMENDATION]),
+      'POST /api/v1/recommendations/7/dismiss': () => (calls++ === 0 ? FAIL() : noContent()),
+    })
+    renderRoute('/app')
+    let card = await screen.findByRole('article', { name: 'httpx' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    card = await screen.findByRole('article', { name: 'httpx' })
+    expect(await within(card).findByText("Couldn't hide.")).toBeInTheDocument()
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+
+    expect(await screen.findByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    expect(screen.queryByText("Couldn't hide.")).not.toBeInTheDocument()
+  })
+
+  it('keeps a failed dismissal on the page where it failed', async () => {
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations/7': () => json(DETAIL),
+      'POST /api/v1/recommendations/7/feedback': () => noContent(),
+      'POST /api/v1/recommendations/7/dismiss': FAIL,
+    })
+    const { router } = renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    const back = await screen.findByRole('article', { name: 'httpx' })
+    expect(await within(back).findByText("Couldn't hide.")).toBeInTheDocument()
+
+    await act(() => router.navigate('/app/recommendations/7'))
+    expect(await screen.findByRole('button', { name: 'Dismiss' })).toBeEnabled()
+    expect(screen.queryByText("Couldn't hide.")).not.toBeInTheDocument()
+
+    await act(() => router.navigate(-1))
+    expect(await screen.findByRole('article', { name: 'httpx' })).toBeInTheDocument()
+    expect(screen.queryByText("Couldn't hide.")).not.toBeInTheDocument()
+  })
+
+  it('does not put a failed dismissal back on a page it moved away from', async () => {
+    const dismiss = later()
+    let lists = 0
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      // Later refetches never answer: the cache holds what the rollback wrote.
+      'GET /api/v1/recommendations': () =>
+        lists++ === 0 ? page([RECOMMENDATION, OTHER]) : new Promise<Response>(() => {}),
+      'POST /api/v1/recommendations/7/dismiss': () => dismiss.response,
+    })
+    const { queryClient } = renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('article', { name: 'httpx' })).toBeNull())
+    // A refetch meanwhile moved it to page 2 of the same list.
+    queryClient.setQueryData(['profile', 'recommendations', 'list', '/recommendations?page=2'], {
+      count: 2,
+      next: null,
+      previous: '/api/v1/recommendations',
+      results: [RECOMMENDATION],
+    })
+
+    await dismiss.answer(FAIL())
+    await settle()
+
+    const first = queryClient.getQueryData<{ results: { id: number }[]; count: number }>([
+      'profile',
+      'recommendations',
+      'list',
+      '/recommendations',
+    ])
+    expect(first?.results.map((r) => r.id)).toEqual([8])
+  })
+
+  it('says when dismissing from the detail page fails and stays there', async () => {
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations/7': () => json(DETAIL),
+      'POST /api/v1/recommendations/7/feedback': () => noContent(),
+      'POST /api/v1/recommendations/7/dismiss': FAIL,
+    })
+    const { router } = renderRoute('/app/recommendations/7')
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
+    expect(await screen.findByText("Couldn't hide.")).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/recommendations/7')
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeEnabled()
+  })
+
+  const SAVED_ENTRY = {
+    repository_id: 70,
+    repository: REPOSITORY,
+    saved_at: '2026-09-29T10:00:00Z',
+    activity_label: '',
+    recommendation: null,
+  }
+  const HIDDEN_ENTRY = {
+    repository_id: 72,
+    repository: { ...REPOSITORY, full_name: 'meh/thing', name: 'thing' },
+    dismissed_at: '2026-09-29T11:00:00Z',
+    reason: null,
+  }
+
+  it('says when Remove fails on the saved page, and a retry clears it', async () => {
+    let calls = 0
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/saved?page_size=50': () => page([SAVED_ENTRY]),
+      'GET /api/v1/dismissed?page_size=50': () => page([]),
+      'DELETE /api/v1/saved/70': () => (calls++ === 0 ? FAIL() : noContent()),
+    })
+    renderRoute('/app/saved')
+    const entry = await screen.findByRole('article', { name: 'encode/httpx' })
+    await userEvent.click(within(entry).getByRole('button', { name: 'Remove' }))
+    expect(await within(entry).findByText("Couldn't remove.")).toBeInTheDocument()
+    expect(within(entry).getByRole('button', { name: 'Remove' })).toBeEnabled()
+
+    await userEvent.click(within(entry).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(calls).toBe(2))
+    await waitFor(() =>
+      expect(within(entry).queryByText("Couldn't remove.")).not.toBeInTheDocument(),
+    )
+  })
+
+  it('says when Restore fails on the saved page, and a retry clears it', async () => {
+    let calls = 0
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/saved?page_size=50': () => page([]),
+      'GET /api/v1/dismissed?page_size=50': () => page(calls > 1 ? [] : [HIDDEN_ENTRY]),
+      'DELETE /api/v1/dismissed/72': () => (calls++ === 0 ? FAIL() : noContent()),
+    })
+    renderRoute('/app/saved')
+    const list = await screen.findByRole('list', { name: 'Hidden projects' })
+    const item = within(list).getByRole('listitem')
+    await userEvent.click(within(item).getByRole('button', { name: 'Restore' }))
+    expect(await within(item).findByText("Couldn't restore.")).toBeInTheDocument()
+    expect(within(item).getByRole('button', { name: 'Restore' })).toBeEnabled()
+
+    await userEvent.click(within(item).getByRole('button', { name: 'Restore' }))
+    expect(await screen.findByText('No hidden projects.')).toBeInTheDocument()
+  })
+
+  it('says when "Show more" fails, keeps the entries and lets it be tried again', async () => {
+    let calls = 0
+    const more = {
+      ...HIDDEN_ENTRY,
+      repository_id: 73,
+      repository: { ...REPOSITORY, full_name: 'big/monorepo', name: 'monorepo' },
+    }
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/saved?page_size=50': () => page([]),
+      'GET /api/v1/dismissed?page_size=50': () =>
+        json({
+          count: 2,
+          next: 'http://testserver/api/v1/dismissed?cursor=c1&page_size=50',
+          previous: null,
+          results: [HIDDEN_ENTRY],
+        }),
+      'GET /api/v1/dismissed?page_size=50&cursor=c1': () =>
+        calls++ === 0
+          ? json({ error: { code: 'bad_request', message: 'No.' } }, 400)
+          : json({ count: 2, next: null, previous: null, results: [more] }),
+    })
+    renderRoute('/app/saved')
+    await screen.findByText('meh/thing')
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }))
+
+    expect(await screen.findByText("Couldn't load more.")).toBeInTheDocument()
+    expect(screen.getByText('meh/thing')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }))
+
+    expect(await screen.findByText('big/monorepo')).toBeInTheDocument()
+    expect(screen.queryByText("Couldn't load more.")).not.toBeInTheDocument()
+  })
+})
+
+describe('undo notice lifecycle', () => {
+  it('gives a second dismissal a fresh notice after a failed undo', async () => {
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations': () => page([RECOMMENDATION, OTHER]),
+      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+      'POST /api/v1/recommendations/8/dismiss': () => noContent(),
+      'DELETE /api/v1/dismissed/70': FAIL,
+    })
+    renderRoute('/app')
+    const a = await screen.findByRole('article', { name: 'httpx' })
+    await userEvent.click(within(a).getByRole('button', { name: 'Dismiss' }))
+    const first = await screen.findByText(/hidden encode\/httpx/i)
+    await userEvent.click(within(first.parentElement!).getByRole('button', { name: 'Undo' }))
+    expect(await screen.findByText("Undo didn't work.")).toBeInTheDocument()
+
+    const b = await screen.findByRole('article', { name: 'starlette' })
+    await userEvent.click(within(b).getByRole('button', { name: 'Dismiss' }))
+
+    const second = await screen.findByText(/hidden encode\/starlette/i)
+    expect(screen.queryByText("Undo didn't work.")).not.toBeInTheDocument()
+    expect(within(second.parentElement!).getByRole('button', { name: 'Undo' })).toBeEnabled()
+  })
+
+  async function undoAtNineSeconds(result: () => Response) {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const restore = later()
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'POST /api/v1/recommendations/7/dismiss': () => noContent(),
+      'DELETE /api/v1/dismissed/70': () => restore.response,
+    })
+    renderRoute('/app')
+    const card = await screen.findByRole('article', { name: 'httpx' })
+    await user.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    const notice = await screen.findByText(/hidden encode\/httpx/i)
+    await vi.advanceTimersByTimeAsync(9000)
+    await user.click(within(notice.parentElement!).getByRole('button', { name: 'Undo' }))
+    await vi.advanceTimersByTimeAsync(3000)
+    // Past 10 s from the dismissal, still open: the undo has not answered yet.
+    expect(screen.getByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    await restore.answer(result())
+  }
+
+  it('keeps a slow failed undo visible for 10 s from the failure', async () => {
+    await undoAtNineSeconds(FAIL)
+    expect(await screen.findByText("Undo didn't work.")).toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(9500)
+    expect(screen.getByText(/hidden encode\/httpx/i)).toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(1000)
+    await waitFor(() => expect(screen.queryByText(/hidden encode\/httpx/i)).not.toBeInTheDocument())
+  })
+
+  it('closes the notice when a slow undo succeeds', async () => {
+    await undoAtNineSeconds(noContent)
+    await waitFor(() => expect(screen.queryByText(/hidden encode\/httpx/i)).not.toBeInTheDocument())
+  })
+
+  it('stays where the user went when a detail-page dismissal is confirmed later', async () => {
+    const dismiss = later()
+    mockFetch({
+      ...WITH_RECOMMENDATION,
+      'GET /api/v1/recommendations/7': () => json(DETAIL),
+      'POST /api/v1/recommendations/7/feedback': () => noContent(),
+      'POST /api/v1/recommendations/7/dismiss': () => dismiss.response,
+      'GET /api/v1/saved?page_size=50': () => page([]),
+      'GET /api/v1/dismissed?page_size=50': () => page([]),
+    })
+    const { router } = renderRoute('/app/recommendations/7')
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
+    await act(() => router.navigate('/app/saved'))
+    await dismiss.answer(noContent())
+    await settle()
+
+    expect(router.state.location.pathname).toBe('/app/saved')
   })
 })

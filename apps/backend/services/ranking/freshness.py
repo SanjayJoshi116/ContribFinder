@@ -20,6 +20,7 @@ from django.db.models import Exists, F, OuterRef, Q, Subquery
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Greatest
 from django.utils import timezone
+from kombu.exceptions import OperationalError as BrokerError
 
 from developers.models import DeveloperProfile
 from jobs.models import SyncJob
@@ -43,10 +44,10 @@ def due_profiles() -> list[DeveloperProfile]:
     last_config = completed.annotate(config=KeyTextTransform("config_version", "metadata")).values(
         "config"
     )[:1]
-    active = ScoringConfig.objects.filter(is_active=True).values("pk")[:1]
+    # One reading of the active configuration, by version: recommendations and jobs record it.
     active_version = ScoringConfig.objects.filter(is_active=True).values("version")[:1]
     outdated_config = Recommendation.objects.filter(developer=OuterRef("pk")).exclude(
-        scoring_config=Subquery(active)
+        scoring_config__version=Subquery(active_version)
     )
     candidates = RepositoryCandidate.objects.filter(developer=OuterRef("pk"))
     recommendations = Recommendation.objects.filter(developer=OuterRef("pk"))
@@ -112,9 +113,10 @@ def start_due_generations() -> int:
     for profile in due_profiles():
         try:
             _, created = start_recommendations(profile.user, rerun_if_running=False)
-        except Exception:
-            # One developer's job that cannot be queued (a broker error) must not stop the
-            # sweep for the others; a job left PENDING is re-sent by job recovery.
+        except BrokerError:
+            # One developer's job that cannot be queued must not stop the sweep for the
+            # others; a job left PENDING is re-sent by job recovery. Anything else (a database
+            # error) fails the beat task.
             logger.exception("Could not start the generation for user %s", profile.user_id)
             continue
         started += created

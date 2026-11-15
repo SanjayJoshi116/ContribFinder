@@ -31,14 +31,25 @@ def read(path: Path | None = None) -> dict[str, Any]:
     return data
 
 
+def check_source(source: Path, name: str, path: Path | None = None) -> None:
+    """``BaselineError`` unless the dataset loaded from ``source`` is ``<name>.json`` next to the
+    baselines file, the only place the baseline test and the default rewrite look; checked
+    before evaluating."""
+    expected = (path or BASELINES).parent / f"{name}.json"
+    if source.resolve() != expected.resolve():
+        raise BaselineError(
+            f"{source} is not {expected}, where the baseline test reads {name}; only datasets "
+            "in the evaluation folder are recorded."
+        )
+
+
 def write(reports: Sequence[Report], path: Path | None = None) -> None:
     """Format 4: one entry per dataset with its top N. Each evaluated configuration replaces its
     recorded entry; configurations not evaluated and other datasets keep theirs (design D3). A
     run at a different top N must cover every configuration recorded for the dataset. Raises
-    ``BaselineError`` before writing anything, also for a dataset whose file
-    ``<name>.json`` is not next to the baselines file, since the baseline test and the default
-    rewrite look only there. The file is written whole or not at all; an OS error is a
-    ``CommandError`` naming it."""
+    ``BaselineError`` before writing anything. Callers check each dataset's location first
+    with ``check_source`` (the one location rule). The file is written whole or not at all; an
+    OS error is a ``CommandError`` naming it."""
     path = path or BASELINES
     existing = read(path) if path.exists() else {}
     recorded: dict[str, dict[str, Any]] = {
@@ -48,12 +59,6 @@ def write(reports: Sequence[Report], path: Path | None = None) -> None:
     groups: dict[str, list[Report]] = {}
     for report in reports:
         groups.setdefault(report.dataset, []).append(report)
-    for name in groups:
-        if not (path.parent / f"{name}.json").is_file():
-            raise BaselineError(
-                f"{name}: no dataset file {path.parent / f'{name}.json'}; the baseline test "
-                "reads recorded datasets only from there."
-            )
     for name, group in groups.items():
         sizes = {r.top_n for r in group}
         if len(sizes) != 1:

@@ -7,12 +7,14 @@ import { fetchStatusAndRefresh, isActive } from '@/app/jobTransitions'
 
 // Under ['profile'], so delete-data removes them; the `recommendations` data version
 // refetches them (src/app/dataVersions.ts).
-const ROOT = ['profile', 'recommendations'] as const
+/** Every recommendation query: lists, details, status. */
+export const recommendationsRootKey = ['profile', 'recommendations'] as const
 // Job status keys live under ['jobs'], never ['profile']: the data versions invalidate
 // ['profile'] queries, and a status must not be refetched by them.
 export const recommendationStatusKey = ['jobs', 'recommendations'] as const
-export const recommendationListKey = [...ROOT, 'list'] as const
-export const recommendationDetailKey = (id: number) => [...ROOT, 'detail', id] as const
+export const recommendationListKey = [...recommendationsRootKey, 'list'] as const
+export const recommendationDetailKey = (id: number) =>
+  [...recommendationsRootKey, 'detail', id] as const
 export const RECOMMENDATION_POLL_INTERVAL_MS = 3000
 
 export const FILTER_KEYS = [

@@ -1,11 +1,37 @@
+import { useMutationState } from '@tanstack/react-query'
 import { Bookmark, BookmarkCheck, ChevronDown, EyeOff } from 'lucide-react'
-import { type KeyboardEvent, useEffect, useEffectEvent, useId, useRef, useState } from 'react'
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 
 import type { DismissReason, Recommendation } from '@/api/types'
 import { Button } from '@/components/ui/button'
 
-import { useDismiss, useRestore, useSave, useUnsave } from './api'
-import { DISMISS_REASON_TEXT, DISMISS_REASONS } from './messages'
+import {
+  type DismissVariables,
+  dismissMutationKey,
+  useDismiss,
+  useRestore,
+  useSave,
+  useUnsave,
+} from './api'
+import { DISMISS_REASON_TEXT, DISMISS_REASONS, FAILED_TEXT } from './messages'
+import { usePageVisit } from './visit'
+
+/** Inline text for a failed action, next to its control. */
+export function Failed({ children }: { children: ReactNode }) {
+  return (
+    <span role="status" className="text-destructive text-xs">
+      {children}
+    </span>
+  )
+}
 
 export interface DismissedProject {
   repositoryId: number
@@ -17,23 +43,28 @@ export function SaveButton({ recommendation }: { recommendation: Recommendation 
   const unsave = useUnsave()
   const { saved } = recommendation
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      aria-pressed={saved}
-      // One request at a time: overlapping save and unsave have no order, and each rollback
-      // would restore a snapshot taken before the other.
-      disabled={save.isPending || unsave.isPending}
-      onClick={() =>
-        (saved ? unsave : save).mutate({
-          id: recommendation.id,
-          repositoryId: recommendation.repository_id,
-        })
-      }
-    >
-      {saved ? <BookmarkCheck aria-hidden="true" /> : <Bookmark aria-hidden="true" />}
-      {saved ? 'Saved' : 'Save'}
-    </Button>
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        aria-pressed={saved}
+        // One request at a time: overlapping save and unsave of one card have no order.
+        disabled={save.isPending || unsave.isPending}
+        onClick={() => {
+          save.reset()
+          unsave.reset()
+          ;(saved ? unsave : save).mutate({
+            id: recommendation.id,
+            repositoryId: recommendation.repository_id,
+          })
+        }}
+      >
+        {saved ? <BookmarkCheck aria-hidden="true" /> : <Bookmark aria-hidden="true" />}
+        {saved ? 'Saved' : 'Save'}
+      </Button>
+      {save.isError && <Failed>{FAILED_TEXT.save}</Failed>}
+      {unsave.isError && <Failed>{FAILED_TEXT.unsave}</Failed>}
+    </>
   )
 }
 
@@ -45,11 +76,26 @@ export function DismissButton({
   onDismissed: (project: DismissedProject) => void
 }) {
   const dismiss = useDismiss()
+  const visit = usePageVisit()
+  // A failed dismissal brings the card back as a new component, so the error is read from the
+  // latest dismissal of this recommendation in the mutation cache, not from `dismiss`. Only
+  // from this page visit: a failed mutation stays cached, and its text must not follow the
+  // recommendation to its detail page or to a later visit of the list.
+  const statuses = useMutationState({
+    filters: {
+      mutationKey: dismissMutationKey,
+      predicate: (m) => {
+        const variables = m.state.variables as DismissVariables | undefined
+        return variables?.id === recommendation.id && (variables.visit ?? '') === visit
+      },
+    },
+    select: (m) => m.state.status,
+  })
   // The card holding these buttons is removed optimistically, and mutate()'s per-call
   // callbacks are skipped once the component unmounts; the mutateAsync promise still settles.
   const run = (reason?: DismissReason) =>
     dismiss
-      .mutateAsync({ id: recommendation.id, reason })
+      .mutateAsync({ id: recommendation.id, reason, visit })
       .then(() =>
         onDismissed({
           repositoryId: recommendation.repository_id,
@@ -66,6 +112,7 @@ export function DismissButton({
         Dismiss
       </Button>
       <DismissReasonMenu disabled={dismiss.isPending} onChoose={(reason) => void run(reason)} />
+      {statuses.at(-1) === 'error' && <Failed>{FAILED_TEXT.dismiss}</Failed>}
     </span>
   )
 }
@@ -178,7 +225,9 @@ function DismissReasonMenu({
 
 export const UNDO_TIMEOUT_MS = 10_000
 
-/** "Hidden … Undo" notice shown for a few seconds after a dismissal. */
+/** "Hidden … Undo" notice shown for a few seconds after a dismissal. Keyed by the project, so
+ * each dismissal starts with fresh undo state. An undo in flight keeps it open; a failed one
+ * keeps it 10 s from the failure, so its result is always seen. */
 export function DismissUndo({
   project,
   onClose,
@@ -187,13 +236,15 @@ export function DismissUndo({
   onClose: () => void
 }) {
   const restore = useRestore()
-  // The window runs from the dismissal: a new onClose (the list re-renders on every filter
-  // or page change) must not restart it.
+  // The window runs from the dismissal (this mount): a new onClose (the list re-renders on
+  // every filter or page change) must not restart it.
+  const [deadline, setDeadline] = useState(() => Date.now() + UNDO_TIMEOUT_MS)
   const close = useEffectEvent(onClose)
   useEffect(() => {
-    const timer = setTimeout(() => close(), UNDO_TIMEOUT_MS)
+    if (restore.isPending) return
+    const timer = setTimeout(() => close(), Math.max(0, deadline - Date.now()))
     return () => clearTimeout(timer)
-  }, [project])
+  }, [deadline, restore.isPending])
 
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border p-3 text-sm">
@@ -202,11 +253,16 @@ export function DismissUndo({
         variant="outline"
         size="sm"
         disabled={restore.isPending}
-        onClick={() => restore.mutate(project.repositoryId, { onSuccess: onClose })}
+        onClick={() =>
+          restore.mutate(project.repositoryId, {
+            onSuccess: onClose,
+            onError: () => setDeadline(Date.now() + UNDO_TIMEOUT_MS),
+          })
+        }
       >
         Undo
       </Button>
-      {restore.isError && <span className="text-destructive">Undo didn&apos;t work.</span>}
+      {restore.isError && <Failed>{FAILED_TEXT.undo}</Failed>}
     </div>
   )
 }

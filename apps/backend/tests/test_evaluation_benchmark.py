@@ -155,13 +155,14 @@ def test_baseline_write_different_top_n(folder) -> None:
     assert baseline.top_n(baseline.read(path), "d") == 20
 
 
-def test_baseline_write_refuses_a_dataset_without_its_file(folder) -> None:
+def test_check_source_accepts_only_the_file_next_to_the_baselines(folder, tmp_path) -> None:
     path = folder / "baselines.json"
-    baseline.write([report("v1", 0.5)], path)
-    before = path.read_bytes()
-    with pytest.raises(baseline.BaselineError, match="no dataset file"):
-        baseline.write([report("v1", 0.6), report("v1", 0.4, dataset="judged")], path)
-    assert path.read_bytes() == before
+    baseline.check_source(folder / "d.json", "d", path)
+    elsewhere = tmp_path / "other" / "d.json"
+    with pytest.raises(baseline.BaselineError, match="where the baseline test reads d"):
+        baseline.check_source(elsewhere, "d", path)
+    with pytest.raises(baseline.BaselineError):
+        baseline.check_source(folder / "d.json", "judged", path)
 
 
 def test_rewriting_the_committed_baselines_keeps_their_bytes(tmp_path) -> None:

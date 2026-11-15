@@ -166,6 +166,91 @@ describe('onboarding', () => {
     )
   })
 
+  it('shows the running step of a stalled sync as stopped, without a spinner', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/sync/status': () =>
+        json({
+          job: job({ status: 'RUNNING', steps: { repositories: 'running' }, stalled: true }),
+          last_synced_at: null,
+        }),
+    })
+    renderRoute('/onboarding')
+
+    const steps = await screen.findByRole('list', { name: 'Sync progress' })
+    const step = within(steps).getByText('Repositories').closest('li')!
+    expect(step).toHaveTextContent('Stopped')
+    expect(step).not.toHaveTextContent('In progress')
+    expect(step.querySelector('.animate-spin')).toBeNull()
+  })
+
+  it('shows an unknown step state as waiting', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/sync/status': () =>
+        json({
+          job: job({ status: 'RUNNING', steps: { profile: 'done', readme: 'brand_new_state' } }),
+          last_synced_at: null,
+        }),
+    })
+    renderRoute('/onboarding')
+
+    const steps = await screen.findByRole('list', { name: 'Sync progress' })
+    expect(within(steps).getByText('Profile README').closest('li')).toHaveTextContent('Waiting')
+    expect(within(steps).getByText('Profile').closest('li')).toHaveTextContent('Done')
+  })
+
+  it('offers sign-in when Start sync finds GitHub not connected', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      ...NEVER_SYNCED,
+      'POST /api/v1/profile/sync': () =>
+        json(
+          {
+            error: {
+              code: 'github_not_connected',
+              message: 'Your GitHub account is not connected.',
+            },
+          },
+          409,
+        ),
+    })
+    renderRoute('/onboarding')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start sync' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not connected/i)
+    expect(screen.getByRole('link', { name: 'Sign in with GitHub again' })).toBeInTheDocument()
+  })
+
+  it('offers sign-in when Try again finds GitHub not connected after another failure', async () => {
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/sync/status': () =>
+        json({
+          job: job({ status: 'FAILED', error_code: 'github_rate_limited' }),
+          last_synced_at: null,
+        }),
+      'POST /api/v1/profile/sync': () =>
+        json(
+          {
+            error: {
+              code: 'github_not_connected',
+              message: 'Your GitHub account is not connected.',
+            },
+          },
+          409,
+        ),
+    })
+    renderRoute('/onboarding')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+
+    expect(
+      await screen.findByRole('link', { name: 'Sign in with GitHub again' }),
+    ).toBeInTheDocument()
+  })
+
   it('shows the same cooldown message as the dashboard', async () => {
     mockFetch({
       ...ME_ROUTE,

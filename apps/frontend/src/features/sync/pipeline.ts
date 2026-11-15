@@ -16,14 +16,16 @@ export const STAGE_TEXT: Record<PipelineStage, string> = {
 }
 
 /** Which stage of the refresh pipeline (sync → analysis → discovery → recommendations) is
- * running, from the status queries the dashboard already polls. Null when idle. The discovery
- * and recommendation observers are passive (disabled): the discovery card and the
- * recommendation list fetch and poll them, and a second active observer would refetch on
- * mount. */
-export function usePipelineStage(): PipelineStage | null {
+ * running, from the status queries the dashboard already polls. Null when idle. With
+ * `fetchStages` false the discovery and recommendation observers are passive: the discovery
+ * card and the recommendation list fetch and poll them, and a second active observer would
+ * refetch on mount. Pass true only while those will not be shown (profile loaded but not
+ * analyzed), so the stages are still followed; false while the profile loads, since the cards
+ * mount right after. */
+export function usePipelineStage(fetchStages: boolean): PipelineStage | null {
   const sync = useSyncStatus()
-  const discovery = useDiscoveryStatus(false)
-  const recommendations = useRecommendationStatus(false)
+  const discovery = useDiscoveryStatus(fetchStages)
+  const recommendations = useRecommendationStatus(fetchStages)
 
   const syncJob = sync.data?.job
   const discoveryJob = discovery.data?.job

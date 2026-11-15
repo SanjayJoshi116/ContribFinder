@@ -119,6 +119,36 @@ def test_undo_without_a_rank_still_undoes() -> None:
     assert report.unattributed == {"unsaved": 1}
 
 
+def test_restore_without_a_version_undoes_the_dismissal() -> None:
+    # services.feedback.restore records UNDISMISSED with no recommendation, so no version.
+    found = [
+        Event(1, "dismissed", "a", 1, repository="o/w"),
+        Event(1, "undismissed", "", None, repository="o/w"),
+    ]
+    report = build(found, minimum=1)
+    assert report.configs[0].buckets[0].decisive == 0
+    assert report.unattributed == {"undismissed": 1}
+
+
+def test_unsave_under_a_later_version_undoes_the_save() -> None:
+    found = [
+        Event(1, "saved", "a", 1, repository="o/w"),
+        Event(1, "unsaved", "b", 2, repository="o/w"),
+    ]
+    by_version = {c.version: c for c in build(found, minimum=1).configs}
+    assert by_version["a"].buckets[0].decisive == 0
+
+
+def test_outcomes_kept_per_version_of_one_repository() -> None:
+    found = [
+        Event(1, "dismissed", "a", 1, repository="o/w"),
+        Event(1, "saved", "b", 1, repository="o/w"),
+    ]
+    by_version = {c.version: c.buckets[0] for c in build(found, minimum=1).configs}
+    assert (by_version["a"].positive, by_version["a"].decisive) == (0, 1)
+    assert (by_version["b"].positive, by_version["b"].decisive) == (1, 1)
+
+
 def test_dismiss_undismiss_then_open_is_positive() -> None:
     found = [
         Event(1, "dismissed", "a", 1, repository="o/w"),
@@ -515,3 +545,24 @@ def test_command_reads_undo_events_in_order() -> None:
     (row,) = config.buckets
     assert (row.positive, row.decisive) == (1, 1)
     assert "position-adjusted 1.0000 (coverage 1.0000)" in run("--minimum", "1")
+
+
+@pytest.mark.django_db
+def test_config_filter_still_reads_undo_events_of_other_versions() -> None:
+    # A restore records no version and an unsave may carry a later one: both still undo a
+    # decision of the reported version (services-evaluation-review-fixes).
+    user = UserFactory()
+    stored(user, "v3-deterministic", 1, "dismissed", repository="owner/one")
+    stored(user, "", None, "undismissed", repository="owner/one")
+    stored(user, "v3-deterministic", 1, "saved", repository="owner/two")
+    stored(user, "v4-deterministic", 2, "unsaved", repository="owner/two")
+    stored(user, "v3-deterministic", 1, "opened_repository", repository="owner/three")
+    report = feedback_report.build(
+        feedback_report.load(None), minimum=1, versions=["v3-deterministic"]
+    )
+    (config,) = report.configs
+    assert config.version == "v3-deterministic"
+    (row,) = config.buckets
+    assert (row.positive, row.decisive) == (1, 1)
+    assert report.unattributed == {}
+    assert "v4-deterministic" not in run("--config", "v3-deterministic", "--minimum", "1")

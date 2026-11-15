@@ -9,10 +9,11 @@ import {
   changingVersions,
   json,
   mockFetch,
+  page,
   renderRoute,
 } from '@/test/render'
 
-import { recommendationStatusKey, recommendationsPath } from './api'
+import { recommendationDetailKey, recommendationStatusKey, recommendationsPath } from './api'
 import { shareText } from './messages'
 import { listPath } from './navigation'
 
@@ -83,9 +84,6 @@ const DETAIL = {
     open_issues: 45,
   },
 }
-
-const page = (results: unknown[], extra: Record<string, unknown> = {}) =>
-  json({ count: results.length, next: null, previous: null, results, ...extra })
 
 const GENERATED = {
   job: { id: 9, job_type: 'recommendation_generation', status: 'COMPLETED', steps: {} },
@@ -229,6 +227,31 @@ describe('recommendation cards', () => {
         String(url).endsWith('?difficulty=beginner&contribution_type=documentation'),
       ),
     ).toBe(true)
+  })
+
+  it('keeps the empty reason during a background refetch', async () => {
+    let answer: () => void = () => {}
+    let calls = 0
+    mockFetch({
+      ...ME_ROUTE,
+      ...SYNCED_USER,
+      'GET /api/v1/recommendations/status': () => json({ ...GENERATED, count: 25 }),
+      'GET /api/v1/recommendations?language=python': () => {
+        calls += 1
+        if (calls === 1) return page([])
+        return new Promise<Response>((resolve) => {
+          answer = () => resolve(page([]))
+        })
+      },
+    })
+    const { queryClient } = renderRoute('/app?language=python')
+    expect(await screen.findByText('No recommendations match these filters.')).toBeInTheDocument()
+
+    void queryClient.refetchQueries({ queryKey: ['profile', 'recommendations'] })
+    await waitFor(() => expect(calls).toBe(2))
+    expect(screen.getByText('No recommendations match these filters.')).toBeInTheDocument()
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    await act(async () => answer())
   })
 
   it('hides filters when everything fits on one page', async () => {
@@ -502,7 +525,7 @@ describe('recommendation detail page', () => {
     const fetchMock = mockFetch(ME_ROUTE)
     renderRoute(path)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(message)
     expect(screen.getByRole('link', { name: 'Back to your dashboard' })).toHaveAttribute(
       'href',
       '/app',
@@ -531,7 +554,7 @@ describe('recommendation detail page', () => {
         json({ error: { code: 'not_found', message: 'Not found.' } }, 404),
     })
     renderRoute('/app/recommendations/7')
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no longer exists/)
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(/no longer exists/)
   })
 })
 
@@ -786,5 +809,76 @@ describe('list return path and share text', () => {
       'under 1%',
       'under 1%',
     ])
+  })
+})
+
+describe('detail dead ends and section links', () => {
+  const NOT_FOUND = () => json({ error: { code: 'not_found', message: 'Not found.' } }, 404)
+
+  it('focuses the dead end when a refetch says the recommendation is gone', async () => {
+    let gone = false
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/recommendations/7': () => (gone ? NOT_FOUND() : json(DETAIL)),
+    })
+    const { queryClient } = renderRoute('/app/recommendations/7')
+    const save = await screen.findByRole('button', { name: 'Save' })
+    save.focus()
+
+    gone = true
+    await act(() => queryClient.refetchQueries({ queryKey: recommendationDetailKey(7) }))
+
+    const heading = await screen.findByRole('heading', { level: 1, name: /no longer exists/ })
+    expect(heading).toHaveFocus()
+  })
+
+  it('tries a failed first load again', async () => {
+    let answer: (response: Response) => void = () => {}
+    let calls = 0
+    mockFetch({
+      ...ME_ROUTE,
+      'GET /api/v1/recommendations/7': () => {
+        calls += 1
+        // A 4xx is never retried by the query client, so the first load fails at once.
+        if (calls === 1) return json({ error: { code: 'bad', message: 'Bad.' } }, 400)
+        return new Promise<Response>((resolve) => (answer = resolve))
+      },
+    })
+    renderRoute('/app/recommendations/7')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Could not load this recommendation.' }),
+    ).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading…')
+    expect(screen.queryByText('Could not load this recommendation.')).not.toBeInTheDocument()
+
+    answer(json(DETAIL))
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('encode/httpx')
+  })
+
+  it('does not scroll to the section again on Back', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      mockFetch({ ...ME_ROUTE, 'GET /api/v1/recommendations/7': () => json(DETAIL) })
+      const { router } = renderRoute('/app/recommendations/7#relevant-issues')
+      const heading = await screen.findByRole('heading', { name: 'Relevant issues' })
+      await waitFor(() => expect(heading).toHaveFocus())
+
+      // Another page (an invalid id makes no request), then Back to the same history entry.
+      await act(() => router.navigate('/app/recommendations/abc'))
+      await screen.findByRole('heading', { level: 1, name: /doesn't point to a recommendation/ })
+      await act(() => router.navigate(-1))
+
+      expect(await screen.findByRole('heading', { name: 'Relevant issues' })).not.toHaveFocus()
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
+
+      // A new visit to a section link (a new history entry) scrolls again.
+      await act(() => router.navigate('/app/recommendations/7#relevant-issues'))
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(2))
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
   })
 })

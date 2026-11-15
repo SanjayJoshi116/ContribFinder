@@ -1809,6 +1809,157 @@ without a separate run. `/security-review`: nothing. `npm run e2e` 10/10.
   since the list is refetched; the detail page's no-`%` check excludes the language list.
   E2E `dashboard.spec.ts`: Back from a detail page returns to `?page=2`.
 
+**Fix-diff review of 0.12.66–0.12.68** (MVP+, fix release)  ✅ shipped in v0.12.69
+
+No OpenSpec change (as batch 62: the fixes follow the existing specs). `Bug_Backlog.md` batch 71
+(CR6-1…CR6-6, all fixed). `/code-review` (high) of the staged 0.12.66–0.12.68 code; three of its
+cleanups were already in the unstaged edits. No API, OpenAPI or migration change; baselines
+unchanged. Backend 1985 passed, frontend 218 passed; `npm run e2e` not run.
+- `feedback_report`: `Stacks` keyed `(user, repository)`; `Decision` gains `version`; an undo
+  removes the latest matching decision whatever its version (restore records none, unsave may
+  carry a later one); outcomes are the latest decision per version in each stack.
+- `useDismiss` (supersedes the 0.12.68 note): a per-query-client count of unanswered dismiss
+  requests (`counted` around `mutationFn`) replaces `isMutating(...) === 1`, which two
+  overlapping dismissals could both miss.
+- `RecommendationList` (supersedes the 0.12.68 `settling`): `settling = dismissing ||
+  isPlaceholderData`; the page > 1 recovery also waits for `isFetching`; the empty state shows
+  "Loading…" only while settling and not generating.
+- `rank_pool`: RNK-9 reverted, issues matched whenever the config has `issues` params (shown,
+  not only scored). Archived design D6 of `ranking-review-fixes` left as written.
+- `start_due_generations` catches `kombu.exceptions.OperationalError` only.
+- `baseline.write` no longer checks dataset files; `check_source` is the one location rule.
+
+**Feedback interface fixes, review sweep: features/feedback** (MVP+, fix release)  ✅ shipped in v0.12.70
+
+Archived: `openspec/changes/archive/2026-11-14-feedback-ui-review-fixes/`. Spec: ADDED "Failed feedback actions" and "Undo notice lifecycle" to
+`recommendation-feedback`. `Bug_Backlog.md` batch 66 (FBK-1…FBK-5, FBK-8…FBK-10 fixed; FBK-6, FBK-7
+duplicates fixed in 0.12.68). Task 5.2 (`/simplify`, fix-diff `/code-review`) skipped by the
+owner. `npm run e2e` 10/10; frontend 232 tests.
+- `useSaveToggle`: `setSaved(id, saved)` on error flips only that id back (lists and detail).
+  `useDismiss.onMutate` returns `Removed` (per list key: index and item; the detail entry); on
+  error each page lacking the id gets the item back at its index (clamped) with `count + 1`.
+  `cancelRecommendation` runs both cancels in `Promise.all`.
+- `DismissUndo`: keyed by `repositoryId` in `RecommendationList`; `deadline` state (mount + 10 s);
+  the timer effect does nothing while `restore.isPending`; `onError` sets `deadline = now + 10 s`.
+- `RecommendationDetailPage`: `mounted` ref (true in the effect, false in its cleanup) guards
+  `navigate` in `onDismissed`.
+- `messages.ts` `FAILED_TEXT`; `RecommendationActions.Failed` (`role="status"`). `SaveButton`
+  resets both mutations before a click. Deviation from design D4: `DismissButton` reads the
+  latest dismissal's status for its recommendation from `useMutationState` (the card a rollback
+  re-inserts is a new component, so `dismiss.isError` would never show). Unsave failure says
+  "Couldn't remove." (the spec lists no unsave text). `SavedPage`: `Loaded` for both lists;
+  `ShowMore` shows the error while `isFetchNextPageError` and not fetching.
+- `features/recommendations/api.ts` exports `recommendationsRootKey`.
+- Tests: `later()` (a response answered by the test), `OTHER` card; 14 tests under "failed
+  feedback actions" and "undo notice lifecycle".
+
+**Profile page fixes, review sweep: features/profile** (MVP+, fix release)  ✅ shipped in v0.12.71
+
+Archived: `openspec/changes/archive/2026-11-14-profile-ui-review-fixes/`. Spec: delta to `developer-profile` ("Profile page"). `Bug_Backlog.md`
+batch 67 (PRF-1…PRF-10 fixed; PRF-2, PRF-4 latent). Task 4.2 (`/simplify`, fix-diff
+`/code-review`) skipped by the owner. No e2e run (no spec matches the changed list names);
+frontend 238 tests.
+- `SkillGroups`: `SkillBar` is `<details className="group">` with a `<summary>` grid (chevron
+  `group-open:rotate-90`, name with `title`, bar, label); the evidence list is always rendered
+  inside it. Keys `skill.skill.slug`; list names from `CATEGORY_LIST_NAMES`.
+- `EvidenceItem.tsx` (label, repository link, detail, observed date) used by `SkillGroups` and
+  `InterestList` (keys `interest.slug`, evidence list named "Evidence for <name>").
+- `evidence.ts`: `CATEGORY_ORDER = Object.keys(CATEGORY_LABELS)`; `SKILL_SOURCE_LABELS`,
+  `INTEREST_SOURCE_LABELS`; `evidenceLabel` falls back to "repository languages" (language
+  evidence) or "evidence recorded".
+- `languageRows`: sorts a copy by bytes, then name; all rows when at most `MAX_ROWS + 1`.
+  `LanguageChart` list named "Languages by code".
+- `dataVersions.ts` imports `developerProfileKey`, `skillsKey`, `interestsKey`.
+- Tests: the "no number" check reads skill summaries only (evidence details such as "90% of code"
+  are in the DOM inside closed disclosures); the expand test uses `findByTitle` and the `open`
+  attribute.
+
+**Pipeline progress fixes, review sweep: features/sync + discovery** (MVP+, fix release)  ✅ shipped in v0.12.72
+
+Archived: `openspec/changes/archive/2026-11-15-pipeline-progress-review-fixes/`. Specs: deltas to `sync-jobs` ("Follow-up job
+visible with the completion") and `web-client` ("Pipeline progress display"). `Bug_Backlog.md`
+batch 68 (PIPE-1…PIPE-10 fixed; PIPE-3, PIPE-8 partial). Task 4.2 (`/simplify`, fix-diff
+`/code-review`) skipped by the owner. `npm run e2e` run (onboarding and dashboard progress).
+- `services/jobs.py`: `_finish_and_follow_up(job, status, hook, **fields)` wraps `finish_job` and
+  `_follow_up` in one `transaction.atomic()`; `_follow_up` runs the hook in a savepoint and logs
+  its errors. A broker refusing the follow-up task after commit (`kombu` `OperationalError`) is
+  logged; job recovery re-sends the PENDING job. Tests in `tests/test_job_follow_up.py`.
+- Deviation from D2: `AppShell` calls `usePipelineStage(!developer.isPending && !developer.data)`,
+  not while the profile loads (the cards mount right after and refetch on mount, a second status
+  request that broke the transition tests).
+- `describeDiscovery` checks stalled before active (`STALLED_NOTICE`); `SyncSteps` reads
+  `job.stalled` (running step: `CircleSlash`, "Stopped") and treats unknown states as pending.
+- `formatRelative(iso, now)` in `lib/format` (`Intl.RelativeTimeFormat`, future clamped to 0);
+  `DiscoveryCard` holds `now`, updated every 60 s while it shows a time.
+- `GITHUB_FAILURES` in `features/sync/messages.ts` (reason, `needsSignIn`); sync and discovery add
+  their own next step; onboarding takes `needsSignIn` from the failed job or `start.error.code`.
+
+**Shared component fixes, review sweep: components + lib** (MVP+, fix release)  ✅ shipped in v0.12.73
+
+Archived: `openspec/changes/archive/2026-11-15-shared-components-review-fixes/`. Spec: delta to `web-client` ("Render failures
+and dead ends"). `Bug_Backlog.md` batch 69 (CMP-1…CMP-10: fixed; CMP-1 partial, CMP-2 latent,
+CMP-4 accepted, CMP-6 duplicate of FBK-8). Task 4.2 (`/simplify`, fix-diff `/code-review`)
+skipped by the owner. Frontend 253 tests; `npm run e2e` 11/11.
+- `routes.tsx`: one pathless root route with `errorElement: <RouteError />` wraps every route.
+  `RouteError` shows no error text.
+- `lib/format.ts`: `parse(time)` returns null for an invalid date; every formatter (also
+  `formatRelative`) returns "Unknown" then.
+- `components/Loaded.tsx`: `Loaded` takes `isFetching?` (failed only when not fetching);
+  `DetailLoaded({ query, gone, failed })` (404 → `DeadEnd` gone, also over data; data; failed →
+  `DeadEnd` with `onRetry={refetch}`; else `Loading`). Detail pages render `RecommendationView` /
+  `IssueView` inside it; failed messages lost "Please refresh the page".
+- `DeadEnd`: `h1` with `tabIndex={-1}`, focused on mount; no `role="alert"`; optional Try again.
+  Tests query the level-1 heading.
+- `useScrollToHash`: module-level `handled` set of location keys. Deviation: test-only
+  `forgetScrolledEntries()`, cleared in `test/setup.ts` after each test, because every memory
+  router starts at key "default".
+- `Loading` (`role="status"`) used by `Loaded`, the detail gate, `AppShell`, `OnboardingPage`,
+  `RecommendationList`, `RequireAuth`, `LandingPage`.
+- Added beyond the tasks: e2e `dashboard.spec.ts` "a missing recommendation is a dead end with a
+  focused heading" (read-only, `e2e-dashboard`).
+
+**Root config fixes, review sweep: compose, env template, package.json** (MVP+, fix release)  ✅ shipped in v0.12.74
+
+Archived: `openspec/changes/archive/2026-11-15-root-config-review-fixes/`. Spec: delta to `developer-tooling` ("Docker
+development mode stays local and current"). `Bug_Backlog.md` batch 70 (ROOT-1…ROOT-10 fixed), the
+last module of the full review sweep (complete 2026-11-15). Task 5.2 (`/simplify`, fix-diff
+`/code-review`) skipped by the owner. Backend 1993 tests; no e2e (no browser flow change).
+- `docker-compose.yml`: `x-postgres-env` anchor (service env), healthcheck
+  `pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"`, `DATABASE_URL` the one repeated literal;
+  backend `127.0.0.1:8000:8000`, frontend `127.0.0.1:5173:5173` with `VITE_WATCH_POLLING: "true"`;
+  Redis without `ports`; no `DJANGO_SETTINGS_MODULE` in `environment`.
+- `vite.config.ts`: `server.watch` `{ usePolling: true, interval: 300 }` when
+  `VITE_WATCH_POLLING=true`; `host: true` kept (LAN phone testing, accepted).
+- `development.py`: `DEBUG = env.bool("DJANGO_DEBUG", default=True)`.
+- `tests/test_env_example.py`: `ast` collects first string arguments of `env(...)`, `env.*(...)`,
+  `env_list`, `env_words`, `env_json`, `env_mapping` in `base.py` and `production.py`; each must be
+  `NAME=` or `# NAME=` in `.env.example` (allow-list `DJANGO_READ_DOTENV`). The development DEBUG
+  test runs `config.settings.development` in a subprocess. Deviation: 19 settings added, not 17
+  (`GITHUB_OAUTH_REDIRECT_URI`, `EXPERIENCE_THRESHOLDS` read through helpers the review's grep missed).
+- Root `package.json`: `format:scripts:write`, `engines.node >=22` (also in `package-lock.json`'s
+  root entry).
+- Not run: `docker compose config` / `up --build` (no Docker on this machine); the compose file
+  was parsed with PyYAML. CLAUDE.md §7 Future keeps the fresh-`.env` compose check.
+
+**Fix-diff review of 0.12.70–0.12.74** (MVP+, fix release)  ✅ shipped in v0.12.75
+
+No OpenSpec change (the fixes follow the existing specs). `Bug_Backlog.md` batch 72 (CR7-1…CR7-10,
+all fixed; owner: fix all). Backend 1996 tests, frontend 256; no e2e. Each fix has a test that
+fails on the old code, except CR7-5.
+- `feedback_report.load(since)` no longer takes versions; `build(..., versions=)` settles every
+  event, then drops other versions' rows and the unattributed counts. The command passes
+  `--config` to `build`.
+- `jobs._finish_and_follow_up`: a first `on_commit` (`mark_committed`) marks the commit. An
+  exception after it is logged ("Follow-up task of job … not queued" for `BrokerError`,
+  "Follow-up of job … failed" otherwise), and one before it is raised. With a hook,
+  `select_for_update` on the user's active jobs, ordered by pk, runs before `finish_job`.
+- Frontend: `OnboardingPage` `signIn` ORs the failure and the start error. `useDismiss` counts
+  from `onMutate` (`begin`/`answered`). The rollback skips lists (`listOf`: key path without
+  `page`) that already hold the item. `DismissVariables.visit` comes from the `PageVisit`
+  context (`useVisitOf(route)` in `SignedInLayout`, a counter per route change), and
+  `DismissButton` matches it. `formatRelative` picks the unit after rounding. `evidence.ts`
+  builds both category maps from `CATEGORIES`.
+
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).
@@ -1827,4 +1978,4 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63), services/discovery review fixes (0.12.64), services/matching review fixes (0.12.65), services/ranking review fixes (0.12.66), services/evaluation review fixes (0.12.67), recommendations view review fixes (0.12.68).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63), services/discovery review fixes (0.12.64), services/matching review fixes (0.12.65), services/ranking review fixes (0.12.66), services/evaluation review fixes (0.12.67), recommendations view review fixes (0.12.68), fix-diff review of 0.12.66–0.12.68 (0.12.69), feedback interface review fixes (0.12.70), profile page review fixes (0.12.71), pipeline progress review fixes (0.12.72), shared components review fixes (0.12.73), root config review fixes (0.12.74; the full review sweep complete), fix-diff review of 0.12.70–0.12.74 (0.12.75).

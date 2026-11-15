@@ -214,9 +214,12 @@ describe('issue detail page', () => {
     gone = true
     await act(() => queryClient.refetchQueries({ queryKey: ['profile', 'issues', 31] }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      /no longer among your relevant issues/,
-    )
+    // The dead end replaces the page during the visit: focus moves to its heading (CMP-8).
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: /no longer among your relevant issues/,
+    })
+    expect(heading).toHaveFocus()
   })
 
   it('explains an issue that is no longer relevant', async () => {
@@ -226,7 +229,7 @@ describe('issue detail page', () => {
         json({ error: { code: 'not_found', message: 'Not found.' } }, 404),
     })
     renderRoute('/app/issues/31')
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       /no longer among your relevant issues/,
     )
     expect(screen.getByRole('link', { name: 'Back to your dashboard' })).toHaveAttribute(

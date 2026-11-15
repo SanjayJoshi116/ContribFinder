@@ -1,5 +1,7 @@
 import { Navigate, Outlet } from 'react-router'
 
+import { Loading } from '@/components/Loading'
+
 import { useMe } from './api'
 
 export function RequireAuth() {
@@ -10,8 +12,8 @@ export function RequireAuth() {
   if (me.data) return <Outlet context={me.data} />
   if (me.isPending) {
     return (
-      <div className="text-muted-foreground flex min-h-svh items-center justify-center">
-        Loading…
+      <div className="flex min-h-svh items-center justify-center">
+        <Loading />
       </div>
     )
   }

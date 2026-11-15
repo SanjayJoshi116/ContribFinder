@@ -5,6 +5,7 @@ converts it to the frozen matching inputs that ``rank_pool`` takes. No database 
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -248,10 +249,8 @@ def _issue(
     if (raw_updated := data.get("updated_at")) is not None:
         # A naive time would be read in the machine's time zone, so issue order could differ
         # between machines (change services-evaluation-review-fixes, EVL-9).
-        try:
+        with contextlib.suppress(ValueError):  # unparseable: updated_at stays None
             updated_at = datetime.fromisoformat(str(raw_updated))
-        except ValueError:
-            updated_at = None
         if updated_at is None or updated_at.tzinfo is None:
             errors.append(f"{where}: updated_at must be an ISO 8601 time with a UTC offset")
     if len(errors) > before:

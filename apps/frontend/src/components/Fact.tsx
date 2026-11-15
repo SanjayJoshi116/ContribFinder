@@ -3,7 +3,7 @@ export function Fact({ term, value, note }: { term: string; value: string; note?
   return (
     <div className="flex justify-between gap-4 border-b py-1 text-sm last:border-0">
       <dt className="text-muted-foreground">{term}</dt>
-      <dd className="text-right">
+      <dd className="min-w-0 text-right break-words">
         {value}
         {note && <span className="text-muted-foreground block text-xs">{note}</span>}
       </dd>

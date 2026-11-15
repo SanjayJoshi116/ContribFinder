@@ -154,7 +154,8 @@ ContribFinder/
 │  │     │                  bootstrap (paired intervals), feedback_report (outcomes per config)
 │  │     └─ ai/             provider interfaces only (future)
 │  └─ frontend/           src/{app,components,features,hooks,lib,api,types,routes}; components/
-│                         holds DeadEnd, ExternalLink, Fact, Loaded; lib/ format (dates); app/ holds
+│                         holds DeadEnd, ExternalLink, Fact, Loaded (+ DetailLoaded), Loading,
+│                         RouteError (root errorElement); lib/ format (dates); app/ holds
 │                         the query client (retry, stale time, 401), session.ts (identity key,
 │                         endSession, leaveSignedIn), job-transition refresh and data versions;
 │                         e2e/ Playwright specs, playwright.config.ts; csp.config.ts (the built
@@ -229,7 +230,8 @@ Local, no Docker (primary on this machine):
 - `npm run test:scripts`: Node built-in tests for the runners (`scripts/*.test.mjs`, also in CI
   on Linux and Windows; they import only Node built-ins and `./*.mjs`, so CI's Windows job
   installs nothing).
-  `npm run lint:scripts` / `format:scripts`: ESLint and Prettier for `scripts/` (also in CI).
+  `npm run lint:scripts` / `format:scripts`: ESLint and Prettier for `scripts/` (also in CI);
+  `format:scripts:write` fixes. Root `engines.node` is `>=22` (CI runs 24).
   `.gitattributes` keeps LF in every checkout; a Windows checkout from before 0.12.11 refreshes
   its working files once (README).
   `npm run setup` uses `npm ci` (never rewrites a lockfile); `npm run check:version` also checks
@@ -283,7 +285,10 @@ Local, no Docker (primary on this machine):
   since commands run in `apps/backend`); committing `benchmark-v2` is the judge's call.
 
 Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
-`REDIS_URL` with container hostnames; Postgres is on host port 5433.
+`REDIS_URL` with container hostnames; Postgres is on host port 5433, Redis is not published
+(the WSL Redis keeps 6379), backend and frontend listen on 127.0.0.1 only, and
+`DJANGO_SETTINGS_MODULE` comes from `.env`. After a frontend dependency change:
+`docker compose up --build --renew-anon-volumes`.
 
 Backend (`apps/backend`, uses `uv`):
 - `uv sync`: install deps
@@ -328,7 +333,7 @@ Frontend (`apps/frontend`, npm):
 
 ## 7. Status and roadmap
 
-Current: **v0.12.68**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
+Current: **v0.12.75**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
 in v0.6.0. The full per-release record (phase FRs, deviations as built, carry-overs, every fix
 release since 0.12.1) lives in **`CLAUDE_HISTORY.md`**: read the entry for an area before
 changing it. Per-release detail also in `CHANGELOG.md`; accepted behaviour in `openspec/specs/`.
@@ -358,6 +363,10 @@ plans, similar repositories, observability (Sentry, Prometheus, Grafana).
 Durable rules from the history; the release that introduced each is in `CLAUDE_HISTORY.md`.
 
 Jobs and locking:
+- `run_tracked_job` hooks (`on_completed`, `on_failed`) run in the transaction that ends the job,
+  each in a savepoint: a follow-up job commits with the outcome, its task is sent on commit. With a
+  hook, the user's active jobs are locked in pk order first. Any error after the commit (a broker
+  refusal, an inline eager task) is logged, never raised.
 - Job services: `claim_job` → pass the claimed job object (never an id) to `job_write`,
   `save_progress` (steps), `merge_metadata` (metadata), `heartbeat`, `finish_job`. Fetch before
   `job_write`; no I/O under the lock. `job_guard.stale_before` / `lost_before` / `is_stalled` are
@@ -367,6 +376,10 @@ Jobs and locking:
   repository locks in GitHub ID order (`storage.lock_for_upsert` before a batch of upserts).
 - Eager Celery = last attempt: `retry.attempt_number(..., eager=)`. Retry-path tests use
   `override_settings(CELERY_TASK_ALWAYS_EAGER=False)`.
+- Feedback report outcomes: an undo (`unsaved`, `undismissed`) cancels by user and repository,
+  never by version: restore records no version, unsave may carry a later one.
+- Sweeps that queue jobs per user catch only broker errors (`kombu.exceptions.OperationalError`);
+  a database error fails the task.
 - Feedback events never reference a recommendation that may be gone; services re-read what they
   snapshot (`_current`), so a service called from a view must not touch
   `recommendation.repository` before its re-read.
@@ -392,7 +405,8 @@ GitHub and data:
 
 Backend conventions:
 - Settings: comma lists `env_list`, JSON `env_json`/`env_mapping` (never bare `env.list`/`env.json`).
-  A new numeric setting needs a system check (`core/checks.py`).
+  A new numeric setting needs a system check (`core/checks.py`). A new setting read from the
+  environment goes in `.env.example` too (`tests/test_env_example.py`).
 - Admins use a `core.admin` base; job-written data uses `ViewOnlyAdmin`.
 - Management commands writing JSON use `core.reports.write_json`.
 - Test fixtures shared by import live in `tests/shared_fixtures.py`, not `conftest.py`. Register
@@ -406,13 +420,25 @@ Frontend:
 - New status hook passes its path and signal to `fetchStatusAndRefresh`; a mutation writing a
   status key cancels it first. Sign-out flows set `ENDS_SESSION_META_KEY` and use
   `leaveSignedIn`; account mutations use `accountMutationKey`.
-- Pages gate on `data` first (pending → no data: error → data), via `src/components/Loaded`.
+- Pages gate on `data` first (pending → no data: error → data), via `src/components/Loaded`;
+  detail pages via `DetailLoaded` (404 → gone, failed → Try again). Loading text is `<Loading />`.
+  Tests that remount a hash page rely on `forgetScrolledEntries` (cleared in `test/setup.ts`).
+- Skills and interests are keyed by catalog slug, never row id: each analysis recreates the rows.
+  Lists on one page have distinct accessible names.
 - A detail route wraps its page in `RouteId`. Lazy components only via `src/app/lazyLoaders.ts`.
 - A list link into a detail page passes `listState(location.search)`; the page returns
   through `listPath(location.state)` (`features/recommendations/navigation.ts`).
 - `apiFetch` JSON callers use `json:` (never a hand-built header). External links use
   `ExternalLink`; dates `src/lib/format`.
 - A mutation started from a component an optimistic update unmounts uses `mutateAsync`.
+- "Last mutation in flight" is never `isMutating(...) === 1` in `onSettled` (a mutation stays
+  pending until its `onSettled` finishes): count unanswered requests from the start of `onMutate`
+  until the request is answered (`useDismiss`). Background refetches never replace an empty state with "Loading…".
+- A failed optimistic action reverts only the item it changed (never a whole-list snapshot). A
+  failure shown on a card a rollback re-mounts is read from the mutation cache
+  (`useMutationState`), not from the new component's mutation, filtered to the current page
+  visit (`usePageVisit`, `features/feedback/visit.ts`). Failed actions show inline text
+  (`FAILED_TEXT`, `Failed`) next to their control.
 - New script, image or API origin goes in `csp.config.ts`. Refetch tests wait (`settle`) after
   `refetchQueries`. Playwright: data-changing specs own a seeded user (`MUTATING_USERS`); match
   exact names (`{ name: 'Dismiss', exact: true }`).

@@ -42,25 +42,49 @@ export interface FailureMessage {
   needsSignIn: boolean
 }
 
-const FAILURES: Record<string, FailureMessage> = {
+export interface GitHubFailure {
+  reason: string
+  /** The sign-in that fixes it, when re-authorizing with GitHub is the fix. */
+  signIn?: string
+}
+
+/** The one reason per GitHub failure code, used by every page that shows one. Each page adds
+ * its own next step. */
+export const GITHUB_FAILURES: Record<string, GitHubFailure> = {
   github_auth_invalid: {
-    text: 'GitHub access has expired or was revoked. Sign in with GitHub again to continue.',
-    needsSignIn: true,
+    reason: 'GitHub access has expired or was revoked.',
+    signIn: 'Sign in with GitHub again',
   },
   github_not_connected: {
-    text: 'Your GitHub account is not connected. Sign in with GitHub to continue.',
-    needsSignIn: true,
+    reason: 'Your GitHub account is not connected.',
+    signIn: 'Sign in with GitHub',
   },
-  github_rate_limited: {
-    text: 'GitHub is limiting requests right now. Please try again in a few minutes.',
-    needsSignIn: false,
-  },
+  github_rate_limited: { reason: 'GitHub is limiting requests right now.' },
+  github_unavailable: { reason: 'GitHub is not responding right now.' },
+}
+
+/** Whether an error code (a failed job's or a rejected start's) is fixed by signing in. */
+export function needsSignIn(code: string | undefined): boolean {
+  return !!code && !!GITHUB_FAILURES[code]?.signIn
+}
+
+const SYNC_RETRY: Record<string, string> = {
+  github_rate_limited: 'Please try again in a few minutes.',
+  github_unavailable: 'Please try again shortly.',
+}
+
+const FAILURES: Record<string, FailureMessage> = {
+  ...Object.fromEntries(
+    Object.entries(GITHUB_FAILURES).map(([code, { reason, signIn }]) => [
+      code,
+      {
+        text: `${reason} ${signIn ? `${signIn} to continue.` : (SYNC_RETRY[code] ?? 'Please try again.')}`,
+        needsSignIn: !!signIn,
+      },
+    ]),
+  ),
   analysis_failed: {
     text: 'Your GitHub data was synced, but your profile could not be built from it. Please try again.',
-    needsSignIn: false,
-  },
-  github_unavailable: {
-    text: 'GitHub is not responding right now. Please try again shortly.',
     needsSignIn: false,
   },
 }

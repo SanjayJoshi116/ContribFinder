@@ -24,7 +24,7 @@ export function LanguageChart({ languages }: { languages: readonly ProfileLangua
       {/* The chart's accessible equivalent. */}
       <ul
         className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm"
-        aria-label="Languages"
+        aria-label="Languages by code"
       >
         {rows.map((row) => (
           <li key={row.name}>

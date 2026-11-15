@@ -10,6 +10,9 @@ const apiTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8000'
 // Same-origin: the browser only ever talks to the Vite server, so session and CSRF cookies
 // work without cross-site configuration. Shared by the dev server and `vite preview`.
 const proxy = { '/api': { target: apiTarget, changeOrigin: false, xfwd: true } }
+// Docker on a Windows host: bind mounts send no file events, so the compose file asks for polling.
+const watch =
+  process.env.VITE_WATCH_POLLING === 'true' ? { usePolling: true, interval: 300 } : undefined
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), contentSecurityPolicy()],
@@ -20,6 +23,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy,
+    watch,
   },
   preview: { proxy },
   test: {

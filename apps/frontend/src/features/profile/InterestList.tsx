@@ -1,12 +1,7 @@
 import type { DeveloperInterest } from '@/api/types'
-import { ExternalLink } from '@/components/ExternalLink'
 
-const SOURCE_LABELS: Record<DeveloperInterest['evidence'][number]['source'], string> = {
-  readme: 'Profile README',
-  repo_description: 'Repository description',
-  topic: 'Repository topic',
-  contribution: 'Contribution',
-}
+import { EvidenceItem } from './EvidenceItem'
+import { INTEREST_SOURCE_LABELS } from './evidence'
 
 export function InterestList({ interests }: { interests: readonly DeveloperInterest[] }) {
   if (interests.length === 0) {
@@ -14,8 +9,9 @@ export function InterestList({ interests }: { interests: readonly DeveloperInter
   }
   return (
     <ul className="space-y-2" aria-label="Interests">
-      {interests.map(({ id, interest, evidence }) => (
-        <li key={id}>
+      {/* By slug: a re-analysis recreates the rows with new ids. */}
+      {interests.map(({ interest, evidence }) => (
+        <li key={interest.slug}>
           <details className="rounded-lg border px-3 py-2">
             <summary className="cursor-pointer text-sm">
               <span className="font-medium">{interest.name}</span>
@@ -24,20 +20,15 @@ export function InterestList({ interests }: { interests: readonly DeveloperInter
                 · {evidence.length} {evidence.length === 1 ? 'signal' : 'signals'}
               </span>
             </summary>
-            <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
+            <ul className="mt-2 space-y-1 text-sm" aria-label={`Evidence for ${interest.name}`}>
               {evidence.map((item, index) => (
-                <li key={index}>
-                  <span className="text-foreground">{SOURCE_LABELS[item.source]}</span>
-                  {item.repository && (
-                    <>
-                      {' · '}
-                      <ExternalLink href={item.repository.html_url} className="hover:underline">
-                        {item.repository.full_name}
-                      </ExternalLink>
-                    </>
-                  )}
-                  {item.detail && ` · ${item.detail}`}
-                </li>
+                <EvidenceItem
+                  key={index}
+                  label={INTEREST_SOURCE_LABELS[item.source]}
+                  repository={item.repository}
+                  detail={item.detail}
+                  observedAt={item.observed_at}
+                />
               ))}
             </ul>
           </details>

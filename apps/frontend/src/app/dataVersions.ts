@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type { DataVersions } from '@/api/types'
+import { developerProfileKey, interestsKey, skillsKey } from '@/features/profile/api'
 
 /** Outside ['profile'] and ['jobs']: a versions fetch invalidates ['profile'] queries, and the
  * job refreshes invalidate ['jobs']; neither may invalidate the query that triggered it. */
@@ -23,11 +24,7 @@ export const AREA_KEYS: Record<DataArea, readonly QueryKey[]> = {
     ['profile', 'github'],
     ['profile', 'repositories'],
   ],
-  profile: [
-    ['profile', 'developer'],
-    ['profile', 'skills'],
-    ['profile', 'interests'],
-  ],
+  profile: [developerProfileKey, skillsKey, interestsKey],
   recommendations: [
     ['profile', 'recommendations'],
     ['profile', 'issues'],

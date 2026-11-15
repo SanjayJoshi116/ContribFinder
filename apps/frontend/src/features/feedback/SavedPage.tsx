@@ -2,13 +2,15 @@ import { Link } from 'react-router'
 
 import type { DismissedRepository, SavedRepository } from '@/api/types'
 import { ExternalLink } from '@/components/ExternalLink'
+import { Loaded } from '@/components/Loaded'
 import { Button } from '@/components/ui/button'
 import { ACTIVITY_TEXT } from '@/features/recommendations/messages'
 import { MatchBadge } from '@/features/recommendations/RecommendationCard'
 import { formatDate } from '@/lib/format'
 
 import { useDismissed, useRestore, useSaved, useUnsaveRepository } from './api'
-import { DISMISS_REASON_TEXT } from './messages'
+import { DISMISS_REASON_TEXT, FAILED_TEXT } from './messages'
+import { Failed } from './RecommendationActions'
 
 function SavedEntry({ entry }: { entry: SavedRepository }) {
   const unsave = useUnsaveRepository()
@@ -58,6 +60,7 @@ function SavedEntry({ entry }: { entry: SavedRepository }) {
         >
           Remove
         </Button>
+        {unsave.isError && <Failed>{FAILED_TEXT.remove}</Failed>}
       </footer>
     </article>
   )
@@ -83,6 +86,7 @@ function HiddenEntry({ entry }: { entry: DismissedRepository }) {
       >
         Restore
       </Button>
+      {restore.isError && <Failed>{FAILED_TEXT.restore}</Failed>}
     </li>
   )
 }
@@ -95,14 +99,17 @@ function ShowMore({
 }) {
   if (!list.hasNextPage) return null
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={list.isFetchingNextPage}
-      onClick={() => void list.fetchNextPage()}
-    >
-      Show more
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={list.isFetchingNextPage}
+        onClick={() => void list.fetchNextPage()}
+      >
+        Show more
+      </Button>
+      {list.isFetchNextPageError && !list.isFetchingNextPage && <Failed>{FAILED_TEXT.more}</Failed>}
+    </div>
   )
 }
 
@@ -110,8 +117,6 @@ function ShowMore({
 export function SavedPage() {
   const saved = useSaved()
   const dismissed = useDismissed()
-  const savedEntries = saved.data?.pages.flatMap((page) => page.results) ?? []
-  const hiddenEntries = dismissed.data?.pages.flatMap((page) => page.results) ?? []
 
   return (
     <>
@@ -123,24 +128,28 @@ export function SavedPage() {
         <h1 id="saved-heading" className="text-2xl font-semibold">
           Saved projects
         </h1>
-        {saved.isPending ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
-        ) : !saved.data ? (
-          <p role="alert">Could not load your saved projects. Please refresh the page.</p>
-        ) : savedEntries.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Nothing saved yet. Use Save on a recommendation to keep it here.
-          </p>
-        ) : (
-          <>
-            <div className="space-y-3">
-              {savedEntries.map((entry) => (
-                <SavedEntry key={entry.repository_id} entry={entry} />
-              ))}
-            </div>
-            <ShowMore list={saved} />
-          </>
-        )}
+        <Loaded
+          query={saved}
+          failed={<p role="alert">Could not load your saved projects. Please refresh the page.</p>}
+        >
+          {(data) => {
+            const entries = data.pages.flatMap((page) => page.results)
+            return entries.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Nothing saved yet. Use Save on a recommendation to keep it here.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {entries.map((entry) => (
+                    <SavedEntry key={entry.repository_id} entry={entry} />
+                  ))}
+                </div>
+                <ShowMore list={saved} />
+              </>
+            )
+          }}
+        </Loaded>
       </section>
 
       <section className="space-y-3" aria-labelledby="hidden-heading">
@@ -150,22 +159,26 @@ export function SavedPage() {
         <p className="text-muted-foreground text-xs">
           Projects you dismissed are never recommended again. Restore one to let it come back.
         </p>
-        {dismissed.isPending ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
-        ) : !dismissed.data ? (
-          <p role="alert">Could not load your hidden projects. Please refresh the page.</p>
-        ) : hiddenEntries.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No hidden projects.</p>
-        ) : (
-          <>
-            <ul aria-label="Hidden projects">
-              {hiddenEntries.map((entry) => (
-                <HiddenEntry key={entry.repository_id} entry={entry} />
-              ))}
-            </ul>
-            <ShowMore list={dismissed} />
-          </>
-        )}
+        <Loaded
+          query={dismissed}
+          failed={<p role="alert">Could not load your hidden projects. Please refresh the page.</p>}
+        >
+          {(data) => {
+            const entries = data.pages.flatMap((page) => page.results)
+            return entries.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No hidden projects.</p>
+            ) : (
+              <>
+                <ul aria-label="Hidden projects">
+                  {entries.map((entry) => (
+                    <HiddenEntry key={entry.repository_id} entry={entry} />
+                  ))}
+                </ul>
+                <ShowMore list={dismissed} />
+              </>
+            )
+          }}
+        </Loaded>
       </section>
     </>
   )

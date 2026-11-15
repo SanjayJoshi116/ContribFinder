@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.68** (recommendations view fixes from the review sweep; MVP+). After signing in with
+**Version 0.12.75** (fix-diff review fixes after the review sweep; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -338,6 +338,14 @@ Compose runs its own Postgres (host port 5433) and Redis, and overrides `DATABAS
 `REDIS_URL` with container hostnames, so the same `.env` works for both modes. If you copied
 `.env.example`, fill in `DJANGO_SECRET_KEY` and `TOKEN_ENCRYPTION_KEYS` yourself (commands
 are in the file).
+
+The backend (http://127.0.0.1:8000) and the frontend (http://localhost:5173) are published on
+the loopback interface only. Redis is not published on the host, so it never collides with the
+WSL Redis that `npm start` uses, and Postgres stays on host port 5433. `DJANGO_SETTINGS_MODULE`
+comes from `.env`, not from your shell. Vite polls for file changes in the container (bind
+mounts from Windows send no file events). The frontend's `node_modules` live in an anonymous
+volume, so after a frontend dependency change rebuild with
+`docker compose up --build --renew-anon-volumes`.
 
 ## Deploying behind a proxy
 

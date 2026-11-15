@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 
 import { clearSignedInData } from '@/app/session'
+import { Loading } from '@/components/Loading'
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL, useMe } from '@/features/auth/api'
 import { authErrorMessage } from '@/features/auth/authErrors'
@@ -26,8 +27,8 @@ export function LandingPage() {
   // same loading text as RequireAuth, so a slow or retried answer is not a blank page (CR-6).
   if (me.isPending) {
     return (
-      <div className="text-muted-foreground flex min-h-svh items-center justify-center">
-        Loading…
+      <div className="flex min-h-svh items-center justify-center">
+        <Loading />
       </div>
     )
   }

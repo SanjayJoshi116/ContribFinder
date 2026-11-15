@@ -1,10 +1,16 @@
 import { Navigate } from 'react-router'
 
+import { Loading } from '@/components/Loading'
 import { Button } from '@/components/ui/button'
 import { GITHUB_SIGN_IN_URL } from '@/features/auth/api'
 import { isActive, isStalled } from '@/app/jobTransitions'
 import { useStartSync, useSyncStatus } from '@/features/sync/api'
-import { STALLED_NOTICE, failureMessage, startErrorText } from '@/features/sync/messages'
+import {
+  STALLED_NOTICE,
+  failureMessage,
+  needsSignIn,
+  startErrorText,
+} from '@/features/sync/messages'
 import { SyncSteps } from '@/features/sync/SyncSteps'
 
 export function OnboardingPage() {
@@ -12,7 +18,7 @@ export function OnboardingPage() {
   const start = useStartSync()
   const job = status.data?.job ?? null
 
-  if (status.isPending) return <p className="text-muted-foreground">Loading…</p>
+  if (status.isPending) return <Loading />
   // Only without data: a failed poll keeps the progress shown (ROUTE-2).
   if (!status.data) {
     return <p role="alert">Could not load sync status. Please refresh the page.</p>
@@ -24,6 +30,9 @@ export function OnboardingPage() {
   const failed = job && (job.status === 'FAILED' || job.status === 'CANCELLED')
   const failure = failed ? failureMessage(job) : null
   const stalled = isStalled(job)
+  // From the failed job or from a rejected start (409 github_not_connected, ...): a start
+  // rejected after a failure for another reason still needs sign-in.
+  const signIn = (failure?.needsSignIn ?? false) || (start.isError && needsSignIn(start.error.code))
 
   return (
     <section className="space-y-6">
@@ -59,7 +68,7 @@ export function OnboardingPage() {
         </p>
       )}
 
-      {failure?.needsSignIn ? (
+      {signIn ? (
         <Button asChild>
           <a href={GITHUB_SIGN_IN_URL}>Sign in with GitHub again</a>
         </Button>

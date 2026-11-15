@@ -79,9 +79,9 @@ def _add(groups: Groups, key: tuple[str, Any], event: Event) -> None:
     users.add(event.user_id)
 
 
-def _outcome(outcomes: Outcomes, key: tuple[str, Any], event: Event) -> None:
+def _outcome(outcomes: Outcomes, key: tuple[str, Any], action: str) -> None:
     tally = outcomes.setdefault(key, [0, 0])
-    tally[0] += event.action in POSITIVE
+    tally[0] += action in POSITIVE
     tally[1] += 1
 
 
@@ -138,8 +138,8 @@ class BucketRow:
     counts: dict[str, int]  # every action (raw events), 0 when absent
     users: int
     share: float | None  # None below the minimum
-    positive: int = 0  # outcomes
-    decisive: int = 0
+    positive: int  # outcomes
+    decisive: int
 
 
 @dataclass(frozen=True)
@@ -148,8 +148,8 @@ class LabelRow:
     counts: dict[str, int]
     users: int
     share: float | None  # not adjusted for rank
-    positive: int = 0
-    decisive: int = 0
+    positive: int
+    decisive: int
 
 
 @dataclass(frozen=True)
@@ -225,15 +225,14 @@ def _row_dict(name_key: str, name: str, row: BucketRow | LabelRow) -> dict[str, 
     }
 
 
-def load(since: datetime | None, versions: Sequence[str] = ()) -> Iterator[Event]:
-    """Every feedback event in the window (all time without ``since``), optionally only for
-    some configuration versions, oldest first (``build`` reads undo events in order). One
-    query, streamed in chunks."""
+def load(since: datetime | None) -> Iterator[Event]:
+    """Every feedback event in the window (all time without ``since``), oldest first (``build``
+    reads undo events in order). One query, streamed in chunks. Never filtered by version: an
+    undo carries no version or a later one, so ``build(versions=)`` narrows the report after
+    settling outcomes."""
     rows = RecommendationFeedback.objects.order_by("created_at", "id")
     if since is not None:
         rows = rows.filter(created_at__gte=since)
-    if versions:
-        rows = rows.filter(config_version__in=versions)
     fields = (
         "user_id",
         "action",
@@ -246,7 +245,18 @@ def load(since: datetime | None, versions: Sequence[str] = ()) -> Iterator[Event
     return (Event(*row) for row in rows.values_list(*fields).iterator(chunk_size=2000))
 
 
-Stacks = dict[tuple[int, str, str], list[tuple[Event, int]]]  # (event, its rank)
+class Decision(NamedTuple):
+    """What an outcome needs from a decisive event."""
+
+    action: str
+    version: str
+    bucket: tuple[int, int | None]
+    match_label: str
+
+
+# Per (user, repository): the decisive events not undone, oldest first. Not keyed by version:
+# an undo carries no version (restore) or a later one (unsave after a regeneration).
+Stacks = dict[tuple[int, str], list[Decision]]
 
 
 def _rank(event: Event) -> int | None:
@@ -257,26 +267,32 @@ def _rank(event: Event) -> int | None:
 
 
 def _settle(stacks: Stacks, event: Event, rank: int | None) -> None:
-    """Keep each (user, repository, version)'s decisive events that were not undone, in order.
-    An undo event takes back the latest event it undoes, also when it has no rank itself."""
-    if not event.config_version:
-        return
-    key = (event.user_id, event.repository, event.config_version)
+    """Keep each (user, repository)'s decisive events that were not undone, in order. An undo
+    event takes back the latest event it undoes, whatever its own version and rank."""
+    key = (event.user_id, event.repository)
     if event.action in UNDOES:
         stack = stacks.get(key, [])
         undone = UNDOES[event.action]
         for index in range(len(stack) - 1, -1, -1):
-            if stack[index][0].action == undone:
+            if stack[index].action == undone:
                 del stack[index]
                 break
     elif rank is not None and event.action in DECISIVE:
-        stacks.setdefault(key, []).append((event, rank))
+        decision = Decision(event.action, event.config_version, _bucket(rank), event.match_label)
+        stacks.setdefault(key, []).append(decision)
 
 
 def build(
-    events: Iterable[Event], *, minimum: int = DEFAULT_MINIMUM, since_days: int | None = None
+    events: Iterable[Event],
+    *,
+    minimum: int = DEFAULT_MINIMUM,
+    since_days: int | None = None,
+    versions: Sequence[str] = (),
 ) -> FeedbackReport:
-    """``events`` in the order they happened."""
+    """``events`` in the order they happened. With ``versions``, only those configuration
+    versions are reported (no unattributed events), but every event still settles outcomes, so
+    an undo of another version (or none) takes back a decision of a reported one."""
+    wanted = frozenset(versions)
     if minimum < 1:
         raise ValueError("minimum must be at least 1")
     buckets: Groups = {}  # (version, bucket)
@@ -290,6 +306,8 @@ def build(
         dismissed = event.action == FeedbackAction.DISMISSED
         rank = _rank(event)
         _settle(stacks, event, rank)
+        if wanted and event.config_version not in wanted:
+            continue
         if rank is None:
             unattributed[event.action] += 1
             if dismissed:
@@ -304,11 +322,13 @@ def build(
     bucket_outcomes: Outcomes = {}
     label_outcomes: Outcomes = {}
     for stack in stacks.values():
-        if stack:
-            last, rank = stack[-1]
-            _outcome(bucket_outcomes, (last.config_version, _bucket(rank)), last)
+        latest = {decision.version: decision for decision in stack}  # per version, its last
+        for version, last in latest.items():
+            if wanted and version not in wanted:
+                continue
+            _outcome(bucket_outcomes, (version, last.bucket), last.action)
             if last.match_label:
-                _outcome(label_outcomes, (last.config_version, last.match_label), last)
+                _outcome(label_outcomes, (version, last.match_label), last.action)
 
     # The common bucket mix for the position adjustment: decisive outcomes over every config.
     weight: Counter[Any] = Counter()
