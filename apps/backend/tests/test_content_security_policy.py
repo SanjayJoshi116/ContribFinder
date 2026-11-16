@@ -39,7 +39,7 @@ def test_admin_page_gets_the_html_policy(admin_client: Client) -> None:
     assert "frame-ancestors 'none'" in policy
     assert "object-src 'none'" in policy
     # The admin runs under the policy: every script it includes is a file, none inline.
-    scripts = re.findall(r"<script\b[^>]*>", response.content.decode())
+    scripts = re.findall(r"<script\b[^>]*>", response.content.decode(), re.IGNORECASE)
     assert scripts
     assert all("src=" in tag or 'type="application/json"' in tag for tag in scripts)
 

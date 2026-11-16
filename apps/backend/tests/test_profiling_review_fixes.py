@@ -242,3 +242,19 @@ def test_profile_records_the_taxonomy_version(synced) -> None:
 def test_commented_out_readme_gives_no_interests() -> None:
     commented = profile(readme="<!-- I build machine learning pipelines -->")
     assert [e for e in interest_evidence(commented) if e.source == "readme"] == []
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("<!-- hidden --!> Python", " Python"),  # the parser also ends a comment at --!>
+        ("<!--> Python", " Python"),  # empty comment
+        ("<!---> Python", " Python"),  # empty comment
+        ("<!-- a -- b --> Python", " Python"),  # "--" inside does not end it
+        ("<!-- x --> Go <!-- y --!> Rust", " Go  Rust"),
+    ],
+)
+def test_comments_end_where_the_html_parser_ends_them(text: str, expected: str) -> None:
+    from services.profiling.text import strip_html_comments
+
+    assert strip_html_comments(text) == expected

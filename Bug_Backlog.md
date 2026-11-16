@@ -103,8 +103,7 @@ fixed as CR-1) and one fix-diff `/code-review` (batch 52, all fixed) over their 
 Batches 26–34 fixed in
 0.12.39–0.12.47 (CFG-7, CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 and SVC-13…SVC-15,
 SVC-17…SVC-19 accepted; batches 32–34: one `/simplify` and one fix-diff `/code-review` over their combined diff, batch 35).
-SVC-16 (per-user ETag cache generation, the root fix for SVC-6) fixed in 0.12.76, with batches 73 (`/simplify`) and 74 (fix-diff `/code-review`). Open: PUB-3 (batch 55: the
-repository's GitHub settings before it goes public; owner only). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
+SVC-16 (per-user ETag cache generation, the root fix for SVC-6) fixed in 0.12.76, with batches 73 (`/simplify`) and 74 (fix-diff `/code-review`). PUB-3 (batch 55: GitHub settings) fixed 2026-11-16, the repository is public. Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
 their releases. Known gaps (K) are in the next section. Ranking-visible fixes must win on the selection benchmark and not regress on
@@ -219,7 +218,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 52 | **Fix-diff review of 0.12.55–0.12.57** | CR-1…CR-10 | `/code-review` (high, no verify pass) of the uncommitted 0.12.55–0.12.57 code after batch 51, 2026-11-03; each row checked by reading; CR-1…CR-7, CR-10 fixed before commit (owner: fix all), CR-8 already documented, CR-9 kept (SIM2-11). |
 | 53 | **`/simplify` of 0.12.58–0.12.60** | SIM3-1…SIM3-14 | `/simplify` (reuse, simplification, efficiency, altitude; one combined diff of the uncommitted 0.12.58–0.12.60 tooling and CI code), 2026-11-06; SIM3-1…SIM3-8 fixed before commit, SIM3-9 later fixed as CR3-5, SIM3-10…SIM3-14 skipped (reasons in its section). |
 | 54 | **Fix-diff review of 0.12.58–0.12.60** | CR3-1…CR3-8 | `/code-review` (high) of the uncommitted 0.12.58–0.12.60 code after batch 53, 2026-11-06; each row checked by reading; all fixed before commit (owner: fix all). |
-| 55 | **Public-release check** | PUB-1…PUB-3 | History and repository check before going public, 2026-11-12; PUB-1 fixed in 0.12.61, PUB-2 accepted, PUB-3 open (GitHub settings, owner only). |
+| 55 | **Public-release check** | PUB-1…PUB-3 | History and repository check before going public, 2026-11-12; PUB-1 fixed in 0.12.61, PUB-2 accepted, PUB-3 fixed 2026-11-16 (owner; repository public). |
 | 56 | **Sweep: `services/repositories/`** | RS-1…RS-10 | Full review sweep (low group), 2026-11-12: verified by reading; RS-1…RS-3, RS-5…RS-10 fixed in 0.12.62 (`services-repositories-review-fixes`), RS-4 false positive. `/security-review` found nothing. |
 | 57 | **Sweep: `services/issues/`** | ISV-1…ISV-10 | Full review sweep (low group), 2026-11-12: verified (ISV-1…ISV-4 reproduced); ISV-1, ISV-2, ISV-4…ISV-8, ISV-10 fixed and ISV-3 in part in 0.12.63 (`services-issues-review-fixes`), ISV-9 accepted. `/security-review` found nothing. |
 | 59 | **Sweep: `services/discovery/`** | DSC-1…DSC-8 | Full review sweep (low group), 2026-11-13: verified by reading; DSC-1, DSC-2, DSC-4…DSC-8 fixed in 0.12.64 (`services-discovery-review-fixes`), DSC-3 false positive. `/simplify` in batch 61, fix-diff `/code-review` in batch 62. `/security-review` found nothing. |
@@ -238,6 +237,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 72 | **Fix-diff review of 0.12.70–0.12.74** | CR7-1…CR7-10 | `/code-review` (high) of the uncommitted 0.12.70–0.12.74 code, 2026-11-15; all fixed in 0.12.75 (owner: fix all; no OpenSpec change). |
 | 73 | **`/simplify` of 0.12.76** | SIM5-1…SIM5-5 | `/simplify` (4 agents) of the uncommitted 0.12.76 code (cache generation), 2026-11-16; SIM5-1…SIM5-3 fixed before commit (SIM5-1 later reverted by CR8-1), SIM5-4, SIM5-5 skipped (reasons in its section). |
 | 74 | **Fix-diff review of 0.12.76** | CR8-1…CR8-8 | `/code-review` (high, no verify pass) of the uncommitted 0.12.76 code after batch 73, 2026-11-16; each row checked by reading; CR8-1…CR8-4, CR8-7, CR8-8 fixed before commit (owner: fix all), CR8-5, CR8-6 rejected (reasons in its section). |
+| 75 | **CodeQL default setup, first scan** | CQ-1…CQ-4 | GitHub code scanning (CodeQL default setup) after the repository went public, 2026-11-16; alerts pasted by the owner, each checked by reading; all fixed in 0.12.77 (no OpenSpec change). None exploitable: no matched text is rendered as HTML. |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -1630,7 +1630,7 @@ in both workflows, no `pull_request_target`, no `secrets.*`.
 |---|---|---|---|---|
 | PUB-1 | docs | `CHANGELOG.md` (link references) | The compare links stopped at 0.10.0 and pointed at `v*` tags that were never created (the repository has no tags), so every version link returned 404. | fixed (0.12.61): link references removed, headings stay `## [x.y.z] - date` as plain text; noted under `[Unreleased]` "Removed". Tagging release commits and restoring the links stays possible |
 | PUB-2 | privacy | git history (`55f0fe9` … `8074cbe`) | Both SRS files, untracked in 0.12.39, are still reachable in history. | accepted: the owner's own documents, not confidential (`ideas.md` §5); removing them would need a history rewrite and a force-push |
-| PUB-3 | settings | GitHub repository settings | Private vulnerability reporting (which `SECURITY.md` relies on), secret scanning with push protection, Dependabot alerts, `main` protection (required checks, no force-push) and approval for fork workflows are not yet turned on. | open (owner only; the list is in `ideas.md` §5) |
+| PUB-3 | settings | GitHub repository settings | Private vulnerability reporting (which `SECURITY.md` relies on), secret scanning with push protection, Dependabot alerts, `main` protection (required checks, no force-push) and approval for fork workflows are not yet turned on. | fixed 2026-11-16 by the owner, then the repository went public. Checked through the public API: `main` rules (no deletion, no force-push, pull request, the six required checks), private vulnerability reporting enabled. Secret scanning, push protection, Dependabot alerts and fork-workflow approval need admin access to read: owner confirmed |
 
 ## Sweep: `services/repositories/` (2026-11-12)
 
@@ -2035,3 +2035,18 @@ batch 73. Each row checked against the code. Owner: fix all; CR8-5 and CR8-6 rej
 | CR8-6 | efficiency | `client.py:for_user` | A client built before the deletion committed writes and deletes every entry for the rest of its run. | rejected: refreshing `_owner` after a mismatch would let the cancelled sync cache again, the bug SVC-16 fixes; the churn ends with the run |
 | CR8-7 | docs | `CLAUDE_HISTORY.md`, change `tasks.md` 5.2 | Said `/simplify` and `/code-review` were skipped, contradicting batch 73. | fixed: both name batches 73 and 74 |
 | CR8-8 | release | `README.md` Screenshots | `docs/screenshots/` untracked: committing only modified files would break the images. | fixed: staged with the release commit |
+
+## CodeQL default setup, first scan (2026-11-16)
+
+Batch 75. Source: GitHub code scanning (CodeQL default setup: Python, JavaScript/TypeScript,
+Actions), turned on right after the repository went public. Alerts need write access to read; the
+owner pasted them. Each checked against the code. None is exploitable (the matched text is never
+rendered as HTML; evidence extraction and tests only), but each was a real inaccuracy. Fixed in
+0.12.77.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CQ-1 | accuracy | `profiling/text.py:_HTML_COMMENT` | `py/bad-tag-filter`: comments ended only at `-->`; the HTML parser (and GitHub) also end one at `--!>`, and `<!-->` / `<!--->` are empty. `<!-- x --!> Python` hid "Python" from evidence (everything to the end was stripped). | fixed: `<!--(?:-?>\|.*?(?:--!?>\|\Z))`; parametrized test |
+| CQ-2 | accuracy | `profiling/readme.py:badge_skills` | `py/incomplete-url-substring-sanitization`: `netloc.endswith("shields.io")` (and `skillicons.dev`, same pattern, not flagged) accepted `notshields.io`, and `netloc` with a port (`img.shields.io:443`) missed. | fixed: `hostname` plus `_on(host, domain)` (exact or subdomain); test with real and lookalike hosts |
+| CQ-3 | test | `tests/test_content_security_policy.py:42` | `py/bad-tag-filter`: the "no inline script" check matched lowercase `<script` only. | fixed: `re.IGNORECASE` |
+| CQ-4 | test | `apps/frontend/csp.config.test.ts:52` | Same pattern in the built-index check (JavaScript; reported by the owner after CQ-3). | fixed: `/gi` |

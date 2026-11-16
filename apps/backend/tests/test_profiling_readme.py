@@ -135,3 +135,18 @@ def test_phrase_matcher_boundaries() -> None:
     assert matcher.find("C, C++ and C#.") == {"c": "c", "cpp": "c++", "csharp": "c#"}
     assert matcher.find("maintain") == {}
     assert matcher.find("AI-powered") == {"ai": "ai"}
+
+
+def test_badge_hosts_match_exactly_never_a_lookalike() -> None:
+    kept = (
+        "![](https://shields.io/badge/x-1?logo=go)"
+        " ![](https://IMG.shields.io:443/badge/x-1?logo=rust)"
+        " ![](https://skillicons.dev/icons?i=py)"
+    )
+    assert badge_skills(kept) >= {"go", "rust", "python"}
+    lookalikes = (
+        "![](https://notshields.io/badge/x-1?logo=go)"
+        " ![](https://shields.io.example.com/badge/x-1?logo=rust)"
+        " ![](https://evilskillicons.dev/icons?i=py)"
+    )
+    assert badge_skills(lookalikes) == set()

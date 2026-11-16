@@ -333,7 +333,7 @@ Frontend (`apps/frontend`, npm):
 
 ## 7. Status and roadmap
 
-Current: **v0.12.76**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
+Current: **v0.12.77**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
 in v0.6.0. The full per-release record (phase FRs, deviations as built, carry-overs, every fix
 release since 0.12.1) lives in **`CLAUDE_HISTORY.md`**: read the entry for an area before
 changing it. Per-release detail also in `CHANGELOG.md`; accepted behaviour in `openspec/specs/`.
@@ -346,8 +346,9 @@ must be an improvement on the selection benchmark (`benchmark-v1` until `benchma
 judged real developer), must not regress on a fresh holdout (add `holdout-v3` first), and end
 with `--write-baseline`. Judging `real-a-v2` / building `benchmark-v2` is optional.
 
-**Next** (`ideas.md`, each needs an OpenSpec change). First, owner only: the GitHub settings
-before going public (PUB-3, `ideas.md` §5), then flip to public. Can ship now (no ranking change): platform
+**Next** (`ideas.md`, each needs an OpenSpec change). The repository is public since 2026-11-16
+(PUB-3 done; `main` ruleset requires a pull request and the six CI checks, the owner bypasses).
+Can ship now (no ranking change): platform
 items (migration round trip), then the interface revamp (§18, owner request: design direction
 first, one OpenSpec change per step). Ranking-visible (†): IDF weighting, diversity, stated
 preferences, contribution-success signals, opportunity qualifiers, upstream dependencies,
@@ -398,6 +399,10 @@ GitHub and data:
 - One text helper each: `profiling/text.strip_html_comments`, `FENCE`/`strip_code_fences`,
   `labels.parts` (label parser; a new scope word must not clash with aliases),
   `IssueInput(max_chars=)` before `classify.difficulty` / `technologies.detect`.
+- Host checks use `urlsplit(...).hostname` and match the domain exactly or as a subdomain
+  (`profiling/readme._on`), never `endswith`/`in` on the raw URL or `netloc`. HTML comment
+  matching follows the HTML parser (`-->`, `--!>`, empty `<!-->`). CodeQL default setup scans
+  every push (`Bug_Backlog.md` batch 75); fix its alerts at the cause, test included.
 - A new difficulty signal needs words in `features/issues/evidence.ts` `SIGNAL_TEXT` (test).
 - Scoring configs are immutable once stored; new seeds after v2 use `migrations/_seeding.py`
   (stored inactive); activation only through `activate_scoring_config`.

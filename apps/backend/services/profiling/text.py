@@ -40,7 +40,8 @@ class PhraseMatcher:
         return found
 
 
-_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
+# Ends as the HTML parser does: ``-->`` or ``--!>``, and ``<!-->`` / ``<!--->`` are empty.
+_HTML_COMMENT = re.compile(r"<!--(?:-?>|.*?(?:--!?>|\Z))", re.S)
 
 
 def strip_html_comments(text: str) -> str:

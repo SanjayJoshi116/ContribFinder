@@ -7,6 +7,30 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.77] - 2026-11-16
+
+Fixes for the first CodeQL code scan, run after the repository went public (`Bug_Backlog.md`
+batch 75). No OpenSpec change (the fixes follow the existing specs), no migration, no API or
+ranking change. No e2e run.
+
+### Fixed
+
+- HTML comments in profile READMEs, manifests and issue bodies end where the HTML parser ends
+  them: `--!>` also closes a comment, and `<!-->` / `<!--->` are empty. Before, text after such a
+  comment was dropped as if still commented out (CodeQL `py/bad-tag-filter`).
+- Badge and skill-icon evidence counts only `shields.io` and `skillicons.dev` or their
+  subdomains, read from the URL's host. A lookalike host (`notshields.io`) no longer counted, and
+  a host with a port (`img.shields.io:443`) no longer missed (CodeQL
+  `py/incomplete-url-substring-sanitization`).
+- The Content Security Policy tests' "no inline script" checks match `<script>` in any case
+  (CodeQL `py/bad-tag-filter`).
+
+### Changed
+
+- The repository is public (2026-11-16): private vulnerability reporting, secret scanning with
+  push protection, Dependabot alerts, a `main` ruleset (pull request and the six CI checks) and
+  CodeQL default setup are on.
+
 ## [0.12.76] - 2026-11-15
 
 Root fix for the GitHub response cache outliving a data deletion (`Bug_Backlog.md` SVC-16,

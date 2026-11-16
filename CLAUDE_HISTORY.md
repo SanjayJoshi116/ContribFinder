@@ -1985,6 +1985,24 @@ and `*.png binary` in `.gitattributes`. Public-release recheck 2026-11-16 (`idea
   last, broker error logged by `on_commit(robust=True)`). The generation covers only entries
   written after the deletion, so this retry is what clears older ones (CR8-2).
 
+**CodeQL fixes** (MVP+, fix release)  ✅ shipped in v0.12.77 (ranking-visible through data, rarely)
+
+No OpenSpec change (the fixes follow the existing specs). `Bug_Backlog.md` batch 75 (CQ-1…CQ-4),
+from the first CodeQL default-setup scan after the repository went public on 2026-11-16 (PUB-3
+done: private vulnerability reporting, secret scanning with push protection, Dependabot alerts,
+`main` ruleset with a pull request and the six CI checks, repository admin bypass; CodeQL
+default setup, not a workflow file). Backend 2013 tests; no e2e, no API or ranking-config change.
+- `profiling/text._HTML_COMMENT`: `<!--(?:-?>|.*?(?:--!?>|\Z))`, as the HTML parser ends a
+  comment. Profile, manifest and issue evidence after a `--!>` comment is no longer dropped.
+- `profiling/readme.badge_skills`: host from `urlsplit(...).hostname` (lowercased, no port or
+  credentials), matched by `_on(host, domain)` (exact or subdomain) for `shields.io` and
+  `skillicons.dev`. Devicon detection still looks for "devicon" anywhere in the URL (a path
+  check, not a host check; not flagged).
+- CSP tests (`tests/test_content_security_policy.py`, `apps/frontend/csp.config.test.ts`) match
+  `<script>` case-insensitively. The frontend one was not flagged yet (same pattern).
+- Alerts are visible only with write access: read them in the Security tab (or `gh api` once
+  `gh` is installed); they close when the fix reaches `main` and CodeQL re-runs.
+
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).

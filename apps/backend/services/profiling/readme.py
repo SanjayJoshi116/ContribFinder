@@ -109,21 +109,27 @@ def _shields_badge_skills(path: str) -> set[str]:
     return found
 
 
+def _on(host: str, domain: str) -> bool:
+    """Whether ``host`` is ``domain`` or one of its subdomains (``img.shields.io``), never a
+    lookalike (``notshields.io``)."""
+    return host == domain or host.endswith("." + domain)
+
+
 def badge_skills(readme: str) -> set[str]:
     """Skills named by badges, skill icons and image alt text."""
     found: set[str] = set()
     for url in _URLS.findall(readme):
         # URLs inside HTML attributes escape "&" as "&amp;".
         parts = urlsplit(html.unescape(url))
-        host = parts.netloc.lower()
+        host = parts.hostname or ""  # lowercased, without port or credentials
         query = parse_qs(parts.query)
-        if host.endswith("shields.io"):
+        if _on(host, "shields.io"):
             for logo in query.get("logo", []):
                 if slug := skill_for_icon(logo):
                     found.add(slug)
             if "/badge/" in parts.path:
                 found.update(_shields_badge_skills(parts.path.split("/badge/", 1)[1]))
-        elif host.endswith("skillicons.dev"):
+        elif _on(host, "skillicons.dev"):
             for icons in query.get("i", []):
                 for token in icons.split(","):
                     if slug := skill_for_icon(token.strip()):

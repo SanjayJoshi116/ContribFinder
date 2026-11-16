@@ -362,12 +362,15 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   Rechecked 2026-11-16 (v0.12.76): all 51 commits scanned again, no real secrets (fake test
   tokens, local dev `contribfinder` password only), only `.env.example` and no-reply emails; SRS
   copies in history (`55f0fe9`…`8074cbe`) left as accepted (PUB-2), SRS stays untracked. README
-  screenshots added (owner's real public profile, chosen by the owner). Owner progress on PUB-3:
-  private vulnerability reporting turned on account-wide for public repositories (check
-  "Report a vulnerability" on this repository after the flip); `main` ruleset created (bypass:
-  repository admin; not enforced on a private repository on the free plan, active once public);
-  fork-workflow approval appears only once public. Without a paid plan, secret scanning and the
-  ruleset take effect only after the flip.
+  screenshots added (owner's real public profile, chosen by the owner).
+  **Done 2026-11-16: the repository is public** (after v0.12.76, CI green). PUB-3 settings on:
+  private vulnerability reporting, `main` ruleset (no deletion, no force-push, pull request, the
+  six required checks; bypass: repository admin, so the owner's direct pushes still work),
+  secret scanning with push protection, Dependabot alerts, fork-workflow approval for outside
+  collaborators, read-only `GITHUB_TOKEN`. CodeQL default setup on (no workflow file); its first
+  scan's alerts fixed in v0.12.77 (`Bug_Backlog.md` batch 75). Left, optional: GitHub's community
+  profile is at 71% (no `CODE_OF_CONDUCT.md`, issue or pull request templates); add CodeQL to the
+  ruleset's required checks once it stays quiet.
 
 ## Evaluation
 

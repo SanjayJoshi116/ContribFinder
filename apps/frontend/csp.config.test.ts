@@ -49,7 +49,7 @@ describe('content security policy', () => {
     () => {
       const html = readFileSync(built, 'utf-8')
       expect(html).toContain('http-equiv="Content-Security-Policy"')
-      const scripts = html.match(/<script\b[^>]*>/g) ?? []
+      const scripts = html.match(/<script\b[^>]*>/gi) ?? []
       expect(scripts.length).toBeGreaterThan(0)
       expect(scripts.every((tag) => tag.includes('src='))).toBe(true)
     },

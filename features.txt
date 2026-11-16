@@ -439,6 +439,18 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.77 - CodeQL fixes (first code scan after going public)
+============================================================================
+
+Profile evidence (Bug_Backlog.md batch 75, CQ-1..CQ-4; no OpenSpec change)
+  [x] HTML comments end where the HTML parser ends them (--!>, empty <!--> and <!--->)
+  [x] Badge skills only from shields.io / skillicons.dev or their subdomains, never lookalikes
+  [x] "No inline script" checks match <script> in any case (backend and frontend tests)
+
+Repository
+  [x] Public since 2026-11-16; GitHub settings done (PUB-3); CodeQL default setup on
+
+============================================================================
 SHIPPED - v0.12.76 - Cache generation for data deletion
 ============================================================================
 
@@ -645,8 +657,9 @@ Repository (Bug_Backlog.md batch 55, ideas.md §5)
   [x] Git history checked again: no real secrets, no local data, no-reply emails
   [x] Dead CHANGELOG compare links removed (no v* tags exist)
   [x] .gitignore covers private keys, certificates and .envrc
-  [ ] GitHub settings before going public (owner only: vulnerability reporting, secret
-      scanning, branch protection, fork workflow approval; PUB-3)
+  [x] GitHub settings before going public (owner only: vulnerability reporting, secret
+      scanning, branch protection, fork workflow approval; PUB-3, done 2026-11-16)
+  [x] Repository public (2026-11-16, after v0.12.76)
 
 ============================================================================
 SHIPPED - v0.12.60 - CI fixes (review sweep: .github/workflows)
