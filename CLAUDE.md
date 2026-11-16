@@ -176,7 +176,8 @@ ContribFinder/
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
 │  ideas.md (unplanned gap analysis by when it can ship: no ranking change first, then
 │  ranking-visible ideas; each idea needs an OpenSpec change first); reports/ (gitignored --json
-│  outputs); docs/screenshots/ (README images, retake after a UI change; .gitattributes: binary)
+│  outputs); docs/screenshots/ (README images, retake after a UI change; .gitattributes: binary),
+│  docs/social-preview.png (1280×640 GitHub social preview, uploaded in repo settings)
 └─ .github/workflows/ci.yml, audit.yml (dependency audit: PRs, main, weekly, on demand);
    dependabot.yml (GitHub Actions pins, weekly)
 ```

@@ -33,6 +33,8 @@ ranking change. No e2e run.
 - README "Known issues" (a release-by-release batch log, last updated at 0.12.33) replaced by
   "Known limitations": a short list of what does not work yet, linking `Bug_Backlog.md` and
   this changelog.
+- `docs/social-preview.png`: the repository's 1280×640 social preview image (link cards on
+  LinkedIn and elsewhere), kept with the screenshots.
 
 ## [0.12.76] - 2026-11-15
 
