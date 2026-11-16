@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.75** (fix-diff review fixes after the review sweep; MVP+). After signing in with
+**Version 0.12.76** (cache generation for data deletion, README screenshots; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -28,6 +28,24 @@ are measured offline on a hand-judged benchmark before they count as improvement
   [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Engineering guide and roadmap: [`CLAUDE.md`](CLAUDE.md). Specs: `openspec/specs/`; archived
   changes: `openspec/changes/archive/`.
+
+## Screenshots
+
+Taken from v0.12.76; the interface is being redesigned, so newer versions may look different.
+
+**Dashboard:** the evidence-backed profile summary, then recommended projects with filters,
+match labels and reasons.
+
+![Dashboard with profile summary, filters and recommended projects](docs/screenshots/dashboard.png)
+
+**Recommendation detail:** why a project matches, its technologies, and open issues that fit,
+each with a contribution type and an estimated difficulty.
+
+![Recommendation detail with match reasons and relevant issues](docs/screenshots/detail.png)
+
+| Skills and their evidence | Saved and hidden projects |
+|---|---|
+| ![Skills grouped by kind, each with an evidence bar and its sources](docs/screenshots/skills.png) | ![Saved projects and a hidden project with its dismiss reason](docs/screenshots/saved.png) |
 
 ## 1. Register a GitHub OAuth App
 

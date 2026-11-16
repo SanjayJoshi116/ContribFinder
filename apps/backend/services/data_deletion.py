@@ -16,7 +16,7 @@ from django.core.cache import caches
 from django.core.cache.backends.locmem import LocMemCache
 from django.core.cache.backends.redis import RedisCache
 from django.db import transaction
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, F, OuterRef
 
 from accounts.models import User
 from developers.models import DeveloperProfile, InterestEvidence, SkillEvidence
@@ -52,8 +52,8 @@ def _touched_repository_ids(user: User) -> set[int]:
 def delete_github_data(user: User) -> dict[str, int]:
     """Cancel the user's jobs and delete everything derived from GitHub for them, including
     shared repositories nobody else references. Returns counts for the audit entry (no
-    content). The user's cached GitHub responses are purged after commit, and once more later
-    for entries a cancelled worker's last request wrote after the first purge."""
+    content). The user's cached GitHub responses are purged after commit; the generation bump
+    makes a client built before the deletion drop any entry it writes afterwards."""
     # Account deletion deletes the user before this commits: ``user.pk`` is None by then.
     user_id = user.pk
     jobs.cancel_active_syncs(user)
@@ -79,19 +79,22 @@ def delete_github_data(user: User) -> dict[str, int]:
         }
         counts["repositories"] = _delete_orphans(repository_ids)
         # The display name comes from the GitHub profile; the next sign-in sets it again.
-        user.display_name = ""
-        user.save(update_fields=["display_name"])
-        transaction.on_commit(lambda: purge_user_github_cache(user_id))
-        transaction.on_commit(lambda: _purge_later(user_id), robust=True)
+        User.objects.filter(pk=user_id).update(
+            display_name="", github_cache_generation=F("github_cache_generation") + 1
+        )
+        # In step with the row, so a later full save of ``user`` cannot undo the bump.
+        user.refresh_from_db(fields=["display_name", "github_cache_generation"])
+        transaction.on_commit(lambda: _purge(user_id), robust=True)
     return counts
 
 
-def _purge_later(user_id: int) -> None:
-    """Purge again once cancelled workers have stopped: by ``SYNC_STALE_AFTER_SECONDS`` a worker
-    has hit ``JobCancelled`` at a guarded write or counts as dead."""
-    from github.tasks import purge_user_cache  # avoid import cycle
+def _purge(user_id: int) -> None:
+    """Purge at commit; if that fails (a brief cache outage), queue retries. The generation
+    covers entries written after the deletion, not the ones that were already there."""
+    if not purge_user_github_cache(user_id):
+        from github.tasks import purge_user_cache  # avoid import cycle
 
-    purge_user_cache.apply_async((user_id,), countdown=settings.SYNC_STALE_AFTER_SECONDS)
+        purge_user_cache.apply_async((user_id,), countdown=settings.GITHUB_CACHE_BACKOFF_SECONDS)
 
 
 def _delete_orphans(repository_ids: set[int]) -> int:
@@ -122,10 +125,10 @@ def _delete_orphans(repository_ids: set[int]) -> int:
     return orphans.delete()[1].get("repositories.Repository", 0)
 
 
-def purge_user_github_cache(user_id: int) -> None:
+def purge_user_github_cache(user_id: int) -> bool:
     """Delete the user-scope GitHub response cache (``github:etag:{pk}:*``). ``public``
-    entries are shared and expire on their own. Failures are logged, never raised: entries
-    expire within ``GITHUB_ETAG_TTL`` anyway."""
+    entries are shared and expire on their own. Failures are logged, never raised; returns
+    False after one, so the caller can try again (entries expire within ``GITHUB_ETAG_TTL``)."""
     cache = caches["default"]
     try:
         # Written before 0.12.10 (one-hour TTL). Remove this delete in a later release.
@@ -142,6 +145,9 @@ def purge_user_github_cache(user_id: int) -> None:
                 for key in [k for k in locmem._cache if fnmatchcase(k, pattern)]:
                     locmem._delete(key)
         else:
+            # A retry cannot help: report done.
             logger.warning("GitHub cache purge not supported for %s", type(cache).__name__)
     except Exception as exc:
         logger.warning("GitHub cache purge failed: %s", type(exc).__name__)
+        return False
+    return True

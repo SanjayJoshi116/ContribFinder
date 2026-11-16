@@ -1960,6 +1960,31 @@ fails on the old code, except CR7-5.
   `DismissButton` matches it. `formatRelative` picks the unit after rounding. `evidence.ts`
   builds both category maps from `CATEGORIES`.
 
+**Cache generation for data deletion** (MVP+, fix release)  ✅ shipped in v0.12.76
+
+OpenSpec change `etag-cache-generation` (MODIFIED "Delete GitHub-derived data" in `data-controls`:
+new scenario "Cached response written after deletion"). `Bug_Backlog.md` SVC-16 fixed, the root
+fix for SVC-6 and SVC-15. Backend 2007 tests; no e2e, no API change. `/simplify` (`Bug_Backlog.md`
+batch 73) and a fix-diff `/code-review` (batch 74, owner: fix all) ran before commit.
+Also README "Screenshots" (`docs/screenshots/`: dashboard, detail, skills, saved and hidden; taken
+from the owner's real local profile with a Playwright script against the dev stack, not kept;
+the save and dismissal made for the saved page were undone and their feedback events deleted)
+and `*.png binary` in `.gitattributes`. Public-release recheck 2026-11-16 (`ideas.md` §5).
+- `User.github_cache_generation` (migration `accounts/0006`). `delete_github_data` bumps it with
+  `F() + 1` and clears `display_name` in one `update()`; the purge still runs on commit.
+- `GitHubClient.for_user` reads token and generation in one query (not from the passed `User`,
+  which may predate a deletion); a client on the user's own scope sets `_owner`. After an ETag
+  `cache.set`, `_still_current()` re-reads the generation; changed or user gone → `cache.delete`.
+  A `DatabaseError` there is logged and counts as stale (fail closed: one cache miss). The check
+  always runs after a set: the shared backoff state cannot tell whether this thread's write
+  landed (CR8-1). Public-scope clients never check. The passed `user` is refreshed after the
+  bump, so a later full save keeps it.
+- `_purge_later` removed. `purge_user_github_cache` returns whether it succeeded; when the purge
+  at commit fails, `data_deletion._purge` queues `github.purge_user_cache`
+  (`GITHUB_CACHE_BACKOFF_SECONDS` countdown, `PURGE_ATTEMPTS` = 3 tries, eager: first try is the
+  last, broker error logged by `on_commit(robust=True)`). The generation covers only entries
+  written after the deletion, so this retry is what clears older ones (CR8-2).
+
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).
@@ -1978,4 +2003,4 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63), services/discovery review fixes (0.12.64), services/matching review fixes (0.12.65), services/ranking review fixes (0.12.66), services/evaluation review fixes (0.12.67), recommendations view review fixes (0.12.68), fix-diff review of 0.12.66–0.12.68 (0.12.69), feedback interface review fixes (0.12.70), profile page review fixes (0.12.71), pipeline progress review fixes (0.12.72), shared components review fixes (0.12.73), root config review fixes (0.12.74; the full review sweep complete), fix-diff review of 0.12.70–0.12.74 (0.12.75).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63), services/discovery review fixes (0.12.64), services/matching review fixes (0.12.65), services/ranking review fixes (0.12.66), services/evaluation review fixes (0.12.67), recommendations view review fixes (0.12.68), fix-diff review of 0.12.66–0.12.68 (0.12.69), feedback interface review fixes (0.12.70), profile page review fixes (0.12.71), pipeline progress review fixes (0.12.72), shared components review fixes (0.12.73), root config review fixes (0.12.74; the full review sweep complete), fix-diff review of 0.12.70–0.12.74 (0.12.75), cache generation for data deletion (0.12.76).

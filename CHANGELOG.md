@@ -7,6 +7,34 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.76] - 2026-11-15
+
+Root fix for the GitHub response cache outliving a data deletion (`Bug_Backlog.md` SVC-16,
+closing SVC-6 and SVC-15). OpenSpec change `etag-cache-generation`. One migration
+(`accounts/0006`); no API, OpenAPI or ranking change. No e2e run. `/simplify` and a fix-diff
+`/code-review` ran before release (`Bug_Backlog.md` batches 73 and 74).
+
+### Added
+
+- README "Screenshots" section: dashboard, recommendation detail, skills evidence, saved and
+  hidden projects (`docs/screenshots/`). PNG files are marked binary in `.gitattributes`.
+
+### Fixed
+
+- A GitHub response that a cancelled sync receives after "delete my data" (or account deletion)
+  committed is no longer left in the user's response cache. Each deletion bumps a per-user cache
+  generation; a client built before it re-reads the generation after every cache write and
+  deletes the entry it just wrote. Before, a timed second purge only narrowed the window, and a
+  worker slower than `SYNC_STALE_AFTER_SECONDS` escaped it (SVC-16).
+- A cache purge that fails as a data deletion commits (a brief cache outage) is retried in the
+  background, up to three times; before, the user's existing entries stayed until they expired.
+- A failed generation read drops the entry just written instead of keeping it.
+
+### Removed
+
+- The unconditional delayed second cache purge; `github.purge_user_cache` now runs only to retry
+  a failed purge.
+
 ## [0.12.75] - 2026-11-15
 
 Fixes from the fix-diff review of 0.12.70–0.12.74 (`Bug_Backlog.md` batch 72, CR7-1…CR7-10).

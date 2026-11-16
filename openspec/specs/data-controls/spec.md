@@ -38,6 +38,14 @@ A signed-in user SHALL be able to delete all GitHub-derived data (`DELETE /api/v
 - **WHEN** writing the `github_data_deleted` audit entry fails during a GitHub data deletion
 - **THEN** the response is an error, the user's GitHub-derived data still exists, and no `github_data_deleted` entry exists
 
+#### Scenario: Cached response written after deletion
+- **WHEN** a sync's GitHub request was in flight while the user deleted their GitHub data, and its response arrives after the deletion committed
+- **THEN** the response is not left in the user's GitHub response cache, without waiting for a later purge
+
+#### Scenario: Cache purge fails at deletion
+- **WHEN** purging the user's GitHub response cache fails as the deletion commits (a brief cache outage)
+- **THEN** the deletion still succeeds, and the purge is tried again in the background until it succeeds or its tries run out; entries left after that expire within the response cache's lifetime
+
 ### Requirement: Delete account
 A signed-in user SHALL be able to delete their ContribFinder account (`DELETE /api/v1/auth/account`, CSRF-protected). The system SHALL cancel the user's jobs, delete the stored credential and all GitHub-derived data as above, delete the user, and end the session. When connected, it SHALL ask GitHub to revoke the authorization in the background, never inside the request, holding the token only encrypted; a failed revocation SHALL NOT stop the deletion and SHALL be recorded without the token. The deletion audit entry, the anonymization of the user's audit entries and the deletion of the user SHALL happen together or not at all. After deletion, signing in with the same GitHub account SHALL create a new, empty account.
 

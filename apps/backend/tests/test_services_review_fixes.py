@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 import pytest
-from django.conf import settings
 from django.core.cache import caches
 from django.test import override_settings
 from django.utils import timezone
@@ -49,30 +48,6 @@ def test_account_deletion_purges_the_users_github_cache(
         response = signed_in_client.delete("/api/v1/auth/account")
     assert response.status_code == 204
     assert cache.get(key) is None  # purged by the id, not by the deleted user's pk (None)
-
-
-def test_a_second_purge_is_queued_after_workers_stop(
-    user: User, django_capture_on_commit_callbacks
-) -> None:
-    with (
-        patch("github.tasks.purge_user_cache.apply_async") as later,
-        django_capture_on_commit_callbacks(execute=True),
-    ):
-        data_deletion.delete_github_data(user)
-    later.assert_called_once_with((user.pk,), countdown=settings.SYNC_STALE_AFTER_SECONDS)
-
-
-def test_a_broker_error_never_fails_the_deletion(
-    signed_in_client: APIClient, user: User, django_capture_on_commit_callbacks
-) -> None:
-    linked_repo(user, 1)
-    with (
-        patch("github.tasks.purge_user_cache.apply_async", side_effect=ConnectionError("down")),
-        django_capture_on_commit_callbacks(execute=True),
-    ):
-        response = signed_in_client.delete("/api/v1/profile/github-data")
-    assert response.status_code == 204
-    assert not UserRepository.objects.filter(user=user).exists()
 
 
 def test_orphans_are_counted_from_the_delete(user: User) -> None:

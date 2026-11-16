@@ -72,10 +72,24 @@ def revoke_later(self: Any, encrypted: str, github_id: int | None, grant: bool) 
         record_revocation_failure(decision.code)
 
 
-@shared_task(name="github.purge_user_cache", acks_late=True)
-def purge_user_cache(user_id: int) -> None:
-    """The delayed second purge after a GitHub data deletion (``data_deletion``)."""
-    purge_user_github_cache(user_id)
+# Tries of a purge that failed at a data deletion's commit (that first purge not counted).
+PURGE_ATTEMPTS = 3
+
+
+@shared_task(bind=True, name="github.purge_user_cache", acks_late=True, max_retries=None)
+def purge_user_cache(self: Any, user_id: int) -> None:
+    """Purge the user's GitHub response cache again after the purge at a data deletion's
+    commit failed (``data_deletion._purge``). Retried while the cache stays down; after the
+    last try the entries expire within ``GITHUB_ETAG_TTL``. Without a worker (eager mode)
+    the first try is the last."""
+    if purge_user_github_cache(user_id):
+        return
+    attempt = attempt_number(
+        self.request.retries + 1, PURGE_ATTEMPTS, eager=settings.CELERY_TASK_ALWAYS_EAGER
+    )
+    if attempt < PURGE_ATTEMPTS:
+        raise self.retry(countdown=settings.GITHUB_CACHE_BACKOFF_SECONDS)
+    logger.warning("GitHub cache purge gave up after %s tries", PURGE_ATTEMPTS)
 
 
 @shared_task(name="github.revoke_replaced_token", acks_late=True)

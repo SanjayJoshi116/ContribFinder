@@ -439,6 +439,22 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.76 - Cache generation for data deletion
+============================================================================
+
+Data controls (Bug_Backlog.md SVC-16; OpenSpec etag-cache-generation)
+  [x] A response arriving after a GitHub data deletion is never left in the user's cache
+      (per-user generation, checked after each write; the timed second purge retired)
+  [x] A cache purge that fails at the deletion's commit is retried in the background (3 tries)
+  [x] A failed generation read drops the entry (fails closed)
+
+Review follow-ups (Bug_Backlog.md batches 73 SIM5-1..SIM5-5, 74 CR8-1..CR8-8)
+  [x] /simplify and fix-diff /code-review of the change, fixed before release
+
+Docs
+  [x] README screenshots (dashboard, detail, skills, saved and hidden; docs/screenshots/)
+
+============================================================================
 SHIPPED - v0.12.75 - Fix-diff review of 0.12.70-0.12.74
 ============================================================================
 

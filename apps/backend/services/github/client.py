@@ -21,6 +21,7 @@ from urllib.parse import quote, urlencode
 import httpx
 from django.conf import settings
 from django.core.cache import cache
+from django.db import DatabaseError
 
 from accounts.models import User
 from core.backoff import Backoff
@@ -286,6 +287,9 @@ class GitHubClient:
             raise ValueError("Pass exactly one of token or auth_header")
         self._auth = auth_header or f"Bearer {token}"
         self._scope = cache_scope
+        # (user pk, cache generation) for a client writing to its user's own cache scope: set by
+        # ``for_user``, checked after every cache write (``_still_current``, SVC-16).
+        self._owner: tuple[int, int] | None = None
         self._http = httpx.Client(
             base_url=settings.GITHUB_API_BASE_URL,
             timeout=settings.GITHUB_HTTP_TIMEOUT,
@@ -299,15 +303,25 @@ class GitHubClient:
 
         ``cache_scope`` defaults to the user; pass ``PUBLIC_SCOPE`` for public repository
         endpoints so their ETags are shared with other users and the app client."""
-        account = GitHubAccount.objects.filter(user=user).first()
-        if account is None:
+        # The generation comes from the database, not ``user``, which may predate a deletion.
+        row = (
+            GitHubAccount.objects.filter(user=user)
+            .values_list("access_token_encrypted", "user__github_cache_generation")
+            .first()
+        )
+        if row is None:
             raise GitHubAuthError("No connected GitHub account")
+        encrypted, generation = row
         try:
-            token = decrypt_token(account.access_token_encrypted)
+            token = decrypt_token(encrypted)
         except TokenDecryptionError:
             # A key rotation dropped the key: the user must sign in again (github_auth_invalid).
             raise GitHubAuthError("Stored GitHub token cannot be decrypted") from None
-        return cls(token, cache_scope=cache_scope or str(user.pk))
+        own_scope = str(user.pk)
+        client = cls(token, cache_scope=cache_scope or own_scope)
+        if client._scope == own_scope:
+            client._owner = (user.pk, generation)
+        return client
 
     @classmethod
     def for_app(cls) -> GitHubClient:
@@ -585,8 +599,30 @@ class GitHubClient:
                     {"etag": etag, "body": result.text, "link": result.link},
                     settings.GITHUB_ETAG_TTL,
                 )
+                if not self._still_current():
+                    _cached(cache.delete, key)
             return result
         raise error_for_response(response, path)
+
+    def _still_current(self) -> bool:
+        """Whether no GitHub data deletion happened since ``for_user`` built this client. Read
+        after the cache write: a deletion's purge either runs after the write and removes the
+        entry, or commits before this read, which then sees the bumped generation (or no user,
+        after account deletion) and the caller removes the entry (SVC-16). A failed read counts
+        as stale: losing the entry costs one cache miss, keeping it could outlive a deletion."""
+        if self._owner is None:
+            return True
+        user_id, generation = self._owner
+        try:
+            current = (
+                User.objects.filter(pk=user_id)
+                .values_list("github_cache_generation", flat=True)
+                .first()
+            )
+        except DatabaseError as exc:
+            logger.warning("GitHub cache generation check failed: %s", type(exc).__name__)
+            return False
+        return current == generation
 
     def _send(self, url: str, headers: dict[str, str], path: str) -> httpx.Response:
         """GET ``url``, following redirects (renamed or transferred repositories) up to

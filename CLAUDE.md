@@ -176,7 +176,7 @@ ContribFinder/
 ├─ VERSION, CHANGELOG.md, features.txt, Bug_Backlog.md (verified findings, fix batches),
 │  ideas.md (unplanned gap analysis by when it can ship: no ranking change first, then
 │  ranking-visible ideas; each idea needs an OpenSpec change first); reports/ (gitignored --json
-│  outputs)
+│  outputs); docs/screenshots/ (README images, retake after a UI change; .gitattributes: binary)
 └─ .github/workflows/ci.yml, audit.yml (dependency audit: PRs, main, weekly, on demand);
    dependabot.yml (GitHub Actions pins, weekly)
 ```
@@ -333,7 +333,7 @@ Frontend (`apps/frontend`, npm):
 
 ## 7. Status and roadmap
 
-Current: **v0.12.75**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
+Current: **v0.12.76**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
 in v0.6.0. The full per-release record (phase FRs, deviations as built, carry-overs, every fix
 release since 0.12.1) lives in **`CLAUDE_HISTORY.md`**: read the entry for an area before
 changing it. Per-release detail also in `CHANGELOG.md`; accepted behaviour in `openspec/specs/`.
@@ -346,7 +346,8 @@ must be an improvement on the selection benchmark (`benchmark-v1` until `benchma
 judged real developer), must not regress on a fresh holdout (add `holdout-v3` first), and end
 with `--write-baseline`. Judging `real-a-v2` / building `benchmark-v2` is optional.
 
-**Next** (`ideas.md`, each needs an OpenSpec change). Can ship now (no ranking change): platform
+**Next** (`ideas.md`, each needs an OpenSpec change). First, owner only: the GitHub settings
+before going public (PUB-3, `ideas.md` §5), then flip to public. Can ship now (no ranking change): platform
 items (migration round trip), then the interface revamp (§18, owner request: design direction
 first, one OpenSpec change per step). Ranking-visible (†): IDF weighting, diversity, stated
 preferences, contribution-success signals, opportunity qualifiers, upstream dependencies,
@@ -400,6 +401,11 @@ GitHub and data:
 - A new difficulty signal needs words in `features/issues/evidence.ts` `SIGNAL_TEXT` (test).
 - Scoring configs are immutable once stored; new seeds after v2 use `migrations/_seeding.py`
   (stored inactive); activation only through `activate_scoring_config`.
+- A user-scope ETag cache write is checked against `User.github_cache_generation` afterwards
+  (`GitHubClient._still_current`); a new user-scope cache writer does the same, never a timed purge.
+  The check runs after every set (never gated on the shared `_cache_backoff` state, which races
+  between worker threads) and fails closed. A purge that fails at a deletion's commit is retried
+  (`github.purge_user_cache`); the generation never covers entries written before the deletion.
 - New user-linked model: deleted by `delete_github_data` or kept on purpose, category on
   `PrivacyPage.tsx` (`test_privacy_coverage.py`).
 

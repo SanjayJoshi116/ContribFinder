@@ -11,6 +11,9 @@ class User(AbstractUser):
     """
 
     display_name = models.CharField(max_length=255, blank=True)
+    # Bumped by every GitHub data deletion: a client built before it drops the cache entries
+    # it writes afterwards (services/github/client.py, SVC-16).
+    github_cache_generation = models.PositiveIntegerField(default=0)
 
 
 class AuditEvent(models.Model):

@@ -103,7 +103,7 @@ fixed as CR-1) and one fix-diff `/code-review` (batch 52, all fixed) over their 
 Batches 26–34 fixed in
 0.12.39–0.12.47 (CFG-7, CFG-8, ACC-4, GH-6, SEED-13, SEED-14, SEED-18 and SVC-13…SVC-15,
 SVC-17…SVC-19 accepted; batches 32–34: one `/simplify` and one fix-diff `/code-review` over their combined diff, batch 35).
-Open: SVC-16 (per-user ETag cache generation, the root fix for SVC-6). PUB-3 (batch 55: the
+SVC-16 (per-user ETag cache generation, the root fix for SVC-6) fixed in 0.12.76, with batches 73 (`/simplify`) and 74 (fix-diff `/code-review`). Open: PUB-3 (batch 55: the
 repository's GitHub settings before it goes public; owner only). Open rows: RT-3, RT-4, RT-5 (batch 24, design-level; renamed from R-3…R-5, which clashed with the
 2026-10-19 "R" rows).
 Earlier: P-1 accepted; B-6, D-11 and T-11 fixed in 0.12.32; batches 21–23, 25 fixed or closed in
@@ -195,7 +195,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 28 | **Sweep: `accounts/`** | ACC-1…ACC-20 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/accounts/`, verified; fixed in 0.12.41 (`accounts-review-fixes`), ACC-4 accepted; its fix-diff review ACC-11…ACC-20 fixed before commit (ACC-17 in part). `/security-review` of the module found nothing. |
 | 29 | **Sweep: `github/`** | GH-1…GH-8 | Full review sweep, 2026-10-30: `/code-review` (high) of `apps/backend/github/`, verified; fixed in 0.12.42 (`github-review-fixes`), GH-6 accepted; its fix-diff review GH-9…GH-15 (GH-10, GH-13 fixed, the rest accepted or wontfix). `/security-review` of the module found nothing. |
 | 30 | **Sweep: `e2e/`** | SEED-1…SEED-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/e2e/`, verified; fixed in 0.12.43 (`e2e-seed-review-fixes`); its fix-diff review SEED-11…SEED-19 (SEED-13, SEED-14, SEED-18 accepted, the rest fixed). `/security-review` of the module found nothing. |
-| 31 | **Sweep: `services/*.py`** | SVC-1…SVC-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/services/*.py`, verified; fixed in 0.12.44 (`services-review-fixes`); its fix-diff review SVC-11…SVC-20 (SVC-11, SVC-12 fixed, SVC-20 in part, SVC-16 open, the rest accepted). `/security-review` of the module found nothing (validated against the code). |
+| 31 | **Sweep: `services/*.py`** | SVC-1…SVC-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/services/*.py`, verified; fixed in 0.12.44 (`services-review-fixes`); its fix-diff review SVC-11…SVC-20 (SVC-11, SVC-12 fixed, SVC-20 in part, SVC-16 fixed in 0.12.76, the rest accepted). `/security-review` of the module found nothing (validated against the code). |
 | 32 | **Sweep: `services/github/`** | GHS-1…GHS-10 | Full review sweep, 2026-10-31: `/code-review` (high) of `apps/backend/services/github/`, verified; GHS-3, GHS-7, GHS-8 partial, the rest confirmed; fixed in 0.12.45 (`github-services-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing (validated against the code). |
 | 33 | **Sweep: `frontend/src/api/`** | API-1…API-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/frontend/src/api/`, verified; API-1, API-4, API-9 confirmed, API-2, API-3, API-5 partial, API-6, API-7 accepted, API-8 false positive; fixed in 0.12.46 (`api-client-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing. `openapi.json` matches a fresh export. |
 | 34 | **Sweep: `frontend/src/features/auth/`** | AUTH-1…AUTH-9 | Full review sweep, 2026-11-02: `/code-review` (high) of `apps/frontend/src/features/auth/`, verified; AUTH-1, AUTH-2, AUTH-5, AUTH-6, AUTH-7, AUTH-9 confirmed, AUTH-3, AUTH-4, AUTH-8 partial; fixed in 0.12.47 (`auth-review-fixes`); its fix-diff review is batch 35. `/security-review` of the module found nothing (no cross-user path for AUTH-4: sign-in is a full-page navigation). |
@@ -236,6 +236,8 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 69 | **Sweep: `frontend/src/components/ + src/lib/`** | CMP-1…CMP-10 | Full review sweep (low group), 2026-11-14: verified by reading; fixed in 0.12.73 (`shared-components-review-fixes`), CMP-4 accepted, CMP-6 duplicate of FBK-8. `/security-review` found nothing. |
 | 70 | **Sweep: root config** | ROOT-1…ROOT-10 | Full review sweep (low group, last module), 2026-11-14: verified by reading; all fixed in 0.12.74 (`root-config-review-fixes`). `/security-review` found nothing at its bar. |
 | 72 | **Fix-diff review of 0.12.70–0.12.74** | CR7-1…CR7-10 | `/code-review` (high) of the uncommitted 0.12.70–0.12.74 code, 2026-11-15; all fixed in 0.12.75 (owner: fix all; no OpenSpec change). |
+| 73 | **`/simplify` of 0.12.76** | SIM5-1…SIM5-5 | `/simplify` (4 agents) of the uncommitted 0.12.76 code (cache generation), 2026-11-16; SIM5-1…SIM5-3 fixed before commit (SIM5-1 later reverted by CR8-1), SIM5-4, SIM5-5 skipped (reasons in its section). |
+| 74 | **Fix-diff review of 0.12.76** | CR8-1…CR8-8 | `/code-review` (high, no verify pass) of the uncommitted 0.12.76 code after batch 73, 2026-11-16; each row checked by reading; CR8-1…CR8-4, CR8-7, CR8-8 fixed before commit (owner: fix all), CR8-5, CR8-6 rejected (reasons in its section). |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -1089,7 +1091,7 @@ feedback, job_guard, jobs, locks, text). Each row checked against the code.
 | SVC-3 | race | `data_deletion.py:97` | `_delete_orphans` decides orphans with NOT EXISTS and locks nothing: another user's discovery linking the repository at the same moment fails one transaction's deferred FK at commit. | partial (rare, fails loudly, no data lost; lock the candidate orphans in pk order, then re-check); fixed (0.12.44, `services-review-fixes`) |
 | SVC-4 | deadlock | `jobs.py:86` | `_end_jobs` locks rows in no fixed order; recovery, cancel and expiry can lock overlapping jobs in opposite orders. | confirmed (`.order_by("pk")` before `select_for_update()`); fixed (0.12.44, `services-review-fixes`) |
 | SVC-5 | bug | `jobs.py:379` | A rerun requested on a RUNNING generation is dropped when that run ends FAILED (`rerun_recommendations_if_requested` is only `on_completed`); a restored repository stays away up to `RECOMMENDATION_FAILED_RETRY_MINUTES`. | confirmed (also run the hook after a final failure; check `recommendation-engine` spec wording); fixed (0.12.44, `services-review-fixes`) |
-| SVC-6 | privacy | `data_deletion.py:103` | The purge runs once at commit: a cancelled sync's in-flight GitHub request can write its ETag entry afterwards, which then outlives "delete my data" for `GITHUB_ETAG_TTL`. | partial (window is one request; a second purge queued with a countdown past `GITHUB_HTTP_TIMEOUT`); narrowed (0.12.44, `services-review-fixes`: second purge; root fix SVC-16) |
+| SVC-6 | privacy | `data_deletion.py:103` | The purge runs once at commit: a cancelled sync's in-flight GitHub request can write its ETag entry afterwards, which then outlives "delete my data" for `GITHUB_ETAG_TTL`. | partial (window is one request; a second purge queued with a countdown past `GITHUB_HTTP_TIMEOUT`); narrowed (0.12.44, `services-review-fixes`: second purge); fixed (0.12.76, `etag-cache-generation`: root fix SVC-16) |
 | SVC-7 | data | `feedback.py:63` | Event snapshots (rank, label, config version) come from the object loaded before the lock, so a regeneration in between stores the old values. | confirmed (minor; snapshot from the row re-read under the lock); fixed (0.12.44, `services-review-fixes`) |
 | SVC-8 | robustness | `jobs.py:74` | `claim_job` reloads with `.get()`: a job deleted by data deletion right after the claim raises `DoesNotExist` outside `run_tracked_job`'s try. | confirmed (`.first()`, None); fixed (0.12.44, `services-review-fixes`) |
 | SVC-9 | freshness | `data_versions.py:59` | Save, unsave, dismiss and restore without generation never move the `recommendations` version, so another tab keeps a stale saved/hidden list up to the stale time. | partial (matches the "Data versions endpoint" spec; a fix includes the user's latest save/dismiss feedback event time and needs a spec delta); fixed (0.12.44, `services-review-fixes`) |
@@ -1110,8 +1112,8 @@ checked against the code.
 | SVC-12 | docs | `data_deletion.py` `_delete_orphans` | The comment said every linking writer holds the row lock; with deferred FKs an insert-only writer locks nothing until commit. | fixed (comment narrowed; that case stays a loud FK failure, design D4) |
 | SVC-13 | behavior | `services/jobs.py` `on_failed` | A requested rerun follows any final failure, also a permanent one, outside the freshness sweep's failure backoff. | accepted (one extra run per request at most, design D2) |
 | SVC-14 | efficiency | `data_deletion.py` `_purge_later` | The delayed purge also clears the ETag cache of a sync started right after a delete-data. | accepted (the cache only saves requests: one unconditional round) |
-| SVC-15 | privacy | `data_deletion.py` `_purge_later` | A worker slower than `SYNC_STALE_AFTER_SECONDS` can still write after the second purge. | accepted (window bounded by `GITHUB_ETAG_TTL`; root fix SVC-16) |
-| SVC-16 | design | `data_deletion.py` | The timed second purge is a stopgap: the root fix scopes user ETag keys to a generation that deletion bumps (or checks the claim before a cache write). | open (follow-up; non-goal of `services-review-fixes`) |
+| SVC-15 | privacy | `data_deletion.py` `_purge_later` | A worker slower than `SYNC_STALE_AFTER_SECONDS` can still write after the second purge. | accepted (window bounded by `GITHUB_ETAG_TTL`; root fix SVC-16); fixed (0.12.76, `etag-cache-generation`) |
+| SVC-16 | design | `data_deletion.py` | The timed second purge is a stopgap: the root fix scopes user ETag keys to a generation that deletion bumps (or checks the claim before a cache write). | open (follow-up; non-goal of `services-review-fixes`); fixed (0.12.76, `etag-cache-generation`: `User.github_cache_generation` bumped by deletion; a user-scope client re-reads it after each ETag write and deletes the entry when it changed or the user is gone; the timed second purge is retired) |
 | SVC-17 | convention | `github/tasks.py` `purge_user_cache` | The task creates no `SyncJob` and does not retry. | accepted (best-effort cache cleanup, logged; entries expire within the TTL; as `revoke_later`, no job) |
 | SVC-18 | efficiency | `data_versions.py` | Every save or dismiss moves the version, so the next route change or focus refetches the recommendation area. | accepted (the purpose of SVC-9; at most one refetch per route change or focus) |
 | SVC-19 | freshness | `data_versions.py` | Event `created_at` is stamped at insert, not commit: a change committed after a newer generation time is not seen. | accepted (same clock basis as every version time) |
@@ -2001,3 +2003,35 @@ that fails on the old code, except CR7-5 (the race needs controlled `onMutate` t
 | CR7-8 | docs | `sync/pipeline.ts:usePipelineStage` | Doc said pass true while the profile loads; the only caller passes false then. | fixed: doc matches the caller |
 | CR7-9 | bug | `lib/format.ts:formatRelative` | Unit chosen before rounding: 3599 s → "60 minutes ago", 86399 s → "24 hours ago". | fixed: unit chosen after rounding; tests |
 | CR7-10 | structure | `profile/evidence.ts` | `CATEGORY_LIST_NAMES` repeated every category of `CATEGORY_LABELS` by hand. | fixed: both derived from one `CATEGORIES` record |
+
+## `/simplify` of 0.12.76 (2026-11-16)
+
+Batch 73. Source: `/simplify` with four agents (reuse, simplification, efficiency, altitude) over
+the uncommitted 0.12.76 code (`services/github/client.py`, `services/data_deletion.py`,
+`github/tasks.py`, `accounts`, tests). Reuse found nothing; altitude confirmed `_get` is the only
+user-scope cache writer. Findings deduplicated across agents.
+
+| ID | Type | Where | Finding | Status |
+|---|---|---|---|---|
+| SIM5-1 | efficiency | `client.py:_get` | `_still_current()` ran after a cache write the backoff had skipped or that had just failed: one wasted query per GitHub response during a cache outage. | fixed, then reverted by CR8-1 (the shared backoff state races between threads) |
+| SIM5-2 | simplification | `test_etag_cache_generation.py` | Account-deletion test repeated `user_keys` inline with a wider filter. | fixed: `user_keys(user)` (the in-memory `user` keeps its pk) |
+| SIM5-3 | simplification | same | Route setup line repeated in six tests. | fixed: `languages()` registers the route |
+| SIM5-4 | simplification, altitude | `client.py:for_user` | `_owner` holds the pk `_scope` already implies; a client built directly with a user's scope skips the check. | skipped: no caller builds one (only `for_user`, `for_app`); parsing the scope back into an int is no simpler. Revisit if the constructor changes |
+| SIM5-5 | efficiency | `client.py:_still_current` | One primary-key query per user-scope cache write. | skipped: minimal query next to a GitHub round trip; batching or checking first reopens the write/check gap (design D1) |
+
+## Fix-diff review of 0.12.76 (2026-11-16)
+
+Batch 74. Source: `/code-review` (high, no verify pass) of the uncommitted 0.12.76 code after
+batch 73. Each row checked against the code. Owner: fix all; CR8-5 and CR8-6 rejected with reasons
+(fixing them would undo design D1 or the fix itself).
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CR8-1 | bug | `client.py:_get` (SIM5-1) | The check was skipped while the process-wide `_cache_backoff` was down; in the threaded worker another thread can mark it down between this thread's successful write and the check, so a deleted user's entry stayed. | fixed: SIM5-1 reverted, the check always runs after a set (its test removed) |
+| CR8-2 | bug | `data_deletion.py` | Dropping `_purge_later` dropped the only retry of a purge that fails at commit; the generation covers only entries written afterwards, so existing entries stayed for `GITHUB_ETAG_TTL`. | fixed: `purge_user_github_cache` returns success; on failure `_purge` queues `github.purge_user_cache` (backoff-seconds countdown, 3 tries, eager: one); spec scenario "Cache purge fails at deletion"; tests |
+| CR8-3 | privacy | `client.py:_still_current` | A `DatabaseError` counted as current, keeping the entry. | fixed: fails closed (entry deleted, one cache miss); test. The aborted-transaction part does not apply: GitHub I/O never runs inside `atomic` (no I/O under a lock) |
+| CR8-4 | trap | `data_deletion.py:delete_github_data` | The bump updated the row only; a later full `user.save()` of the passed object would write the old generation back. | fixed: `refresh_from_db(fields=[display_name, github_cache_generation])`; test saves the object after the deletion |
+| CR8-5 | efficiency | `client.py:_still_current` | One PostgreSQL query per user-scope cache write; keep the generation in Redis or the key instead. | rejected: SIM5-5; design D1 rejected the key namespace (stale entries stay stored), and a Redis copy is lost with the cache it guards |
+| CR8-6 | efficiency | `client.py:for_user` | A client built before the deletion committed writes and deletes every entry for the rest of its run. | rejected: refreshing `_owner` after a mismatch would let the cancelled sync cache again, the bug SVC-16 fixes; the churn ends with the run |
+| CR8-7 | docs | `CLAUDE_HISTORY.md`, change `tasks.md` 5.2 | Said `/simplify` and `/code-review` were skipped, contradicting batch 73. | fixed: both name batches 73 and 74 |
+| CR8-8 | release | `README.md` Screenshots | `docs/screenshots/` untracked: committing only modified files would break the images. | fixed: staged with the release commit |

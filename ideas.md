@@ -76,6 +76,52 @@ Round 9 (2026-10-27), requested by the owner. The interface grew page by page wi
 change, so it can ship now, but it is big: one OpenSpec change per step, starting with the
 design direction.
 
+- **Screenshots.** README images (`docs/screenshots/`, v0.12.76) show the old interface: retake
+  them when a revamp step changes those pages.
+- **Design direction (owner review, 2026-11-15).** Agreed on a dashboard sample (`frontend-design`
+  skill; Claude canvas "ContribFinder interface direction",
+  `https://claude.ai/artifact/6afpDBSZBnAQQZtyoCSMom`, private to the owner). Decisions:
+  - *The one bold element: the evidence thread.* Each card draws lines from the user's work
+    ("From your work": repos, top language, interests) to the project's technologies ("In this
+    project"). Selecting one of your repos highlights its lines and the technologies it reaches.
+    Needs an API addition: reasons are text only today; the thread needs, per reason, which of the
+    user's repos or interests support which project technology (data the backend already stores).
+    Its own OpenSpec step. Below about 600 px the thread becomes a list ("Django: shop-api,
+    ledger, contrib-bot").
+  - *Card.* Two zones: evidence (match label, repo name 28 px, owner and activity, the top reason
+    at 18 px capped at 60ch, the thread capped at 640 px, "Also: ..." one more reason) and an
+    action rail (issues that fit you as a block, or a dashed "No open issues fit you yet"; Open on
+    GitHub; Save and Hide pinned at the bottom). Match labels: Strong filled ink, Good outlined,
+    Partial dashed (told apart without color). Technology chips: green outline = shared with
+    you, dashed = not in your profile.
+  - *Palette (light / dark).* Two hues carry meaning, the rest is neutral: green = your evidence
+    (`#1F6B4F` / `#7CC4A1`, chip `#E2EFE8` / `#1C3329`), blue = links, actions, focus (`#2950C8` /
+    `#9BB0F5`). Page `#F3F5F4` / `#11161C`, surface `#FFFFFF` / `#171E26`, rail `#F8FAF9` /
+    `#1B232C`, sync strip `#EEF4F0` / `#15221D`, ink `#17202A` / `#E6EAE8`, secondary `#55606A` /
+    `#9AA5AE` (6.1:1 / 6.8:1), lines `#DDE2DF` / `#29323C`, strong lines `#C3CBC7` / `#3A4550`.
+    Errors in text only, brick `#A3341F` / `#F08C78`.
+  - *Type.* Bricolage Grotesque (names, headings; 800 for the wordmark and page title) and
+    Atkinson Hyperlegible Next (body). Both self-hosted (CSP). Scale 13 / 15 / 18 / 22 / 28 / 40.
+  - *Shape and space.* 4 px step; radius by size: tags 4, controls 6, panels and cards 10. No
+    shadows; a line or a tint separates.
+  - *Header.* Light (white, bottom line), not dark: a dark top band with left links read as
+    GitHub, and the app links to GitHub everywhere. Page links on the left after the logo (four
+    items; the right side is for the account), current page marked by a 2 px ink underline.
+    Pipeline status as a pale green strip under it, Refresh on the right.
+  - *Wide screens.* One centered column, at most 1360 px; header and strip backgrounds full
+    bleed, content aligned to the logo. Margins are page color on purpose (line length, eye
+    travel). Gutters 32 px, 16 px on phones. Optional later: 1520 px at 2200 px and wider.
+  - *Sidebar navigation: not now.* A nav sidebar plus the filter column takes about 520 px from
+    the cards. Revisit at about six pages; then a combined sidebar (nav, the page's own panel
+    such as filters, account and theme at the bottom), not two left columns.
+  - *Dark mode.* Every token has a dark value. Planned: a System / Light / Dark switch in the
+    header next to the username (System default), stored per browser, theme set on `<html>`
+    before first paint; one mechanism (today `index.css` follows only `prefers-color-scheme`
+    while declaring an unused `.dark` variant).
+  - *Not designed yet:* phone width (thread list, filters in a sheet, links in a menu, the action
+    rail as a bottom bar), detail, onboarding, profile and saved pages.
+  - *Next:* the first OpenSpec change: tokens, self-hosted fonts and the theme switch in
+    `index.css`, no page changes.
 - **Design direction first.** Tokens (color, type scale, spacing, radius) in one place, dark
   mode, an empty/loading/error pattern used by every page. Decide before touching pages. Since
   0.12.57 `src/components/Loaded` holds the data-first order (data, else error, else loading) for
@@ -304,10 +350,24 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   (PUB-1: no `v*` tags exist), `.gitignore` covers keys and certificates (all v0.12.61). Left, in the repository's GitHub settings (owner only, PUB-3):
   - turn on private vulnerability reporting (`SECURITY.md` points to it), secret scanning with
     push protection, and Dependabot alerts (free for public repositories);
-  - protect `main` (no force-push, required checks: CI and the dependency audit);
+  - protect `main` (no force-push, required checks: CI and the dependency audit). A required
+    check names a job, not a workflow, so list each one: `backend`, `frontend`,
+    `api-contract`, `scripts-windows`, `e2e` (`ci.yml`) and `dependency-audit` (`audit.yml`).
+    `e2e` already runs on every push and pull request (Playwright against the production
+    build), but nothing stops a merge while it is red until it is required (noted 2026-11-15,
+    after v0.12.75);
   - Actions: require approval for workflows from fork pull requests, read-only default
     `GITHUB_TOKEN` permissions;
   - flipping to public is hard to undo: clones and forks persist if it goes private again.
+  Rechecked 2026-11-16 (v0.12.76): all 51 commits scanned again, no real secrets (fake test
+  tokens, local dev `contribfinder` password only), only `.env.example` and no-reply emails; SRS
+  copies in history (`55f0fe9`…`8074cbe`) left as accepted (PUB-2), SRS stays untracked. README
+  screenshots added (owner's real public profile, chosen by the owner). Owner progress on PUB-3:
+  private vulnerability reporting turned on account-wide for public repositories (check
+  "Report a vulnerability" on this repository after the flip); `main` ruleset created (bypass:
+  repository admin; not enforced on a private repository on the free plan, active once public);
+  fork-workflow approval appears only once public. Without a paid plan, secret scanning and the
+  ruleset take effect only after the flip.
 
 ## Evaluation
 
