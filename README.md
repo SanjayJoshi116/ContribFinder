@@ -466,22 +466,19 @@ PostgreSQL. Nothing calls GitHub: sign-in uses sessions created by a seed comman
   see the same settings as CI. The SPA build does read `apps/frontend/.env*` files (Vite), so
   keep `VITE_*` overrides out of them when comparing with CI, which has none.
 
-## Known issues
+## Known limitations
 
-`Bug_Backlog.md` lists the findings of a full codebase review (2026-10-19), each verified against
-the code (confirmed, partial or false positive), grouped into fix batches in priority order.
-Batch 1 (security hardening) shipped in 0.12.1, batch 2 (privacy and deletion finality) in
-0.12.2, batch 3 (evaluation tooling integrity) in 0.12.3, batch 4 (job lifecycle and claim
-fencing) in 0.12.4, batch 5 (GitHub error resilience) in 0.12.5, together with the follow-ups
-from its own review (rows V-1…V-9, batch 12), batch 6 (recommendation consistency) in 0.12.6,
-batch 7 (discovery and repository data) in 0.12.7, batch 9 (frontend correctness) in 0.12.8,
-together with the follow-ups from its review (rows Y-1…Y-10, batch 14; Y-6 in part and Y-7 in 0.12.12),
-and batch 10 (dev scripts, checks and migrations) in 0.12.9, together with the follow-ups from its
-review (rows Z-1…Z-10, batch 15; Z-1 in 0.12.12), and batch 11 (performance and cleanup) in
-0.12.10 (A-18 wontfix), and batch 16 (tooling and data hygiene) in 0.12.11. B-14…B-16 and D-7
-of batch 8 shipped in 0.12.14 with S-1…S-5 from the review of 0.12.13/0.12.14 (batch 18), and
-D-12, D-13 and S-9…S-11 in 0.12.15, D-8, D-9, D-15…D-18 of batch 8 in 0.12.16, and S-7 in
-0.12.17, S-6 in 0.12.18. B-6 and D-11, the rest of batch 8, and T-11 shipped in 0.12.32, T-14 in 0.12.33.
+- **Docker Compose is not verified** from a fresh `.env` (K-2); the local setup above is the
+  tested path.
+- **No semantic matching yet.** Ranking is deterministic, from skills, languages, topics and
+  activity; embeddings come later (Phase 6).
+- **Docs-style repositories** with a code language and no list topic (for example
+  `system-design-primer`) can pass the "not code" filter (K-4).
+- **Issue recommendations are not benchmarked**; only repository ranking is measured (K-3).
+- **Public data only:** private repositories and private contributions are never read.
+
+Verified findings and their fix batches: [`Bug_Backlog.md`](Bug_Backlog.md). Release notes:
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ## Versioning
 

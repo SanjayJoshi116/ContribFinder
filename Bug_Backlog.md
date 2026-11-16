@@ -238,6 +238,7 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 73 | **`/simplify` of 0.12.76** | SIM5-1…SIM5-5 | `/simplify` (4 agents) of the uncommitted 0.12.76 code (cache generation), 2026-11-16; SIM5-1…SIM5-3 fixed before commit (SIM5-1 later reverted by CR8-1), SIM5-4, SIM5-5 skipped (reasons in its section). |
 | 74 | **Fix-diff review of 0.12.76** | CR8-1…CR8-8 | `/code-review` (high, no verify pass) of the uncommitted 0.12.76 code after batch 73, 2026-11-16; each row checked by reading; CR8-1…CR8-4, CR8-7, CR8-8 fixed before commit (owner: fix all), CR8-5, CR8-6 rejected (reasons in its section). |
 | 75 | **CodeQL default setup, first scan** | CQ-1…CQ-4 | GitHub code scanning (CodeQL default setup) after the repository went public, 2026-11-16; alerts pasted by the owner, each checked by reading; all fixed in 0.12.77 (no OpenSpec change). None exploitable: no matched text is rendered as HTML. |
+| 76 | **Dependabot alerts after going public** | DEP-1, DEP-2 | GitHub Dependabot alerts #1 and #2, 2026-11-16; pasted by the owner, checked with `npm ls` and `npm audit`; both dismissed as not used (dev-only, no outside input). |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
 W-1…W-10) in 0.12.6, 7 and 13 in 0.12.7, 9 and 14 in 0.12.8, 10 and 15 in 0.12.9, 11 and 17 in
@@ -2050,3 +2051,17 @@ rendered as HTML; evidence extraction and tests only), but each was a real inacc
 | CQ-2 | accuracy | `profiling/readme.py:badge_skills` | `py/incomplete-url-substring-sanitization`: `netloc.endswith("shields.io")` (and `skillicons.dev`, same pattern, not flagged) accepted `notshields.io`, and `netloc` with a port (`img.shields.io:443`) missed. | fixed: `hostname` plus `_on(host, domain)` (exact or subdomain); test with real and lookalike hosts |
 | CQ-3 | test | `tests/test_content_security_policy.py:42` | `py/bad-tag-filter`: the "no inline script" check matched lowercase `<script` only. | fixed: `re.IGNORECASE` |
 | CQ-4 | test | `apps/frontend/csp.config.test.ts:52` | Same pattern in the built-index check (JavaScript; reported by the owner after CQ-3). | fixed: `/gi` |
+
+## Dependabot alerts after going public (2026-11-16)
+
+Batch 76. Source: GitHub Dependabot alerts, turned on when the repository went public. Pasted by
+the owner; checked with `npm ls minimatch --all` and `npm audit` in each tree. Both are
+GHSA-g3hv-75wg-m249 (minimatch 7.0.0–11.0.0, moderate: slowdown from a crafted glob pattern,
+"globparts amplification"); the fix exists only in 11.0.1+, outside every dependent's declared
+range. `npm run audit:deps` stays green (npm fails on high or critical only), so nothing goes in
+`audit-accepted.json`.
+
+| ID | Type | Where | Finding | Status |
+|---|---|---|---|---|
+| DEP-1 | dependency | `apps/frontend/package-lock.json` (alert #1) | `minimatch@10.2.6` through `eslint`, `@eslint/config-array` and `typescript-eslint` (`^10.x` each). Dev only: `npm audit --omit=dev` finds nothing; patterns come from our own ESLint config. | dismissed in GitHub as "vulnerable code is not actually used"; no `overrides` (forcing 11 breaks the declared ranges). Revisit when ESLint and typescript-eslint move to minimatch 11 (Dependabot opens the PR) |
+| DEP-2 | dependency | `package-lock.json` (alert #2) | `minimatch@10.2.6` through `eslint` (`^10.2.5`), used only by `npm run lint:scripts`; the root has no runtime dependencies. | dismissed, same reason and revisit point |

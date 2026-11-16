@@ -30,6 +30,9 @@ ranking change. No e2e run.
 - The repository is public (2026-11-16): private vulnerability reporting, secret scanning with
   push protection, Dependabot alerts, a `main` ruleset (pull request and the six CI checks) and
   CodeQL default setup are on.
+- README "Known issues" (a release-by-release batch log, last updated at 0.12.33) replaced by
+  "Known limitations": a short list of what does not work yet, linking `Bug_Backlog.md` and
+  this changelog.
 
 ## [0.12.76] - 2026-11-15
 
