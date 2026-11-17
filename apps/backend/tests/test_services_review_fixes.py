@@ -129,8 +129,8 @@ def recommendation(user: User) -> Recommendation:
 
 def test_events_snapshot_the_row_under_the_lock(user: User, recommendation) -> None:
     Recommendation.objects.filter(pk=recommendation.pk).update(rank=7, match_label="strong")
-    assert feedback.record(user, recommendation, "viewed")  # loaded before the regeneration
-    feedback.save(user, recommendation)
+    assert feedback.record(user, recommendation.pk, "viewed")  # loaded before the regeneration
+    feedback.save(user, recommendation.pk)
     snapshots = set(RecommendationFeedback.objects.values_list("action", "rank", "match_label"))
     assert snapshots == {("viewed", 7, "strong"), ("saved", 7, "strong")}
 
@@ -139,13 +139,13 @@ def test_an_issue_gone_before_the_lock_stores_no_event(user: User, recommendatio
     issue = make_issue(recommendation.repository, 1)
     type(issue).objects.filter(pk=issue.pk).delete()  # an issue refresh closed it meanwhile
     # A race, like a recommendation gone meanwhile: no event, no error.
-    assert not feedback.record(user, recommendation, "opened_issue", issue_id=issue.pk)
+    assert not feedback.record(user, recommendation.pk, "opened_issue", issue_id=issue.pk)
     assert not RecommendationFeedback.objects.exists()
 
 
 def test_a_dismissal_moves_the_recommendations_version(user: User, recommendation) -> None:
     before = versions(user).recommendations
-    feedback.dismiss(user, recommendation)
+    feedback.dismiss(user, recommendation.repository_id)
     dismissed = RecommendationFeedback.objects.get(action="dismissed").created_at
     after = versions(user)
     assert after.recommendations == dismissed

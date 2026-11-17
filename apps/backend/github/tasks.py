@@ -5,7 +5,9 @@ from celery import shared_task
 from django.conf import settings
 
 from jobs.models import SyncJob
+from services import dispatch
 from services.data_deletion import purge_user_github_cache
+from services.errors import log_failure
 from services.github.accounts import record_revocation_failure, revoke
 from services.github.errors import GitHubRateLimited
 from services.github.oauth import OAuthError
@@ -65,10 +67,9 @@ def revoke_later(self: Any, encrypted: str, github_id: int | None, grant: bool) 
         )
         if isinstance(decision, Retry):
             raise self.retry(countdown=decision.countdown) from None
-        if decision.code == "internal_error" and not isinstance(exc, OAuthError):
-            # A bug, not GitHub refusing (OAuthError): keep the traceback. The task holds
-            # ciphertext only, and ``revoke`` raises nothing that carries the plaintext.
-            logger.exception("GitHub revocation failed unexpectedly")
+        # A bug keeps its traceback; GitHub refusing (OAuthError) does not. The task holds
+        # ciphertext only, and ``revoke`` raises nothing that carries the plaintext.
+        log_failure(logger, decision.code, exc, "GitHub revocation failed", expected=(OAuthError,))
         record_revocation_failure(decision.code)
 
 
@@ -95,4 +96,4 @@ def purge_user_cache(self: Any, user_id: int) -> None:
 @shared_task(name="github.revoke_replaced_token", acks_late=True)
 def revoke_replaced_token(github_id: int, previous_encrypted: str) -> None:
     """Messages queued before 0.12.41; new ones use ``revoke_later``."""
-    revoke_later.delay(previous_encrypted, github_id, False)
+    dispatch.send(revoke_later, previous_encrypted, github_id, False, about="token revocation")

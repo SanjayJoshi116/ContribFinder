@@ -396,7 +396,7 @@ def test_regeneration_replaces_recommended_issues(user, developer, pool) -> None
 def test_dismissed_recommendation_loses_its_issues(user, developer, pool) -> None:
     django_issues(pool["django"])
     generate(user)
-    feedback.dismiss(user, Recommendation.objects.get(repository=pool["django"]))
+    feedback.dismiss(user, pool["django"].pk)
     assert not RecommendedIssue.objects.exists()
     assert Issue.objects.count() == 3  # shared data stays
 

@@ -9,6 +9,7 @@ from django.contrib.admin.sites import site
 from django.contrib.sessions.models import Session
 from django.test import Client, RequestFactory
 from django.utils import timezone
+from kombu.exceptions import OperationalError as BrokerError
 
 from accounts.models import AuditEvent, User
 from accounts.tasks import clear_expired_sessions
@@ -178,11 +179,16 @@ def test_a_removed_key_is_logged(caplog: pytest.LogCaptureFixture) -> None:
     assert "encryption key was removed" in caplog.text
 
 
-def test_a_broker_failure_never_stops_a_disconnect(user: User) -> None:
+def test_a_broker_failure_never_stops_a_disconnect(
+    user: User, django_capture_on_commit_callbacks
+) -> None:
     client = Client(enforce_csrf_checks=True)
     client.force_login(user)
     client.get("/api/v1/auth/csrf/")
-    with patch("github.tasks.revoke_later.delay", side_effect=ConnectionError("broker down")):
+    with (
+        patch("github.tasks.revoke_later.delay", side_effect=BrokerError("broker down")),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
         response = client.post(
             "/api/v1/auth/github/disconnect", HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value
         )
@@ -193,9 +199,14 @@ def test_a_broker_failure_never_stops_a_disconnect(user: User) -> None:
 
 
 @respx.mock
-def test_a_broker_failure_on_a_refused_sign_in_still_redirects(client: Client) -> None:
+def test_a_broker_failure_on_a_refused_sign_in_still_redirects(
+    client: Client, django_capture_on_commit_callbacks
+) -> None:
     mock_github_ok(respx.mock)
     User.objects.create(username=f"gh_{GITHUB_ID}", is_active=False)
-    with patch("github.tasks.revoke_later.delay", side_effect=ConnectionError("broker down")):
+    with (
+        patch("github.tasks.revoke_later.delay", side_effect=BrokerError("broker down")),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
         response = callback(client, code=CODE, state=start(client))
     _assert_auth_error_redirect(response, "failed")

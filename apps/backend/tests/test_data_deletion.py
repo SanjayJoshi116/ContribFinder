@@ -64,9 +64,9 @@ def everything(user, synced, developer, pool):
     generate(user)
     django_rec = Recommendation.objects.get(repository=pool["django"])
     plain_rec = Recommendation.objects.get(repository=pool["plain"])
-    feedback.record(user, django_rec, "viewed")
-    feedback.save(user, django_rec)
-    feedback.dismiss(user, plain_rec)
+    feedback.record(user, django_rec.pk, "viewed")
+    feedback.save(user, django_rec.pk)
+    feedback.dismiss(user, plain_rec.repository_id)
     SyncJob.objects.create(user=user, job_type="github_profile_sync", status="COMPLETED")
     return pool
 

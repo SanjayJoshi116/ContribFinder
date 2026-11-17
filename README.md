@@ -3,7 +3,7 @@
 Finds open-source repositories and issues that match a developer's demonstrated skills and
 interests. It builds an evidence-backed profile from GitHub and explains every recommendation.
 
-**Version 0.12.77** (CodeQL fixes; MVP+). After signing in with
+**Version 0.12.80** (feedback ids and signal enum; MVP+). After signing in with
 GitHub, your public profile, README, repositories, dependencies and contributions are synced in
 the background and turned into an evidence-backed profile: skills (with the evidence behind each),
 interests and languages. From that profile ContribFinder finds and analyzes candidate projects,
@@ -404,6 +404,9 @@ Windows (`scripts-windows`). CI installs exactly what the lockfiles record (`uv 
 `npm ci`): a `pyproject.toml` change without `uv lock` fails it. The OpenAPI type generator
 (`npm run api:sync`) has its own locked npm tree in `apps/frontend/tools/api-types`
 (TypeScript 5; the app is on 6), installed by `npm run setup`.
+`tests/test_migration_round_trip.py` unapplies every app's migrations and applies them again
+(about 18 s): give every `RunPython` / `RunSQL` a reverse (`noop` when there is nothing to undo),
+or it fails naming the migration.
 All commands are in `CLAUDE.md` §6.
 
 ### Dependency audit

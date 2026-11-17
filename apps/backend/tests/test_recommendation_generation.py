@@ -650,29 +650,32 @@ def test_job_without_config_version_is_not_due_by_itself(user, developer, pool) 
     assert freshness.due_profiles() == []
 
 
-def test_sweep_continues_past_a_failing_start(user, developer, pool, monkeypatch) -> None:
-    """RNK-6: queuing one developer's job fails; the next developer still gets one."""
+def test_sweep_continues_past_a_refused_send(
+    user, developer, pool, monkeypatch, caplog, django_capture_on_commit_callbacks
+) -> None:
+    """RNK-6: the broker refuses one developer's job; the next developer still gets one, and
+    the refused job stays PENDING for job recovery (services.dispatch logs the refusal)."""
     other = cast(User, UserFactory())
     other_profile = DeveloperProfile.objects.create(
         user=other, analyzed_at=timezone.now() - timedelta(days=1)
     )
     add_candidate(other_profile, pool["go"], rank=1)
-    monkeypatch.setattr("recommendations.tasks.generate_recommendations.delay", lambda pk: None)
-    real_start = jobs.start_recommendations
-    tried: list[int] = []
+    refused: list[int] = []
+    sent: list[int] = []
 
-    def start(user, **kwargs):
-        # Outside a transaction (the beat sweep) the send runs inside this call and a broker
-        # error raises out of it; tests run inside one, so it is raised here.
-        tried.append(user.pk)
-        if len(tried) == 1:
+    def delay(pk: int) -> None:
+        if not refused:
+            refused.append(pk)
             raise BrokerError("broker down")
-        return real_start(user, **kwargs)
+        sent.append(pk)
 
-    monkeypatch.setattr(freshness, "start_recommendations", start)
-    assert freshness.start_due_generations() == 1
-    assert sorted(tried) == sorted([user.pk, other.pk])
-    assert SyncJob.objects.filter(job_type="recommendation_generation").count() == 1
+    monkeypatch.setattr("recommendations.tasks.generate_recommendations.delay", delay)
+    with django_capture_on_commit_callbacks(execute=True):
+        assert freshness.start_due_generations() == 2
+    assert len(refused) == 1 and len(sent) == 1
+    pending = SyncJob.objects.filter(job_type="recommendation_generation", status="PENDING")
+    assert pending.count() == 2
+    assert "Task recommendations.generate_recommendations not queued" in caplog.text
 
 
 def test_sweep_fails_on_a_database_error(user, developer, pool, monkeypatch) -> None:

@@ -641,6 +641,43 @@ export interface components {
      * @enum {string}
      */
     DifficultyEnum: 'beginner' | 'intermediate' | 'advanced' | 'unknown'
+    /**
+     * @description How the difficulty estimate was reached. Returned as stored: an older issue may lack
+     *     keys or name a signal not listed here.
+     */
+    DifficultyEvidence: {
+      signals?: components['schemas']['DifficultyVote'][]
+      votes?: {
+        [key: string]: number
+      }
+      thresholds?: {
+        [key: string]: number
+      }
+    }
+    /**
+     * @description * `label` - Label
+     *     * `body_length` - Body Length
+     *     * `technology_count` - Technology Count
+     *     * `contribution_type` - Contribution Type
+     *     * `comments` - Comments
+     * @enum {string}
+     */
+    DifficultySignalEnum:
+      'label' | 'body_length' | 'technology_count' | 'contribution_type' | 'comments'
+    DifficultyVote: {
+      signal: components['schemas']['DifficultySignalEnum']
+      /**
+       * @description The level it voted for, if any.
+       *
+       *     * `beginner` - Beginner
+       *     * `intermediate` - Intermediate
+       *     * `advanced` - Advanced
+       *     * `unknown` - Unknown
+       */
+      vote: (components['schemas']['DifficultyEnum'] | components['schemas']['NullEnum']) | null
+      /** @description What the signal measured (label, length, count). */
+      value: unknown
+    }
     DisconnectResult: {
       /**
        * @description Whether a GitHub revocation was queued. Local credentials are deleted at once.
@@ -787,9 +824,7 @@ export interface components {
        *     * `unknown` - Unknown
        */
       difficulty: components['schemas']['DifficultyEnum']
-      difficulty_evidence: {
-        [key: string]: unknown
-      }
+      difficulty_evidence: components['schemas']['DifficultyEvidence']
       readonly technologies: components['schemas']['IssueTechnology'][]
       reasons: components['schemas']['IssueReason'][]
       recommendation: components['schemas']['IssueRecommendation']

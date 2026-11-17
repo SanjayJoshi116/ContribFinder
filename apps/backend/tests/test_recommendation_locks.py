@@ -93,7 +93,7 @@ def test_dismiss_during_a_generation_write(user, developer, pool, monkeypatch) -
 
     generation = _thread(lambda: generate(user), errors)
     assert paused.wait(20)
-    dismiss = _thread(lambda: feedback.dismiss(user, rec), errors)
+    dismiss = _thread(lambda: feedback.dismiss(user, rec.repository_id), errors)
     _wait_for_lock_waiter()  # the dismiss waits for the generation's profile lock
     resume.set()
     generation.join(30)
@@ -136,7 +136,7 @@ def test_simultaneous_views_are_recorded_once(user, developer, pool) -> None:
 
     def view() -> None:
         barrier.wait()
-        feedback.record(user, rec, "viewed")
+        feedback.record(user, rec.pk, "viewed")
 
     threads = [_thread(view, errors) for _ in range(2)]
     for thread in threads:
@@ -192,7 +192,7 @@ def test_dismiss_after_a_generation_dropped_the_recommendation(user, developer, 
     stale = Recommendation.objects.get(repository=pool["django"])  # the page's copy
     Recommendation.objects.filter(pk=stale.pk).delete()  # a generation dropped it, committed
 
-    feedback.dismiss(user, stale)  # commits here: no reference to the deleted row
+    feedback.dismiss(user, stale.repository_id)  # commits here: no reference to the deleted row
 
     assert DismissedRepository.objects.filter(user=user, repository=pool["django"]).exists()
     event = RecommendationFeedback.objects.get(user=user, action="dismissed")
@@ -203,5 +203,5 @@ def test_view_of_a_dropped_recommendation_records_nothing(user, developer, pool)
     generate(user)
     stale = Recommendation.objects.get(repository=pool["django"])
     Recommendation.objects.filter(pk=stale.pk).delete()
-    assert feedback.record(user, stale, "viewed") is False
+    assert feedback.record(user, stale.pk, "viewed") is False
     assert not RecommendationFeedback.objects.filter(user=user).exists()

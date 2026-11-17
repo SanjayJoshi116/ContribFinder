@@ -26,7 +26,7 @@ from jobs.models import SyncJob
 from recommendations.models import Recommendation
 from repositories.models import Repository, RepositoryCandidate, UserRepository
 
-from . import jobs
+from . import dispatch, jobs
 from .locks import lock_developer
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,12 @@ def _purge(user_id: int) -> None:
     if not purge_user_github_cache(user_id):
         from github.tasks import purge_user_cache  # avoid import cycle
 
-        purge_user_cache.apply_async((user_id,), countdown=settings.GITHUB_CACHE_BACKOFF_SECONDS)
+        dispatch.send(
+            purge_user_cache,
+            user_id,
+            about=f"cache purge of user {user_id}",
+            countdown=settings.GITHUB_CACHE_BACKOFF_SECONDS,
+        )
 
 
 def _delete_orphans(repository_ids: set[int]) -> int:

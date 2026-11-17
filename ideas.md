@@ -23,7 +23,7 @@ Open ideas only, in suggested order within each cell. † = changes what users a
 | | Cheap | Expensive |
 |---|---|---|
 | **High value** | significance gate for ranking changes (§3); opportunity qualifiers† (§6) | content-based `not_code`† (§11, needs a judged sample); responsiveness signals† (§2); user intent / preferences† (§1); upstream dependencies† (§6); `similar_repo` from saves† (§6) |
-| **Lower value** | IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); generic migration round trip (§15, slow test); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
+| **Lower value** | IDF weighting† (§1); per-owner diversity cap† (§1) | discovery-recall metric (§3); second judge / κ (§3); server page clamping (§14, API change); stored activity (§16, migration); periodic resync (§9, budget); GitHub budget load model (§5); starred repos† (§6, privacy disclosure) |
 
 Not ranked yet: acting on the discovery yield report† (§12, needs runs), intervals on the
 feedback-report shares (§4, needs traffic), dismiss reasons against grades (§4, needs real-developer grades),
@@ -288,11 +288,6 @@ design direction.
 
 Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
 
-- **One "dispatch after commit" helper** (from the 0.12.41 `/simplify` review). Only
-  `queue_revocation` dispatches with `transaction.on_commit(..., robust=True)`; `services/jobs.py`,
-  `services/repositories/backlog.py` and `services/data_deletion.py` call `.delay()` directly, so
-  a broker outage raises there but is logged here. A `services/dispatch.after_commit(task, *args)`
-  used everywhere would give one policy.
 - **Error handling for views the browser navigates to** (same review). The OAuth callback catches
   `Exception` itself to redirect instead of a JSON 500; a small redirect-on-error wrapper for
   navigation views would replace that one-off catch-all.
@@ -300,20 +295,17 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   query cache special-cases the identity query by hash (`isMe`) and, since 0.12.47, by whether it
   held data; mutations use `meta.endsSession`. A query `meta` opt-out (set by `useMe` while it has
   no identity) would make both sides one mechanism.
-- **One traceback rule for job failures** (from the batches 36–38 `/simplify`, 2026-11-02).
-  `revoke_later` and the repository refresh log `internal_error` with its traceback;
-  `run_tracked_job` logs every final failure as a plain warning, so a sync or analysis bug loses
-  its stack. A shared `retry.log_failure(logger, decision, ...)` used by all three would give one
-  rule. Belongs with a `services/` follow-up (`Bug_Backlog.md` SIM-10).
 - **The backlog owns sending its refreshes** (same pass, SIM-11). `queue_batch` stamps
   `refresh_queued_at`, and the task unstamps refused sends and renews on retry
   (`backlog.mark_queued`/`unmark_queued`); a `backlog.dispatch(batch, send)` would keep every
-  stamp rule in `backlog`. Pairs with the "dispatch after commit" helper above.
-- **Feedback services take ids** (from the 0.12.51–0.12.54 `/simplify`, `Bug_Backlog.md` batch
-  50). Since 0.12.53 the views pass a `Recommendation` loaded with `only("pk", "repository_id")`,
-  and `save`, `dismiss` and `record` must not touch `recommendation.repository` before their own
-  re-read (a deferred field would be one hidden query). Taking `recommendation_id` and
-  `repository_id`, as `unsave` and `restore` already do, would make that rule the type.
+  stamp rule in `backlog`. `services/dispatch` (0.12.79) cannot unmark, so the backlog keeps
+  `send_refreshes`.
+- **Stop job recovery at the first broker refusal** (`Bug_Backlog.md` SIM6-9). During an outage
+  `_requeue` waits the broker timeout once per remaining job; the `sync-jobs` spec says recovery
+  continues past a refusal, so this needs a spec change.
+- **Own error code for a refused revocation** (SIM6-14). `decide_retry` maps `OAuthError` to
+  `internal_error`, so `revoke_later` passes `expected=(OAuthError,)`; a dedicated code removes
+  that but changes the revocation audit's `error_code`.
 - **Retire `DELETE /recommendations/{id}/save`** (same pass). The SPA unsaves through
   `DELETE /saved/{repository_id}` since 0.12.53; the old endpoint still 404s once a generation
   drops the recommendation. Deprecating it in OpenAPI first, then removing it, is a contract
@@ -322,15 +314,6 @@ Round 5 (2026-10-21), from the `dev-scripts-checks` review and cleanup pass.
   `re.IGNORECASE` and maps the match back through `casefold()`, skipping the few variants that
   fold differently (dotless `ı`). Named groups per slug (`match.lastgroup`) would map every match
   directly. No ranking change for ASCII text, but it touches every taxonomy path.
-- **Difficulty signal names in the API schema** (from the 0.12.55–0.12.57 `/simplify` and
-  review, `Bug_Backlog.md` SIM2-11, CR-9). `tests/test_issue_signal_wording.py` reads
-  `evidence.ts` with a regex to check every signal `classify` writes has words on the issue page.
-  Declaring the signal names as an enum in the issue detail serializer would put a
-  `DifficultySignal` union in `schema.d.ts`, so `SIGNAL_TEXT: Record<DifficultySignal, …>` is
-  checked by `tsc` and `api:sync` drift. OpenAPI addition (not breaking), needs an OpenSpec change.
-- **A generic data-migration round trip.** `tests/test_seed_migrations.py` covers the scoring
-  seeds only. One test that migrates every app back to its first migration and forward again
-  would catch the next irreversible or non-idempotent `RunPython`.
 
 ### 5. Platform
 
@@ -492,6 +475,11 @@ Newest first.
 
 | Idea | § | Shipped in |
 |---|---|---|
+| Feedback services take ids (`record`/`save` a recommendation id, `dismiss` a repository id) | §15 | v0.12.80 (views pass ids from the ownership check) |
+| Difficulty signal names in the API schema (`DifficultySignal` enum; `SIGNAL_TEXT` checked by `tsc`) | §15 | v0.12.80 (schema only, body unchanged; `Bug_Backlog.md` SIM2-11, CR-9) |
+| One "dispatch after commit" helper (broker refusal logged, never fails committed work) | §15 | v0.12.79 (`services/dispatch`; the backlog keeps `send_refreshes`, SIM-11) |
+| One traceback rule for job failures (`internal_error` at ERROR with traceback, else WARNING) | §15 | v0.12.79 (`services/errors.log_failure`; `Bug_Backlog.md` SIM-10) |
+| Generic migration round trip (every app to zero and back, schema compared, seeds checked) | §15 | v0.12.78 (`tests/test_migration_round_trip.py`, ~18 s) |
 | Bulk repository locks behind one helper (rows and name holders in GitHub ID order before a batch of upserts) | §15 | v0.12.63 (`storage.lock_for_upsert`; `Bug_Backlog.md` FD-2, CR4-8) |
 | Broker-refusal handling in one place (send each refresh, unmark the refused) | §15 | v0.12.63 (`backlog.send_refreshes`; the wider "dispatch after commit" helper stays open) |
 | Browser tests on the production build (`vite build` + `vite preview`, CSP violations fail a test) | §14 | v0.12.38 (`E2E_DEV_SERVER=1` keeps the dev server locally) |

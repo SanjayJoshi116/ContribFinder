@@ -12,7 +12,6 @@ an active generation is skipped, and one whose latest finished generation failed
 
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
 
 from django.conf import settings
@@ -20,7 +19,6 @@ from django.db.models import Exists, F, OuterRef, Q, Subquery
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Greatest
 from django.utils import timezone
-from kombu.exceptions import OperationalError as BrokerError
 
 from developers.models import DeveloperProfile
 from jobs.models import SyncJob
@@ -28,8 +26,6 @@ from recommendations.models import Recommendation, ScoringConfig
 from repositories.models import Lifecycle, RepositoryCandidate
 from services.jobs import RECOMMENDATIONS, start_recommendations
 from services.repositories.staleness import PART_FIELDS
-
-logger = logging.getLogger(__name__)
 
 
 def due_profiles() -> list[DeveloperProfile]:
@@ -108,16 +104,11 @@ def due_profiles() -> list[DeveloperProfile]:
 
 def start_due_generations() -> int:
     """Start a generation for every due developer without an active one. A running one is
-    left alone: it loads current inputs, and asking it to run again would repeat it."""
+    left alone: it loads current inputs, and asking it to run again would repeat it. A task
+    the broker refuses is logged by ``services.dispatch`` and the sweep goes on (job recovery
+    re-sends the PENDING job); anything else (a database error) fails the beat task."""
     started = 0
     for profile in due_profiles():
-        try:
-            _, created = start_recommendations(profile.user, rerun_if_running=False)
-        except BrokerError:
-            # One developer's job that cannot be queued must not stop the sweep for the
-            # others; a job left PENDING is re-sent by job recovery. Anything else (a database
-            # error) fails the beat task.
-            logger.exception("Could not start the generation for user %s", profile.user_id)
-            continue
+        _, created = start_recommendations(profile.user, rerun_if_running=False)
         started += created
     return started

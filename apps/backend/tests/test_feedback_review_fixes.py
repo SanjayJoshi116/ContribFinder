@@ -46,14 +46,14 @@ def test_issue_dropped_after_the_ownership_check_stores_nothing(
     race is answered like a recommendation gone meanwhile (no event, no error)."""
     rec = generated["django"]
     issue = Issue.objects.get(number=1)
-    own = feedback_api._own_recommendation
+    own = feedback_api._own_repository_id
 
     def regenerated_meanwhile(request, pk):
         found = own(request, pk)
         RecommendedIssue.objects.filter(recommendation=rec, issue=issue).delete()
         return found
 
-    monkeypatch.setattr(feedback_api, "_own_recommendation", regenerated_meanwhile)
+    monkeypatch.setattr(feedback_api, "_own_repository_id", regenerated_meanwhile)
     response = opened(signed_in_client, rec, issue)
     assert response.status_code == 204
     assert not RecommendationFeedback.objects.exists()
@@ -82,14 +82,14 @@ def test_dismiss_of_a_repository_deleted_meanwhile_is_404(
     signed_in_client: APIClient, generated, monkeypatch
 ) -> None:
     rec = generated["django"]
-    own = feedback_api._own_recommendation
+    own = feedback_api._own_repository_id
 
     def deleted_meanwhile(request, pk):
         found = own(request, pk)
         Repository.objects.filter(pk=rec.repository_id).delete()  # delete-data, cascading
         return found
 
-    monkeypatch.setattr(feedback_api, "_own_recommendation", deleted_meanwhile)
+    monkeypatch.setattr(feedback_api, "_own_repository_id", deleted_meanwhile)
     response = signed_in_client.post(f"{RECS}/{rec.pk}/dismiss", {}, format="json")
     assert response.status_code == 404
     assert not RecommendationFeedback.objects.exists()
@@ -99,14 +99,14 @@ def test_recommendation_gone_before_the_lock_stores_nothing(
     signed_in_client: APIClient, generated, monkeypatch
 ) -> None:
     rec = generated["django"]
-    own = feedback_api._own_recommendation
+    own = feedback_api._own_repository_id
 
     def dismissed_meanwhile(request, pk):
         found = own(request, pk)
         Recommendation.objects.filter(pk=rec.pk).delete()
         return found
 
-    monkeypatch.setattr(feedback_api, "_own_recommendation", dismissed_meanwhile)
+    monkeypatch.setattr(feedback_api, "_own_repository_id", dismissed_meanwhile)
     response = opened(signed_in_client, rec, Issue.objects.get(number=1))
     assert response.status_code == 204
     assert not RecommendationFeedback.objects.exists()

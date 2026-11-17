@@ -4,7 +4,7 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from services.errors import PermanentJobError
+from services.errors import INTERNAL_ERROR, PermanentJobError
 
 from .errors import (
     GitHubAuthError,
@@ -57,4 +57,4 @@ def decide_retry(
         return Retry(backoff + int(rng() * backoff * 0.2))
     if isinstance(error, GitHubError):
         return Fail("github_error")
-    return Fail("internal_error")
+    return Fail(INTERNAL_ERROR)

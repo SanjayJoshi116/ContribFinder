@@ -262,6 +262,7 @@ SPECTACULAR_SETTINGS = {
     # Issue difficulty and the profile's preferred difficulty share one choice set.
     "ENUM_NAME_OVERRIDES": {
         "DifficultyEnum": "developers.models.IssueDifficulty",
+        "DifficultySignalEnum": "issues.models.DifficultySignal",
         "DismissReasonEnum": "feedback.models.DismissReason",
     },
 }

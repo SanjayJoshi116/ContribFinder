@@ -49,6 +49,10 @@ TypeScript, Vite), plus the npm runners in `scripts/`. `CLAUDE.md` §4 maps ever
 - Frontend API types are generated, never written by hand: after any API change run
   `npm run api:sync` in `apps/frontend` and commit both `src/api/openapi.json` and
   `src/api/schema.d.ts`.
+- Every migration must be reversible: give each `RunPython` / `RunSQL` a reverse
+  (`migrations.RunPython.noop` / `RunSQL.noop` when there is nothing to undo).
+  `tests/test_migration_round_trip.py` unapplies every app and applies it again, and fails on an
+  irreversible operation or a reverse that leaves a table, column, constraint or index behind.
 - Explanations come only from computed signals; the UI shows match labels (Strong / Good /
   Partial), never a percentage.
 

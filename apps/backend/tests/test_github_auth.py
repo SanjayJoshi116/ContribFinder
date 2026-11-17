@@ -505,7 +505,8 @@ def test_failed_revocation_still_signs_in(
         _sign_in_twice(client, respx.mock, django_capture_on_commit_callbacks)
     assert "_auth_user_id" in client.session  # signed in with the new token
     # Eager mode (no worker) decides as on the last attempt: recorded, never fatal.
-    assert "GitHub revocation failed for good: github_unavailable" in caplog.text
+    assert "GitHub revocation failed: github_unavailable" in caplog.text
+    assert "for good" not in caplog.text  # logged once (CR9-7)
     assert TOKEN not in caplog.text and NEW_TOKEN not in caplog.text
 
 

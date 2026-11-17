@@ -439,6 +439,36 @@ Browser tests
       its page, browser tests ignore the local .env except DATABASE_URL
 
 ============================================================================
+SHIPPED - v0.12.80 - Feedback ids and signal enum
+============================================================================
+
+Issues and feedback (OpenSpec feedback-ids-and-signal-enum; ideas.md §15; SIM2-11, CR-9)
+  [x] Difficulty signal names declared in the API schema (DifficultySignalEnum); the issue
+      page's words checked by tsc, the classifier's names by a backend test
+  [x] Feedback services take ids (record/save a recommendation id, dismiss a repository id)
+  [x] Review fixes before commit (Bug_Backlog batches 77, 78: SIM6-1…SIM6-8, CR9-1…CR9-8):
+      revocation send never fails committed work, feedback reads filtered by user, typed job
+      errors logged as warnings, one log per refused requeue / failed revocation
+
+============================================================================
+SHIPPED - v0.12.79 - Task dispatch and failure logs
+============================================================================
+
+Jobs (OpenSpec task-dispatch-and-failure-logs; ideas.md §15; Bug_Backlog.md SIM-10)
+  [x] A refused task send never fails committed work (sync start, restore: no 500; PENDING
+      job re-sent by recovery); recovery continues past a refused send
+  [x] One send helper (services/dispatch): broker refusal logged without arguments
+  [x] Unexpected job, revocation and refresh failures logged at error level with traceback
+
+============================================================================
+SHIPPED - v0.12.78 - Migration round trip
+============================================================================
+
+Developer tooling (OpenSpec migration-round-trip; ideas.md §15)
+  [x] Every app's migrations unapplied to zero and reapplied in the backend tests (CI):
+      schema compared before and after, seeded scoring configs back with one active
+
+============================================================================
 SHIPPED - v0.12.77 - CodeQL fixes (first code scan after going public)
 ============================================================================
 

@@ -5,7 +5,7 @@ from django.db import transaction
 
 from accounts.models import AuditEvent, User
 from github.models import GitHubAccount
-from services import audit
+from services import audit, dispatch
 from services.crypto import TokenDecryptionError, decrypt_token, encrypt_token
 from services.github.oauth import GitHubIdentity, TokenResult, revoke_grant, revoke_token
 
@@ -61,10 +61,13 @@ def link_github_account(identity: GitHubIdentity, token: TokenResult) -> LinkRes
 
 def queue_revocation(encrypted: str, github_id: int | None, *, grant: bool) -> None:
     """Revoke a token off the request path, once the caller's transaction commits. Only
-    ciphertext is queued. A broker failure is logged, never raised into the caller (robust)."""
+    ciphertext is queued. A broker refusal is logged, never raised into the caller
+    (``services.dispatch``)."""
     from github.tasks import revoke_later  # avoid import cycle
 
-    transaction.on_commit(lambda: revoke_later.delay(encrypted, github_id, grant), robust=True)
+    dispatch.after_commit(
+        revoke_later, encrypted, github_id, grant, about="token revocation", robust=True
+    )
 
 
 def revoke(encrypted: str, github_id: int | None, *, grant: bool) -> None:
@@ -84,8 +87,8 @@ def revoke(encrypted: str, github_id: int | None, *, grant: bool) -> None:
 
 
 def record_revocation_failure(code: str) -> None:
-    """The final failure of a queued revocation, without the token or who it was for."""
-    logger.warning("GitHub revocation failed for good: %s", code)
+    """The final failure of a queued revocation, without the token or who it was for. Logged
+    by the task (``log_failure``); this only audits it."""
     audit.record(
         AuditEvent.Action.GITHUB_REVOCATION_FAILED,
         AuditEvent.Outcome.FAILURE,

@@ -11,7 +11,7 @@ from recommendations.serializers import IssueReasonSerializer
 from services.issues import technologies
 from services.profiling.taxonomy import SKILLS_BY_SLUG
 
-from .models import ContributionType, Difficulty, RecommendedIssue
+from .models import ContributionType, Difficulty, DifficultySignal, RecommendedIssue
 
 
 class IssueGitHubSerializer(serializers.Serializer[RecommendedIssue]):
@@ -47,6 +47,29 @@ class IssueRecommendationSerializer(serializers.Serializer[RecommendedIssue]):
     )
 
 
+class DifficultyVoteSerializer(serializers.Serializer[dict[str, Any]]):
+    signal = serializers.ChoiceField(choices=DifficultySignal.choices)
+    vote = serializers.ChoiceField(
+        choices=Difficulty.choices, allow_null=True, help_text="The level it voted for, if any."
+    )
+    value = serializers.JSONField(help_text="What the signal measured (label, length, count).")
+
+
+class DifficultyEvidenceSerializer(serializers.Serializer[dict[str, Any]]):
+    """How the difficulty estimate was reached. Returned as stored: an older issue may lack
+    keys or name a signal not listed here."""
+
+    signals = DifficultyVoteSerializer(many=True, required=False)
+    votes = serializers.DictField(child=serializers.IntegerField(), required=False)
+    thresholds = serializers.DictField(child=serializers.IntegerField(), required=False)
+
+
+@extend_schema_field(DifficultyEvidenceSerializer)
+class DifficultyEvidenceField(serializers.DictField):
+    """``difficulty_evidence`` passed through unchanged, described by
+    ``DifficultyEvidenceSerializer`` in the schema."""
+
+
 class IssueAnalysisSerializer(serializers.Serializer[RecommendedIssue]):
     labels = serializers.ListField(
         child=serializers.CharField(),
@@ -62,7 +85,7 @@ class IssueAnalysisSerializer(serializers.Serializer[RecommendedIssue]):
         source="issue.difficulty",
         help_text="Estimated; unknown when the evidence is not enough.",
     )
-    difficulty_evidence = serializers.DictField(source="issue.difficulty_evidence")
+    difficulty_evidence = DifficultyEvidenceField(source="issue.difficulty_evidence")
     technologies = serializers.SerializerMethodField()
     reasons = IssueReasonSerializer(many=True)
     recommendation = IssueRecommendationSerializer(source="*")

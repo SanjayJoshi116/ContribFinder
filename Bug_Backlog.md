@@ -1,7 +1,7 @@
 # Bug Backlog
 
 Findings from the codebase sweep on 2026-10-19 (v0.12.0, `main` @ 50acbb8) and the reviews of
-each fix release since; current through 0.12.75. Order: the full review sweep (top priority),
+each fix release since; current through 0.12.80. Order: the full review sweep (top priority),
 open items and known gaps, the release index, the fix-batch plan
 (nearly all shipped), the totals, then the review history (oldest first) with every row as
 verified.
@@ -97,7 +97,8 @@ findings), batches 36–49 fixed in 0.12.48–0.12.60 (the medium group done); l
 `services/matching/` reviewed as batch 60 (no security findings), fixed in 0.12.65; the rest of the
 low group reviewed as batches 63–70 (no security findings) and fixed in 0.12.66–0.12.74. The full
 review sweep is complete (2026-11-15). Fix-diff review of 0.12.70–0.12.74: batch 72, fixed in
-0.12.75.
+0.12.75. 0.12.78–0.12.80: one `/simplify` (batch 77; SIM6-9…SIM6-14 skipped) and one fix-diff
+`/code-review` (batch 78; CR9-1…CR9-8 fixed, CR9-9, CR9-10 rejected), all before commit.
 Batches 44–46 (0.12.55–0.12.57): one `/simplify` (batch 51; SIM2-9…SIM2-12 skipped, SIM2-9 then
 fixed as CR-1) and one fix-diff `/code-review` (batch 52, all fixed) over their combined diff.
 Batches 26–34 fixed in
@@ -238,6 +239,8 @@ later reviews). Every verified row is in exactly one batch (A-10 dropped). All s
 | 73 | **`/simplify` of 0.12.76** | SIM5-1…SIM5-5 | `/simplify` (4 agents) of the uncommitted 0.12.76 code (cache generation), 2026-11-16; SIM5-1…SIM5-3 fixed before commit (SIM5-1 later reverted by CR8-1), SIM5-4, SIM5-5 skipped (reasons in its section). |
 | 74 | **Fix-diff review of 0.12.76** | CR8-1…CR8-8 | `/code-review` (high, no verify pass) of the uncommitted 0.12.76 code after batch 73, 2026-11-16; each row checked by reading; CR8-1…CR8-4, CR8-7, CR8-8 fixed before commit (owner: fix all), CR8-5, CR8-6 rejected (reasons in its section). |
 | 75 | **CodeQL default setup, first scan** | CQ-1…CQ-4 | GitHub code scanning (CodeQL default setup) after the repository went public, 2026-11-16; alerts pasted by the owner, each checked by reading; all fixed in 0.12.77 (no OpenSpec change). None exploitable: no matched text is rendered as HTML. |
+| 77 | **`/simplify` of 0.12.78–0.12.80** | SIM6-1…SIM6-14 | Four cleanup agents (reuse, simplification, efficiency, altitude) over the uncommitted 0.12.78–0.12.80 diff, 2026-11-16; SIM6-1…SIM6-8 fixed before commit, SIM6-9…SIM6-14 skipped (reasons in its section). |
+| 78 | **Fix-diff review of 0.12.78–0.12.80** | CR9-1…CR9-10 | `/code-review` (high, no verify pass) of the uncommitted 0.12.78–0.12.80 code after batch 77, 2026-11-16; each row checked by reading; CR9-1…CR9-8 fixed before commit (owner: yes), CR9-9, CR9-10 rejected. |
 | 76 | **Dependabot alerts after going public** | DEP-1, DEP-2 | GitHub Dependabot alerts #1 and #2, 2026-11-16; pasted by the owner, checked with `npm ls` and `npm audit`; both dismissed as not used (dev-only, no outside input). |
 
 Shipped: batch 1 in 0.12.1, 2 in 0.12.2, 3 in 0.12.3, 4 in 0.12.4, 5 and 12 in 0.12.5, 6 (with
@@ -1275,7 +1278,7 @@ lockfiles excluded). Findings deduplicated; each checked against the code.
 | SIM-7 | duplication | `pipeline.ts`, `OnboardingPage.tsx` | The stalled notice written twice with different endings. | fixed (`features/sync/messages.STALLED_NOTICE`) |
 | SIM-8 | data loss | `recommendations/admin.py` (feedback imports it) | Its own `ReadOnlyAdmin` still allows delete (as DEV-1, REPO-6). | fixed (`issues/` in 0.12.51, ISS-1, ISS-2; `recommendations/` and `feedback/` in 0.12.52, REC-1: `ReadOnlyAdmin` removed) |
 | SIM-9 | altitude | `reanalyze_profiles.py` | The "sync is running" check lives in the command, not in `start_profile_analysis`. | wontfix (design D4 of `developers-review-fixes`: specified job behavior for every caller) |
-| SIM-10 | altitude | `_refresh`, `revoke_later`, `run_tracked_job` | Three call sites, two traceback rules. | deferred (`ideas.md` §15 "One traceback rule for job failures") |
+| SIM-10 | altitude | `_refresh`, `revoke_later`, `run_tracked_job` | Three call sites, two traceback rules. | fixed 0.12.79 (`services/errors.log_failure`; OpenSpec task-dispatch-and-failure-logs) |
 | SIM-11 | altitude | `repositories/tasks.py`, `backlog.py` | Stamp, unstamp and renew rules split between the task and `backlog`. | deferred (`ideas.md` §15 "The backlog owns sending its refreshes") |
 | SIM-12 | simplification | `backlog.mark_queued`, `unmark_queued` | One `update` with two values. | wontfix (two names read better at the call sites) |
 | SIM-13 | efficiency | `reanalyze_profiles.py` | One `active_jobs(...).exists()` per user. | accepted (operator command; an `Exists` annotation would need the private `_stale_running`) |
@@ -1407,7 +1410,7 @@ fix all. Folded into 0.12.57.
 | CR-6 | ux | `routes/LandingPage.tsx` | Blank page while `/auth/me` loads or retries. | fixed: "Loading…" as `RequireAuth`; spec "Sign-in page while the identity loads" edited directly |
 | CR-7 | bug | `app/queryClient.ts` | After a failed navigation the identity was already removed, so the next 401 went to sign-in without the notice. | fixed: the cached identity is put back when `endSession` rejects |
 | CR-8 | display | `components/Fact.tsx` | Recommendation detail values now right-aligned. | no change: stated in the 0.12.57 changelog |
-| CR-9 | test design | `tests/test_issue_signal_wording.py` | Regex over TypeScript source. | kept: SIM2-11 (an OpenAPI enum would replace it; API change) |
+| CR-9 | test design | `tests/test_issue_signal_wording.py` | Regex over TypeScript source. | fixed 0.12.80 (SIM2-11: `DifficultySignal` enum, test replaced) |
 | CR-10 | style | `SavedPage.tsx`, `SkillGroups.tsx` | `@/components/ExternalLink` import in the third-party group. | fixed |
 
 Found while fixing: the refetch tests for the issue page, the recommendation detail page and the
@@ -1432,7 +1435,7 @@ into 0.12.55–0.12.57. The fix-diff `/code-review` was not run.
 | SIM2-8 | reuse | `app/jobTransitions.test.ts` | Own job builder and hand-built held promise. | fixed: `COMPLETED_JOB`, stubbed `fetch` with one `held()` helper |
 | SIM2-9 | altitude | `RecommendationDetailPage`, `DiscoveryCard`, `SavedPage`, `RecommendationList` | Still check `isError` before data (ROUTE-2 class); a shared page-state helper would fix it once. | skipped: outside the diff; for the low-group sweep of those modules |
 | SIM2-10 | altitude | `features/auth/api.ts` | `useSignedInUser` via outlet context needs each layout to pass it on. | skipped: design D5 of `routes-review-fixes` (a throwing `useMe` hook can run in the render where `endSession` removed the identity) |
-| SIM2-11 | altitude | `tests/test_issue_signal_wording.py` | Reads `evidence.ts` source; an OpenAPI enum of signal names would let `tsc` check it. | skipped: API change; candidate for a later OpenSpec change |
+| SIM2-11 | altitude | `tests/test_issue_signal_wording.py` | Reads `evidence.ts` source; an OpenAPI enum of signal names would let `tsc` check it. | fixed 0.12.80 (OpenSpec feedback-ids-and-signal-enum; `tests/test_difficulty_signals.py`) |
 | SIM2-12 | reuse | sync start error markup, test fail-then-refetch and `auxclick` helpers | Small repeats. | skipped: the two start error blocks differ (status vs alert); test repeats are two or three lines |
 
 ## Sweep: `frontend/src/routes/` (2026-11-03)
@@ -2065,3 +2068,44 @@ range. `npm run audit:deps` stays green (npm fails on high or critical only), so
 |---|---|---|---|---|
 | DEP-1 | dependency | `apps/frontend/package-lock.json` (alert #1) | `minimatch@10.2.6` through `eslint`, `@eslint/config-array` and `typescript-eslint` (`^10.x` each). Dev only: `npm audit --omit=dev` finds nothing; patterns come from our own ESLint config. | dismissed in GitHub as "vulnerable code is not actually used"; no `overrides` (forcing 11 breaks the declared ranges). Revisit when ESLint and typescript-eslint move to minimatch 11 (Dependabot opens the PR) |
 | DEP-2 | dependency | `package-lock.json` (alert #2) | `minimatch@10.2.6` through `eslint` (`^10.2.5`), used only by `npm run lint:scripts`; the root has no runtime dependencies. | dismissed, same reason and revisit point |
+
+## `/simplify` of 0.12.78–0.12.80 (2026-11-16)
+
+Batch 77. Source: four cleanup agents (reuse, simplification, efficiency, altitude) over the
+uncommitted diff of OpenSpec `migration-round-trip`, `task-dispatch-and-failure-logs` and
+`feedback-ids-and-signal-enum`. SIM6-1…SIM6-8 fixed; SIM6-9…SIM6-14 skipped.
+
+| ID | Angle | Where | Finding | Status |
+|---|---|---|---|---|
+| SIM6-1 | simplification | `services/errors.log_failure` and callers | Every caller passed `decision.code` twice. | fixed: `log_failure` appends `: code` |
+| SIM6-2 | reuse | `services/github/retry.py` | Literal `"internal_error"` beside the new `INTERNAL_ERROR`. | fixed: `Fail(INTERNAL_ERROR)` |
+| SIM6-3 | simplification | `services/dispatch.__all__` | Dead `BrokerError` export. | fixed: removed |
+| SIM6-4 | simplification | `feedback/api.py:SaveView.post` | Ownership check inside a `try` for `DoesNotExist` it never raises. | fixed: moved out |
+| SIM6-5 | simplification | `issues/serializers.py` | Comment repeating two docstrings. | fixed: removed |
+| SIM6-6 | simplification | `evidence.ts:difficultyBasis` | `filter` + `map` + `as DifficultySignal` cast. | fixed: one `flatMap` |
+| SIM6-7 | reuse / simplification | `tests/test_task_dispatch.py`, `test_recommendation_generation.py` | Stale jobs built by hand; negative pks as a refusal marker. | fixed: `make_job`; `refused` / `sent` lists |
+| SIM6-8 | test | `tests/test_accounts_review_fixes.py` | Two broker tests raised `ConnectionError` and never ran their on-commit callbacks, so they passed without testing anything. | fixed: `BrokerError`, callbacks executed |
+| SIM6-9 | efficiency | `services/jobs._requeue` | During an outage every remaining send waits for the broker timeout. | skipped: the `sync-jobs` spec says recovery continues past a refusal; revisit with a spec change |
+| SIM6-10 | efficiency | `tests/test_migration_round_trip.py` | ~18 s; could be marked slow / own CI step. | skipped: the spec runs it with the normal suite |
+| SIM6-11 | efficiency | `feedback/api.py` views | Ownership query plus the service's read (2 queries, as before). | skipped: no regression; CR9-2 adds the user filter |
+| SIM6-12 | altitude | `services/repositories/backlog.send_refreshes` | Still sends and catches every `Exception` itself. | skipped: changes behaviour for non-broker errors; SIM-11 stays open |
+| SIM6-13 | simplification | `services/dispatch.send` | Always `apply_async`. | skipped: tests patch `.delay`; the branch is cheap |
+| SIM6-14 | altitude | `github/tasks.revoke_later` `expected=(OAuthError,)` | `decide_retry` maps `OAuthError` to `internal_error`; its own code would remove `expected=`. | skipped: changes the revocation audit's `error_code`; needs its own change |
+
+## Fix-diff review of 0.12.78–0.12.80 (2026-11-16)
+
+Batch 78. Source: `/code-review` (high, no verify pass) of the uncommitted diff after batch 77. Each row
+checked against the code. CR9-1…CR9-8 fixed before commit (owner: yes); CR9-9, CR9-10 rejected.
+
+| ID | Type | Where | Finding → failure | Status |
+|---|---|---|---|---|
+| CR9-1 | regression | `services/github/accounts.py:queue_revocation` | `dispatch.after_commit` dropped the old `robust=True`: a send error other than a broker refusal (or, eager, a failing audit write) raises after the disconnect or deletion committed, so the user sees a 500, and Django skips the later on-commit callbacks (`delete_github_data`'s cache purge, registered after it). | fixed: `after_commit(..., robust=True)`; test with a non-broker error and a later callback |
+| CR9-2 | latent | `services/feedback.py:_current` | Reads the recommendation by id without `developer__user=user`; ownership is only the view's separate check. A future caller passing an unchecked id would snapshot another user's recommendation. | fixed: `_current` filters by user; test |
+| CR9-3 | logging | `services/jobs.run_tracked_job`, `services/errors.log_failure` | A bare `PermanentJobError` (default code `internal_error`) is a typed job error but is logged at ERROR with traceback and its text. | fixed: `expected=(PermanentJobError,)`; test |
+| CR9-4 | test | `tests/test_migration_round_trip.py` | No `try/finally`: a failure part-way (the case the test exists for) leaves the shared test database without tables, so every later transactional test fails too. | fixed: reapply in `finally` |
+| CR9-5 | rule | `github/tasks.py:revoke_replaced_token` | Still calls `revoke_later.delay(...)` directly, against the CLAUDE.md §7 dispatch rule. | fixed: `dispatch.send`; test |
+| CR9-6 | logging | `services/jobs._requeue` | Logs "requeued" before sending, so a refused send reads as requeued. | fixed: logged after a successful send; test |
+| CR9-7 | logging | `github/tasks.revoke_later`, `services/github/accounts.record_revocation_failure` | Every final revocation failure logged twice (`log_failure` and "failed for good"). | fixed: warning dropped (audit only); auth test asserts one log |
+| CR9-8 | rule | `apps/frontend/src/features/issues/evidence.ts:Vote` | Handwritten `Vote` duplicates the generated `DifficultyVote` (CLAUDE.md §4: API types are generated). | fixed: `Vote` = `DifficultyVote` with `signal: string` |
+| CR9-9 | schema | `issues/serializers.py:DifficultyVoteSerializer` | `vote` allows `unknown`; `signal` is a closed enum while stored evidence may hold other names. | rejected: the spec declares the enum on purpose; the page keeps its unknown-name guard; narrowing `vote` adds another enum for no consumer |
+| CR9-10 | simplification | `services/dispatch.send` | `delay` vs `apply_async` branch. | rejected: same as SIM6-13 |

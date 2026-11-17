@@ -2003,15 +2003,96 @@ default setup, not a workflow file). Backend 2013 tests; no e2e, no API or ranki
 - Alerts are visible only with write access: read them in the Security tab (or `gh api` once
   `gh` is installed); they close when the fix reaches `main` and CodeQL re-runs.
 
+**Migration round trip** (MVP+, fix release)  ✅ shipped in v0.12.78
+
+OpenSpec `migration-round-trip` (ideas.md §15, "A generic data-migration round trip"); spec
+`developer-tooling` gains "Database migrations reverse and reapply cleanly". Test only: no
+model, migration, API or ranking change; backend 2014 tests; no e2e.
+- `tests/test_migration_round_trip.py`: `MigrationExecutor` takes every migrated app (contrib
+  included, since `auth`/`admin` depend on `accounts.User`) to zero, checks only
+  `django_migrations` is left, reapplies the graph's leaf nodes, then compares an introspected
+  schema (tables, column types and nullability, constraint/index names with columns and kinds)
+  and checks the v1/v2 seeds are back with exactly one active. About 18 s.
+- Deviation: the design compared the seeded configs before and after; in the full suite an
+  earlier transactional test has already flushed them, so they are checked only afterwards.
+- Proven to bite with a scratch migration: `RunPython(f)` without a reverse raises
+  `IrreversibleError` naming `feedback.9999_scratch`; `RunSQL` with a `noop` reverse leaves
+  `scratch_left` behind and fails the zero-state check.
+- `tests/test_seed_migrations.py::test_real_migrations_round_trip` kept (it pins `v2` active
+  after the recommendations-only round trip).
+- CONTRIBUTING.md: every `RunPython`/`RunSQL` needs a reverse.
+
+**Task dispatch and failure logs** (MVP+, fix release)  ✅ shipped in v0.12.79
+
+OpenSpec `task-dispatch-and-failure-logs` (ideas.md §15: "One dispatch after commit helper", "One
+traceback rule for job failures"; `Bug_Backlog.md` SIM-10 fixed); spec `sync-jobs` gains "A
+refused task send never fails committed work" and "Unexpected job failures keep their
+traceback". No API, migration or ranking change; backend 2030 tests; no e2e.
+- Bug fixed on the way: with the broker down, `POST /api/v1/profile/sync` and restoring a
+  dismissed repository answered 500 although the job / restore was committed (`_start_job` sent
+  in a non-robust `on_commit`). Now 202 / success, the PENDING job is re-sent by job recovery.
+- `services/dispatch.py`: `send(task, *args, about="", **options) -> bool` (`delay`, or
+  `apply_async` with options, so tests patching `.delay` still work) and `after_commit(...)`.
+  Catches only `kombu` `OperationalError`, logs "Task <name> not queued (<about>)" at WARNING
+  with traceback, never the arguments. Other errors propagate (unlike Django's `robust=True`).
+- Users: `_start_job`, `_requeue` (recovery continues past a refusal; the job keeps its bumped
+  `updated_at`, so it is tried a waiting period later), `queue_revocation`, `data_deletion._purge`.
+  `freshness.start_due_generations` lost its `BrokerError` catch; `_finish_and_follow_up` its
+  broker branch ("Follow-up task of job N not queued" message gone; the catch-all for inline
+  errors stays). The backlog keeps `send_refreshes` (unmarks refused rows; SIM-11 open).
+  `revoke_replaced_token` (legacy messages) still calls `.delay` inside a task.
+- `services/errors.log_failure(logger, code, exc, message, *args, expected=())`: in
+  `services/errors.py`, not `retry.py` (pure policies). `run_tracked_job` now logs a bug at
+  ERROR with traceback (was a warning); `revoke_later` passes `expected=(OAuthError,)` and now
+  also logs expected final failures at WARNING ("GitHub revocation failed: <code>"; the old
+  "GitHub revocation failed unexpectedly" message is gone); `_refresh` unchanged in effect.
+- Deviation: the proposal named `POST /api/v1/sync`; the endpoint is `/api/v1/profile/sync`.
+- Tests: `tests/test_task_dispatch.py` (helper, sync/restore with a refusing broker, recovery,
+  database error, log levels, no token); `test_job_follow_up`, `test_recommendation_generation`
+  (sweep past a refused send) and `test_github_review_fixes` updated.
+
+**Feedback ids and signal enum** (MVP+, fix release)  ✅ shipped in v0.12.80
+
+OpenSpec `feedback-ids-and-signal-enum` (ideas.md §15: "Feedback services take ids", "Difficulty
+signal names in the API schema"; `Bug_Backlog.md` SIM2-11, CR-9 fixed); spec `issue-matching`
+gains "Difficulty signals are declared in the API schema". OpenAPI addition only (contract stays
+`1.0.0`, response bodies unchanged); no migration or ranking change; backend 2038 tests, frontend
+256; no e2e (no browser flow changed).
+- `services/feedback.py`: `record(user, recommendation_id, ...)`, `save(user,
+  recommendation_id)`, `dismiss(user, repository_id, reason)`; `_current` takes a pk.
+  `feedback/api._own_recommendation` became `_own_repository_id` (`values_list`, 404 for another
+  user's id); views pass ids. 47 test call sites moved to `.pk` / `.repository_id`.
+- `issues.models.DifficultySignal` (TextChoices, no migration: JSON column). `classify._vote`
+  takes it; `LEVEL_VOTERS` uses its members.
+- `issues/serializers.py`: `DifficultyVoteSerializer`, `DifficultyEvidenceSerializer` (top keys
+  optional) and `DifficultyEvidenceField` (a `DictField` with `@extend_schema_field`): schema
+  only, stored evidence passed through. `ENUM_NAME_OVERRIDES["DifficultySignalEnum"]`.
+- Frontend: `DifficultySignal` exported from `src/api/types.ts`; `SIGNAL_TEXT:
+  Record<DifficultySignal, …>` with an `isKnown` guard for unknown stored names (FI-4). Proven:
+  removing the `comments` entry fails `tsc` (TS2741).
+- `tests/test_issue_signal_wording.py` (regex over `evidence.ts`) replaced by
+  `tests/test_difficulty_signals.py`: classifier writes exactly the declared set, stored evidence
+  validates against the schema serializer, schema names the enum, detail body unchanged for an
+  unknown stored signal.
+- Deviation: the ownership helper returns the repository id only (the pk is the URL's), not a
+  `(pk, repository_id)` pair as tasks.md said.
+- Review before commit (0.12.78–0.12.80 together): `/simplify` batch 77 (SIM6-1…SIM6-8 fixed)
+  and fix-diff `/code-review` batch 78 (`Bug_Backlog.md`): CR9-1 `dispatch.after_commit(...,
+  robust=True)` for `queue_revocation` (any send error logged, later on-commit callbacks still
+  run); CR9-2 `feedback._current(user, pk)` filters by user; CR9-3 `run_tracked_job` passes
+  `expected=(PermanentJobError,)`; CR9-4 round-trip test reapplies in `finally`; CR9-5
+  `revoke_replaced_token` uses `dispatch.send`; CR9-6 `_requeue` logs after a successful send;
+  CR9-7 `record_revocation_failure` audits only (task logs once); CR9-8 `evidence.ts` `Vote`
+  derived from generated `DifficultyVote`. CR9-9, CR9-10 rejected.
+
 
 **Post-MVP**: personalized or feedback-based ranking, notifications, contribution tracking,
 contribution plans, similar repositories, observability dashboards (Sentry, Prometheus, Grafana).
 
 **Ideas** (`ideas.md`, unplanned; each needs an OpenSpec change). Since 0.12.22 ordered by when
 an idea can ship. Can ship now (no ranking change), in suggested order:
-platform items
-(migration round trip), then the interface revamp (§18, owner request:
-design direction first, one OpenSpec change per step). Ranking-visible (†, must win on the
+the interface revamp (§18, owner request:
+design direction first, one OpenSpec change per step), other §15/§5 platform items. Ranking-visible (†, must win on the
 selection benchmark and not regress on a fresh holdout): IDF weighting, diversity, stated
 preferences, contribution-success signals, opportunity qualifiers,
 upstream dependencies, `similar_repo`, content-based `not_code`, and moving the label bands;
@@ -2021,4 +2102,4 @@ series: bootstrap intervals (0.12.19), feedback report (0.12.20), label calibrat
 (0.12.21), dismiss reasons (0.12.23), setup readiness (0.12.24), discovery yield report (0.12.25), post-analysis pool cleanup (0.12.26),
 data versions (0.12.27), new seeds stored inactive (0.12.28),
 rank constraint (0.12.29, T-12), Content Security Policy (0.12.30), JSON report writer (0.12.33, T-14), dependency audit (0.12.34), labeled-issue fetch
-(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63), services/discovery review fixes (0.12.64), services/matching review fixes (0.12.65), services/ranking review fixes (0.12.66), services/evaluation review fixes (0.12.67), recommendations view review fixes (0.12.68), fix-diff review of 0.12.66–0.12.68 (0.12.69), feedback interface review fixes (0.12.70), profile page review fixes (0.12.71), pipeline progress review fixes (0.12.72), shared components review fixes (0.12.73), root config review fixes (0.12.74; the full review sweep complete), fix-diff review of 0.12.70–0.12.74 (0.12.75), cache generation for data deletion (0.12.76).
+(0.12.35), released-name refresh (0.12.36), route-level id validation (0.12.37), browser tests on the production build (0.12.38), config review fixes (0.12.39), core review fixes (0.12.40), accounts review fixes (0.12.41), github review fixes (0.12.42), e2e seed review fixes (0.12.43), services review fixes (0.12.44), GitHub services review fixes (0.12.45), API client review fixes (0.12.46), auth review fixes (0.12.47), jobs review fixes (0.12.48), developers review fixes (0.12.49), repositories review fixes (0.12.50), issues review fixes (0.12.51), recommendations review fixes (0.12.52), feedback review fixes (0.12.53), profiling review fixes (0.12.54), app review fixes (0.12.55), routes review fixes (0.12.56), issue detail review fixes (0.12.57), e2e config review fixes (0.12.58), scripts review fixes (0.12.59), CI review fixes (0.12.60), public-release preparation (0.12.61), services/repositories review fixes (0.12.62), services/issues review fixes (0.12.63), services/discovery review fixes (0.12.64), services/matching review fixes (0.12.65), services/ranking review fixes (0.12.66), services/evaluation review fixes (0.12.67), recommendations view review fixes (0.12.68), fix-diff review of 0.12.66–0.12.68 (0.12.69), feedback interface review fixes (0.12.70), profile page review fixes (0.12.71), pipeline progress review fixes (0.12.72), shared components review fixes (0.12.73), root config review fixes (0.12.74; the full review sweep complete), fix-diff review of 0.12.70–0.12.74 (0.12.75), cache generation for data deletion (0.12.76), migration round trip (0.12.78), task dispatch and failure logs (0.12.79), feedback ids and signal enum (0.12.80).

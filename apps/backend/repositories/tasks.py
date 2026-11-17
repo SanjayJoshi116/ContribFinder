@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from jobs.models import SyncJob
 from services.discovery.service import DiscoveryService
+from services.errors import log_failure
 from services.github.client import GitHubClient
 from services.github.errors import GitHubAuthError
 from services.github.oauth import has_app_credentials
@@ -72,14 +73,7 @@ def _refresh(task: Any, repo_id: int, parts: list[str] | None) -> None:
             backlog.mark_queued([repo_id], timezone.now())
             raise task.retry(countdown=decision.countdown) from None
         # Not a GitHub failure (a bug, a database error): keep its traceback.
-        unexpected = decision.code == "internal_error"
-        logger.log(
-            logging.ERROR if unexpected else logging.WARNING,
-            "Repository %s refresh failed: %s",
-            repo_id,
-            decision.code,
-            exc_info=unexpected,
-        )
+        log_failure(logger, decision.code, exc, "Repository %s refresh failed", repo_id)
         record_refresh_failure(repo_id, decision.code, since=started)
         return
     logger.info("Repository %s refresh: %s", repo_id, outcome)

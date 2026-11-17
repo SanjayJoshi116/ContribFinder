@@ -16,12 +16,12 @@ from django.db import IntegrityError, transaction
 from django.db.models import F, Q, QuerySet
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from kombu.exceptions import OperationalError as BrokerError
 
 from accounts.models import User
 from github.models import GitHubAccount
 from jobs.models import SyncJob
-from services.errors import JobCancelled, PermanentJobError
+from services import dispatch
+from services.errors import JobCancelled, PermanentJobError, log_failure
 from services.github.errors import GitHubError
 from services.github.retry import Retry, attempt_number, decide_retry
 from services.github.sync import STEPS
@@ -168,7 +168,14 @@ def run_tracked_job(
                 )
                 raise task.retry(countdown=decision.countdown) from None
             return
-        logger.warning("Job %s failed: %s (%s)", job_id, decision.code, type(exc).__name__)
+        log_failure(
+            logger,
+            decision.code,
+            exc,
+            "Job %s failed",
+            job_id,
+            expected=(PermanentJobError,),
+        )
         _finish_and_follow_up(
             job,
             Status.FAILED,
@@ -198,9 +205,10 @@ def _finish_and_follow_up(
     does: the hook may expire the user's stale jobs (``_expire_stale``), and taking those locks
     after the finishing job's own would deadlock with recovery or a cancel.
 
-    The hook's tasks are sent on commit, outside its savepoint: any error from sending (a broker
-    that refuses it) or from running one inline (eager mode) is logged, as a failing hook is.
-    The job is ended, and job recovery re-sends a PENDING follow-up."""
+    The hook's tasks are sent on commit, outside its savepoint, through ``services.dispatch``
+    (a broker refusal is logged there); any other error after the commit (a task run inline in
+    eager mode) is logged, as a failing hook is. The job is ended, and job recovery re-sends a
+    PENDING follow-up."""
     committed = False
 
     def mark_committed() -> None:
@@ -219,13 +227,10 @@ def _finish_and_follow_up(
                 )
             if finish_job(job, status, **fields):
                 _follow_up(hook, job)
-    except Exception as exc:
+    except Exception:
         if not committed:
             raise
-        if isinstance(exc, BrokerError):
-            logger.exception("Follow-up task of job %s not queued", job.pk)
-        else:
-            logger.exception("Follow-up of job %s failed", job.pk)
+        logger.exception("Follow-up of job %s failed", job.pk)
 
 
 def _follow_up(hook: Callable[[SyncJob], None] | None, job: SyncJob) -> None:
@@ -299,12 +304,16 @@ def recover_stale_jobs() -> dict[str, int]:
 
 
 def _requeue(jobs: QuerySet[SyncJob], reason: str, **update: Any) -> int:
-    """Apply ``update`` to each job still matching ``jobs`` and send its task once."""
+    """Apply ``update`` to each job still matching ``jobs`` and send its task once. A job whose
+    send the broker refuses keeps the update, so it is tried again a full waiting period later;
+    the others are still sent."""
     requeued = 0
     for job_id, job_type in list(jobs.values_list("pk", "job_type")):
-        if jobs.filter(pk=job_id).update(**update):
+        # Logged only once the broker took it (CR9-6).
+        if jobs.filter(pk=job_id).update(**update) and dispatch.send(
+            _task_for(job_type), job_id, about=f"job {job_id}"
+        ):
             logger.warning("Job %s (%s) %s; requeued", job_id, job_type, reason)
-            _task_for(job_type).delay(job_id)
             requeued += 1
     return requeued
 
@@ -339,7 +348,9 @@ def new_job(user: User, job_type: str) -> SyncJob:
 
 def _start_job(user: User, job_type: str) -> tuple[SyncJob, bool]:
     """Return ``(job, created)``: the active job of this type, or a new one queued on commit.
-    A RUNNING job that stopped updating is not active: it fails with ``worker_lost`` (D5)."""
+    A RUNNING job that stopped updating is not active: it fails with ``worker_lost`` (D5).
+    A broker that refuses the task is logged, never raised: the PENDING job is committed and
+    job recovery sends it again."""
     if existing := active_jobs(user, job_type).first():
         return existing, False
     _expire_stale(user, job_type)
@@ -347,7 +358,7 @@ def _start_job(user: User, job_type: str) -> tuple[SyncJob, bool]:
     try:
         with transaction.atomic():
             job = new_job(user, job_type)
-            transaction.on_commit(lambda: task.delay(job.pk))
+            dispatch.after_commit(task, job.pk, about=f"job {job.pk}")
     except IntegrityError:
         # A concurrent start created the active job first (partial unique constraint). It may
         # have finished since: then report that job as it is now, never a server error.

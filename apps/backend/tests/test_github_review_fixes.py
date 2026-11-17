@@ -116,7 +116,10 @@ def test_an_unexpected_error_keeps_its_traceback(caplog: pytest.LogCaptureFixtur
     ):
         revoke_later.apply(args=(encrypt_token(TOKEN), None, True), throw=True)
 
-    record = next(r for r in caplog.records if r.message == "GitHub revocation failed unexpectedly")
+    record = next(
+        r for r in caplog.records if r.message == "GitHub revocation failed: internal_error"
+    )
+    assert record.levelno == logging.ERROR
     assert record.exc_info is not None and record.exc_info[0] is ValueError
     event = AuditEvent.objects.get(action="github_revocation_failed")
     assert event.metadata == {"reason": "internal_error"}

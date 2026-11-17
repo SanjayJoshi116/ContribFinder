@@ -123,7 +123,8 @@ ContribFinder/
 │  │  │                     judged real developers; selection benchmark once it exists),
 │  │  │                     baselines.json (format 4, keyed by dataset, top N each)
 │  │  └─ services/          crypto.py (token encryption), audit.py, jobs.py (start/claim/finish
-│  │     │                  jobs), errors.py (PermanentJobError, JobCancelled), job_guard.py
+│  │     │                  jobs), errors.py (PermanentJobError, JobCancelled, log_failure),
+│  │     │                  dispatch.py (send / after_commit: broker refusal logged), job_guard.py
 │  │     │                  (stale_before, lost_before, job_write, save_progress, merge_metadata,
 │  │     │                  heartbeat),
 │  │     │                  locks.py (lock_developer: one lock order for recommendations and
@@ -334,7 +335,7 @@ Frontend (`apps/frontend`, npm):
 
 ## 7. Status and roadmap
 
-Current: **v0.12.77**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
+Current: **v0.12.80**. Phases 1–5, 7, 8a, 8b shipped; MVP definition of done (SRS-2 §82) met
 in v0.6.0. The full per-release record (phase FRs, deviations as built, carry-overs, every fix
 release since 0.12.1) lives in **`CLAUDE_HISTORY.md`**: read the entry for an area before
 changing it. Per-release detail also in `CHANGELOG.md`; accepted behaviour in `openspec/specs/`.
@@ -349,9 +350,9 @@ with `--write-baseline`. Judging `real-a-v2` / building `benchmark-v2` is option
 
 **Next** (`ideas.md`, each needs an OpenSpec change). The repository is public since 2026-11-16
 (PUB-3 done; `main` ruleset requires a pull request and the six CI checks, the owner bypasses).
-Can ship now (no ranking change): platform
-items (migration round trip), then the interface revamp (§18, owner request: design direction
-first, one OpenSpec change per step). Ranking-visible (†): IDF weighting, diversity, stated
+Can ship now (no ranking change): the
+interface revamp (§18, owner request: design direction first, one OpenSpec change per step),
+other §15/§5 platform items. Ranking-visible (†): IDF weighting, diversity, stated
 preferences, contribution-success signals, opportunity qualifiers, upstream dependencies,
 `similar_repo`, content-based `not_code`, moving the label bands. Whether a ranking change must
 also be significant is decided once real developers enlarge the benchmark.
@@ -381,11 +382,16 @@ Jobs and locking:
   `override_settings(CELERY_TASK_ALWAYS_EAGER=False)`.
 - Feedback report outcomes: an undo (`unsaved`, `undismissed`) cancels by user and repository,
   never by version: restore records no version, unsave may carry a later one.
-- Sweeps that queue jobs per user catch only broker errors (`kombu.exceptions.OperationalError`);
-  a database error fails the task.
-- Feedback events never reference a recommendation that may be gone; services re-read what they
-  snapshot (`_current`), so a service called from a view must not touch
-  `recommendation.repository` before its re-read.
+- Tasks are sent through `services/dispatch` (`send`, `after_commit`): a broker refusal
+  (`kombu.exceptions.OperationalError`) is logged with the task name, never its arguments, and
+  never fails committed work (job recovery re-sends a PENDING job); any other error propagates,
+  so a database error still fails a sweep. Exception: `backlog.send_refreshes` (unmarks refused).
+  `after_commit(..., robust=True)` where committed work must never fail (token revocation).
+- A final job or task failure is logged through `services.errors.log_failure`: `internal_error`
+  at ERROR with traceback, anything else at WARNING with the exception type only.
+- Feedback events never reference a recommendation that may be gone; services read what they
+  snapshot under their locks (`_current`). Feedback services take ids (`record`/`save` a
+  recommendation id, `dismiss`/`unsave`/`restore` a repository id), never a model instance.
 
 GitHub and data:
 - Public client methods raise typed errors (`GitHubInvalidResponse` for bad JSON); callers never
@@ -404,7 +410,9 @@ GitHub and data:
   (`profiling/readme._on`), never `endswith`/`in` on the raw URL or `netloc`. HTML comment
   matching follows the HTML parser (`-->`, `--!>`, empty `<!-->`). CodeQL default setup scans
   every push (`Bug_Backlog.md` batch 75); fix its alerts at the cause, test included.
-- A new difficulty signal needs words in `features/issues/evidence.ts` `SIGNAL_TEXT` (test).
+- A new difficulty signal is a `issues.models.DifficultySignal` member (the classifier writes
+  only those, `tests/test_difficulty_signals.py`); after `api:sync`, `SIGNAL_TEXT` in
+  `features/issues/evidence.ts` (`Record<DifficultySignal, …>`) fails `tsc` until it has words.
 - Scoring configs are immutable once stored; new seeds after v2 use `migrations/_seeding.py`
   (stored inactive); activation only through `activate_scoring_config`.
 - A user-scope ETag cache write is checked against `User.github_cache_generation` afterwards
@@ -419,6 +427,9 @@ Backend conventions:
 - Settings: comma lists `env_list`, JSON `env_json`/`env_mapping` (never bare `env.list`/`env.json`).
   A new numeric setting needs a system check (`core/checks.py`). A new setting read from the
   environment goes in `.env.example` too (`tests/test_env_example.py`).
+- Every migration is reversible: each `RunPython`/`RunSQL` has a reverse (`noop` when nothing to
+  undo); `tests/test_migration_round_trip.py` takes every app to zero and back and compares the
+  schema. It is a transactional test (flushes tables): never assume seeded rows before it.
 - Admins use a `core.admin` base; job-written data uses `ViewOnlyAdmin`.
 - Management commands writing JSON use `core.reports.write_json`.
 - Test fixtures shared by import live in `tests/shared_fixtures.py`, not `conftest.py`. Register

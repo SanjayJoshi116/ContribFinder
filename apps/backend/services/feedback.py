@@ -50,13 +50,13 @@ def _current_recommendation(user: User, repository_id: int) -> Recommendation | 
     )
 
 
-def _current(recommendation: Recommendation, *, lock: bool = False) -> Recommendation | None:
-    """The recommendation as stored now, with what an event snapshots; None when it is gone.
-    ``lock`` takes its row lock (and only its row)."""
+def _current(user: User, recommendation_id: int, *, lock: bool = False) -> Recommendation | None:
+    """The user's recommendation as stored now, with what an event snapshots; None when it is
+    gone or another user's. ``lock`` takes its row lock (and only its row)."""
     rows = Recommendation.objects.select_related("repository", "scoring_config")
     if lock:
         rows = rows.select_for_update(of=("self",))
-    return rows.filter(pk=recommendation.pk).first()
+    return rows.filter(pk=recommendation_id, developer__user=user).first()
 
 
 def _event(
@@ -82,9 +82,7 @@ def _event(
     )
 
 
-def record(
-    user: User, recommendation: Recommendation, action: str, *, issue_id: int | None = None
-) -> bool:
+def record(user: User, recommendation_id: int, action: str, *, issue_id: int | None = None) -> bool:
     """Record an event with a snapshot of the recommendation (and, for ``opened_issue``, of
     the issue ``issue_id``). A ``viewed`` event within ``FEEDBACK_VIEW_DEDUP_MINUTES`` of the
     previous one is skipped. Returns whether an event was stored: not when the recommendation
@@ -95,8 +93,8 @@ def record(
         # Only this recommendation's row: views of one recommendation check and insert in
         # turn, without waiting for a generation's whole write. A recommendation deleted
         # meanwhile (regenerated away, dismissed) gets no event: it would reference no row.
-        # The snapshot comes from the locked row, not the one the caller loaded before.
-        current = _current(recommendation, lock=True)
+        # The snapshot comes from the locked row; the caller passes only its id.
+        current = _current(user, recommendation_id, lock=True)
         if current is None:
             return False
         issue = None
@@ -133,15 +131,15 @@ def record(
     return True
 
 
-def save(user: User, recommendation: Recommendation) -> SavedRepository:
+def save(user: User, recommendation_id: int) -> SavedRepository:
     """Idempotent: saving twice keeps the first save time and records one event. Raises
     ``Recommendation.DoesNotExist`` when the recommendation is gone (dismissed or regenerated
     away) by the time the lock is held: a dismissed repository is never saved."""
     with transaction.atomic():
         lock_developer(user.pk)
-        # Re-read under the profile lock (a generation writes under it too): the snapshot is
-        # the row as it is now, not as the caller loaded it.
-        current = _current(recommendation)
+        # Read under the profile lock (a generation writes under it too): the snapshot is the
+        # row as it is now.
+        current = _current(user, recommendation_id)
         if (
             current is None
             or DismissedRepository.objects.filter(
@@ -174,20 +172,20 @@ def unsave(user: User, repository_id: int) -> bool:
     return bool(deleted)
 
 
-def dismiss(user: User, recommendation: Recommendation, reason: str = "") -> None:
+def dismiss(user: User, repository_id: int, reason: str = "") -> None:
     """Hide the repository from this and every later generation, and unsave it (recorded as
     ``unsaved``). The optional ``reason`` (a ``DismissReason``) is stored on the hidden entry
     and its ``dismissed`` event; an already hidden repository keeps its stored reason."""
     with transaction.atomic():
         lock_developer(user.pk)
         # A generation may have dropped it before the lock was ours: the dismissal still
-        # holds, but the events must not reference the deleted row. The caller may pass a
-        # pk-and-repository-id instance (FB-5), so the repository comes from this read.
-        current = _current_recommendation(user, recommendation.repository_id)
+        # holds, but the events must not reference the deleted row. The repository comes from
+        # this read (the caller passes only its id).
+        current = _current_recommendation(user, repository_id)
         repository = (
             current.repository
             if current is not None
-            else Repository.objects.filter(pk=recommendation.repository_id).first()
+            else Repository.objects.filter(pk=repository_id).first()
         )
         if repository is None:
             # Deleted meanwhile with the user's data (delete-data, orphan cleanup): nothing

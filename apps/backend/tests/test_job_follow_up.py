@@ -92,24 +92,27 @@ def test_a_failing_follow_up_keeps_the_completion_and_drops_its_writes(other, ca
     assert f"Follow-up of job {job.pk} failed" in caplog.text
 
 
-def test_a_refused_follow_up_task_keeps_the_completion(other, caplog) -> None:
+def test_a_refused_follow_up_task_keeps_the_completion(other, caplog, monkeypatch) -> None:
     from kombu.exceptions import OperationalError
 
     user = cast(User, UserFactory())
     job = new_job(user)
 
-    def refused() -> None:
+    def refused(pk: int) -> None:
         raise OperationalError("broker down")
 
+    monkeypatch.setattr("repositories.tasks.generate_candidates.delay", refused)
+
     def start_next(finished: SyncJob) -> None:
-        jobs.new_job(user, DISCOVERY)
-        transaction.on_commit(refused)
+        jobs._start_job(user, DISCOVERY)
 
     jobs.run_tracked_job(MagicMock(), job.pk, lambda j: None, on_completed=start_next)
 
     # Committed before the send failed; job recovery re-sends the PENDING follow-up.
     assert committed(other, user) == {SYNC: "COMPLETED", DISCOVERY: "PENDING"}
-    assert f"Follow-up task of job {job.pk} not queued" in caplog.text
+    follow_up = SyncJob.objects.get(user=user, job_type=DISCOVERY)
+    assert f"Task repositories.generate_candidates not queued (job {follow_up.pk})" in caplog.text
+    assert "Follow-up of job" not in caplog.text
 
 
 def test_a_follow_up_task_failing_inline_keeps_the_completion(other, caplog) -> None:

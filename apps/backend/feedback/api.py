@@ -11,7 +11,7 @@ from django.db.models import Model, Prefetch, Q, QuerySet
 from django.http import Http404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.exceptions import APIException, ValidationError
-from rest_framework.generics import ListAPIView, get_object_or_404
+from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -36,14 +36,17 @@ from .serializers import (
 _NO_CONTENT = OpenApiResponse(description="Done.")
 
 
-def _own_recommendation(request: Request, pk: int) -> Recommendation:
-    """The requesting user's recommendation, pk and repository id only; 404 for anyone
-    else's. The services re-read the row under their locks (FB-5)."""
-    return get_object_or_404(
-        Recommendation.objects.only("pk", "repository_id"),
-        pk=pk,
-        developer__user=current_user(request),
+def _own_repository_id(request: Request, pk: int) -> int:
+    """The repository id of the requesting user's recommendation ``pk``; 404 for anyone
+    else's. The services take ids and read the row under their locks (FB-5)."""
+    repository_id = (
+        Recommendation.objects.filter(pk=pk, developer__user=current_user(request))
+        .values_list("repository_id", flat=True)
+        .first()
     )
+    if repository_id is None:
+        raise Http404
+    return repository_id
 
 
 class FeedbackView(APIView):
@@ -53,13 +56,13 @@ class FeedbackView(APIView):
         responses={204: _NO_CONTENT, **error_responses(400, 401, 403, 404)},
     )
     def post(self, request: Request, pk: int) -> Response:
-        recommendation = _own_recommendation(request, pk)
+        _own_repository_id(request, pk)
         body = FeedbackSerializer(data=request.data)
         body.is_valid(raise_exception=True)
         try:
             feedback.record(
                 current_user(request),
-                recommendation,
+                pk,
                 body.validated_data["action"],
                 issue_id=body.validated_data.get("issue_id"),
             )
@@ -77,8 +80,9 @@ class SaveView(APIView):
         responses={200: SaveResultSerializer, **error_responses(401, 403, 404)},
     )
     def post(self, request: Request, pk: int) -> Response:
+        _own_repository_id(request, pk)
         try:
-            feedback.save(current_user(request), _own_recommendation(request, pk))
+            feedback.save(current_user(request), pk)
         except Recommendation.DoesNotExist:
             raise Http404 from None  # dismissed (or regenerated away) meanwhile
         return Response(SaveResultSerializer({"saved": True}).data)
@@ -90,8 +94,7 @@ class SaveView(APIView):
     def delete(self, request: Request, pk: int) -> Response:
         # Kept for API clients (OpenAPI 1.0.0); the SPA unsaves through DELETE /saved/{id},
         # which still works once the recommendation is regenerated away (FB-3).
-        recommendation = _own_recommendation(request, pk)
-        feedback.unsave(current_user(request), recommendation.repository_id)
+        feedback.unsave(current_user(request), _own_repository_id(request, pk))
         return Response(SaveResultSerializer({"saved": False}).data)
 
 
@@ -102,12 +105,12 @@ class DismissView(APIView):
         responses={204: _NO_CONTENT, **error_responses(400, 401, 403, 404)},
     )
     def post(self, request: Request, pk: int) -> Response:
-        recommendation = _own_recommendation(request, pk)
+        repository_id = _own_repository_id(request, pk)
         body = DismissSerializer(data=request.data)
         body.is_valid(raise_exception=True)
         try:
             feedback.dismiss(
-                current_user(request), recommendation, body.validated_data.get("reason", "")
+                current_user(request), repository_id, body.validated_data.get("reason", "")
             )
         except Recommendation.DoesNotExist:
             raise Http404 from None  # its repository was deleted with the user's data meanwhile

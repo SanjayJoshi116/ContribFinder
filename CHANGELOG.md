@@ -7,6 +7,71 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+## [0.12.80] - 2026-11-16
+
+Feedback ids and signal enum (OpenSpec `feedback-ids-and-signal-enum`, ideas.md §15,
+`Bug_Backlog.md` SIM2-11, CR-9). OpenAPI addition only: response bodies and the `1.0.0`
+contract unchanged. No migration or ranking change. No e2e run.
+
+### Added
+
+- The OpenAPI schema describes an issue's difficulty evidence: its signals (with the signal
+  names as the `DifficultySignalEnum` enumeration), the vote count per level and the thresholds.
+
+### Changed
+
+- The issue page's words for difficulty signals are checked by the TypeScript compiler against
+  the declared signal names; a backend test checks the classifier writes exactly those names.
+  The test that read `evidence.ts` with a regular expression is gone.
+- Feedback services take ids instead of recommendation objects (internal; no behaviour change).
+
+### Fixed
+
+Review of 0.12.78–0.12.80 before commit (`Bug_Backlog.md` batch 78, CR9-1…CR9-8):
+
+- A token revocation that cannot be sent for any reason (not only a broker refusal) no longer
+  fails a disconnect or account deletion that already committed, nor skips the cache purge
+  registered after it.
+- Feedback services read a recommendation only for its own user.
+- A job's typed permanent error is logged as a warning, not as a bug; a refused requeue is no
+  longer logged as requeued; a final revocation failure is logged once; the old
+  `revoke_replaced_token` task sends through the dispatch helper.
+- The migration round-trip test reapplies every migration even when it fails part-way.
+- The issue page's vote type comes from the generated API types.
+
+## [0.12.79] - 2026-11-16
+
+Task dispatch and failure logs (OpenSpec `task-dispatch-and-failure-logs`, ideas.md §15,
+`Bug_Backlog.md` SIM-10). No API, migration or ranking change. No e2e run.
+
+### Fixed
+
+- With the task broker down, starting a sync and restoring a dismissed repository no longer
+  answer 500 after the work was saved: the job waits as PENDING and job recovery sends it again.
+- Job recovery goes on with the other jobs when the broker refuses one.
+- A bug in a sync, analysis, discovery or generation job is logged at error level with its
+  traceback (was a one-line warning).
+
+### Changed
+
+- Background tasks are sent through one helper (`services/dispatch`) that logs a broker
+  refusal (task name, never its arguments) and lets every other error through.
+- Final failures of jobs, token revocations and repository refreshes share one logging rule:
+  unexpected errors at error level with traceback, the rest as warnings without.
+
+## [0.12.78] - 2026-11-16
+
+Migration round trip (OpenSpec `migration-round-trip`, ideas.md §15). Test only: no migration,
+API or ranking change. No e2e run.
+
+### Added
+
+- A backend test unapplies every app's migrations and applies them again. It fails on a
+  migration without a reverse, or on a reverse that leaves a table, column, constraint or index
+  behind, and checks the seeded scoring configurations come back with one active. Runs in CI
+  with the other backend tests (about 18 s).
+- CONTRIBUTING.md: every `RunPython` / `RunSQL` migration needs a reverse.
+
 ## [0.12.77] - 2026-11-16
 
 Fixes for the first CodeQL code scan, run after the repository went public (`Bug_Backlog.md`

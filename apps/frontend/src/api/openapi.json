@@ -2163,6 +2163,59 @@
         "type": "string",
         "description": "* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
       },
+      "DifficultyEvidence": {
+        "type": "object",
+        "description": "How the difficulty estimate was reached. Returned as stored: an older issue may lack\nkeys or name a signal not listed here.",
+        "properties": {
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DifficultyVote"
+            }
+          },
+          "votes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "thresholds": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "DifficultySignalEnum": {
+        "enum": ["label", "body_length", "technology_count", "contribution_type", "comments"],
+        "type": "string",
+        "description": "* `label` - Label\n* `body_length` - Body Length\n* `technology_count` - Technology Count\n* `contribution_type` - Contribution Type\n* `comments` - Comments"
+      },
+      "DifficultyVote": {
+        "type": "object",
+        "properties": {
+          "signal": {
+            "$ref": "#/components/schemas/DifficultySignalEnum"
+          },
+          "vote": {
+            "nullable": true,
+            "description": "The level it voted for, if any.\n\n* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DifficultyEnum"
+              },
+              {
+                "$ref": "#/components/schemas/NullEnum"
+              }
+            ]
+          },
+          "value": {
+            "description": "What the signal measured (label, length, count)."
+          }
+        },
+        "required": ["signal", "value", "vote"]
+      },
       "DisconnectResult": {
         "type": "object",
         "properties": {
@@ -2508,8 +2561,7 @@
             "description": "Estimated; unknown when the evidence is not enough.\n\n* `beginner` - Beginner\n* `intermediate` - Intermediate\n* `advanced` - Advanced\n* `unknown` - Unknown"
           },
           "difficulty_evidence": {
-            "type": "object",
-            "additionalProperties": {}
+            "$ref": "#/components/schemas/DifficultyEvidence"
           },
           "technologies": {
             "type": "array",

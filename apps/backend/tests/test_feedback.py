@@ -13,7 +13,12 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from developers.models import DeveloperProfile
 from e2e.builders import add_candidate
-from feedback.models import DismissedRepository, RecommendationFeedback, SavedRepository
+from feedback.models import (
+    DismissedRepository,
+    FeedbackAction,
+    RecommendationFeedback,
+    SavedRepository,
+)
 from github.models import GitHubAccount
 from jobs.models import SyncJob
 from recommendations.models import Recommendation
@@ -66,7 +71,7 @@ def test_save_and_dismissal_are_unique_per_user(user, recs) -> None:
 
 def test_feedback_survives_recommendation_and_repository_deletion(user, recs) -> None:
     rec = recs["django"]
-    feedback.record(user, rec, "viewed")
+    feedback.record(user, rec.pk, "viewed")
     rec.delete()
     event = events(user).get()
     assert event.recommendation is None
@@ -82,8 +87,8 @@ def test_feedback_survives_recommendation_and_repository_deletion(user, recs) ->
 
 
 def test_saves_dismissals_and_feedback_cascade_with_the_user(user, recs) -> None:
-    feedback.save(user, recs["django"])
-    feedback.dismiss(user, recs["plain"])
+    feedback.save(user, recs["django"].pk)
+    feedback.dismiss(user, recs["plain"].repository_id)
     user.delete()
     assert not SavedRepository.objects.exists()
     assert not DismissedRepository.objects.exists()
@@ -95,26 +100,26 @@ def test_saves_dismissals_and_feedback_cascade_with_the_user(user, recs) -> None
 
 def test_view_recorded_once_within_the_window(user, recs, settings) -> None:
     rec = recs["django"]
-    assert feedback.record(user, rec, "viewed") is True
-    assert feedback.record(user, rec, "viewed") is False
+    assert feedback.record(user, rec.pk, "viewed") is True
+    assert feedback.record(user, rec.pk, "viewed") is False
     assert events(user, "viewed").count() == 1
     events(user).update(
         created_at=timezone.now() - timedelta(minutes=settings.FEEDBACK_VIEW_DEDUP_MINUTES + 1)
     )
-    assert feedback.record(user, rec, "viewed") is True
+    assert feedback.record(user, rec.pk, "viewed") is True
     assert events(user, "viewed").count() == 2
 
 
 def test_other_actions_are_not_deduplicated(user, recs) -> None:
-    feedback.record(user, recs["django"], "opened_repository")
-    feedback.record(user, recs["django"], "opened_repository")
+    feedback.record(user, recs["django"].pk, "opened_repository")
+    feedback.record(user, recs["django"].pk, "opened_repository")
     assert events(user, "opened_repository").count() == 2
 
 
 def test_save_is_idempotent_and_unsave_records_once(user, recs) -> None:
     rec = recs["django"]
-    first = feedback.save(user, rec)
-    again = feedback.save(user, rec)
+    first = feedback.save(user, rec.pk)
+    again = feedback.save(user, rec.pk)
     assert first.pk == again.pk and first.saved_at == again.saved_at
     assert events(user, "saved").count() == 1
     assert feedback.unsave(user, rec.repository_id) is True
@@ -125,8 +130,8 @@ def test_save_is_idempotent_and_unsave_records_once(user, recs) -> None:
 
 def test_dismiss_removes_recommendation_and_unsaves(user, recs) -> None:
     rec = recs["django"]
-    feedback.save(user, rec)
-    feedback.dismiss(user, rec)
+    feedback.save(user, rec.pk)
+    feedback.dismiss(user, rec.repository_id)
     assert not Recommendation.objects.filter(pk=rec.pk).exists()
     assert not SavedRepository.objects.filter(user=user).exists()
     assert DismissedRepository.objects.filter(user=user, repository=rec.repository).exists()
@@ -141,15 +146,15 @@ def test_dismiss_removes_recommendation_and_unsaves(user, recs) -> None:
 
 
 def test_dismiss_of_unsaved_repository_records_no_unsave(user, recs) -> None:
-    feedback.dismiss(user, recs["django"])
+    feedback.dismiss(user, recs["django"].repository_id)
     assert not events(user, "unsaved").exists()
 
 
 def test_save_after_a_dismiss_is_refused(user, recs) -> None:
     stale = Recommendation.objects.get(pk=recs["django"].pk)  # a second tab's copy
-    feedback.dismiss(user, recs["django"])
+    feedback.dismiss(user, recs["django"].repository_id)
     with pytest.raises(Recommendation.DoesNotExist):
-        feedback.save(user, stale)
+        feedback.save(user, stale.pk)
     assert not SavedRepository.objects.filter(user=user).exists()
     assert not events(user, "saved").exists()
 
@@ -158,7 +163,7 @@ def test_save_of_a_dismissed_repository_is_refused(user, recs) -> None:
     rec = recs["django"]
     DismissedRepository.objects.create(user=user, repository=rec.repository)  # row still there
     with pytest.raises(Recommendation.DoesNotExist):
-        feedback.save(user, rec)
+        feedback.save(user, rec.pk)
     assert not SavedRepository.objects.filter(user=user).exists()
 
 
@@ -166,8 +171,8 @@ def test_save_endpoint_racing_a_dismiss_is_404(
     signed_in_client: APIClient, user, recs, monkeypatch
 ) -> None:
     stale = Recommendation.objects.get(pk=recs["django"].pk)
-    feedback.dismiss(user, recs["django"])
-    monkeypatch.setattr("feedback.api._own_recommendation", lambda request, pk: stale)
+    feedback.dismiss(user, recs["django"].repository_id)
+    monkeypatch.setattr("feedback.api._own_repository_id", lambda request, pk: stale.repository_id)
     response = signed_in_client.post(f"{RECS}/{stale.pk}/save")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
@@ -175,7 +180,7 @@ def test_save_endpoint_racing_a_dismiss_is_404(
 
 
 def test_dismissed_repository_absent_after_regeneration(user, recs, pool) -> None:
-    feedback.dismiss(user, recs["django"])
+    feedback.dismiss(user, recs["django"].repository_id)
     generate(user)
     repos = list(Recommendation.objects.order_by("rank").values_list("repository_id", "rank"))
     assert pool["django"].pk not in [r for r, _ in repos]
@@ -206,7 +211,7 @@ def test_restore_records_and_starts_a_generation(user, recs, pool, monkeypatch) 
     monkeypatch.setattr(
         "recommendations.tasks.generate_recommendations.delay", lambda pk: queued.append(pk)
     )
-    feedback.dismiss(user, recs["django"])
+    feedback.dismiss(user, recs["django"].repository_id)
     assert feedback.restore(user, pool["django"].pk) is True
     assert not DismissedRepository.objects.exists()
     assert events(user, "undismissed").count() == 1
@@ -221,9 +226,9 @@ def test_restore_records_and_starts_a_generation(user, recs, pool, monkeypatch) 
 def test_feedback_does_not_change_scores(user, recs) -> None:
     before = sorted(Recommendation.objects.values_list("repository_id", "score", "rank"))
     for _ in range(5):
-        feedback.record(user, recs["plain"], "opened_repository")
-    feedback.record(user, recs["plain"], "viewed")
-    feedback.save(user, recs["plain"])
+        feedback.record(user, recs["plain"].pk, "opened_repository")
+    feedback.record(user, recs["plain"].pk, "viewed")
+    feedback.save(user, recs["plain"].pk)
     generate(user)
     after = sorted(Recommendation.objects.values_list("repository_id", "score", "rank"))
     assert after == before
@@ -339,20 +344,20 @@ def restore_and_generate(user, repository_id: int, monkeypatch) -> None:
 
 
 def test_dismiss_reason_does_not_change_scores(user, recs, pool, monkeypatch) -> None:
-    feedback.dismiss(user, recs["django"], "not_my_stack")
+    feedback.dismiss(user, recs["django"].repository_id, "not_my_stack")
     generate(user)
     with_reason = dict(Recommendation.objects.values_list("repository_id", "score"))
     assert pool["django"].pk not in with_reason
     restore_and_generate(user, pool["django"].pk, monkeypatch)
-    feedback.dismiss(user, Recommendation.objects.get(repository=pool["django"]))
+    feedback.dismiss(user, pool["django"].pk)
     generate(user)
     assert dict(Recommendation.objects.values_list("repository_id", "score")) == with_reason
 
 
 def test_dismiss_again_after_restore_keeps_no_old_reason(user, recs, pool, monkeypatch) -> None:
-    feedback.dismiss(user, recs["django"], "too_big")
+    feedback.dismiss(user, recs["django"].repository_id, "too_big")
     restore_and_generate(user, pool["django"].pk, monkeypatch)
-    feedback.dismiss(user, Recommendation.objects.get(repository=pool["django"]))
+    feedback.dismiss(user, pool["django"].pk)
     assert DismissedRepository.objects.get(user=user).reason == ""
     reasons = list(
         events(user, "dismissed").order_by("pk").values_list("dismiss_reason", flat=True)
@@ -371,8 +376,8 @@ def test_restore_endpoint(signed_in_client: APIClient, user, recs, monkeypatch) 
 
 
 def test_saved_list(signed_in_client: APIClient, user, recs) -> None:
-    feedback.save(user, recs["plain"])
-    feedback.save(user, recs["django"])
+    feedback.save(user, recs["plain"].pk)
+    feedback.save(user, recs["django"].pk)
     body = signed_in_client.get("/api/v1/saved").json()
     assert body["count"] == 2
     first = body["results"][0]
@@ -413,7 +418,7 @@ def test_latest_snapshot_is_the_only_one_loaded(
             activity_label="low_activity",
             thresholds_version="x",
         )
-    feedback.save(user, recs["django"])
+    feedback.save(user, recs["django"].pk)
     assert signed_in_client.get("/api/v1/saved").json()["results"][0]["activity_label"] == (
         "recently_active"
     )
@@ -427,7 +432,7 @@ def test_latest_snapshot_is_the_only_one_loaded(
 
 
 def test_saved_list_keeps_no_longer_recommended(signed_in_client: APIClient, user, recs) -> None:
-    feedback.save(user, recs["django"])
+    feedback.save(user, recs["django"].pk)
     Repository.objects.filter(pk=recs["django"].repository_id).update(is_eligible=False)
     generate(user)
     assert not Recommendation.objects.filter(repository=recs["django"].repository).exists()
@@ -449,22 +454,22 @@ def test_list_query_count_is_constant(signed_in_client: APIClient, user, recs, p
     signed_in_client.get(RECS)  # warm up session and content types
     with CaptureQueriesContext(connection) as few:
         signed_in_client.get(RECS)
-    feedback.save(user, recs["django"])
+    feedback.save(user, recs["django"].pk)
     extra = ready_repo(50, "extra/django-app", topics=("django",), deps=("django",))
     add_candidate(recs["django"].developer, extra)
     generate(user)
-    feedback.save(user, Recommendation.objects.get(repository=extra))
+    feedback.save(user, Recommendation.objects.get(repository=extra).pk)
     with CaptureQueriesContext(connection) as more:
         signed_in_client.get(RECS)
     assert len(more) == len(few)
 
 
 def test_saved_list_query_count_is_constant(signed_in_client: APIClient, user, recs) -> None:
-    feedback.save(user, recs["django"])
+    feedback.save(user, recs["django"].pk)
     signed_in_client.get("/api/v1/saved")
     with CaptureQueriesContext(connection) as one:
         signed_in_client.get("/api/v1/saved")
-    feedback.save(user, recs["plain"])
+    feedback.save(user, recs["plain"].pk)
     with CaptureQueriesContext(connection) as two:
         signed_in_client.get("/api/v1/saved")
     assert len(two) == len(one)
@@ -522,10 +527,21 @@ def test_every_reader_shows_the_activity_generation_scored(
     assert rec.activity_label == "moderately_active"
     detail = signed_in_client.get(f"{RECS}/{rec.pk}").json()
     assert detail["activity_signals"]["days_since_push"] == 40
-    feedback.save(user, rec)
+    feedback.save(user, rec.pk)
     saved = signed_in_client.get("/api/v1/saved").json()["results"][0]
     assert saved["activity_label"] == "moderately_active"
     pool_list = signed_in_client.get("/api/v1/discovery/candidates").json()["results"]
     [listed] = [c for c in pool_list if c["repository"]["full_name"] == repo.full_name]
     assert listed["activity_label"] == "moderately_active"
     assert RepositorySnapshot.objects.get(repository=repo).activity_label == "recently_active"
+
+
+def test_services_never_read_another_users_recommendation(user, recs) -> None:
+    """CR9-2: the services filter by user themselves, not only the views' ownership check."""
+    stranger = other_user()
+    rec = recs["django"]
+    assert feedback.record(stranger, rec.pk, FeedbackAction.OPENED_REPOSITORY) is False
+    with pytest.raises(Recommendation.DoesNotExist):
+        feedback.save(stranger, rec.pk)
+    assert not events(stranger).exists()
+    assert not SavedRepository.objects.filter(user=stranger).exists()

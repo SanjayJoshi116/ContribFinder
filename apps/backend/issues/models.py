@@ -6,6 +6,17 @@ from developers.models import IssueDifficulty
 Difficulty = IssueDifficulty
 
 
+class DifficultySignal(models.TextChoices):
+    """The signals ``services/issues/classify.difficulty`` writes into ``difficulty_evidence``.
+    Declared in the API schema, so the issue page's words for each are checked by ``tsc``."""
+
+    LABEL = "label"
+    BODY_LENGTH = "body_length"
+    TECHNOLOGY_COUNT = "technology_count"
+    CONTRIBUTION_TYPE = "contribution_type"
+    COMMENTS = "comments"
+
+
 class ContributionType(models.TextChoices):
     CODE = "code"
     DOCUMENTATION = "documentation"

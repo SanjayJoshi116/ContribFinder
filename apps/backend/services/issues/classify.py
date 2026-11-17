@@ -18,6 +18,7 @@ from typing import Any
 
 from issues.models import ContributionType as CT
 from issues.models import Difficulty
+from issues.models import DifficultySignal as S
 from services.profiling.text import strip_code_fences
 
 from . import labels as L
@@ -78,16 +79,16 @@ def contribution_type(canonical: Sequence[str], title: str) -> tuple[str, dict[s
     return str(CT.UNKNOWN), {}
 
 
-def _vote(signal: str, vote: str | None, value: Any) -> dict[str, Any]:
-    return {"signal": signal, "vote": str(vote) if vote else None, "value": value}
+def _vote(signal: S, vote: str | None, value: Any) -> dict[str, Any]:
+    return {"signal": str(signal), "vote": str(vote) if vote else None, "value": value}
 
 
 # The signals that can vote for each level (``difficulty`` below). A level needs
 # ``min_votes`` agreeing votes, so these capacities bound the setting (core.E040, core.W004).
 LEVEL_VOTERS: dict[str, tuple[str, ...]] = {
-    Difficulty.BEGINNER: ("label", "body_length", "technology_count", "contribution_type"),
-    Difficulty.INTERMEDIATE: ("label", "technology_count"),
-    Difficulty.ADVANCED: ("label", "body_length", "technology_count", "comments"),
+    Difficulty.BEGINNER: (S.LABEL, S.BODY_LENGTH, S.TECHNOLOGY_COUNT, S.CONTRIBUTION_TYPE),
+    Difficulty.INTERMEDIATE: (S.LABEL, S.TECHNOLOGY_COUNT),
+    Difficulty.ADVANCED: (S.LABEL, S.BODY_LENGTH, S.TECHNOLOGY_COUNT, S.COMMENTS),
 }
 MAX_LEVEL_VOTES = max(len(voters) for voters in LEVEL_VOTERS.values())
 
@@ -104,8 +105,8 @@ def _label_votes(raw: Sequence[str]) -> list[dict[str, Any]]:
         if (level := DIFFICULTY_LABELS.get(p.value)) is not None:
             found.setdefault(level, name)
     if not found:
-        return [_vote("label", None, None)]
-    return [_vote("label", level, found[level]) for level in LEVELS if level in found]
+        return [_vote(S.LABEL, None, None)]
+    return [_vote(S.LABEL, level, found[level]) for level in LEVELS if level in found]
 
 
 def difficulty(
@@ -133,7 +134,7 @@ def difficulty(
         body_vote = Difficulty.BEGINNER
     elif length > thresholds["long_body"]:
         body_vote = Difficulty.ADVANCED
-    signals.append(_vote("body_length", body_vote, length))
+    signals.append(_vote(S.BODY_LENGTH, body_vote, length))
 
     tech_vote: str | None = None
     if technology_count >= thresholds["many_technologies"]:
@@ -142,13 +143,13 @@ def difficulty(
         tech_vote = Difficulty.INTERMEDIATE
     elif technology_count == 1:
         tech_vote = Difficulty.BEGINNER
-    signals.append(_vote("technology_count", tech_vote, technology_count))
+    signals.append(_vote(S.TECHNOLOGY_COUNT, tech_vote, technology_count))
 
     type_vote = Difficulty.BEGINNER if contribution_type == CT.DOCUMENTATION else None
-    signals.append(_vote("contribution_type", type_vote, contribution_type))
+    signals.append(_vote(S.CONTRIBUTION_TYPE, type_vote, contribution_type))
 
     discussion_vote = Difficulty.ADVANCED if comments >= thresholds["long_discussion"] else None
-    signals.append(_vote("comments", discussion_vote, comments))
+    signals.append(_vote(S.COMMENTS, discussion_vote, comments))
 
     votes = {str(level): sum(s["vote"] == level for s in signals) for level in LEVELS}
     voted = [level for level, count in votes.items() if count]
