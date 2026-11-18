@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "ecosystem": "npm",
+    "id": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "reason": "Dev only (vite, tinyglobby, fdir, vitest); globs come from our own build and test config, never outside input. No patched release exists (<= 4.0.7). Remove once picomatch publishes a fix and vite/vitest pick it up (Bug_Backlog DEP-3).",
+    "accepted_on": "2026-11-18"
+  }
+]

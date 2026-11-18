@@ -2068,6 +2068,7 @@ range. `npm run audit:deps` stays green (npm fails on high or critical only), so
 |---|---|---|---|---|
 | DEP-1 | dependency | `apps/frontend/package-lock.json` (alert #1) | `minimatch@10.2.6` through `eslint`, `@eslint/config-array` and `typescript-eslint` (`^10.x` each). Dev only: `npm audit --omit=dev` finds nothing; patterns come from our own ESLint config. | dismissed in GitHub as "vulnerable code is not actually used"; no `overrides` (forcing 11 breaks the declared ranges). Revisit when ESLint and typescript-eslint move to minimatch 11 (Dependabot opens the PR) |
 | DEP-2 | dependency | `package-lock.json` (alert #2) | `minimatch@10.2.6` through `eslint` (`^10.2.5`), used only by `npm run lint:scripts`; the root has no runtime dependencies. | dismissed, same reason and revisit point |
+| DEP-3 | dependency | `apps/frontend/package-lock.json` | GHSA-fc5q-39xc-vjpf (high, published 2026-10-19): `picomatch@4.0.7` ReDoS from single-branch repeated extglobs such as `+(*)`. Reached through `vite` (direct and via `tinyglobby`/`fdir`) and `vitest`, both dev only; globs come from our own config. No patched release (`<= 4.0.7`). Failed CI `audit:deps` on 2026-11-18. | accepted in `audit-accepted.json` (2026-11-18). Revisit when picomatch ships a fix: upgrade and remove the entry |
 
 ## `/simplify` of 0.12.78–0.12.80 (2026-11-16)
 
