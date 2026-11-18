@@ -7,6 +7,11 @@ the minor version (`0.x.0`).
 
 ## [Unreleased]
 
+### Changed
+
+- Docker Compose (`docker compose up --build`) is verified to work (K-2 closed); README no
+  longer lists it as a known limitation.
+
 ## [0.12.80] - 2026-11-16
 
 Feedback ids and signal enum (OpenSpec `feedback-ids-and-signal-enum`, ideas.md §15,

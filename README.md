@@ -471,8 +471,6 @@ PostgreSQL. Nothing calls GitHub: sign-in uses sessions created by a seed comman
 
 ## Known limitations
 
-- **Docker Compose is not verified** from a fresh `.env` (K-2); the local setup above is the
-  tested path.
 - **No semantic matching yet.** Ranking is deterministic, from skills, languages, topics and
   activity; embeddings come later (Phase 6).
 - **Docs-style repositories** with a code language and no list topic (for example

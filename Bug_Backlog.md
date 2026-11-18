@@ -115,7 +115,7 @@ a fresh holdout; they no longer wait for K-1 (since 2026-10-28).
 | ID | Item | Source | Status |
 |---|---|---|---|
 | K-1 | Judge `real-a-v2`, build `benchmark-v2`, evaluate v1/v2 (all/persona/real), `--write-baseline`. Optional since 2026-10-28 (owner decision): no longer blocks ranking changes, which are judged on the selection benchmark (`benchmark-v1` until `benchmark-v2` exists) and a fresh holdout. | features.txt:664, CLAUDE.md §7 | open (optional) |
-| K-2 | Docker Compose verification from a fresh `.env` (no Docker on dev machine). | features.txt:663 | open |
+| K-2 | Docker Compose verification from a fresh `.env`. | features.txt:663 | closed (verified by the owner 2026-11-18) |
 | K-3 | Issue-level evaluation (benchmark covers repositories only). | features.txt:673 | open |
 | K-4 | Docs-style repositories with a code language and no list topic (`system-design-primer`, `developer-roadmap`) pass `not_code`. Since 0.12.7 a suspected list (`awesome-*`, list topic) that declares manifest dependencies (lint or site tooling) passes too. | CHANGELOG 0.12.0, 0.12.7 | open (known limit; `ideas.md` §11) |
 | K-5 | Active config v2 is not an improvement over v1 on `benchmark-v1` (NDCG@10 +0.0195, P@5 −0.0333). | CLAUDE.md Phase 8b | open (a later config must win on `benchmark-v1`) |

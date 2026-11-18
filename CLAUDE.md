@@ -286,8 +286,8 @@ Local, no Docker (primary on this machine):
   `benchmark-v1`. Exports and sheets go in the gitignored `judging/` (paths `../../judging/...`,
   since commands run in `apps/backend`); committing `benchmark-v2` is the judge's call.
 
-Docker (kept, not used here): `docker compose up --build`. Compose overrides `DATABASE_URL` /
-`REDIS_URL` with container hostnames; Postgres is on host port 5433, Redis is not published
+Docker (verified working 2026-11-18, K-2 closed; local stays the primary path):
+`docker compose up --build`. Compose overrides `DATABASE_URL` / `REDIS_URL` with container hostnames; Postgres is on host port 5433, Redis is not published
 (the WSL Redis keeps 6379), backend and frontend listen on 127.0.0.1 only, and
 `DJANGO_SETTINGS_MODULE` comes from `.env`. After a frontend dependency change:
 `docker compose up --build --renew-anon-volumes`.
@@ -358,7 +358,7 @@ preferences, contribution-success signals, opportunity qualifiers, upstream depe
 also be significant is decided once real developers enlarge the benchmark.
 
 **Future**: Phase 6 semantic matching (`services/ai/` interfaces, pgvector, `EMBEDDED` state, AI
-failure falls back to deterministic); verify `docker compose up` from a fresh `.env`.
+failure falls back to deterministic).
 **Post-MVP**: personalized/feedback-based ranking, notifications, contribution tracking and
 plans, similar repositories, observability (Sentry, Prometheus, Grafana).
 

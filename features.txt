@@ -519,7 +519,7 @@ Docker mode and configuration (Bug_Backlog.md batch 70; last module of the revie
   [x] DJANGO_DEBUG honored by development settings
   [x] .env.example complete (19 settings added), kept so by a test
   [x] format:scripts:write; engines.node >=22
-  [~] docker compose up --build from a fresh .env (manual check, Docker not installed here)
+  [x] docker compose up --build verified by the owner (2026-11-18, K-2)
 
 ============================================================================
 SHIPPED - v0.12.73 - Shared component fixes (review sweep: components + lib)
@@ -1311,7 +1311,6 @@ Checks, seeds, tests
 PLANNED - MVP+ / FUTURE
 ============================================================================
 
-  [ ] Docker Compose verification (needs a machine with Docker)
   [ ] Judge real-a-v2 (K-1, optional since 2026-10-28), build benchmark-v2, evaluate v1/v2, write its baseline
   [ ] Phase 6  Semantic matching (embeddings, pgvector; AI provider not chosen)
   [ ]          Issue-level evaluation
